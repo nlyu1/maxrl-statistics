@@ -90,12 +90,13 @@ def _tokenize_padded(
     tokenizer,
     prompts: list[str],
     ceil_padded_seqlen: int,
+    desc: str,
 ) -> Tensor:
     if not prompts:
         raise ValueError("Cannot tokenize an empty split")
 
     chunks: list[Tensor] = []
-    for start in tqdm(range(0, len(prompts), _BATCH_SIZE)):
+    for start in tqdm(range(0, len(prompts), _BATCH_SIZE), desc=desc):
         batch = prompts[start : start + _BATCH_SIZE]
         enc = tokenizer(
             batch,
@@ -115,12 +116,14 @@ def _build_tokenized_split_from_raw(
     prompts: list[str],
     tokenizer,
     ceil_padded_seqlen: int,
+    desc: str,
 ) -> RegressionSplit:
     return RegressionSplit(
         tokens=_tokenize_padded(
             tokenizer=tokenizer,
             prompts=prompts,
             ceil_padded_seqlen=ceil_padded_seqlen,
+            desc=desc,
         ),
         targets=torch.tensor(df["target"].to_list(), dtype=torch.float32),
         ground_truth=torch.tensor(df["signal"].to_list(), dtype=torch.float32),
@@ -217,12 +220,14 @@ class TokenizedParquetDatasetConfig(TokenizedRegressionDatasetConfig):
             prompts=filtered_train_prompts,
             tokenizer=tokenizer,
             ceil_padded_seqlen=ceil_padded_seqlen,
+            desc="Tokenize train",
         )
         val = _build_tokenized_split_from_raw(
             df=filtered_val_df,
             prompts=filtered_val_prompts,
             tokenizer=tokenizer,
             ceil_padded_seqlen=ceil_padded_seqlen,
+            desc="Tokenize val",
         )
 
         return TokenizedParquetDataset(
@@ -234,18 +239,24 @@ class TokenizedParquetDatasetConfig(TokenizedRegressionDatasetConfig):
         )
 
     def init_or_load_dataset(self) -> "TokenizedParquetDataset":
-        """Loads from cache if the tokenized folder exists, otherwise tokenizes and caches."""
+        """Loads from cache if the folder exists and its config matches; otherwise re-generates."""
         work_dir = _tokenizer_work_dir(
             folder=self.folder,
             tokenizer_model_name=self.tokenizer_model_name,
         )
-        if work_dir.exists():
-            return TokenizedParquetDataset.from_folder(
-                tokenizer_model_name=self.tokenizer_model_name,
-                folder=self.folder,
+        config_path = work_dir / "config.json"
+        if config_path.exists():
+            saved = TokenizedParquetDatasetConfig.model_validate_json(
+                config_path.read_text()
             )
+            if saved == self:
+                return TokenizedParquetDataset.from_folder(
+                    tokenizer_model_name=self.tokenizer_model_name,
+                    folder=self.folder,
+                )
+            print("Cached config mismatch — re-generating dataset.")
         ds = self.to_dataset()
-        ds.to_folder()
+        ds.to_folder(exists_ok=True)
         return ds
 
 

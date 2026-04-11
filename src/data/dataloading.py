@@ -61,6 +61,7 @@ class TokenizedRegressionDataset:
             self.unfiltered_train_token_lengths,
             self.unfiltered_val_token_lengths,
             filter_threshold=filter_threshold,
+            pad_threshold=self.ceil_padded_seqlen,
         )
 
 

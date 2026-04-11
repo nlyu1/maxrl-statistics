@@ -8,6 +8,7 @@ def token_length_distribution_plot(
     train_lengths: Tensor,
     val_lengths: Tensor,
     filter_threshold: int | None = None,
+    pad_threshold: int | None = None,
 ) -> go.Figure:
     def value_counts(t: Tensor) -> tuple:
         vals, cnts = torch.unique(t, return_counts=True)
@@ -26,5 +27,7 @@ def token_length_distribution_plot(
         secondary_y=True,
     )
     if filter_threshold is not None:
-        fig.add_vline(x=filter_threshold, line_dash="dash", annotation_text="threshold")
+        fig.add_vline(x=filter_threshold, line_dash="dash", annotation_text="filter")
+    if pad_threshold is not None:
+        fig.add_vline(x=pad_threshold, line_dash="dot", annotation_text="pad-to")
     return fig

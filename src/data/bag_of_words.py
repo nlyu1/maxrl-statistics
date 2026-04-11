@@ -237,9 +237,6 @@ class BagOfWordsDatasetConfig(BaseConfig):
         word_assignments: list[str],
         word_decay_power: float,
     ) -> "BagOfWordsDatasetConfig":
-        """Loads from folder if already written, otherwise initializes and writes."""
-        if (folder / "config.json").exists():
-            return cls.load_from(folder)
         config = cls.initialize(
             snr=snr,
             num_train_samples=num_train_samples,
@@ -248,5 +245,17 @@ class BagOfWordsDatasetConfig(BaseConfig):
             word_assignments=word_assignments,
             word_decay_power=word_decay_power,
         )
+
+        config_path = folder / "config.json"
+        required_paths = (folder / "train.parquet", folder / "val.parquet")
+        if config_path.exists():
+            saved = cls.load_from(folder)
+            if saved == config and all(path.exists() for path in required_paths):
+                return saved
+            if saved != config:
+                print("Cached config mismatch — re-generating dataset.")
+            else:
+                print("Cached dataset files missing — re-generating dataset.")
+
         config.write_to(folder=folder)
         return config
