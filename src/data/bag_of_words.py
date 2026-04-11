@@ -224,3 +224,29 @@ class BagOfWordsDatasetConfig(BaseConfig):
     def load_from(cls, path: Path) -> "BagOfWordsDatasetConfig":
         """Restores config from a folder written by write_to."""
         return cls.model_validate_json((path / "config.json").read_text())
+
+    @classmethod
+    def init_or_load_from(
+        cls,
+        *,
+        folder: Path,
+        snr: float,
+        num_train_samples: int,
+        num_val_samples: int,
+        prompt_length: int,
+        word_assignments: list[str],
+        word_decay_power: float,
+    ) -> "BagOfWordsDatasetConfig":
+        """Loads from folder if already written, otherwise initializes and writes."""
+        if (folder / "config.json").exists():
+            return cls.load_from(folder)
+        config = cls.initialize(
+            snr=snr,
+            num_train_samples=num_train_samples,
+            num_val_samples=num_val_samples,
+            prompt_length=prompt_length,
+            word_assignments=word_assignments,
+            word_decay_power=word_decay_power,
+        )
+        config.write_to(folder=folder)
+        return config
