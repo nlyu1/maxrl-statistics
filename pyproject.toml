@@ -36,3 +36,12 @@ torchvision = [
 
 [tool.setuptools.packages.find]
 include = ["src*"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.10",
+]
+
+[tool.ruff.lint]
+# Jaxtyping fixes
+per-file-ignores = {"**/*.py" = ["F821", "F722"]}
