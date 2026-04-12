@@ -28,6 +28,8 @@ class BagOfWordsSFTState(BagOfWordsStudyBaseState):
         *,
         context: Int[Tensor, "batch seq"],
     ) -> Float[Tensor, "batch"]:
+        # Fixed-width EOS padding is intentionally part of the causal context here:
+        # this projects from the final padded position, not the last non-pad token.
         return self.model(tokens=context).squeeze(-1)
 
     def train_step(

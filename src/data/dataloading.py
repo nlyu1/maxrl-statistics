@@ -60,6 +60,8 @@ class TokenizedRegressionDataset:
         return token_length_distribution_plot(
             self.unfiltered_train_token_lengths,
             self.unfiltered_val_token_lengths,
+            train_num_filtered=self.num_train_samples,
+            val_num_filtered=self.num_val_samples,
             filter_threshold=filter_threshold,
             pad_threshold=self.ceil_padded_seqlen,
         )

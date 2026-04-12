@@ -7,6 +7,9 @@ from torch import Tensor
 def token_length_distribution_plot(
     train_lengths: Tensor,
     val_lengths: Tensor,
+    *,
+    train_num_filtered: int,
+    val_num_filtered: int,
     filter_threshold: int | None = None,
     pad_threshold: int | None = None,
 ) -> go.Figure:
@@ -18,6 +21,12 @@ def token_length_distribution_plot(
     vx, vy = value_counts(val_lengths)
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig.update_layout(
+        title=(
+            f"Token lengths: {train_num_filtered} / {train_lengths.numel()} train, "
+            f"{val_num_filtered} / {val_lengths.numel()} val"
+        )
+    )
     fig.add_trace(
         go.Scatter(x=tx, y=ty, mode="lines+markers", name="train"),
         secondary_y=False,

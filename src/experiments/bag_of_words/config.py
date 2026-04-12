@@ -98,7 +98,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         dataloading = DataloadingConfig(
             train_batch_size=batch_size,
             eval_batch_size=batch_size * eval_batch_size_multiple,
-            drop_last=True,
+            drop_last=True,  # This is explicitly ok. Synthetic dataset anyways
             world_size=1,
             rank=0,
         )
@@ -173,6 +173,3 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             val_dl=val_dl,
             device=device,
         )
-
-
-__all__ = ["BagOfWordsStudyBaseConfig"]

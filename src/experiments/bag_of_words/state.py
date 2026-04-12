@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from dataclasses import field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import polars as pl
 import torch
@@ -17,10 +16,8 @@ from torch.utils.data import DataLoader
 from tqdm.autonotebook import tqdm
 
 from src.data.parquet import TokenizedParquetDataset
+from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
 from src.metrics import CorrelationCounter
-
-if TYPE_CHECKING:
-    from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
