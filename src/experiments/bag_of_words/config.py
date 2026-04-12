@@ -53,7 +53,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         aux_words_ratio: float,
         num_words: int = 7,
         num_samples: int = 50_000,
-        prompt_length: int = 256,
+        prompt_length: int = 128,
         filter_samples_above_n_tokens: int = 384,
         word_decay_power: float = 0.0,
         batch_size: int = 64,
@@ -148,6 +148,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         *,
         device: torch.device,
     ) -> BagOfWordsStudyBaseState:
+        torch.set_float32_matmul_precision("medium")
         self.prepare_study_folder()
         dataset = self.tokenization.init_or_load_dataset()
         train_dl = self.dataloading.get_train_dataloader(dataset)

@@ -98,6 +98,7 @@ class DataloadingConfig(BaseConfig):
             batch_size=batch_size,
             shuffle=shuffle,
             drop_last=self.drop_last,
+            pin_memory=True,
         )
 
     def get_train_dataloader(self, ds: TokenizedRegressionDataset) -> DataLoader:

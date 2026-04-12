@@ -15,7 +15,6 @@ from src.config.base import BaseConfig
 class CausalLMConfig(BaseConfig):
     pretrained_model: str
     initial_output_norms: list[float]  # one norm per output dimension
-
     def get_model(self) -> "CausalLMWithLinearHead":
         from transformers import AutoModelForCausalLM
 
