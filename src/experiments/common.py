@@ -1,3 +1,2 @@
-class MinimalModelConfig(BaseConfig):
-    model_config: TransformerModelConfig
-    optimizer_config: OptimizerConfig
+class OptimizationConfig(BaseConfig, ABC):
+    def get_optimizer(self, model: )
