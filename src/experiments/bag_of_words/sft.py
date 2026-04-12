@@ -59,8 +59,13 @@ class BagOfWordsSFTState(BagOfWordsStudyBaseState):
             loss = F.mse_loss(prediction, target)
             with torch.no_grad():
                 self.last_pred_norm = float(prediction.detach().float().norm().cpu())
-                self.train_corr_counter.tick(
-                    x=prediction.detach().float().cpu()[:, None],
+                pred_cpu = prediction.detach().float().cpu()[:, None]
+                self.train_corr_target_counter.tick(
+                    x=pred_cpu,
+                    y=target.detach().float().cpu()[:, None],
+                )
+                self.train_corr_ground_truth_counter.tick(
+                    x=pred_cpu,
                     y=ground_truth.detach().float().cpu()[:, None],
                 )
 
@@ -71,15 +76,22 @@ class BagOfWordsSFTState(BagOfWordsStudyBaseState):
 
     def run_train_epoch(self, *, epoch: int) -> None:
         self.current_epoch = epoch
-        self.train_corr_counter.empty_()
+        self.train_corr_target_counter.empty_()
+        self.train_corr_ground_truth_counter.empty_()
         self.model.train()
 
         pbar = tqdm(self.train_dl, desc=f"sft epoch {epoch}")
         for batch in pbar:
             self.train_step(batch=batch)
-            train_corr = float(self.train_corr_counter.get_stats().squeeze(0))
+            train_corr_target = float(
+                self.train_corr_target_counter.get_stats().squeeze(0)
+            )
+            train_corr_ground_truth = float(
+                self.train_corr_ground_truth_counter.get_stats().squeeze(0)
+            )
             pbar.set_postfix(
-                train_corr=f"{train_corr:.4f}",
+                train_corr_target=f"{train_corr_target:.4f}",
+                train_corr_ground_truth=f"{train_corr_ground_truth:.4f}",
                 pred_norm=f"{self.last_pred_norm:.4f}",
             )
 
@@ -87,11 +99,12 @@ class BagOfWordsSFTState(BagOfWordsStudyBaseState):
         for epoch in range(self.config.train_epochs):
             self.run_train_epoch(epoch=epoch)
             validation = self.compute_validation()
-            self.serialize_at_end_of_epoch(validation=validation)
-            train_corr = float(self.train_corr_counter.get_stats().squeeze(0))
+            metrics = self.serialize_at_end_of_epoch(validation=validation)
             tqdm.write(
                 f"epoch {epoch:2d}  "
-                f"train_corr={train_corr:.4f}  "
+                f"train_corr_target={metrics['train_corr_target']:.4f}  "
+                f"train_corr_ground_truth={metrics['train_corr_ground_truth']:.4f}  "
                 f"pred_norm={self.last_pred_norm:.4f}  "
-                f"val_corr={validation.compute_corr().item():.4f}"
+                f"val_corr_target={metrics['val_corr_target']:.4f}  "
+                f"val_corr_ground_truth={metrics['val_corr_ground_truth']:.4f}"
             )

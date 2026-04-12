@@ -62,7 +62,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         lr_per_token: float = 2.3e-8,
         backbone_lr_divisor: float = 6.66,
         pad_to_multiple: int = 8,
-        model_name: str = "HuggingFaceTB/SmolLM2-135M",
+        model_name: str = "HuggingFaceTB/SmolLM2-360M",
         train_epochs: int = 10,
         clip_grad_norm: float = 1.0,
         compile_model: bool = True,
