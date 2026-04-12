@@ -16,7 +16,7 @@ class CausalLMConfig(BaseConfig):
     pretrained_model: str
     initial_output_norms: list[float]  # one norm per output dimension
 
-    def get_model(self) -> CausalLMWithLinearHead:
+    def get_model(self) -> "CausalLMWithLinearHead":
         from transformers import AutoModelForCausalLM
 
         backbone = AutoModelForCausalLM.from_pretrained(self.pretrained_model)
@@ -43,19 +43,7 @@ class CausalLMBackbone(Protocol):
         **kwargs: Any,
     ) -> CausalLMOutputWithPast: ...
 
-    def generate(
-        self,
-        input_ids: Int[Tensor, "batch seq"],
-        **kwargs: Any,
-    ) -> Any: ...
-
-    def compute_transition_scores(
-        self,
-        sequences: Int[Tensor, "batch seq"],
-        scores: tuple[Float[Tensor, "batch vocab"], ...],
-        normalize_logits: bool = ...,
-        beam_indices: Tensor | None = ...,
-    ) -> Float[Tensor, "batch step"]: ...
+    def parameters(self, recurse: bool = True) -> Any: ...
 
 
 class CausalLMWithLinearHead(nn.Module):
@@ -115,36 +103,76 @@ class CausalLMWithLinearHead(nn.Module):
         num_rollout_samples: int,
         num_rollout_steps: int,
     ) -> RolloutOutput:
-        batch_size, context_len = context.shape
-        flat_context = self._repeat_context(
-            context=context, num_rollouts=num_rollout_samples
-        )
+        """
+        Shared-prefill rollout path.
 
-        generation_output = self.backbone.generate(
-            input_ids=flat_context,
-            do_sample=True,
-            temperature=1,
-            top_k=None,
-            top_p=None,
-            min_new_tokens=num_rollout_steps,
-            max_new_tokens=num_rollout_steps,
-            return_dict_in_generate=True,
-            output_scores=True,
-            use_cache=True,
-        )
+        We prefill the prompt once per batch item, repeat the resulting cache across
+        rollout samples, and then sample fixed rollout steps manually.
+        """
+        batch_size = context.shape[0]
+        flat_batch_size = batch_size * num_rollout_samples
 
-        full_sequences: Int[Tensor, "flat_batch full_seq"] = generation_output.sequences
-        flat_rollout_tokens = full_sequences[:, context_len:]
-        rollout_tokens: Int[Tensor, "batch rollout step"] = flat_rollout_tokens.reshape(
-            batch_size, num_rollout_samples, num_rollout_steps
-        )
-
-        flat_logprobs: Float[Tensor, "flat_batch step"] = (
-            self.backbone.compute_transition_scores(
-                sequences=generation_output.sequences,
-                scores=generation_output.scores,
-                normalize_logits=True,
+        if num_rollout_steps == 0:
+            empty_tokens: Int[Tensor, "flat_batch step"] = context.new_empty(
+                flat_batch_size, 0
             )
+            empty_logprobs: Float[Tensor, "flat_batch step"] = torch.empty(
+                flat_batch_size, 0, device=context.device, dtype=torch.float32
+            )
+            return CausalLMWithLinearHead.RolloutOutput(
+                tokens=empty_tokens.reshape(batch_size, num_rollout_samples, 0),
+                logprobs=empty_logprobs.reshape(batch_size, num_rollout_samples, 0),
+            )
+
+        prefill_output: CausalLMOutputWithPast = self.backbone(
+            input_ids=context,
+            use_cache=True,
+            return_dict=True,
+        )
+        past_key_values = prefill_output.past_key_values
+        if past_key_values is None:
+            raise ValueError(
+                "Backbone returned no past_key_values with use_cache=True."
+            )
+
+        next_logits: Float[Tensor, "flat_batch vocab"] = self._repeat_rows(
+            prefill_output.logits[:, -1, :], num_rollout_samples
+        )
+        past_key_values = self._repeat_past_key_values(
+            past_key_values, num_rollout_samples
+        )
+
+        sampled_tokens: list[Int[Tensor, "flat_batch"]] = []
+        sampled_logprobs: list[Float[Tensor, "flat_batch"]] = []
+
+        for step_idx in range(num_rollout_steps):
+            next_tokens, token_logprobs = self._sample_from_logits(next_logits)
+            sampled_tokens.append(next_tokens)
+            sampled_logprobs.append(token_logprobs)
+
+            if step_idx + 1 == num_rollout_steps:
+                break
+
+            step_output: CausalLMOutputWithPast = self.backbone(
+                input_ids=next_tokens[:, None],
+                past_key_values=past_key_values,
+                use_cache=True,
+                return_dict=True,
+            )
+            past_key_values = step_output.past_key_values
+            if past_key_values is None:
+                raise ValueError(
+                    "Backbone returned no past_key_values during cached rollout."
+                )
+            next_logits = step_output.logits[:, -1, :]
+
+        flat_tokens: Int[Tensor, "flat_batch step"] = torch.stack(sampled_tokens, dim=1)
+        flat_logprobs: Float[Tensor, "flat_batch step"] = torch.stack(
+            sampled_logprobs, dim=1
+        )
+
+        rollout_tokens: Int[Tensor, "batch rollout step"] = flat_tokens.reshape(
+            batch_size, num_rollout_samples, num_rollout_steps
         )
         rollout_logprobs: Float[Tensor, "batch rollout step"] = flat_logprobs.reshape(
             batch_size, num_rollout_samples, num_rollout_steps
@@ -170,7 +198,7 @@ class CausalLMWithLinearHead(nn.Module):
         batch_size, context_len = context.shape
         num_rollouts, rollout_steps = rollouts.shape[1], rollouts.shape[2]
 
-        flat_context = self._repeat_context(context=context, num_rollouts=num_rollouts)
+        flat_context = self._repeat_rows(context, num_rollouts)
         flat_rollouts: Int[Tensor, "flat_batch step"] = rollouts.reshape(
             batch_size * num_rollouts, rollout_steps
         )
@@ -198,7 +226,6 @@ class CausalLMWithLinearHead(nn.Module):
             batch_size, num_rollouts, rollout_steps
         )
 
-        # Projection from the final rollout step hidden state
         last_layer_hidden: Float[Tensor, "flat_batch full_seq hdim"] = (
             output.hidden_states[-1]
         )
@@ -216,14 +243,52 @@ class CausalLMWithLinearHead(nn.Module):
         )
 
     @staticmethod
-    def _repeat_context(
-        *,
-        context: Int[Tensor, "batch seq"],
-        num_rollouts: int,
-    ) -> Int[Tensor, "flat_batch seq"]:
-        batch_size, context_len = context.shape
-        return (
-            context[:, None, :]
-            .expand(batch_size, num_rollouts, context_len)
-            .reshape(batch_size * num_rollouts, context_len)
+    def _repeat_rows(
+        tensor: Tensor,
+        repeats: int,
+    ) -> Tensor:
+        if repeats == 1:
+            return tensor
+        return torch.repeat_interleave(
+            tensor,
+            repeats=repeats,
+            dim=0,
+            output_size=tensor.shape[0] * repeats,
         )
+
+    @staticmethod
+    def _repeat_past_key_values(
+        past_key_values: Any,
+        repeats: int,
+    ) -> Any:
+        if repeats == 1:
+            return past_key_values
+
+        # Newer HF cache objects expose batch_repeat_interleave().
+        if hasattr(past_key_values, "batch_repeat_interleave"):
+            repeated = past_key_values.batch_repeat_interleave(repeats)
+            return past_key_values if repeated is None else repeated
+
+        # Fallback for tuple-of-tuples past_key_values.
+        return tuple(
+            tuple(
+                torch.repeat_interleave(
+                    tensor,
+                    repeats=repeats,
+                    dim=0,
+                    output_size=tensor.shape[0] * repeats,
+                )
+                for tensor in layer
+            )
+            for layer in past_key_values
+        )
+
+    @staticmethod
+    def _sample_from_logits(
+        logits: Float[Tensor, "flat_batch vocab"],
+    ) -> tuple[Int[Tensor, "flat_batch"], Float[Tensor, "flat_batch"]]:
+        logits_float = logits.float()
+        logprobs = F.log_softmax(logits_float, dim=-1)
+        tokens = torch.distributions.Categorical(logits=logits_float).sample()
+        token_logprobs = logprobs.gather(dim=-1, index=tokens[:, None]).squeeze(-1)
+        return tokens, token_logprobs

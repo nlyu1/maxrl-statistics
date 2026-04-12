@@ -54,6 +54,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         num_words: int = 7,
         num_samples: int = 50_000,
         prompt_length: int = 256,
+        filter_samples_above_n_tokens: int = 384,
         word_decay_power: float = 0.0,
         batch_size: int = 64,
         weight_decay: float = 0.0,
@@ -89,10 +90,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         tokenization = TokenizedParquetDatasetConfig(
             tokenizer_model_name=model_name,
             folder=dataset_folder,
-            filter_samples_above_n_tokens=_ceil_to_multiple(
-                value=prompt_length + 2,
-                multiple=pad_to_multiple,
-            ),
+            filter_samples_above_n_tokens=filter_samples_above_n_tokens,
             pad_to_multiple=pad_to_multiple,
         )
         dataloading = DataloadingConfig(
