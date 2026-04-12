@@ -18,5 +18,7 @@ Use Python 3.12, 4-space indentation, full-path imports, and minimal `__init__.p
 
 Prefer explicit failure over permissive branching or broad `try/except`. Prefer centralized canonical configs over hidden defaults scattered across modules; default instance values should be rare. When changing an API, make the clean breaking change instead of adding backward-compatible aliases or compatibility shims.
 
+Use polars, not pandas.
+
 ## Testing Guidelines
 This is a research repo, so snippet validation is the default. Use focused `uv run python -c ...` checks to validate imports, shapes, and control flow. If you add tests, place them in `tests/` and name files `test_<feature>.py`.

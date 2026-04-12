@@ -26,15 +26,27 @@ class ValidationOutput:
     ground_truth: Float[Tensor, "n"]
     target: Float[Tensor, "n"]
 
-    def _compute_corr(self, *, y: Float[Tensor, "n"]) -> Float[Tensor, ""]:
+    def _compute_stats(
+        self, *, y: Float[Tensor, "n"]
+    ) -> "CorrelationCounter.Statistics":
         counter = CorrelationCounter.initialize(dim=1, device=self.model_preds.device)
         counter.tick(x=self.model_preds[:, None], y=y[:, None])
-        return counter.get_stats().squeeze(0)
+        return counter.get_stats()
 
     def compute_corrs(self) -> dict[str, float]:
+        target_stats = self._compute_stats(y=self.target)
+        gt_stats = self._compute_stats(y=self.ground_truth)
         return {
-            "target": float(self._compute_corr(y=self.target).cpu()),
-            "ground_truth": float(self._compute_corr(y=self.ground_truth).cpu()),
+            "target_corr": float(target_stats.corr.squeeze(0).cpu()),
+            "target_uncalibrated_rsq": float(
+                target_stats.uncalibrated_rsq.squeeze(0).cpu()
+            ),
+            "target_beta": float(target_stats.beta.squeeze(0).cpu()),
+            "ground_truth_corr": float(gt_stats.corr.squeeze(0).cpu()),
+            "ground_truth_uncalibrated_rsq": float(
+                gt_stats.uncalibrated_rsq.squeeze(0).cpu()
+            ),
+            "ground_truth_beta": float(gt_stats.beta.squeeze(0).cpu()),
         }
 
     def save_to(self, folder: Path) -> None:
@@ -125,18 +137,33 @@ class BagOfWordsStudyBaseState(ABC):
         *,
         validation: ValidationOutput,
     ) -> dict[str, float]:
+        """
+        If this is changed, please change corresponding parsing logic in "analysis.py"
+        """
         validation.save_to(self.config.study_folder / str(self.current_epoch))
 
         val_corrs = validation.compute_corrs()
+        train_target_stats = self.train_corr_target_counter.get_stats()
+        train_gt_stats = self.train_corr_ground_truth_counter.get_stats()
         corr_metrics = {
-            "train_corr_target": float(
-                self.train_corr_target_counter.get_stats().squeeze(0).cpu()
+            "train_corr_target": float(train_target_stats.corr.squeeze(0).cpu()),
+            "train_uncalibrated_rsq_target": float(
+                train_target_stats.uncalibrated_rsq.squeeze(0).cpu()
             ),
-            "train_corr_ground_truth": float(
-                self.train_corr_ground_truth_counter.get_stats().squeeze(0).cpu()
+            "train_beta_target": float(train_target_stats.beta.squeeze(0).cpu()),
+            "train_corr_ground_truth": float(train_gt_stats.corr.squeeze(0).cpu()),
+            "train_uncalibrated_rsq_ground_truth": float(
+                train_gt_stats.uncalibrated_rsq.squeeze(0).cpu()
             ),
-            "val_corr_target": val_corrs["target"],
-            "val_corr_ground_truth": val_corrs["ground_truth"],
+            "train_beta_ground_truth": float(train_gt_stats.beta.squeeze(0).cpu()),
+            "val_corr_target": val_corrs["target_corr"],
+            "val_uncalibrated_rsq_target": val_corrs["target_uncalibrated_rsq"],
+            "val_beta_target": val_corrs["target_beta"],
+            "val_corr_ground_truth": val_corrs["ground_truth_corr"],
+            "val_uncalibrated_rsq_ground_truth": val_corrs[
+                "ground_truth_uncalibrated_rsq"
+            ],
+            "val_beta_ground_truth": val_corrs["ground_truth_beta"],
         }
         metrics_path = self.config.study_folder / "metrics.parquet"
         new_row = pl.DataFrame(

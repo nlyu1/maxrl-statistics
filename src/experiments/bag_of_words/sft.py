@@ -84,10 +84,10 @@ class BagOfWordsSFTState(BagOfWordsStudyBaseState):
         for batch in pbar:
             self.train_step(batch=batch)
             train_corr_target = float(
-                self.train_corr_target_counter.get_stats().squeeze(0)
+                self.train_corr_target_counter.get_stats().corr.squeeze(0)
             )
             train_corr_ground_truth = float(
-                self.train_corr_ground_truth_counter.get_stats().squeeze(0)
+                self.train_corr_ground_truth_counter.get_stats().corr.squeeze(0)
             )
             pbar.set_postfix(
                 train_corr_target=f"{train_corr_target:.4f}",
