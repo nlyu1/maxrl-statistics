@@ -11,14 +11,13 @@ import torch
 from jaxtyping import Float, Int
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
-from torch import Tensor
+from torch import Tensor, nn
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from tqdm.autonotebook import tqdm
 
 from src.data.parquet import TokenizedParquetDataset
 from src.metrics import CorrelationCounter
-from src.model.minimal import CausalLMWithLinearHead
 
 if TYPE_CHECKING:
     from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
@@ -47,7 +46,7 @@ class ValidationOutput:
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
 class BagOfWordsStudyBaseState(ABC):
     config: BagOfWordsStudyBaseConfig
-    model: CausalLMWithLinearHead
+    model: nn.Module
     optimizer: torch.optim.Optimizer
     dataset: TokenizedParquetDataset
     train_dl: DataLoader

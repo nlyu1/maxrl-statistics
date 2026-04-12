@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import torch
 
@@ -15,6 +15,15 @@ from src.model.optimizer import CausalLMWithLinearHeadOptimizerConfig
 
 if TYPE_CHECKING:
     from src.experiments.bag_of_words.state import BagOfWordsStudyBaseState
+
+
+TorchCompileMode = Literal[
+    "default",
+    "lite",
+    "reduce-overhead",
+    "max-autotune-no-cudagraphs",
+    "max-autotune",
+]
 
 
 def _ceil_to_multiple(*, value: int, multiple: int) -> int:
@@ -31,6 +40,8 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
 
     train_epochs: int
     study_folder: Path
+    compile_model: bool = True
+    compile_mode: TorchCompileMode = "reduce-overhead"
 
     @classmethod
     def get_canonical(
@@ -53,6 +64,8 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         model_name: str = "HuggingFaceTB/SmolLM2-135M",
         train_epochs: int = 10,
         clip_grad_norm: float = 1.0,
+        compile_model: bool = True,
+        compile_mode: TorchCompileMode = "reduce-overhead",
     ) -> "BagOfWordsStudyBaseConfig":
         if num_words not in canonical_bags:
             supported = ", ".join(str(n) for n in sorted(canonical_bags))
@@ -107,6 +120,8 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             ),
             train_epochs=train_epochs,
             study_folder=study_base_folder / dataset_folder.name,
+            compile_model=compile_model,
+            compile_mode=compile_mode,
         )
         config.prepare_study_folder()
         return config
@@ -146,6 +161,8 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         with device_context:
             model = self.model.get_model().to(device=device, dtype=torch.bfloat16)
             optimizer = self.optimizer.get_optimizer(model)
+            if self.compile_model and device.type == "cuda":
+                model = torch.compile(model, mode=self.compile_mode)
 
         return self.get_state_cls()(
             config=self,
