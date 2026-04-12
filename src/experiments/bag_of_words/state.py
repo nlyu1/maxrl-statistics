@@ -120,12 +120,15 @@ class BagOfWordsStudyBaseState(ABC):
             target=torch.cat(targets),
         )
 
-    def serialize_at_end_of_epoch(self, *, validation: ValidationOutput) -> dict[str, float]:
+    def serialize_at_end_of_epoch(
+        self,
+        *,
+        validation: ValidationOutput,
+    ) -> dict[str, float]:
         validation.save_to(self.config.study_folder / str(self.current_epoch))
 
         val_corrs = validation.compute_corrs()
-        metrics_row = {
-            "epoch": self.current_epoch,
+        corr_metrics = {
             "train_corr_target": float(
                 self.train_corr_target_counter.get_stats().squeeze(0).cpu()
             ),
@@ -136,14 +139,19 @@ class BagOfWordsStudyBaseState(ABC):
             "val_corr_ground_truth": val_corrs["ground_truth"],
         }
         metrics_path = self.config.study_folder / "metrics.parquet"
-        new_row = pl.DataFrame({key: [value] for key, value in metrics_row.items()})
+        new_row = pl.DataFrame(
+            {
+                "epoch": [self.current_epoch],
+                **{key: [value] for key, value in corr_metrics.items()},
+            }
+        )
         if metrics_path.exists():
             metrics = pl.read_parquet(metrics_path)
             if metrics.columns == new_row.columns:
                 metrics = metrics.filter(pl.col("epoch") != self.current_epoch)
                 new_row = pl.concat([metrics, new_row]).sort("epoch")
         new_row.write_parquet(metrics_path)
-        return metrics_row
+        return corr_metrics
 
     def step_and_zero_grad(self) -> None:
         clip_grad_norm_(
