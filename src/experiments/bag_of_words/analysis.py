@@ -1,8 +1,8 @@
 import json
+from pathlib import Path
 
 import plotly.graph_objects as go
 import polars as pl
-from pathlib import Path
 
 from src.config.base import BaseConfig
 from src.experiments.bag_of_words.sft import BagOfWordsSFTConfig
@@ -49,7 +49,9 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         study, epoch, <metric columns>
         """
         frames = [
-            pl.read_parquet(path / "metrics.parquet").with_columns(pl.lit(key).alias("study"))
+            pl.read_parquet(path / "metrics.parquet").with_columns(
+                pl.lit(key).alias("study")
+            )
             for key, path in self.studies.items()
         ]
         return pl.concat(frames).select(["study", "epoch", *self.metrics])
@@ -78,7 +80,8 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                         text=sub["epoch"].to_list(),
                         hovertemplate=f"{x_axis}: %{{x}}<br>{y_axis}: %{{y}}<br>epoch: %{{text}}<extra>%{{fullData.name}}</extra>",
                     ),
-                    row=1, col=col,
+                    row=1,
+                    col=col,
                 )
             fig.update_xaxes(title_text=x_axis, row=1, col=col)
             fig.update_yaxes(title_text=y_axis, row=1, col=col)
