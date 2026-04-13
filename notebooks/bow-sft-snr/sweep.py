@@ -24,6 +24,7 @@ repo_root = Path(__file__).resolve().parents[2]
 os.chdir(repo_root)
 sys.path.insert(0, str(repo_root))
 
+from src.experiments.bag_of_words.analysis import BagOfWordsAnalysisConfig  # noqa: E402
 from src.experiments.bag_of_words.sft import BagOfWordsSFTConfig  # noqa: E402
 
 STUDY_BASE = repo_root / "artifacts" / "bow-sft-snr-sweep"
@@ -65,6 +66,9 @@ def main(device_id: int) -> None:
             snr=snr,
             aux_words_ratio=0.5,
         )
+        if BagOfWordsAnalysisConfig.is_study_complete(config.study_folder):
+            tqdm.write(f"=== SNR={snr:.4f} already complete, skipping ===")
+            continue
         tqdm.write(f"\n=== SNR={snr:.4f}  folder={config.study_folder.name} ===")
         state = config.initialize(device=device)
         state.run_training()

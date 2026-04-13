@@ -55,6 +55,7 @@ class CausalLMWithLinearHead(nn.Module):
     class GradientOutput:
         logprobs: Float[Tensor, "batch rollout step"]  # grad-attached
         projections: Float[Tensor, "batch rollout odim"]  # final-step only
+        final_hidden: Float[Tensor, "batch rollout hdim"]  # final-step hidden states
 
     def __init__(
         self,
@@ -236,9 +237,14 @@ class CausalLMWithLinearHead(nn.Module):
             batch_size, num_rollouts, self.output_dim
         )
 
+        hidden_reshaped: Float[Tensor, "batch rollout hdim"] = final_hidden.reshape(
+            batch_size, num_rollouts, -1
+        )
+
         return CausalLMWithLinearHead.GradientOutput(
             logprobs=logprobs,
             projections=projections,
+            final_hidden=hidden_reshaped,
         )
 
     @staticmethod
