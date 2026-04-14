@@ -27,9 +27,6 @@ sys.path.insert(0, str(repo_root))
 from src.experiments.bag_of_words.analysis import BagOfWordsAnalysisConfig  # noqa: E402
 from src.experiments.bag_of_words.sft import BagOfWordsSFTConfig  # noqa: E402
 
-STUDY_BASE = repo_root / "artifacts" / "bow-sft-snr-sweep"
-DATA_BASE  = repo_root / "artifacts" / "bow-data"
-
 SNR_LIST = [
     0.010, 0.011, 0.013, 0.014, 0.016, 0.018, 0.020, 0.023, 0.026, 0.029,
     0.033, 0.037, 0.041, 0.046, 0.052, 0.059, 0.066, 0.074, 0.084, 0.094,
@@ -38,11 +35,31 @@ SNR_LIST = [
 ]
 
 
+MODEL_VARIANTS: dict[str, tuple[str, str]] = {
+    # flag name → (model_name, folder suffix)
+    "qwen":  ("Qwen/Qwen2.5-0.5B",  "-qwen"),
+    "qwen3": ("Qwen/Qwen3-0.6B", "-qwen3"),
+}
+
+
 @click.command()
 @click.argument("device_id", type=int)
-def main(device_id: int) -> None:
+@click.option("--qwen", is_flag=True, help="Use Qwen/Qwen2.5-0.5B instead of SmolLM2-360M")
+@click.option("--qwen3", is_flag=True, help="Use Qwen/Qwen3-0.6B instead of SmolLM2-360M")
+def main(device_id: int, qwen: bool, qwen3: bool) -> None:
+    # ── resolve folders and model ─────────────────────────────────────────────
+    selected = [k for k, v in [("qwen", qwen), ("qwen3", qwen3)] if v]
+    if len(selected) > 1:
+        raise click.UsageError("At most one model flag may be specified")
+    if selected:
+        model_name, suffix = MODEL_VARIANTS[selected[0]]
+    else:
+        model_name, suffix = "HuggingFaceTB/SmolLM2-360M", ""
+    study_base = repo_root / "artifacts" / f"bow-sft-snr-sweep{suffix}"
+    data_base = repo_root / "artifacts" / f"bow-data{suffix}"
+
     # ── tee stdout+stderr into a log file ──────────────────────────────────────
-    log_path = STUDY_BASE / "logs" / f"device_{device_id}.log"
+    log_path = study_base / "logs" / f"device_{device_id}.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     tee = subprocess.Popen(["tee", "-a", str(log_path)], stdin=subprocess.PIPE)
     os.dup2(tee.stdin.fileno(), sys.stdout.fileno())
@@ -61,10 +78,11 @@ def main(device_id: int) -> None:
 
     for snr in tqdm(my_snrs, desc=f"SNR sweep (device {device_id})", position=0):
         config = BagOfWordsSFTConfig.get_canonical(
-            dataset_base_folder=DATA_BASE,
-            study_base_folder=STUDY_BASE,
+            dataset_base_folder=data_base,
+            study_base_folder=study_base,
             snr=snr,
             aux_words_ratio=0.5,
+            model_name=model_name,
         )
         if BagOfWordsAnalysisConfig.is_study_complete(config.study_folder):
             tqdm.write(f"=== SNR={snr:.4f} already complete, skipping ===")

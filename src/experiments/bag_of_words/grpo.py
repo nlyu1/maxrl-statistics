@@ -30,5 +30,7 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
     def get_state_cls(self) -> type["BagOfWordsSFTState"]:
         return BagOfWordsSFTState
 
+
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
 class BagOfWordsGRPOState(BagOfWordsStudyBaseState):
+    pass
