@@ -10,8 +10,10 @@ Artifacts → artifacts/bow-sft-snr-sweep/
 Logs      → artifacts/bow-sft-snr-sweep/logs/device_<id>.log
 """
 
+import gc
 import os
 import random
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -41,12 +43,53 @@ MODEL_VARIANTS: dict[str, tuple[str, str]] = {
     "qwen3": ("Qwen/Qwen3-0.6B", "-qwen3"),
 }
 
+TRAIN_EPOCHS = 15
+AUX_WORDS_RATIO = 0.5
+
+
+def get_study_folder(
+    *,
+    study_base: Path,
+    snr: float,
+    num_words: int = 7,
+    prompt_length: int = 128,
+    word_decay_power: float = 0.0,
+    aux_words_ratio: float = AUX_WORDS_RATIO,
+) -> Path:
+    return study_base / (
+        f"{num_words}-words_snr-{snr}_len-{prompt_length}"
+        f"_pow-{word_decay_power}_ar-{aux_words_ratio}"
+    )
+
+
+def cleanup_cuda_between_studies(*, device: torch.device) -> None:
+    gc.collect()
+    if device.type != "cuda":
+        return
+    with torch.cuda.device(device):
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+    torch.compiler.reset()
+
 
 @click.command()
 @click.argument("device_id", type=int)
 @click.option("--qwen", is_flag=True, help="Use Qwen/Qwen2.5-0.5B instead of SmolLM2-360M")
 @click.option("--qwen3", is_flag=True, help="Use Qwen/Qwen3-0.6B instead of SmolLM2-360M")
-def main(device_id: int, qwen: bool, qwen3: bool) -> None:
+@click.option("--train-epochs", type=int, default=TRAIN_EPOCHS, show_default=True)
+@click.option(
+    "--overwrite/--resume",
+    default=True,
+    show_default=True,
+    help="Replace existing study artifacts before rerunning each SNR.",
+)
+def main(
+    device_id: int,
+    qwen: bool,
+    qwen3: bool,
+    train_epochs: int,
+    overwrite: bool,
+) -> None:
     # ── resolve folders and model ─────────────────────────────────────────────
     selected = [k for k, v in [("qwen", qwen), ("qwen3", qwen3)] if v]
     if len(selected) > 1:
@@ -61,7 +104,8 @@ def main(device_id: int, qwen: bool, qwen3: bool) -> None:
     # ── tee stdout+stderr into a log file ──────────────────────────────────────
     log_path = study_base / "logs" / f"device_{device_id}.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    tee = subprocess.Popen(["tee", "-a", str(log_path)], stdin=subprocess.PIPE)
+    tee_args = ["tee", str(log_path)] if overwrite else ["tee", "-a", str(log_path)]
+    tee = subprocess.Popen(tee_args, stdin=subprocess.PIPE)
     os.dup2(tee.stdin.fileno(), sys.stdout.fileno())
     os.dup2(tee.stdin.fileno(), sys.stderr.fileno())
     tee.stdin.close()
@@ -77,19 +121,30 @@ def main(device_id: int, qwen: bool, qwen3: bool) -> None:
     print(f"device={device}  {len(my_snrs)} experiments: {[f'{s:.3f}' for s in my_snrs]}\n")
 
     for snr in tqdm(my_snrs, desc=f"SNR sweep (device {device_id})", position=0):
+        study_folder = get_study_folder(study_base=study_base, snr=snr)
+        if overwrite and study_folder.exists():
+            tqdm.write(f"=== SNR={snr:.4f} removing old artifacts ===")
+            shutil.rmtree(study_folder)
+
         config = BagOfWordsSFTConfig.get_canonical(
             dataset_base_folder=data_base,
             study_base_folder=study_base,
             snr=snr,
-            aux_words_ratio=0.5,
+            aux_words_ratio=AUX_WORDS_RATIO,
             model_name=model_name,
+            train_epochs=train_epochs,
         )
         if BagOfWordsAnalysisConfig.is_study_complete(config.study_folder):
             tqdm.write(f"=== SNR={snr:.4f} already complete, skipping ===")
             continue
         tqdm.write(f"\n=== SNR={snr:.4f}  folder={config.study_folder.name} ===")
-        state = config.initialize(device=device)
-        state.run_training()
+        state = None
+        try:
+            state = config.initialize(device=device)
+            state.run_training()
+        finally:
+            del state
+            cleanup_cuda_between_studies(device=device)
 
     print("\nDone.")
 
