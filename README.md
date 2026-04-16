@@ -1,5 +1,10 @@
 # MaxRL-statistics
 
+Research code for maximum-likelihood reinforcement learning for statistical estimation.
+
+## Setup (uv)
+
+System requirements: a machine with nvidia GPUs.
 
 ## Experiments
 

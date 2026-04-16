@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "maxrl-statistics"
 version = "0.1.0"
@@ -46,6 +50,9 @@ include = ["src*"]
 dev = [
     "ruff>=0.15.10",
 ]
+
+[tool.ruff.format]
+preview = true
 
 [tool.ruff.lint]
 # Jaxtyping fixes
