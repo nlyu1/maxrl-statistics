@@ -1,0 +1,12 @@
+---
+title: "MaxRL Statistics"
+author: "Nicholas Lyu"
+date: last-modified
+title-block-banner: false
+---
+
+Placeholder summary of research progress.
+
+{{< include bag-of-words.qmd >}}
+
+{{< include dag-reasoning.qmd >}}

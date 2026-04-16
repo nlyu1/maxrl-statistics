@@ -12,6 +12,10 @@ __pycache__/
 .DS_Store
 .ignore
 
+# Quarto
+**/.quarto/
+**/*.quarto_ipynb
+
 # Project
 artifacts/
 AGENTS.md

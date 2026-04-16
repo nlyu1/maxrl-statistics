@@ -1,0 +1,3 @@
+## Regression: DAG-reasoning
+
+The next DAG-reasoning setup isolates the **reasoning advantage and rollout efficiency** of the compared methods.

@@ -1,0 +1,13 @@
+## Regression: bag of words
+
+The simple, bag-of-words (BoW) setup isolates the noise-robustness of supervised-learning (SL), reinforce (RL), GRPO, and MaxRL in a **zero-step rollout** setting.
+
+### Dataset
+
+A BoW dataset is parameterized by a signal-to-noise ratio (SNR) knob.
+
+### Supervised-learning benchmark
+
+### Reinforce / GRPO
+
+### MaxRL
