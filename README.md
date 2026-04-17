@@ -10,20 +10,13 @@ Repository layout:
     - `artifacts`: locally cached experiment results, graphics etc.
 - `writeup`:
 
-### Environment setup
+### Setup
 
-System requirements: a machine with nvidia GPUs.
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run `uv sync --dev`.
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/):
-
+2. Create a `.env` file at the repo root with your local path:
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Then install dependencies:
-
-```bash
-uv sync --dev
+REPO_BASE="/absolute/path/to/maxrl-statistics"
 ```
 
 ### Locally accessing the writeup

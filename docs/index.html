@@ -40,6 +40,35 @@ ul.task-list li input[type="checkbox"] {
 <link href="index_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="index_files/libs/bootstrap/bootstrap-e25692ba4ea3333bacea3e270705a70c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
@@ -51,11 +80,11 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#regression-bag-of-words-bow" id="toc-regression-bag-of-words-bow" class="nav-link active" data-scroll-target="#regression-bag-of-words-bow">Regression: bag of words (BoW)</a>
+  <li><a href="#regression-bag-of-words" id="toc-regression-bag-of-words" class="nav-link active" data-scroll-target="#regression-bag-of-words">Regression: bag of words</a>
   <ul class="collapse">
   <li><a href="#dataset" id="toc-dataset" class="nav-link" data-scroll-target="#dataset">Dataset</a></li>
   <li><a href="#supervised-learning-benchmark" id="toc-supervised-learning-benchmark" class="nav-link" data-scroll-target="#supervised-learning-benchmark">Supervised-learning benchmark</a></li>
-  <li><a href="#reinforce-grpo" id="toc-reinforce-grpo" class="nav-link" data-scroll-target="#reinforce-grpo">Reinforce / GRPO</a></li>
+  <li><a href="#reinforce-grpo" id="toc-reinforce-grpo" class="nav-link" data-scroll-target="#reinforce-grpo">REINFORCE / GRPO</a></li>
   <li><a href="#maxrl" id="toc-maxrl" class="nav-link" data-scroll-target="#maxrl">MaxRL</a></li>
   </ul></li>
   <li><a href="#regression-dag-reasoning" id="toc-regression-dag-reasoning" class="nav-link" data-scroll-target="#regression-dag-reasoning">Regression: DAG-reasoning</a></li>
@@ -96,18 +125,75 @@ ul.task-list li input[type="checkbox"] {
 
 
 <p>Placeholder summary of research progress.</p>
-<section id="regression-bag-of-words-bow" class="level2">
-<h2 class="anchored" data-anchor-id="regression-bag-of-words-bow">Regression: bag of words (BoW)</h2>
-<p>The simple, bag-of-words (BoW) setup isolates the noise-robustness of supervised-learning (SL), reinforce (RL), GRPO, and MaxRL in a <strong>zero-step rollout</strong> setting.</p>
+<section id="regression-bag-of-words" class="level2">
+<h2 class="anchored" data-anchor-id="regression-bag-of-words">Regression: bag of words</h2>
+<p>The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a <strong>zero-step rollout</strong> setting: the model sees a single prompt and predicts a scalar target, with no sequential reasoning.</p>
 <section id="dataset" class="level3">
 <h3 class="anchored" data-anchor-id="dataset">Dataset</h3>
-<p>A BoW dataset is primarily parameterized by a signal-to-noise ratio (SNR) knob.</p>
+<p>See <code>src/data/bag_of_words.py</code>.</p>
+<p>Each prompt is <span class="math inline">\(L\)</span> words sampled iid from a mixture of <strong>semantic words</strong>, which carries signal, and <strong>auxiliary words</strong>, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by <span class="math inline">\(\rho \in (0, 1]\)</span>, the correlation between signal and target.</p>
+<p><strong>7-word vocabulary.</strong> Semantic words map to integer values centered at zero:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: center;">grim</th>
+<th style="text-align: center;">bad</th>
+<th style="text-align: center;">poor</th>
+<th style="text-align: center;">fair</th>
+<th style="text-align: center;">good</th>
+<th style="text-align: center;">great</th>
+<th style="text-align: center;">perfect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><span class="math inline">\(-3\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(-2\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(-1\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(0\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(+1\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(+2\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(+3\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>The 256 auxiliary words (common function words: <em>the, a, and, if, because, …</em>) carry value 0.</p>
+<p><strong>Sampling distribution.</strong> Semantic words share mass <span class="math inline">\(1 - \alpha\)</span> (where <span class="math inline">\(\alpha\)</span> = <code>aux_words_ratio</code>), shaped by a power-law centered on the neutral word “fair”: <span class="math inline">\(p_i \propto (1 + |i - \text{center}|)^{-\gamma}\)</span>. Auxiliary words uniformly split mass <span class="math inline">\(\alpha\)</span>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="assets/bow/word_density.png" class="img-fluid figure-img" style="width:65.0%"></p>
+<figcaption>Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency: <span class="math inline">\(\alpha = 0.5, \gamma = 1.0\)</span></figcaption>
+</figure>
+</div>
+<p><strong>Target generation.</strong> Let <span class="math inline">\(\rho = \text{SNR}/\sqrt{1 + \text{SNR}^2}\)</span>. Given a prompt of length <span class="math inline">\(L\)</span>: <span class="math display">\[
+\text{signal} = \frac{\rho}{\sqrt{L}\,\sigma} \sum_{i=1}^L v_i, \qquad
+\text{target} = \text{signal} + \mathcal{N}(0, \sqrt{1 - \rho^2})
+\]</span> where <span class="math inline">\(\sigma\)</span> is the per-token standard deviation under the full mixture (per-token mean is zero by symmetry). By construction <span class="math inline">\(\text{Var}(\text{target}) = 1\)</span> and <span class="math inline">\(\text{corr}(\text{signal}, \text{target}) = \rho\)</span>:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="assets/bow/corr_curve.png" class="img-fluid figure-img" style="width:55.0%"></p>
+<figcaption>corr as a function of SNR. For small SNR, corr <span class="math inline">\(approx\)</span> SNR</figcaption>
+</figure>
+</div>
+<p><strong>Example prompts</strong> (<span class="math inline">\(L=16\)</span>, <span class="math inline">\(\sigma = 1.14\)</span>, so <span class="math inline">\(\sqrt{L}\,\sigma = 4.54\)</span>):</p>
+<p><strong><span class="math inline">\(\rho = 0.01\)</span> (SNR = 0.01)</strong> — multiplier <span class="math inline">\(\rho / (\sqrt{L}\,\sigma) = 0.0022\)</span>:</p>
+<blockquote class="blockquote">
+<p><code>fair good perfect fair poor perfect fair because great of as fair of in good fair</code> <span class="math inline">\(\sum v_i = +9\)</span>, signal <span class="math inline">\(= 0.0022 \times 9 = 0.020\)</span>, target <span class="math inline">\(= 0.699\)</span> <strong>(almost pure noise)</strong></p>
+</blockquote>
+<p><strong><span class="math inline">\(\rho = 0.45\)</span> (SNR = 0.5)</strong> — multiplier <span class="math inline">\(= 0.098\)</span>:</p>
+<blockquote class="blockquote">
+<p><code>poor grim bad at perfect poor the poor as great good fair then good bad poor</code> <span class="math inline">\(\sum v_i = -4\)</span>, signal <span class="math inline">\(= 0.098 \times (-4) = -0.394\)</span>, target <span class="math inline">\(= -1.204\)</span></p>
+</blockquote>
+<p><strong><span class="math inline">\(\rho = 0.89\)</span> (SNR = 2.0)</strong> — multiplier <span class="math inline">\(= 0.197\)</span>:</p>
+<blockquote class="blockquote">
+<p><code>but grim some perfect from bad perfect perfect that or perfect fair good the great grim</code> <span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.197 \times 7 = 1.378\)</span>, target <span class="math inline">\(= 1.308\)</span> <strong>(target tracks signal)</strong></p>
+</blockquote>
 </section>
 <section id="supervised-learning-benchmark" class="level3">
 <h3 class="anchored" data-anchor-id="supervised-learning-benchmark">Supervised-learning benchmark</h3>
 </section>
 <section id="reinforce-grpo" class="level3">
-<h3 class="anchored" data-anchor-id="reinforce-grpo">Reinforce / GRPO</h3>
+<h3 class="anchored" data-anchor-id="reinforce-grpo">REINFORCE / GRPO</h3>
 </section>
 <section id="maxrl" class="level3">
 <h3 class="anchored" data-anchor-id="maxrl">MaxRL</h3>

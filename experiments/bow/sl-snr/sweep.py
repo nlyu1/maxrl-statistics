@@ -1,13 +1,13 @@
 """
-SNR sweep over the bag-of-words SFT task.
+SNR sweep over the bag-of-words SL task.
 
 Usage:
-    python notebooks/scripts/bow-sft-snr-sweep.py DEVICE_ID
+    uv run python experiments/bow/sl-snr/sweep.py DEVICE_ID
 
 device_id 0 runs the first half of the shuffled SNR list;
 device_id 1 runs the second half (fixed seed=42, no overlap).
-Artifacts → artifacts/bow-sft-snr-sweep/
-Logs      → artifacts/bow-sft-snr-sweep/logs/device_<id>.log
+Artifacts → artifacts/bow-sl-snr-sweep/
+Logs      → artifacts/bow-sl-snr-sweep/logs/device_<id>.log
 """
 
 import gc
@@ -22,12 +22,13 @@ import click
 import torch
 from tqdm import tqdm
 
-repo_root = Path(__file__).resolve().parents[2]
-os.chdir(repo_root)
-sys.path.insert(0, str(repo_root))
+from src import chdir_repo_base, get_repo_base
 
-from src.experiments.bag_of_words.analysis import BagOfWordsAnalysisConfig  # noqa: E402
-from src.experiments.bag_of_words.sft import BagOfWordsSFTConfig  # noqa: E402
+chdir_repo_base()
+repo_root = get_repo_base()
+
+from src.experiments.bag_of_words.analysis import BagOfWordsAnalysisConfig
+from src.experiments.bag_of_words.sft import BagOfWordsSFTConfig
 
 SNR_LIST = [
     0.010, 0.011, 0.013, 0.014, 0.016, 0.018, 0.020, 0.023, 0.026, 0.029,
@@ -98,7 +99,7 @@ def main(
         model_name, suffix = MODEL_VARIANTS[selected[0]]
     else:
         model_name, suffix = "HuggingFaceTB/SmolLM2-360M", ""
-    study_base = repo_root / "artifacts" / f"bow-sft-snr-sweep{suffix}"
+    study_base = repo_root / "artifacts" / f"bow-sl-snr-sweep{suffix}"
     data_base = repo_root / "artifacts" / f"bow-data{suffix}"
 
     # ── tee stdout+stderr into a log file ──────────────────────────────────────
