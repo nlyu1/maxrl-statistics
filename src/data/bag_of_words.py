@@ -55,7 +55,7 @@ def _power_law_density(*, num_words: int, decay_power: float) -> list[float]:
 
 def _validate_inputs(
     *,
-    snr: float,
+    corr: float,
     num_train_samples: int,
     num_val_samples: int,
     prompt_length: int,
@@ -63,8 +63,8 @@ def _validate_inputs(
     aux_words_ratio: float,
     word_decay_power: float,
 ) -> None:
-    if not isfinite(snr) or snr < 0:
-        raise ValueError("snr must be finite and non-negative")
+    if not isfinite(corr) or not 0 <= corr <= 1:
+        raise ValueError("corr must be finite and in [0, 1]")
     if num_train_samples < 0 or num_val_samples < 0:
         raise ValueError("sample counts must be non-negative")
     if prompt_length <= 0:
@@ -89,11 +89,12 @@ def _validate_inputs(
 
 def _derived_fields(
     *,
-    snr: float,
     word_assignments: tuple[str, ...],
     aux_words_ratio: float,
     word_decay_power: float,
-) -> tuple[dict[str, float], dict[str, int], float, float, float]:
+) -> tuple[dict[str, float], dict[str, int], float]:
+    # Symmetric construction: word_values are [-half..half] with symmetric density,
+    # so the per-token mean is identically 0 and variance = E[value²].
     semantic_density_values = _power_law_density(
         num_words=len(word_assignments),
         decay_power=word_decay_power,
@@ -104,29 +105,18 @@ def _derived_fields(
     word_values.update({word: 0 for word in aux_words})
 
     semantic_mass = 1.0 - aux_words_ratio
-    aux_mass = aux_words_ratio
-
     word_density: dict[str, float] = {
         word: semantic_mass * prob
         for word, prob in zip(word_assignments, semantic_density_values)
     }
     if aux_words:
-        aux_prob = aux_mass / len(aux_words)
+        aux_prob = aux_words_ratio / len(aux_words)
         word_density.update({word: aux_prob for word in aux_words})
 
-    mean = sum(word_density[word] * word_values[word] for word in word_density)
-    second_moment = sum(
+    variance = sum(
         word_density[word] * (word_values[word] ** 2) for word in word_density
     )
-    variance = second_moment - mean**2
-    if variance <= 0:
-        raise ValueError(
-            "Per-token signal variance must be positive; decrease aux_words_ratio."
-        )
-
-    std = variance**0.5
-    target_signal_std = snr / (1 + snr**2) ** 0.5
-    return word_density, word_values, mean, std, target_signal_std
+    return word_density, word_values, variance**0.5
 
 
 class BagOfWordsDatasetConfig(BaseConfig):
@@ -140,10 +130,11 @@ class BagOfWordsDatasetConfig(BaseConfig):
     occupy total probability mass `aux_words_ratio`. `word_decay_power` shapes
     only the semantic-word distribution.
 
-    SNR = sig / noise;  R² = snr² / (1 + snr²)
+    corr ∈ [0, 1] is the target signal std (= Corr(signal, target)) under
+    unit-variance target. R² = corr².
     """
 
-    snr: float
+    corr: float
     num_train_samples: int
     num_val_samples: int
     prompt_length: int
@@ -154,19 +145,17 @@ class BagOfWordsDatasetConfig(BaseConfig):
     # Derived — computed in initialize, stored for round-trip serialization
     word_density: dict[str, float]  # full token distribution over semantic + aux
     word_values: dict[str, int]  # aux words have value 0
-    unnormalized_signal_mean: float  # per-token mean under full token distribution
     unnormalized_signal_std: float  # per-token std under full token distribution
-    target_signal_std: float  # snr / sqrt(1 + snr²)
 
     @property
     def rsq(self) -> float:
-        return self.snr**2 / (1 + self.snr**2)
+        return self.corr**2
 
     @classmethod
     def initialize(
         cls,
         *,
-        snr: float,
+        corr: float,
         num_train_samples: int,
         num_val_samples: int,
         prompt_length: int,
@@ -176,7 +165,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
     ) -> "BagOfWordsDatasetConfig":
         word_assignments_tuple = tuple(word_assignments)
         _validate_inputs(
-            snr=snr,
+            corr=corr,
             num_train_samples=num_train_samples,
             num_val_samples=num_val_samples,
             prompt_length=prompt_length,
@@ -184,14 +173,13 @@ class BagOfWordsDatasetConfig(BaseConfig):
             aux_words_ratio=aux_words_ratio,
             word_decay_power=word_decay_power,
         )
-        word_density, word_values, mean, std, target_std = _derived_fields(
-            snr=snr,
+        word_density, word_values, std = _derived_fields(
             word_assignments=word_assignments_tuple,
             aux_words_ratio=aux_words_ratio,
             word_decay_power=word_decay_power,
         )
         return cls(
-            snr=snr,
+            corr=corr,
             num_train_samples=num_train_samples,
             num_val_samples=num_val_samples,
             prompt_length=prompt_length,
@@ -200,9 +188,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
             word_decay_power=word_decay_power,
             word_density=word_density,
             word_values=word_values,
-            unnormalized_signal_mean=mean,
             unnormalized_signal_std=std,
-            target_signal_std=target_std,
         )
 
     def write_to(self, *, folder: Path):
@@ -210,12 +196,11 @@ class BagOfWordsDatasetConfig(BaseConfig):
         Writes train.parquet, val.parquet, and config.json to folder.
         Each parquet has columns: "prompt" (space-separated words), "target" (float).
 
-        Tokens are sampled iid from the full mixture `word_density`. Auxiliary
-        words contribute zero to `raw`, so normalization uses the full per-token
-        mixture moments:
-            raw = sum of prompt word values
-            signal = (raw - L·μ) / (sqrt(L)·σ) · target_signal_std
-            target = signal + N(0, noise_std)
+        Per-token mean is identically 0 by construction (symmetric word_values
+        and symmetric power-law density), so normalization drops the mean term:
+            raw    = sum of prompt word values
+            signal = raw / (sqrt(L)·σ) · corr
+            target = signal + N(0, sqrt(1 - corr²))
         """
         folder.mkdir(parents=True, exist_ok=True)
         words = list(self.word_density)
@@ -224,7 +209,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
         vocab = np.asarray(words, dtype=object)
 
         rng = np.random.default_rng()
-        noise_std = (1 - self.target_signal_std**2) ** 0.5
+        noise_std = (1 - self.corr**2) ** 0.5
 
         for split, n in [
             ("train", self.num_train_samples),
@@ -233,9 +218,9 @@ class BagOfWordsDatasetConfig(BaseConfig):
             idx = rng.choice(len(words), size=(n, self.prompt_length), p=probs)
             raw = vals[idx].sum(axis=1)
             signal = (
-                (raw - self.prompt_length * self.unnormalized_signal_mean)
+                raw
                 / ((self.prompt_length**0.5) * self.unnormalized_signal_std)
-                * self.target_signal_std
+                * self.corr
             )
             targets = signal + rng.normal(0, noise_std, size=n)
             prompts = [" ".join(vocab[row]) for row in idx]
@@ -255,7 +240,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
         cls,
         *,
         folder: Path,
-        snr: float,
+        corr: float,
         num_train_samples: int,
         num_val_samples: int,
         prompt_length: int,
@@ -264,7 +249,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
         word_decay_power: float,
     ) -> "BagOfWordsDatasetConfig":
         config = cls.initialize(
-            snr=snr,
+            corr=corr,
             num_train_samples=num_train_samples,
             num_val_samples=num_val_samples,
             prompt_length=prompt_length,

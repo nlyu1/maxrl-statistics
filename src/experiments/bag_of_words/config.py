@@ -49,7 +49,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         *,
         dataset_base_folder: Path,
         study_base_folder: Path,
-        snr: float,
+        corr: float,
         aux_words_ratio: float,
         num_words: int = 7,
         num_samples: int = 50_000,
@@ -73,12 +73,12 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             raise ValueError(f"num_words must be one of {{{supported}}}")
 
         dataset_folder = dataset_base_folder / (
-            f"{num_words}-words_snr-{snr}_len-{prompt_length}"
+            f"{num_words}-words_corr-{corr}_len-{prompt_length}"
             f"_pow-{word_decay_power}_ar-{aux_words_ratio}"
         )
         data = BagOfWordsDatasetConfig.init_or_load_from(
             folder=dataset_folder,
-            snr=snr,
+            corr=corr,
             num_train_samples=num_samples,
             num_val_samples=num_samples,
             prompt_length=prompt_length,
@@ -108,7 +108,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             dataloading=dataloading,
             model=CausalLMConfig(
                 pretrained_model=model_name,
-                initial_output_norms=[snr],
+                initial_output_norms=[corr],
             ),
             optimizer=CausalLMWithLinearHeadOptimizerConfig(
                 lr=head_lr / backbone_lr_divisor,
