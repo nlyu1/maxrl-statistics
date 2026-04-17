@@ -29,20 +29,20 @@ where $\sigma$ is the per-token standard deviation under the full mixture (zero 
 
 **Example prompts** ($L=8$, $\sigma = 1.14$, so $\sqrt{L}\,\sigma = 3.21$). Semantic words are **bolded**:
 
-**$\rho = 0.01$** — multiplier $\rho / (\sigma \sqrt{L}) = 0.0031$, noise standard deviation $\sqrt{1 - \rho^2} = 1.00$:
+Low-signal regime: $\rho = 0.01$ — multiplier $\rho / (\sigma \sqrt{L}) = 0.0031$, noise stdev $\sqrt{1 - \rho^2} \approx 1.00$:
 
 > both idea **fair** **poor** rather **bad** **grim** then
-> $\sum v_i = -6$, signal $= 0.0031 \times (-6) = -0.019$, target $= -2.54$ **(almost pure noise)**
+> $\sum v_i = -6$, signal $= 0.0031 \times (-6) = -0.019$, target $= -2.54$
 
-**$\rho = 0.45$** — multiplier $= 0.140$, noise standard deviation $\sqrt{1 - \rho^2} = 0.89$:
+High-signal regime: $\rho = 0.45$ — multiplier $= 0.140$, noise stdev $\sqrt{1 - \rho^2} = 0.89$:
 
 > **grim** **poor** ask look some door do **fair**
 > $\sum v_i = -4$, signal $= 0.140 \times (-4) = -0.560$, target $= -0.707$
 
-**$\rho = 0.89$** — multiplier $= 0.277$, noise standard deviation $\sqrt{1 - \rho^2} = 0.46$:
+Very-high-signal regime: $rho = 0.89$ — multiplier $= 0.277$, noise stdev $\sqrt{1 - \rho^2} = 0.46$:
 
 > **good** **good** floor **good** **good** **good** **perfect** **poor**
-> $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$ **(target tracks signal)**
+> $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$
 
 ### Supervised-learning benchmark
 
