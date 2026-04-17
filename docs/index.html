@@ -25,6 +25,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -165,32 +200,34 @@ window.Quarto = {
 <figcaption>Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency: <span class="math inline">\(\alpha = 0.5, \gamma = 1.0\)</span></figcaption>
 </figure>
 </div>
-<p><strong>Target generation.</strong> Let <span class="math inline">\(\rho = \text{SNR}/\sqrt{1 + \text{SNR}^2}\)</span>. Given a prompt of length <span class="math inline">\(L\)</span>: <span class="math display">\[
-\text{signal} = \frac{\rho}{\sqrt{L}\,\sigma} \sum_{i=1}^L v_i, \qquad
+<p><strong>Target generation.</strong> Given a prompt of length <span class="math inline">\(L\)</span>: <span class="math display">\[
+\text{signal} = \frac{\rho}{\sigma\sqrt{L}} \sum_{i=1}^L v_i, \qquad
 \text{target} = \text{signal} + \mathcal{N}(0, \sqrt{1 - \rho^2})
-\]</span> where <span class="math inline">\(\sigma\)</span> is the per-token standard deviation under the full mixture (per-token mean is zero by symmetry). By construction <span class="math inline">\(\text{Var}(\text{target}) = 1\)</span> and <span class="math inline">\(\text{corr}(\text{signal}, \text{target}) = \rho\)</span>:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="assets/bow/corr_curve.png" class="img-fluid figure-img" style="width:55.0%"></p>
-<figcaption>corr as a function of SNR. For small SNR, corr <span class="math inline">\(approx\)</span> SNR</figcaption>
-</figure>
-</div>
-<p><strong>Example prompts</strong> (<span class="math inline">\(L=16\)</span>, <span class="math inline">\(\sigma = 1.14\)</span>, so <span class="math inline">\(\sqrt{L}\,\sigma = 4.54\)</span>):</p>
-<p><strong><span class="math inline">\(\rho = 0.01\)</span> (SNR = 0.01)</strong> — multiplier <span class="math inline">\(\rho / (\sqrt{L}\,\sigma) = 0.0022\)</span>:</p>
+\]</span> where <span class="math inline">\(\sigma\)</span> is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction <span class="math inline">\(\text{Var}(\text{target}) = 1\)</span> and <span class="math inline">\(\text{corr}(\text{signal}, \text{target}) = \rho\)</span>.</p>
+<p><strong>Example prompts</strong> (<span class="math inline">\(L=8\)</span>, <span class="math inline">\(\sigma = 1.14\)</span>, so <span class="math inline">\(\sqrt{L}\,\sigma = 3.21\)</span>). Semantic words are <strong>bolded</strong>:</p>
+<p><strong><span class="math inline">\(\rho = 0.01\)</span></strong> — multiplier <span class="math inline">\(\rho / (\sigma \sqrt{L}) = 0.0031\)</span>, noise standard deviation <span class="math inline">\(\sqrt{1 - \rho^2} = 1.00\)</span>:</p>
 <blockquote class="blockquote">
-<p><code>fair good perfect fair poor perfect fair because great of as fair of in good fair</code> <span class="math inline">\(\sum v_i = +9\)</span>, signal <span class="math inline">\(= 0.0022 \times 9 = 0.020\)</span>, target <span class="math inline">\(= 0.699\)</span> <strong>(almost pure noise)</strong></p>
+<p>both idea <strong>fair</strong> <strong>poor</strong> rather <strong>bad</strong> <strong>grim</strong> then <span class="math inline">\(\sum v_i = -6\)</span>, signal <span class="math inline">\(= 0.0031 \times (-6) = -0.019\)</span>, target <span class="math inline">\(= -2.54\)</span> <strong>(almost pure noise)</strong></p>
 </blockquote>
-<p><strong><span class="math inline">\(\rho = 0.45\)</span> (SNR = 0.5)</strong> — multiplier <span class="math inline">\(= 0.098\)</span>:</p>
+<p><strong><span class="math inline">\(\rho = 0.45\)</span></strong> — multiplier <span class="math inline">\(= 0.140\)</span>, noise standard deviation <span class="math inline">\(\sqrt{1 - \rho^2} = 0.89\)</span>:</p>
 <blockquote class="blockquote">
-<p><code>poor grim bad at perfect poor the poor as great good fair then good bad poor</code> <span class="math inline">\(\sum v_i = -4\)</span>, signal <span class="math inline">\(= 0.098 \times (-4) = -0.394\)</span>, target <span class="math inline">\(= -1.204\)</span></p>
+<p><strong>grim</strong> <strong>poor</strong> ask look some door do <strong>fair</strong> <span class="math inline">\(\sum v_i = -4\)</span>, signal <span class="math inline">\(= 0.140 \times (-4) = -0.560\)</span>, target <span class="math inline">\(= -0.707\)</span></p>
 </blockquote>
-<p><strong><span class="math inline">\(\rho = 0.89\)</span> (SNR = 2.0)</strong> — multiplier <span class="math inline">\(= 0.197\)</span>:</p>
+<p><strong><span class="math inline">\(\rho = 0.89\)</span></strong> — multiplier <span class="math inline">\(= 0.277\)</span>, noise standard deviation <span class="math inline">\(\sqrt{1 - \rho^2} = 0.46\)</span>:</p>
 <blockquote class="blockquote">
-<p><code>but grim some perfect from bad perfect perfect that or perfect fair good the great grim</code> <span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.197 \times 7 = 1.378\)</span>, target <span class="math inline">\(= 1.308\)</span> <strong>(target tracks signal)</strong></p>
+<p><strong>good</strong> <strong>good</strong> floor <strong>good</strong> <strong>good</strong> <strong>good</strong> <strong>perfect</strong> <strong>poor</strong> <span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.277 \times 7 = 1.94\)</span>, target <span class="math inline">\(= 1.78\)</span> <strong>(target tracks signal)</strong></p>
 </blockquote>
 </section>
 <section id="supervised-learning-benchmark" class="level3">
 <h3 class="anchored" data-anchor-id="supervised-learning-benchmark">Supervised-learning benchmark</h3>
+<details>
+<summary>
+Code instructions
+</summary>
+<p>Run SL-sweep on two devices concurrently.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> experiments/bow/sl-corr/do_sweep.bash</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+Analyze experiment artifacts: <code>experiments/bow/sl-corr/analyze.ipynb</code>
+</details>
 </section>
 <section id="reinforce-grpo" class="level3">
 <h3 class="anchored" data-anchor-id="reinforce-grpo">REINFORCE / GRPO</h3>

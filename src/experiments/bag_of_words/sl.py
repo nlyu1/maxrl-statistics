@@ -14,13 +14,13 @@ from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
 from src.experiments.bag_of_words.state import BagOfWordsStudyBaseState
 
 
-class BagOfWordsSFTConfig(BagOfWordsStudyBaseConfig):
-    def get_state_cls(self) -> type["BagOfWordsSFTState"]:
-        return BagOfWordsSFTState
+class BagOfWordsSLConfig(BagOfWordsStudyBaseConfig):
+    def get_state_cls(self) -> type["BagOfWordsSLState"]:
+        return BagOfWordsSLState
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
-class BagOfWordsSFTState(BagOfWordsStudyBaseState):
+class BagOfWordsSLState(BagOfWordsStudyBaseState):
     last_pred_norm: float = 0.0
 
     def compute_last_step_projections(
@@ -80,7 +80,7 @@ class BagOfWordsSFTState(BagOfWordsStudyBaseState):
         self.train_corr_ground_truth_counter.empty_()
         self.model.train()
 
-        pbar = tqdm(self.train_dl, desc=f"sft epoch {epoch}")
+        pbar = tqdm(self.train_dl, desc=f"sl epoch {epoch}")
         for batch in pbar:
             self.train_step(batch=batch)
             train_corr_target = float(

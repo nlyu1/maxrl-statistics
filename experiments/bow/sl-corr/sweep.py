@@ -28,17 +28,53 @@ chdir_repo_base()
 repo_root = get_repo_base()
 
 from src.experiments.bag_of_words.analysis import BagOfWordsAnalysisConfig  # noqa: E402
-from src.experiments.bag_of_words.sft import BagOfWordsSFTConfig  # noqa: E402
+from src.experiments.bag_of_words.sl import BagOfWordsSLConfig  # noqa: E402
 
 CORR_LIST = [
-    0.010, 0.011, 0.013, 0.014, 0.016, 0.018, 0.020, 0.023, 0.026, 0.029,
-    0.033, 0.037, 0.041, 0.046, 0.052, 0.059, 0.066, 0.074, 0.084, 0.094,
-    0.106, 0.119, 0.134, 0.151, 0.170, 0.191, 0.215, 0.242, 0.273, 0.307,
-    0.346, 0.389, 0.438, 0.492, 0.554, 0.624, 0.702, 0.790, 0.889, 1.000,
+    0.010,
+    0.011,
+    0.013,
+    0.014,
+    0.016,
+    0.018,
+    0.020,
+    0.023,
+    0.026,
+    0.029,
+    0.033,
+    0.037,
+    0.041,
+    0.046,
+    0.052,
+    0.059,
+    0.066,
+    0.074,
+    0.084,
+    0.094,
+    0.106,
+    0.119,
+    0.134,
+    0.151,
+    0.170,
+    0.191,
+    0.215,
+    0.242,
+    0.273,
+    0.307,
+    0.346,
+    0.389,
+    0.438,
+    0.492,
+    0.554,
+    0.624,
+    0.702,
+    0.790,
+    0.889,
+    1.000,
 ]
 
 MODEL_NAME = "HuggingFaceTB/SmolLM2-135M"
-TRAIN_EPOCHS = 15
+TRAIN_EPOCHS = 20
 AUX_WORDS_RATIO = 0.5
 
 STUDY_BASE = repo_root / "artifacts" / "bow-sl-corr-sweep"
@@ -97,11 +133,13 @@ def main(
     corrs = CORR_LIST.copy()
     random.seed(42)
     random.shuffle(corrs)
-    half     = len(corrs) // 2
+    half = len(corrs) // 2
     my_corrs = corrs[:half] if device_id % 2 == 0 else corrs[half:]
 
     device = torch.device(f"cuda:{device_id}")
-    print(f"device={device}  {len(my_corrs)} experiments: {[f'{c:.3f}' for c in my_corrs]}\n")
+    print(
+        f"device={device}  {len(my_corrs)} experiments: {[f'{c:.3f}' for c in my_corrs]}\n"
+    )
 
     for corr in tqdm(my_corrs, desc=f"corr sweep (device {device_id})", position=0):
         study_folder = get_study_folder(study_base=STUDY_BASE, corr=corr)
@@ -109,7 +147,7 @@ def main(
             tqdm.write(f"=== corr={corr:.4f} removing old artifacts ===")
             shutil.rmtree(study_folder)
 
-        config = BagOfWordsSFTConfig.get_canonical(
+        config = BagOfWordsSLConfig.get_canonical(
             dataset_base_folder=DATA_BASE,
             study_base_folder=STUDY_BASE,
             corr=corr,

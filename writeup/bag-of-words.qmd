@@ -22,29 +22,43 @@ The 256 auxiliary words (common function words: *the, a, and, if, because, ...*)
 
 **Target generation.** Given a prompt of length $L$:
 $$
-\text{signal} = \frac{\rho}{\sqrt{L}\,\sigma} \sum_{i=1}^L v_i, \qquad
+\text{signal} = \frac{\rho}{\sigma\sqrt{L}} \sum_{i=1}^L v_i, \qquad
 \text{target} = \text{signal} + \mathcal{N}(0, \sqrt{1 - \rho^2})
 $$
 where $\sigma$ is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction $\text{Var}(\text{target}) = 1$ and $\text{corr}(\text{signal}, \text{target}) = \rho$.
 
-**Example prompts** ($L=16$, $\sigma = 1.14$, so $\sqrt{L}\,\sigma = 4.54$):
+**Example prompts** ($L=8$, $\sigma = 1.14$, so $\sqrt{L}\,\sigma = 3.21$). Semantic words are **bolded**:
 
-**$\rho = 0.01$** — multiplier $\rho / (\sqrt{L}\,\sigma) = 0.0022$:
+**$\rho = 0.01$** — multiplier $\rho / (\sigma \sqrt{L}) = 0.0031$, noise standard deviation $\sqrt{1 - \rho^2} = 1.00$:
 
-> `fair good perfect fair poor perfect fair because great of as fair of in good fair`
-> $\sum v_i = +9$, signal $= 0.0022 \times 9 = 0.020$, target $= 0.699$ **(almost pure noise)**
+> both idea **fair** **poor** rather **bad** **grim** then
+> $\sum v_i = -6$, signal $= 0.0031 \times (-6) = -0.019$, target $= -2.54$ **(almost pure noise)**
 
-**$\rho = 0.45$ (SNR = 0.5)** — multiplier $= 0.098$:
+**$\rho = 0.45$** — multiplier $= 0.140$, noise standard deviation $\sqrt{1 - \rho^2} = 0.89$:
 
-> `poor grim bad at perfect poor the poor as great good fair then good bad poor`
-> $\sum v_i = -4$, signal $= 0.098 \times (-4) = -0.394$, target $= -1.204$
+> **grim** **poor** ask look some door do **fair**
+> $\sum v_i = -4$, signal $= 0.140 \times (-4) = -0.560$, target $= -0.707$
 
-**$\rho = 0.89$ (SNR = 2.0)** — multiplier $= 0.197$:
+**$\rho = 0.89$** — multiplier $= 0.277$, noise standard deviation $\sqrt{1 - \rho^2} = 0.46$:
 
-> `but grim some perfect from bad perfect perfect that or perfect fair good the great grim`
-> $\sum v_i = +7$, signal $= 0.197 \times 7 = 1.378$, target $= 1.308$ **(target tracks signal)**
+> **good** **good** floor **good** **good** **good** **perfect** **poor**
+> $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$ **(target tracks signal)**
 
 ### Supervised-learning benchmark
+
+<details>
+<summary>Code instructions</summary>
+
+Run SL-sweep on two devices concurrently.
+
+```bash
+bash experiments/bow/sl-corr/do_sweep.bash
+```
+
+Analyze experiment artifacts: `experiments/bow/sl-corr/analyze.ipynb`
+</details>
+
+Results: WIP
 
 ### REINFORCE / GRPO
 

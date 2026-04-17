@@ -1,18 +1,18 @@
 from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
-from src.experiments.bag_of_words.sft import BagOfWordsSFTConfig
+from src.experiments.bag_of_words.sl import BagOfWordsSLConfig
 from src.experiments.common import GRPOConfig
 
 
 class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
     grpo: GRPOConfig
-    sft: BagOfWordsSFTConfig
-    num_sft_steps: int
-    sft_checkpoint_folder: Path
+    sl: BagOfWordsSLConfig
+    num_sl_steps: int
+    sl_checkpoint_folder: Path
     proj_loss_temperature: float
     """
-    You can always assume that num_sft_steps is less than 1 epoch
+    You can always assume that num_sl_steps is less than 1 epoch
         (feel free to assert) as well.
-    SFT first for some steps, then GRPO.
+    SL first for some steps, then GRPO.
 
     For the proj_loss_logsumexp_beta, we only supervise the best rollout's supervised loss.
     - Temperature -> 0 corresponds to best rollout
@@ -27,8 +27,8 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
         divides the train_batch_size.
         """
 
-    def get_state_cls(self) -> type["BagOfWordsSFTState"]:
-        return BagOfWordsSFTState
+    def get_state_cls(self) -> type["BagOfWordsSLState"]:
+        return BagOfWordsSLState
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
