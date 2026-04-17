@@ -147,10 +147,6 @@ class BagOfWordsDatasetConfig(BaseConfig):
     word_values: dict[str, int]  # aux words have value 0
     unnormalized_signal_std: float  # per-token std under full token distribution
 
-    @property
-    def rsq(self) -> float:
-        return self.corr**2
-
     @classmethod
     def initialize(
         cls,
