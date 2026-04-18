@@ -153,8 +153,8 @@ def main(
             aux_words_ratio=AUX_WORDS_RATIO,
             train_epochs=train_epochs,
         )
-        if BagOfWordsAnalysisConfig.is_study_complete(config.study_folder):
-            tqdm.write(f"=== corr={corr:.4f} already complete, skipping ===")
+        if BagOfWordsAnalysisConfig.has_study_started(config.study_folder):
+            tqdm.write(f"=== corr={corr:.4f} already started, skipping ===")
             continue
         tqdm.write(f"\n=== corr={corr:.4f}  folder={config.study_folder.name} ===")
         state = None

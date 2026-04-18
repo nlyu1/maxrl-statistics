@@ -201,5 +201,6 @@ def compute_maxrl_score_weights(
             log_likelihoods=log_likelihoods.float(),
             likelihood_ceiling=likelihood_ceiling,
         )
+        # Bulk of the calculation
         omega = _leave_one_out_weight(a=a)
         return (omega * tilde_l).type_as(log_likelihoods)
