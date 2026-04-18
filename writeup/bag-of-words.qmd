@@ -65,6 +65,20 @@ Analyze experiment artifacts: `experiments/bow/sl-corr/analyze.ipynb`
 
 Results: WIP
 
-### REINFORCE / GRPO
+### GRPO
+
+<details>
+<summary>Code instructions</summary>
+
+Coarse GRPO sweep over `(corr, num_rollouts_per_sample)` on two devices concurrently. The shuffle seed is chosen so that `corr=0.01, num_rollouts=4096` runs first — stress-tests the largest rollout group at the smallest correlation up front.
+
+```bash
+bash experiments/bow/grpo-corr/do_coarse_sweep.bash
+```
+
+Analyze experiment artifacts: `experiments/bow/grpo-corr/analyze-coarse-sweep.ipynb`
+</details>
+
+Results: WIP
 
 ### MaxRL

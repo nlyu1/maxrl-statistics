@@ -110,9 +110,10 @@ def cleanup_cuda_between_studies(*, device: torch.device) -> None:
 @click.option("--train-epochs", type=int, default=TRAIN_EPOCHS, show_default=True)
 @click.option(
     "--overwrite/--resume",
-    default=True,
+    default=False,
     show_default=True,
-    help="Replace existing study artifacts before rerunning each corr.",
+    help="If --overwrite, replace existing study artifacts even when complete. "
+    "Default --resume skips only fully-completed studies; partial runs are wiped and rerun.",
 )
 def main(
     device_id: int,
@@ -142,7 +143,13 @@ def main(
 
     for corr in tqdm(my_corrs, desc=f"corr sweep (device {device_id})", position=0):
         study_folder = get_study_folder(study_base=STUDY_BASE, corr=corr)
-        if overwrite and study_folder.exists():
+        if study_folder.exists():
+            if (
+                not overwrite
+                and BagOfWordsAnalysisConfig.is_study_complete(study_folder)
+            ):
+                tqdm.write(f"=== corr={corr:.4f} already complete, skipping ===")
+                continue
             tqdm.write(f"=== corr={corr:.4f} removing old artifacts ===")
             shutil.rmtree(study_folder)
 
@@ -153,9 +160,6 @@ def main(
             aux_words_ratio=AUX_WORDS_RATIO,
             train_epochs=train_epochs,
         )
-        if BagOfWordsAnalysisConfig.has_study_started(config.study_folder):
-            tqdm.write(f"=== corr={corr:.4f} already started, skipping ===")
-            continue
         tqdm.write(f"\n=== corr={corr:.4f}  folder={config.study_folder.name} ===")
         state = None
         try:

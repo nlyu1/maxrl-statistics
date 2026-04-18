@@ -21,6 +21,19 @@ class BagOfWordsAnalysisConfig(BaseConfig):
     def has_study_started(path: Path) -> bool:
         return (path / "metrics.parquet").exists() and (path / "config.json").exists()
 
+    @staticmethod
+    def is_study_complete(path: Path) -> bool:
+        """True iff the study at *path* has completed all its training epochs."""
+        if not BagOfWordsAnalysisConfig.has_study_started(path):
+            return False
+        train_epochs = json.loads((path / "config.json").read_text())["train_epochs"]
+        max_epoch = (
+            pl.read_parquet(path / "metrics.parquet")
+            .select(pl.col("epoch").max())
+            .item()
+        )
+        return max_epoch >= train_epochs - 1
+
     @classmethod
     def from_studies(cls, studies: dict[str, Path]) -> "BagOfWordsAnalysisConfig":
         started = {k: v for k, v in studies.items() if cls.has_study_started(v)}
