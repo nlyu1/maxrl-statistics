@@ -1,9 +1,21 @@
 project:
+  type: website
   output-dir: ../docs
-  render:
-    - index.qmd
   resources:
     - assets/**
+
+website:
+  title: "MaxRL Statistics"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: bag-of-words.qmd
+        text: Bag of Words
+      - href: dag-reasoning.qmd
+        text: DAG Reasoning
+      - href: maxrl-estimator.qmd
+        text: MaxRL Estimator
 
 format:
   html:

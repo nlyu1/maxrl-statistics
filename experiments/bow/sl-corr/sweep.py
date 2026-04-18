@@ -144,9 +144,8 @@ def main(
     for corr in tqdm(my_corrs, desc=f"corr sweep (device {device_id})", position=0):
         study_folder = get_study_folder(study_base=STUDY_BASE, corr=corr)
         if study_folder.exists():
-            if (
-                not overwrite
-                and BagOfWordsAnalysisConfig.is_study_complete(study_folder)
+            if not overwrite and BagOfWordsAnalysisConfig.is_study_complete(
+                study_folder
             ):
                 tqdm.write(f"=== corr={corr:.4f} already complete, skipping ===")
                 continue

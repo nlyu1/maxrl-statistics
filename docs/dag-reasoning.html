@@ -6,10 +6,8 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Nicholas Lyu">
-<meta name="dcterms.date" content="2026-04-18">
 
-<title>MaxRL Statistics</title>
+<title>Regression: DAG-reasoning – MaxRL Statistics</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -73,35 +71,6 @@ ul.task-list li input[type="checkbox"] {
   }
 }</script>
 
-  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
-  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
-
-<script type="text/javascript">
-const typesetMath = (el) => {
-  if (window.MathJax) {
-    // MathJax Typeset
-    window.MathJax.typeset([el]);
-  } else if (window.katex) {
-    // KaTeX Render
-    var mathElements = el.getElementsByClassName("math");
-    var macros = [];
-    for (var i = 0; i < mathElements.length; i++) {
-      var texText = mathElements[i].firstChild;
-      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
-        window.katex.render(texText.data, mathElements[i], {
-          displayMode: mathElements[i].classList.contains('display'),
-          throwOnError: false,
-          macros: macros,
-          fleqn: false
-        });
-      }
-    }
-  }
-}
-window.Quarto = {
-  typesetMath
-};
-</script>
 
 </head>
 
@@ -123,7 +92,7 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
@@ -131,11 +100,11 @@ window.Quarto = {
 <span class="menu-text">Bag of Words</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./dag-reasoning.html"> 
+    <a class="nav-link active" href="./dag-reasoning.html" aria-current="page"> 
 <span class="menu-text">DAG Reasoning</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./maxrl-estimator.html"> 
+    <a class="nav-link" href="./maxrl-estimator.qmd"> 
 <span class="menu-text">MaxRL Estimator</span></a>
   </li>  
 </ul>
@@ -149,40 +118,22 @@ window.Quarto = {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
-   
-  <ul>
-  <li><a href="#contents" id="toc-contents" class="nav-link active" data-scroll-target="#contents">Contents</a></li>
-  </ul>
-</nav>
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+        
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">MaxRL Statistics</h1>
+<h1 class="title">Regression: DAG-reasoning</h1>
 </div>
 
 
 
 <div class="quarto-title-meta">
 
-    <div>
-    <div class="quarto-title-meta-heading">Author</div>
-    <div class="quarto-title-meta-contents">
-             <p>Nicholas Lyu </p>
-          </div>
-  </div>
     
-    <div>
-    <div class="quarto-title-meta-heading">Published</div>
-    <div class="quarto-title-meta-contents">
-      <p class="date">April 18, 2026</p>
-    </div>
-  </div>
   
     
   </div>
@@ -192,17 +143,9 @@ window.Quarto = {
 </header>
 
 
-<p>Placeholder summary of research progress.</p>
-<section id="contents" class="level2">
-<h2 class="anchored" data-anchor-id="contents">Contents</h2>
-<ul>
-<li><a href="./bag-of-words.html">Regression: bag of words</a> — noise-robustness in zero-step sampling setting. WIP.</li>
-<li><a href="./dag-reasoning.html">Regression: DAG-reasoning</a> — work-not-started.</li>
-<li><a href="./maxrl-estimator.html">MaxRL estimator: leave-one-out derivation</a> — generalized MaxRL gradient estimator and its <span class="math inline">\(O(BRD)\)</span> stable computation (fun nontrivial algorithm design problem!).</li>
-</ul>
+<p>The next DAG-reasoning setup isolates the <strong>reasoning advantage and rollout efficiency</strong> of the compared methods.</p>
 
 
-</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

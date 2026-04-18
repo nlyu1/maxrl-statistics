@@ -1,0 +1,100 @@
+[
+  {
+    "objectID": "bag-of-words.html",
+    "href": "bag-of-words.html",
+    "title": "Regression: bag of words",
+    "section": "",
+    "text": "The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a zero-step rollout setting: the model sees a single prompt and predicts a scalar target, with no sequential reasoning."
+  },
+  {
+    "objectID": "bag-of-words.html#dataset",
+    "href": "bag-of-words.html#dataset",
+    "title": "Regression: bag of words",
+    "section": "Dataset",
+    "text": "Dataset\nSee src/data/bag_of_words.py.\nEach prompt is \\(L\\) words sampled iid from a mixture of semantic words, which carries signal, and auxiliary words, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by \\(\\rho \\in (0, 1]\\), the correlation between signal and target.\n7-word vocabulary. Semantic words map to integer values centered at zero:\n\n\n\ngrim\nbad\npoor\nfair\ngood\ngreat\nperfect\n\n\n\n\n\\(-3\\)\n\\(-2\\)\n\\(-1\\)\n\\(0\\)\n\\(+1\\)\n\\(+2\\)\n\\(+3\\)\n\n\n\nThe 256 auxiliary words (common function words: the, a, and, if, because, …) carry value 0.\nSampling distribution. Semantic words share mass \\(1 - \\alpha\\) (where \\(\\alpha\\) = aux_words_ratio), shaped by a power-law centered on the neutral word “fair”: \\(p_i \\propto (1 + |i - \\text{center}|)^{-\\gamma}\\). Auxiliary words uniformly split mass \\(\\alpha\\).\n\n\n\nSemantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency: \\(\\alpha = 0.5, \\gamma = 1.0\\)\n\n\nTarget generation. Given a prompt of length \\(L\\): \\[\n\\text{signal} = \\frac{\\rho}{\\sigma\\sqrt{L}} \\sum_{i=1}^L v_i, \\qquad\n\\text{target} = \\text{signal} + \\mathcal{N}(0, \\sqrt{1 - \\rho^2})\n\\] where \\(\\sigma\\) is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction \\(\\text{Var}(\\text{target}) = 1\\) and \\(\\text{corr}(\\text{signal}, \\text{target}) = \\rho\\)."
+  },
+  {
+    "objectID": "bag-of-words.html#examples",
+    "href": "bag-of-words.html#examples",
+    "title": "Regression: bag of words",
+    "section": "Examples",
+    "text": "Examples\nConsider 8-word prompts; we compute the per-word signal stdev \\(\\sigma = 1.14\\), so the per-prompt stdev \\(\\sqrt{L}\\,\\sigma = 3.21\\). Semantic words are bolded:\nLow-signal regime: \\(\\rho = 0.01\\) — multiplier \\(\\rho / (\\sigma \\sqrt{L}) = 0.0031\\), noise stdev \\(\\sqrt{1 - \\rho^2} \\approx 1.00\\):\n\nboth idea fair poor rather bad grim then\n\n\\(\\sum v_i = -6\\), signal \\(= 0.0031 \\times (-6) = -0.019\\), target \\(= -2.54\\)\nHigh-signal regime: \\(\\rho = 0.45\\) — multiplier \\(= 0.140\\), noise stdev \\(\\sqrt{1 - \\rho^2} = 0.89\\):\n\ngrim poor ask look some door do fair\n\n\\(\\sum v_i = -4\\), signal \\(= 0.140 \\times (-4) = -0.560\\), target \\(= -0.707\\)\nVery-high-signal regime: \\(\\rho = 0.89\\) — multiplier \\(= 0.277\\), noise stdev \\(\\sqrt{1 - \\rho^2} = 0.46\\):\n\ngood good floor good good good perfect poor\n\n\\(\\sum v_i = +7\\), signal \\(= 0.277 \\times 7 = 1.94\\), target \\(= 1.78\\)"
+  },
+  {
+    "objectID": "bag-of-words.html#supervised-learning-benchmark",
+    "href": "bag-of-words.html#supervised-learning-benchmark",
+    "title": "Regression: bag of words",
+    "section": "Supervised-learning benchmark",
+    "text": "Supervised-learning benchmark\n\n\nCode instructions\n\nRun SL-sweep on two devices concurrently.\nbash experiments/bow/sl-corr/do_sweep.bash\nAnalyze experiment artifacts: experiments/bow/sl-corr/analyze.ipynb\n\nResults: WIP"
+  },
+  {
+    "objectID": "bag-of-words.html#grpo",
+    "href": "bag-of-words.html#grpo",
+    "title": "Regression: bag of words",
+    "section": "GRPO",
+    "text": "GRPO\n\n\nCode instructions\n\nCoarse GRPO sweep over (corr, num_rollouts_per_sample) on two devices concurrently. The shuffle seed is chosen so that corr=0.01, num_rollouts=4096 runs first — stress-tests the largest rollout group at the smallest correlation up front.\nbash experiments/bow/grpo-corr/do_coarse_sweep.bash\nAnalyze experiment artifacts: experiments/bow/grpo-corr/analyze-coarse-sweep.ipynb\n\nResults: WIP"
+  },
+  {
+    "objectID": "bag-of-words.html#maxrl",
+    "href": "bag-of-words.html#maxrl",
+    "title": "Regression: bag of words",
+    "section": "MaxRL",
+    "text": "MaxRL\nSee MaxRL estimator: leave-one-out derivation for the estimator math used here."
+  },
+  {
+    "objectID": "dag-reasoning.html",
+    "href": "dag-reasoning.html",
+    "title": "Regression: DAG-reasoning",
+    "section": "",
+    "text": "The next DAG-reasoning setup isolates the reasoning advantage and rollout efficiency of the compared methods."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "MaxRL Statistics",
+    "section": "",
+    "text": "Placeholder summary of research progress."
+  },
+  {
+    "objectID": "index.html#contents",
+    "href": "index.html#contents",
+    "title": "MaxRL Statistics",
+    "section": "Contents",
+    "text": "Contents\n\nRegression: bag of words — noise-robustness in zero-step sampling setting. WIP.\nRegression: DAG-reasoning — work-not-started.\nMaxRL estimator: leave-one-out derivation — generalized MaxRL gradient estimator and its \\(O(BRD)\\) stable computation (fun nontrivial algorithm design problem!)."
+  },
+  {
+    "objectID": "maxrl-estimator.html",
+    "href": "maxrl-estimator.html",
+    "title": "MaxRL estimator: leave-one-out derivation",
+    "section": "",
+    "text": "Reference implementation: src/maxrl_estimator.py.\nWe use the generalized MaxRL estimator in its leave-one-out form. Fix one batch row \\((x, y)\\), draw \\(R\\) iid rollouts \\(z_1, \\dots, z_R \\sim m_\\theta(\\cdot \\mid x)\\), define detached per-rollout likelihoods and score vectors \\[\nl_j := l(y, z_j) \\in [0, 1], \\quad S_j := \\nabla_\\theta \\log m_\\theta(z_j \\mid x).\n\\] Further define the marginal rollout likelihood and weight function \\[\np := \\mathbb{E}[l_j], \\qquad w_D(p) := \\sum_{k=0}^{D-1} (1-p)^k,\n\\] then the degree-\\(D\\) truncated MaxRL gradient estimator is \\[\n\\nabla_\\theta J_D(p) = w_D(p) \\, \\mathbb{E}[l_j S_j].\n\\] The generalized leave-one-out estimator therefore has the form \\[\n\\hat{g}_D(x, y) = \\frac{1}{R} \\sum_{j=1}^R \\omega_j \\, l_j \\, S_j,\n\\] where each \\(\\omega_j\\) is built from the peer rollouts \\(k \\neq j\\) only and satisfies \\[\n\\mathbb{E}[\\omega_j] = w_D(p).\n\\]\n\nFormulating the problem\nDefine the per-rollout complements \\[\na_j := 1 - l_j \\in [0, 1] \\implies w_D(p) = \\sum_{k=0}^{D-1} \\mathbb{E}[a_j]^k.\n\\] For a list \\(b_1, \\dots, b_n\\), let the \\(k\\)-th elementary symmetric polynomial be the sum of all size-\\(k\\) products: \\[\ne_k(b_1, \\dots, b_n) := \\sum_{1 \\le i_1 &lt; \\cdots &lt; i_k \\le n} b_{i_1} \\cdots b_{i_k}, \\qquad e_0 := 1.\n\\]\nFix rollout index \\(j\\). Its canonical leave-one-out peer set is \\[\nC_j := \\{1, \\dots, j-1, j+1, \\dots, R\\}.\n\\] Because the \\(a_i\\) are iid, the normalized elementary symmetric polynomial \\[\n\\frac{e_k\\bigl((a_i)_{i \\in C_j}\\bigr)}{\\binom{R-1}{k}}\n\\] is the U-statistic estimator of \\((1-p)^k\\). Therefore the desired leave-one-out weight is \\[\n\\omega_j = \\sum_{k=0}^{D-1} \\frac{e_k\\bigl((a_i)_{i \\in C_j}\\bigr)}{\\binom{R-1}{k}}.\n\\] This yields a standalone programming problem.\nInput. A batched tensor \\(a \\in [0, 1]^{B \\times R}\\) and an integer \\(1 \\le D \\le R\\).\nOutput. A batched tensor \\(\\omega \\in \\mathbb{R}^{B \\times R}\\) with entries \\[\n\\omega_{b, j} = \\sum_{k=0}^{D-1} \\frac{e_k\\bigl((a_{b, i})_{i \\in C_j}\\bigr)}{\\binom{R-1}{k}}.\n\\]\nTarget complexity. An exact or mathematically equivalent formulation with:\n\n\\(O(BRD)\\) time,\n\\(O(BRD)\\) memory or better,\nno subtraction of nearly equal \\(O(1)\\) or larger terms.\n\nThe last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then “peel off” rollout \\(j\\) by subtraction. We empirically found that this leads to significant numerical errors for \\(R \\geq 32\\), and digit-significance dependence grows approximately linearly in the number of rollouts.\n\n\nState vectors and matrix view\nInstead, we define states that are already normalized by the final peer count \\(R - 1\\). For any canonical subset \\(I \\subseteq \\{1, \\dots, R\\}\\), define the state vector \\[\nx(I) := \\bigl(x_0(I), \\dots, x_{D-1}(I)\\bigr)^\\top, \\quad x_k(I) := \\frac{e_k\\bigl((a_i)_{i \\in I}\\bigr)}{\\binom{R-1}{k}}.\n\\]\nTwo basic facts make this a good state space:\n\n\\(x_0(I) = 1\\).\nBecause each \\(a_i \\in [0, 1]\\), every forward-state coordinate is bounded \\(0 \\le x_k(I) \\le 1\\).\n\nNow suppose \\(I\\) is a canonical subset and we append one new complement value \\(a\\). Using \\[\ne_k(I \\cup \\{a\\}) = e_k(I) + a \\, e_{k-1}(I),\n\\] we obtain the fixed-denominator recurrence over appending elements to the canonical set \\[\nx_0' = x_0, \\quad x_k' = x_k + \\frac{k}{R-k} \\, a \\, x_{k-1}, \\qquad k = 1, \\dots, D-1.\n\\] Package the update as multiplication by a lower-bidiagonal matrix \\(M(a) \\in \\mathbb{R}^{D \\times D}\\): \\[\nx' = M(a) \\, x \\quad  \\text{ where } \\quad M(a)_{k, k} = 1,\\quad  M(a)_{k, k-1} = \\frac{k}{R-k} \\, a\n\\]\nWith the empty-set initial state \\[\ne_0 := (1, 0, \\dots, 0)^\\top,\n\\] the state for any canonical prefix \\(I = \\{1, \\dots, j\\}\\) is obtained by repeated application of these matrices.\n\n\nPrefix-suffix scans\nDefine the forward prefix states so that \\(\\alpha_j = x(\\{1, \\dots, j\\})\\): \\[\n\\alpha_0 := e_0, \\qquad \\alpha_j := M(a_j) \\, \\alpha_{j-1}, \\qquad j = 1, \\dots, R.\n\\] Similarly define the suffix covectors which encode the “suffix-and-sum” operation: \\[\n\\beta_R^\\top := \\mathbf{1}^\\top, \\qquad \\beta_{j-1}^\\top := \\beta_j^\\top M(a_j), \\qquad j = R, \\dots, 1,\n\\]\nNow fix rollout \\(j\\). The leave-one-out peer set \\(C_j\\) is the union of the canonical prefix before \\(j\\) and the canonical suffix after \\(j\\). Its state vector is therefore \\[\nx(C_j) = M(a_R) \\cdots M(a_{j+1}) \\, \\alpha_{j-1} \\implies \\omega_j = \\mathbf{1}^\\top x(C_j) = \\beta_j^\\top \\alpha_{j-1}.\n\\]\n\n\nComputational interpretation\nFor one batch row, the algorithm is:\n\nConvert likelihoods to complements \\(a_j = 1 - l_j\\).\nRun a forward scan over \\(j = 1, \\dots, R\\) using the lower-bidiagonal update \\(M(a_j)\\).\nRun a backward scan over \\(j = R, \\dots, 1\\) using the same update.\nForm all leave-one-out weights via \\(\\omega_j = \\beta_j^\\top \\alpha_{j-1}\\).\n\nEach matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs \\(O(D)\\). The full batched computation therefore has the target complexity \\(O(BRD)\\) with straightforward \\(O(BRD)\\) storage if all prefix states are materialized."
+  },
+  {
+    "objectID": "maxrl-estimator.html#formulating-the-problem",
+    "href": "maxrl-estimator.html#formulating-the-problem",
+    "title": "MaxRL estimator: leave-one-out derivation",
+    "section": "Formulating the problem",
+    "text": "Formulating the problem\nDefine the per-rollout complements \\[\na_j := 1 - l_j \\in [0, 1] \\implies w_D(p) = \\sum_{k=0}^{D-1} \\mathbb{E}[a_j]^k.\n\\] For a list \\(b_1, \\dots, b_n\\), let the \\(k\\)-th elementary symmetric polynomial be the sum of all size-\\(k\\) products: \\[\ne_k(b_1, \\dots, b_n) := \\sum_{1 \\le i_1 &lt; \\cdots &lt; i_k \\le n} b_{i_1} \\cdots b_{i_k}, \\qquad e_0 := 1.\n\\]\nFix rollout index \\(j\\). Its canonical leave-one-out peer set is \\[\nC_j := \\{1, \\dots, j-1, j+1, \\dots, R\\}.\n\\] Because the \\(a_i\\) are iid, the normalized elementary symmetric polynomial \\[\n\\frac{e_k\\bigl((a_i)_{i \\in C_j}\\bigr)}{\\binom{R-1}{k}}\n\\] is the U-statistic estimator of \\((1-p)^k\\). Therefore the desired leave-one-out weight is \\[\n\\omega_j = \\sum_{k=0}^{D-1} \\frac{e_k\\bigl((a_i)_{i \\in C_j}\\bigr)}{\\binom{R-1}{k}}.\n\\] This yields a standalone programming problem.\nInput. A batched tensor \\(a \\in [0, 1]^{B \\times R}\\) and an integer \\(1 \\le D \\le R\\).\nOutput. A batched tensor \\(\\omega \\in \\mathbb{R}^{B \\times R}\\) with entries \\[\n\\omega_{b, j} = \\sum_{k=0}^{D-1} \\frac{e_k\\bigl((a_{b, i})_{i \\in C_j}\\bigr)}{\\binom{R-1}{k}}.\n\\]\nTarget complexity. An exact or mathematically equivalent formulation with:\n\n\\(O(BRD)\\) time,\n\\(O(BRD)\\) memory or better,\nno subtraction of nearly equal \\(O(1)\\) or larger terms.\n\nThe last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then “peel off” rollout \\(j\\) by subtraction. We empirically found that this leads to significant numerical errors for \\(R \\geq 32\\), and digit-significance dependence grows approximately linearly in the number of rollouts."
+  },
+  {
+    "objectID": "maxrl-estimator.html#state-vectors-and-matrix-view",
+    "href": "maxrl-estimator.html#state-vectors-and-matrix-view",
+    "title": "MaxRL estimator: leave-one-out derivation",
+    "section": "State vectors and matrix view",
+    "text": "State vectors and matrix view\nInstead, we define states that are already normalized by the final peer count \\(R - 1\\). For any canonical subset \\(I \\subseteq \\{1, \\dots, R\\}\\), define the state vector \\[\nx(I) := \\bigl(x_0(I), \\dots, x_{D-1}(I)\\bigr)^\\top, \\quad x_k(I) := \\frac{e_k\\bigl((a_i)_{i \\in I}\\bigr)}{\\binom{R-1}{k}}.\n\\]\nTwo basic facts make this a good state space:\n\n\\(x_0(I) = 1\\).\nBecause each \\(a_i \\in [0, 1]\\), every forward-state coordinate is bounded \\(0 \\le x_k(I) \\le 1\\).\n\nNow suppose \\(I\\) is a canonical subset and we append one new complement value \\(a\\). Using \\[\ne_k(I \\cup \\{a\\}) = e_k(I) + a \\, e_{k-1}(I),\n\\] we obtain the fixed-denominator recurrence over appending elements to the canonical set \\[\nx_0' = x_0, \\quad x_k' = x_k + \\frac{k}{R-k} \\, a \\, x_{k-1}, \\qquad k = 1, \\dots, D-1.\n\\] Package the update as multiplication by a lower-bidiagonal matrix \\(M(a) \\in \\mathbb{R}^{D \\times D}\\): \\[\nx' = M(a) \\, x \\quad  \\text{ where } \\quad M(a)_{k, k} = 1,\\quad  M(a)_{k, k-1} = \\frac{k}{R-k} \\, a\n\\]\nWith the empty-set initial state \\[\ne_0 := (1, 0, \\dots, 0)^\\top,\n\\] the state for any canonical prefix \\(I = \\{1, \\dots, j\\}\\) is obtained by repeated application of these matrices."
+  },
+  {
+    "objectID": "maxrl-estimator.html#prefix-suffix-scans",
+    "href": "maxrl-estimator.html#prefix-suffix-scans",
+    "title": "MaxRL estimator: leave-one-out derivation",
+    "section": "Prefix-suffix scans",
+    "text": "Prefix-suffix scans\nDefine the forward prefix states so that \\(\\alpha_j = x(\\{1, \\dots, j\\})\\): \\[\n\\alpha_0 := e_0, \\qquad \\alpha_j := M(a_j) \\, \\alpha_{j-1}, \\qquad j = 1, \\dots, R.\n\\] Similarly define the suffix covectors which encode the “suffix-and-sum” operation: \\[\n\\beta_R^\\top := \\mathbf{1}^\\top, \\qquad \\beta_{j-1}^\\top := \\beta_j^\\top M(a_j), \\qquad j = R, \\dots, 1,\n\\]\nNow fix rollout \\(j\\). The leave-one-out peer set \\(C_j\\) is the union of the canonical prefix before \\(j\\) and the canonical suffix after \\(j\\). Its state vector is therefore \\[\nx(C_j) = M(a_R) \\cdots M(a_{j+1}) \\, \\alpha_{j-1} \\implies \\omega_j = \\mathbf{1}^\\top x(C_j) = \\beta_j^\\top \\alpha_{j-1}.\n\\]"
+  },
+  {
+    "objectID": "maxrl-estimator.html#computational-interpretation",
+    "href": "maxrl-estimator.html#computational-interpretation",
+    "title": "MaxRL estimator: leave-one-out derivation",
+    "section": "Computational interpretation",
+    "text": "Computational interpretation\nFor one batch row, the algorithm is:\n\nConvert likelihoods to complements \\(a_j = 1 - l_j\\).\nRun a forward scan over \\(j = 1, \\dots, R\\) using the lower-bidiagonal update \\(M(a_j)\\).\nRun a backward scan over \\(j = R, \\dots, 1\\) using the same update.\nForm all leave-one-out weights via \\[\n\\omega_j = \\beta_j^\\top \\alpha_{j-1}.\n\\]\n\nEach matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs \\(O(D)\\). The full batched computation therefore has the target complexity \\[\nO(BRD)\n\\] with straightforward \\(O(BRD)\\) storage if all prefix states are materialized."
+  }
+]

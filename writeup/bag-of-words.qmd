@@ -1,8 +1,10 @@
-## Regression: bag of words
+---
+title: "Regression: bag of words"
+---
 
 The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a **zero-step rollout** setting: the model sees a single prompt and predicts a scalar target, with no sequential reasoning.
 
-### Dataset
+## Dataset
 
 See [`src/data/bag_of_words.py`]({{< var repo_url >}}/src/data/bag_of_words.py).
 
@@ -27,7 +29,7 @@ $$
 $$
 where $\sigma$ is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction $\text{Var}(\text{target}) = 1$ and $\text{corr}(\text{signal}, \text{target}) = \rho$.
 
-### Examples
+## Examples
 
 Consider 8-word prompts; we compute the _per-word signal stdev_ $\sigma = 1.14$, so the per-prompt stdev $\sqrt{L}\,\sigma = 3.21$. Semantic words are **bolded**:
 
@@ -49,7 +51,7 @@ $\sum v_i = -4$, signal $= 0.140 \times (-4) = -0.560$, target $= -0.707$
 
 $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$
 
-### Supervised-learning benchmark
+## Supervised-learning benchmark
 
 <details>
 <summary>Code instructions</summary>
@@ -65,7 +67,7 @@ Analyze experiment artifacts: `experiments/bow/sl-corr/analyze.ipynb`
 
 Results: WIP
 
-### GRPO
+## GRPO
 
 <details>
 <summary>Code instructions</summary>
@@ -81,4 +83,6 @@ Analyze experiment artifacts: `experiments/bow/grpo-corr/analyze-coarse-sweep.ip
 
 Results: WIP
 
-### MaxRL
+## MaxRL
+
+See [MaxRL estimator: leave-one-out derivation](maxrl-estimator.qmd) for the estimator math used here.

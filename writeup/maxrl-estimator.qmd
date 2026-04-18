@@ -1,15 +1,8 @@
-# Shared library code
+---
+title: "MaxRL estimator: leave-one-out derivation"
+---
 
-Importable as the `src` package.
-
-- `config/`: utilities for defining, composing, and visualizing stateless configs.
-- `data/`: dataset construction, dataloading, parquet I/O.
-- `model/`: model definitions and optimizers.
-- `experiments/`: per-experiment training/analysis modules (e.g. `bag_of_words/`).
-- `metrics.py`: shared metrics.
-
-
-## MaxRL Estimator Math
+Reference implementation: [`src/maxrl_estimator.py`]({{< var repo_url >}}/src/maxrl_estimator.py).
 
 We use the generalized MaxRL estimator in its leave-one-out form. Fix one batch row $(x, y)$, draw $R$ iid rollouts $z_1, \dots, z_R \sim m_\theta(\cdot \mid x)$, define detached per-rollout likelihoods and score vectors
 $$
@@ -31,7 +24,6 @@ where each $\omega_j$ is built from the peer rollouts $k \neq j$ only and satisf
 $$
 \mathbb{E}[\omega_j] = w_D(p).
 $$
-This subsection isolates the standalone computational problem of evaluating all $\omega_j$ efficiently and stably on GPU. The generalized estimator target comes directly from the rollout-likelihood MaxRL derivation, while the motivation for avoiding the earlier two-term leave-one-out recurrence is its catastrophic cancellation behavior at larger rollout counts.
 
 ### Formulating the problem
 
@@ -78,12 +70,14 @@ An exact or mathematically equivalent formulation with:
 The last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then "peel off" rollout $j$ by subtraction. We empirically found that this leads to significant numerical errors for $R \geq 32$, and digit-significance dependence grows approximately linearly in the number of rollouts.
 
 ### State vectors and matrix view
+
 Instead, we define states that are already normalized by the **final** peer count $R - 1$. For any canonical subset $I \subseteq \{1, \dots, R\}$, define the state vector
 $$
 x(I) := \bigl(x_0(I), \dots, x_{D-1}(I)\bigr)^\top, \quad x_k(I) := \frac{e_k\bigl((a_i)_{i \in I}\bigr)}{\binom{R-1}{k}}.
 $$
 
 Two basic facts make this a good state space:
+
 1. $x_0(I) = 1$.
 2. Because each $a_i \in [0, 1]$, every forward-state coordinate is bounded $0 \le x_k(I) \le 1$.
 
@@ -129,13 +123,6 @@ For one batch row, the algorithm is:
 1. Convert likelihoods to complements $a_j = 1 - l_j$.
 2. Run a forward scan over $j = 1, \dots, R$ using the lower-bidiagonal update $M(a_j)$.
 3. Run a backward scan over $j = R, \dots, 1$ using the same update.
-4. Form all leave-one-out weights via
-   $$
-   \omega_j = \beta_j^\top \alpha_{j-1}.
-   $$
+4. Form all leave-one-out weights via $\omega_j = \beta_j^\top \alpha_{j-1}$.
 
-Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs $O(D)$. The full batched computation therefore has the target complexity
-$$
-O(BRD)
-$$
-with straightforward $O(BRD)$ storage if all prefix states are materialized.
+Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs $O(D)$. The full batched computation therefore has the target complexity $O(BRD)$ with straightforward $O(BRD)$ storage if all prefix states are materialized.

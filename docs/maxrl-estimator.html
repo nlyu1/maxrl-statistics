@@ -6,10 +6,8 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Nicholas Lyu">
-<meta name="dcterms.date" content="2026-04-18">
 
-<title>MaxRL Statistics</title>
+<title>MaxRL estimator: leave-one-out derivation – MaxRL Statistics</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -123,7 +121,7 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
@@ -135,7 +133,7 @@ window.Quarto = {
 <span class="menu-text">DAG Reasoning</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./maxrl-estimator.html"> 
+    <a class="nav-link active" href="./maxrl-estimator.html" aria-current="page"> 
 <span class="menu-text">MaxRL Estimator</span></a>
   </li>  
 </ul>
@@ -154,7 +152,10 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#contents" id="toc-contents" class="nav-link active" data-scroll-target="#contents">Contents</a></li>
+  <li><a href="#formulating-the-problem" id="toc-formulating-the-problem" class="nav-link active" data-scroll-target="#formulating-the-problem">Formulating the problem</a></li>
+  <li><a href="#state-vectors-and-matrix-view" id="toc-state-vectors-and-matrix-view" class="nav-link" data-scroll-target="#state-vectors-and-matrix-view">State vectors and matrix view</a></li>
+  <li><a href="#prefix-suffix-scans" id="toc-prefix-suffix-scans" class="nav-link" data-scroll-target="#prefix-suffix-scans">Prefix-suffix scans</a></li>
+  <li><a href="#computational-interpretation" id="toc-computational-interpretation" class="nav-link" data-scroll-target="#computational-interpretation">Computational interpretation</a></li>
   </ul>
 </nav>
     </div>
@@ -163,26 +164,14 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">MaxRL Statistics</h1>
+<h1 class="title">MaxRL estimator: leave-one-out derivation</h1>
 </div>
 
 
 
 <div class="quarto-title-meta">
 
-    <div>
-    <div class="quarto-title-meta-heading">Author</div>
-    <div class="quarto-title-meta-contents">
-             <p>Nicholas Lyu </p>
-          </div>
-  </div>
     
-    <div>
-    <div class="quarto-title-meta-heading">Published</div>
-    <div class="quarto-title-meta-contents">
-      <p class="date">April 18, 2026</p>
-    </div>
-  </div>
   
     
   </div>
@@ -192,14 +181,86 @@ window.Quarto = {
 </header>
 
 
-<p>Placeholder summary of research progress.</p>
-<section id="contents" class="level2">
-<h2 class="anchored" data-anchor-id="contents">Contents</h2>
+<p>Reference implementation: <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/maxrl_estimator.py"><code>src/maxrl_estimator.py</code></a>.</p>
+<p>We use the generalized MaxRL estimator in its leave-one-out form. Fix one batch row <span class="math inline">\((x, y)\)</span>, draw <span class="math inline">\(R\)</span> iid rollouts <span class="math inline">\(z_1, \dots, z_R \sim m_\theta(\cdot \mid x)\)</span>, define detached per-rollout likelihoods and score vectors <span class="math display">\[
+l_j := l(y, z_j) \in [0, 1], \quad S_j := \nabla_\theta \log m_\theta(z_j \mid x).
+\]</span> Further define the marginal rollout likelihood and weight function <span class="math display">\[
+p := \mathbb{E}[l_j], \qquad w_D(p) := \sum_{k=0}^{D-1} (1-p)^k,
+\]</span> then the degree-<span class="math inline">\(D\)</span> truncated MaxRL gradient estimator is <span class="math display">\[
+\nabla_\theta J_D(p) = w_D(p) \, \mathbb{E}[l_j S_j].
+\]</span> The generalized leave-one-out estimator therefore has the form <span class="math display">\[
+\hat{g}_D(x, y) = \frac{1}{R} \sum_{j=1}^R \omega_j \, l_j \, S_j,
+\]</span> where each <span class="math inline">\(\omega_j\)</span> is built from the peer rollouts <span class="math inline">\(k \neq j\)</span> only and satisfies <span class="math display">\[
+\mathbb{E}[\omega_j] = w_D(p).
+\]</span></p>
+<section id="formulating-the-problem" class="level3">
+<h3 class="anchored" data-anchor-id="formulating-the-problem">Formulating the problem</h3>
+<p>Define the per-rollout complements <span class="math display">\[
+a_j := 1 - l_j \in [0, 1] \implies w_D(p) = \sum_{k=0}^{D-1} \mathbb{E}[a_j]^k.
+\]</span> For a list <span class="math inline">\(b_1, \dots, b_n\)</span>, let the <strong><span class="math inline">\(k\)</span>-th elementary symmetric polynomial</strong> be the sum of all size-<span class="math inline">\(k\)</span> products: <span class="math display">\[
+e_k(b_1, \dots, b_n) := \sum_{1 \le i_1 &lt; \cdots &lt; i_k \le n} b_{i_1} \cdots b_{i_k}, \qquad e_0 := 1.
+\]</span></p>
+<p>Fix rollout index <span class="math inline">\(j\)</span>. Its canonical leave-one-out peer set is <span class="math display">\[
+C_j := \{1, \dots, j-1, j+1, \dots, R\}.
+\]</span> Because the <span class="math inline">\(a_i\)</span> are iid, the normalized elementary symmetric polynomial <span class="math display">\[
+\frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}
+\]</span> is the U-statistic estimator of <span class="math inline">\((1-p)^k\)</span>. Therefore the desired leave-one-out weight is <span class="math display">\[
+\omega_j = \sum_{k=0}^{D-1} \frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}.
+\]</span> This yields a standalone programming problem.</p>
+<p><strong>Input.</strong> A batched tensor <span class="math inline">\(a \in [0, 1]^{B \times R}\)</span> and an integer <span class="math inline">\(1 \le D \le R\)</span>.</p>
+<p><strong>Output.</strong> A batched tensor <span class="math inline">\(\omega \in \mathbb{R}^{B \times R}\)</span> with entries <span class="math display">\[
+\omega_{b, j} = \sum_{k=0}^{D-1} \frac{e_k\bigl((a_{b, i})_{i \in C_j}\bigr)}{\binom{R-1}{k}}.
+\]</span></p>
+<p><strong>Target complexity.</strong> An exact or mathematically equivalent formulation with:</p>
 <ul>
-<li><a href="./bag-of-words.html">Regression: bag of words</a> — noise-robustness in zero-step sampling setting. WIP.</li>
-<li><a href="./dag-reasoning.html">Regression: DAG-reasoning</a> — work-not-started.</li>
-<li><a href="./maxrl-estimator.html">MaxRL estimator: leave-one-out derivation</a> — generalized MaxRL gradient estimator and its <span class="math inline">\(O(BRD)\)</span> stable computation (fun nontrivial algorithm design problem!).</li>
+<li><span class="math inline">\(O(BRD)\)</span> time,</li>
+<li><span class="math inline">\(O(BRD)\)</span> memory or better,</li>
+<li>no subtraction of nearly equal <span class="math inline">\(O(1)\)</span> or larger terms.</li>
 </ul>
+<p>The last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then “peel off” rollout <span class="math inline">\(j\)</span> by subtraction. We empirically found that this leads to significant numerical errors for <span class="math inline">\(R \geq 32\)</span>, and digit-significance dependence grows approximately linearly in the number of rollouts.</p>
+</section>
+<section id="state-vectors-and-matrix-view" class="level3">
+<h3 class="anchored" data-anchor-id="state-vectors-and-matrix-view">State vectors and matrix view</h3>
+<p>Instead, we define states that are already normalized by the <strong>final</strong> peer count <span class="math inline">\(R - 1\)</span>. For any canonical subset <span class="math inline">\(I \subseteq \{1, \dots, R\}\)</span>, define the state vector <span class="math display">\[
+x(I) := \bigl(x_0(I), \dots, x_{D-1}(I)\bigr)^\top, \quad x_k(I) := \frac{e_k\bigl((a_i)_{i \in I}\bigr)}{\binom{R-1}{k}}.
+\]</span></p>
+<p>Two basic facts make this a good state space:</p>
+<ol type="1">
+<li><span class="math inline">\(x_0(I) = 1\)</span>.</li>
+<li>Because each <span class="math inline">\(a_i \in [0, 1]\)</span>, every forward-state coordinate is bounded <span class="math inline">\(0 \le x_k(I) \le 1\)</span>.</li>
+</ol>
+<p>Now suppose <span class="math inline">\(I\)</span> is a canonical subset and we append one new complement value <span class="math inline">\(a\)</span>. Using <span class="math display">\[
+e_k(I \cup \{a\}) = e_k(I) + a \, e_{k-1}(I),
+\]</span> we obtain the fixed-denominator recurrence over <em>appending elements to the canonical set</em> <span class="math display">\[
+x_0' = x_0, \quad x_k' = x_k + \frac{k}{R-k} \, a \, x_{k-1}, \qquad k = 1, \dots, D-1.
+\]</span> Package the update as multiplication by a lower-bidiagonal matrix <span class="math inline">\(M(a) \in \mathbb{R}^{D \times D}\)</span>: <span class="math display">\[
+x' = M(a) \, x \quad  \text{ where } \quad M(a)_{k, k} = 1,\quad  M(a)_{k, k-1} = \frac{k}{R-k} \, a
+\]</span></p>
+<p>With the empty-set initial state <span class="math display">\[
+e_0 := (1, 0, \dots, 0)^\top,
+\]</span> the state for any canonical prefix <span class="math inline">\(I = \{1, \dots, j\}\)</span> is obtained by repeated application of these matrices.</p>
+</section>
+<section id="prefix-suffix-scans" class="level3">
+<h3 class="anchored" data-anchor-id="prefix-suffix-scans">Prefix-suffix scans</h3>
+<p>Define the forward prefix states so that <span class="math inline">\(\alpha_j = x(\{1, \dots, j\})\)</span>: <span class="math display">\[
+\alpha_0 := e_0, \qquad \alpha_j := M(a_j) \, \alpha_{j-1}, \qquad j = 1, \dots, R.
+\]</span> Similarly define the suffix covectors which encode the “suffix-and-sum” operation: <span class="math display">\[
+\beta_R^\top := \mathbf{1}^\top, \qquad \beta_{j-1}^\top := \beta_j^\top M(a_j), \qquad j = R, \dots, 1,
+\]</span></p>
+<p>Now fix rollout <span class="math inline">\(j\)</span>. The leave-one-out peer set <span class="math inline">\(C_j\)</span> is the union of the canonical prefix before <span class="math inline">\(j\)</span> and the canonical suffix after <span class="math inline">\(j\)</span>. Its state vector is therefore <span class="math display">\[
+x(C_j) = M(a_R) \cdots M(a_{j+1}) \, \alpha_{j-1} \implies \omega_j = \mathbf{1}^\top x(C_j) = \beta_j^\top \alpha_{j-1}.
+\]</span></p>
+</section>
+<section id="computational-interpretation" class="level3">
+<h3 class="anchored" data-anchor-id="computational-interpretation">Computational interpretation</h3>
+<p>For one batch row, the algorithm is:</p>
+<ol type="1">
+<li>Convert likelihoods to complements <span class="math inline">\(a_j = 1 - l_j\)</span>.</li>
+<li>Run a forward scan over <span class="math inline">\(j = 1, \dots, R\)</span> using the lower-bidiagonal update <span class="math inline">\(M(a_j)\)</span>.</li>
+<li>Run a backward scan over <span class="math inline">\(j = R, \dots, 1\)</span> using the same update.</li>
+<li>Form all leave-one-out weights via <span class="math inline">\(\omega_j = \beta_j^\top \alpha_{j-1}\)</span>.</li>
+</ol>
+<p>Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs <span class="math inline">\(O(D)\)</span>. The full batched computation therefore has the target complexity <span class="math inline">\(O(BRD)\)</span> with straightforward <span class="math inline">\(O(BRD)\)</span> storage if all prefix states are materialized.</p>
 
 
 </section>

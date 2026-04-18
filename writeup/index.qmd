@@ -7,6 +7,8 @@ title-block-banner: false
 
 Placeholder summary of research progress.
 
-{{< include bag-of-words.qmd >}}
+## Contents
 
-{{< include dag-reasoning.qmd >}}
+- [Regression: bag of words](bag-of-words.qmd) — noise-robustness in zero-step sampling setting. WIP.
+- [Regression: DAG-reasoning](dag-reasoning.qmd) — work-not-started.
+- [MaxRL estimator: leave-one-out derivation](maxrl-estimator.qmd) — generalized MaxRL gradient estimator and its $O(BRD)$ stable computation (fun nontrivial algorithm design problem!).
