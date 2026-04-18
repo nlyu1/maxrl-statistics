@@ -99,12 +99,4 @@ class BagOfWordsSLState(BagOfWordsStudyBaseState):
         for epoch in range(self.config.train_epochs):
             self.run_train_epoch(epoch=epoch)
             validation = self.compute_validation()
-            metrics = self.serialize_at_end_of_epoch(validation=validation)
-            tqdm.write(
-                f"epoch {epoch:2d}  "
-                f"train_corr_target={metrics['train_corr_target']:.4f}  "
-                f"train_corr_ground_truth={metrics['train_corr_ground_truth']:.4f}  "
-                f"pred_norm={self.last_pred_norm:.4f}  "
-                f"val_corr_target={metrics['val_corr_target']:.4f}  "
-                f"val_corr_ground_truth={metrics['val_corr_ground_truth']:.4f}"
-            )
+            self.serialize_at_end_of_epoch(validation=validation)

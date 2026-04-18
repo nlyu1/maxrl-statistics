@@ -6,7 +6,7 @@ from torch import Tensor
 
 
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
-class CorrelationCounter:
+class RegressionStatCounter:
     xy: Float[Tensor, "dim"]
     xx: Float[Tensor, "dim"]
     yy: Float[Tensor, "dim"]
@@ -24,7 +24,7 @@ class CorrelationCounter:
         dim: int,
         *,
         device: torch.device | None = None,
-    ) -> "CorrelationCounter":
+    ) -> "RegressionStatCounter":
         return cls(
             xy=torch.zeros(dim, device=device),
             xx=torch.zeros(dim, device=device),
@@ -42,13 +42,13 @@ class CorrelationCounter:
         self.yy += (y * y).sum(dim=0)
         self.n += x.shape[0]
 
-    def get_stats(self) -> "CorrelationCounter.Statistics":
+    def get_stats(self) -> "RegressionStatCounter.Statistics":
         """Returns the statistics"""
         eps = torch.finfo(self.xy.dtype).eps
         corr = self.xy / (self.xx * self.yy).sqrt().clamp_min(eps)
         mse = (self.xx - 2 * self.xy + self.yy) / self.n.clamp_min(eps)
         beta = self.xy / self.xx.clamp_min(eps)
-        return CorrelationCounter.Statistics(corr=corr, mse=mse, beta=beta)
+        return RegressionStatCounter.Statistics(corr=corr, mse=mse, beta=beta)
 
     def empty_(self) -> None:
         self.xy.zero_()

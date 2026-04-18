@@ -118,6 +118,7 @@ window.Quarto = {
   <li><a href="#regression-bag-of-words" id="toc-regression-bag-of-words" class="nav-link active" data-scroll-target="#regression-bag-of-words">Regression: bag of words</a>
   <ul class="collapse">
   <li><a href="#dataset" id="toc-dataset" class="nav-link" data-scroll-target="#dataset">Dataset</a></li>
+  <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a></li>
   <li><a href="#supervised-learning-benchmark" id="toc-supervised-learning-benchmark" class="nav-link" data-scroll-target="#supervised-learning-benchmark">Supervised-learning benchmark</a></li>
   <li><a href="#reinforce-grpo" id="toc-reinforce-grpo" class="nav-link" data-scroll-target="#reinforce-grpo">REINFORCE / GRPO</a></li>
   <li><a href="#maxrl" id="toc-maxrl" class="nav-link" data-scroll-target="#maxrl">MaxRL</a></li>
@@ -204,19 +205,25 @@ window.Quarto = {
 \text{signal} = \frac{\rho}{\sigma\sqrt{L}} \sum_{i=1}^L v_i, \qquad
 \text{target} = \text{signal} + \mathcal{N}(0, \sqrt{1 - \rho^2})
 \]</span> where <span class="math inline">\(\sigma\)</span> is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction <span class="math inline">\(\text{Var}(\text{target}) = 1\)</span> and <span class="math inline">\(\text{corr}(\text{signal}, \text{target}) = \rho\)</span>.</p>
-<p><strong>Example prompts</strong> (<span class="math inline">\(L=8\)</span>, <span class="math inline">\(\sigma = 1.14\)</span>, so <span class="math inline">\(\sqrt{L}\,\sigma = 3.21\)</span>). Semantic words are <strong>bolded</strong>:</p>
-<p><strong><span class="math inline">\(\rho = 0.01\)</span></strong> — multiplier <span class="math inline">\(\rho / (\sigma \sqrt{L}) = 0.0031\)</span>, noise standard deviation <span class="math inline">\(\sqrt{1 - \rho^2} = 1.00\)</span>:</p>
+</section>
+<section id="examples" class="level3">
+<h3 class="anchored" data-anchor-id="examples">Examples</h3>
+<p>Consider 8-word prompts; we compute the <em>per-word signal stdev</em> <span class="math inline">\(\sigma = 1.14\)</span>, so the per-prompt stdev <span class="math inline">\(\sqrt{L}\,\sigma = 3.21\)</span>. Semantic words are <strong>bolded</strong>:</p>
+<p><strong>Low-signal regime</strong>: <span class="math inline">\(\rho = 0.01\)</span> — multiplier <span class="math inline">\(\rho / (\sigma \sqrt{L}) = 0.0031\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} \approx 1.00\)</span>:</p>
 <blockquote class="blockquote">
-<p>both idea <strong>fair</strong> <strong>poor</strong> rather <strong>bad</strong> <strong>grim</strong> then <span class="math inline">\(\sum v_i = -6\)</span>, signal <span class="math inline">\(= 0.0031 \times (-6) = -0.019\)</span>, target <span class="math inline">\(= -2.54\)</span> <strong>(almost pure noise)</strong></p>
+<p>both idea <strong>fair</strong> <strong>poor</strong> rather <strong>bad</strong> <strong>grim</strong> then</p>
 </blockquote>
-<p><strong><span class="math inline">\(\rho = 0.45\)</span></strong> — multiplier <span class="math inline">\(= 0.140\)</span>, noise standard deviation <span class="math inline">\(\sqrt{1 - \rho^2} = 0.89\)</span>:</p>
+<p><span class="math inline">\(\sum v_i = -6\)</span>, signal <span class="math inline">\(= 0.0031 \times (-6) = -0.019\)</span>, target <span class="math inline">\(= -2.54\)</span></p>
+<p><strong>High-signal regime</strong>: <span class="math inline">\(\rho = 0.45\)</span> — multiplier <span class="math inline">\(= 0.140\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} = 0.89\)</span>:</p>
 <blockquote class="blockquote">
-<p><strong>grim</strong> <strong>poor</strong> ask look some door do <strong>fair</strong> <span class="math inline">\(\sum v_i = -4\)</span>, signal <span class="math inline">\(= 0.140 \times (-4) = -0.560\)</span>, target <span class="math inline">\(= -0.707\)</span></p>
+<p><strong>grim</strong> <strong>poor</strong> ask look some door do <strong>fair</strong></p>
 </blockquote>
-<p><strong><span class="math inline">\(\rho = 0.89\)</span></strong> — multiplier <span class="math inline">\(= 0.277\)</span>, noise standard deviation <span class="math inline">\(\sqrt{1 - \rho^2} = 0.46\)</span>:</p>
+<p><span class="math inline">\(\sum v_i = -4\)</span>, signal <span class="math inline">\(= 0.140 \times (-4) = -0.560\)</span>, target <span class="math inline">\(= -0.707\)</span></p>
+<p><strong>Very-high-signal regime</strong>: <span class="math inline">\(\rho = 0.89\)</span> — multiplier <span class="math inline">\(= 0.277\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} = 0.46\)</span>:</p>
 <blockquote class="blockquote">
-<p><strong>good</strong> <strong>good</strong> floor <strong>good</strong> <strong>good</strong> <strong>good</strong> <strong>perfect</strong> <strong>poor</strong> <span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.277 \times 7 = 1.94\)</span>, target <span class="math inline">\(= 1.78\)</span> <strong>(target tracks signal)</strong></p>
+<p><strong>good</strong> <strong>good</strong> floor <strong>good</strong> <strong>good</strong> <strong>good</strong> <strong>perfect</strong> <strong>poor</strong></p>
 </blockquote>
+<p><span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.277 \times 7 = 1.94\)</span>, target <span class="math inline">\(= 1.78\)</span></p>
 </section>
 <section id="supervised-learning-benchmark" class="level3">
 <h3 class="anchored" data-anchor-id="supervised-learning-benchmark">Supervised-learning benchmark</h3>
@@ -228,6 +235,7 @@ Code instructions
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> experiments/bow/sl-corr/do_sweep.bash</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 Analyze experiment artifacts: <code>experiments/bow/sl-corr/analyze.ipynb</code>
 </details>
+<p>Results: WIP</p>
 </section>
 <section id="reinforce-grpo" class="level3">
 <h3 class="anchored" data-anchor-id="reinforce-grpo">REINFORCE / GRPO</h3>
