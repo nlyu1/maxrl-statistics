@@ -1,21 +1,11 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
-
-import torch
-from jaxtyping import Float, Int
-from pydantic import ConfigDict
-from pydantic.dataclasses import dataclass
-from torch import Tensor
-from tqdm.autonotebook import tqdm
-
 from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
-from src.experiments.bag_of_words.state import BagOfWordsStudyBaseState
 
 
-class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
+class BagOfWordsMaxRLonfig(BagOfWordsStudyBaseConfig):
     """
-    Zero-step rollout, fully on-policy GRPO config.
+    Zero-step rollout, fully on-policy MaxRL config
 
     The policy is a Gaussian on the scalar output,
         m_theta(z | x) = Normal(f_theta(x), gaussian_stdev^2),
@@ -25,8 +15,12 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
     against the (noisy) target.
     """
 
+    # Estimate order = num_rollouts_per_sample
     num_rollouts_per_sample: int
     gaussian_stdev: float
+    # We need an additional term to bound the log-expansion.
+    # In the canonical bag-of-words dataset, this is [-1, 1] -> 2.0
+    reward_range: float
 
     def get_state_cls(self) -> type["BagOfWordsGRPOState"]:
         return BagOfWordsGRPOState
@@ -40,7 +34,7 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
         **kwargs: object,
     ) -> "BagOfWordsGRPOConfig":
         config = cls(
-            **cls.canonical_kwargs(**kwargs),
+            **cls._canonical_kwargs(**kwargs),
             num_rollouts_per_sample=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,
         )
@@ -49,7 +43,7 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
-class BagOfWordsGRPOState(BagOfWordsStudyBaseState):
+class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
     last_pred_norm: float = 0.0
 
     def compute_last_step_projections(
@@ -113,14 +107,12 @@ class BagOfWordsGRPOState(BagOfWordsStudyBaseState):
                 (rollouts - prediction.unsqueeze(-1)) / sigma
             ).pow(2)
 
-            rewards: Float[Tensor, "batch rollouts"] = -(
-                rollouts - target.unsqueeze(-1)
-            ).pow(2)
-            advantages: Float[Tensor, "batch rollouts"] = (
-                rewards - rewards.mean(-1, keepdim=True)
-            ) / (rewards.std(-1, keepdim=True) + 1e-8)
+            # Compute score weights
+            score_weights: Float[Tensor, "batch rollouts"] = (
+                self._compute_score_weights(rollouts=rollouts, target=target)
+            )
 
-            loss = -(logp_rollouts * advantages.detach()).mean()
+            loss = -(logp_rollouts * score_weights.detach()).mean()
 
             with torch.no_grad():
                 self.last_pred_norm = float(prediction.detach().float().norm().cpu())

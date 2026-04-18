@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import plotly.graph_objects as go
@@ -6,7 +7,6 @@ from plotly.colors import qualitative
 from plotly.subplots import make_subplots
 
 from src.config.base import BaseConfig
-from src.experiments.bag_of_words.sl import BagOfWordsSLConfig
 
 
 class BagOfWordsAnalysisConfig(BaseConfig):
@@ -140,9 +140,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         """
         df = self.get_metric_dataframe()
         study_corrs = {
-            s: BagOfWordsSLConfig.model_validate_json(
-                (path / "config.json").read_text()
-            ).data.corr
+            s: float(json.loads((path / "config.json").read_text())["data"]["corr"])
             for s, path in self.studies.items()
         }
         palette = qualitative.Plotly

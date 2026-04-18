@@ -73,7 +73,6 @@ CORR_LIST = [
     1.000,
 ]
 
-MODEL_NAME = "HuggingFaceTB/SmolLM2-135M"
 TRAIN_EPOCHS = 20
 AUX_WORDS_RATIO = 0.5
 
@@ -87,7 +86,7 @@ def get_study_folder(
     corr: float,
     num_words: int = 7,
     prompt_length: int = 128,
-    word_decay_power: float = 0.0,
+    word_decay_power: float = 1.0,
     aux_words_ratio: float = AUX_WORDS_RATIO,
 ) -> Path:
     return study_base / (
@@ -152,7 +151,6 @@ def main(
             study_base_folder=STUDY_BASE,
             corr=corr,
             aux_words_ratio=AUX_WORDS_RATIO,
-            model_name=MODEL_NAME,
             train_epochs=train_epochs,
         )
         if BagOfWordsAnalysisConfig.is_study_complete(config.study_folder):

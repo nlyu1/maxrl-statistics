@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -35,7 +36,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
     compile_mode: str = "reduce-overhead"
 
     @classmethod
-    def get_canonical(
+    def canonical_kwargs(
         cls,
         *,
         dataset_base_folder: Path,
@@ -46,18 +47,18 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         num_samples: int = 50_000,
         prompt_length: int = 128,
         filter_samples_above_n_tokens: int = 384,
-        word_decay_power: float = 0.0,
+        word_decay_power: float = 1.0,
         batch_size: int = 64,
         weight_decay: float = 0.0,
         eval_batch_size_multiple: int = 2,
-        lr_per_token: float = 2.3e-8,
+        lr_per_token: float = 1e-6,
         backbone_lr_divisor: float = 6.66,
         pad_to_multiple: int = 8,
         model_name: str = "HuggingFaceTB/SmolLM2-135M",
         train_epochs: int = 20,
         clip_grad_norm: float = 1.0,
         compile_model: bool = True,
-    ) -> "BagOfWordsStudyBaseConfig":
+    ) -> dict:
         if num_words not in canonical_bags:
             supported = ", ".join(str(n) for n in sorted(canonical_bags))
             raise ValueError(f"num_words must be one of {{{supported}}}")
@@ -92,7 +93,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         )
 
         head_lr = lr_per_token * batch_size * prompt_length
-        config = cls(
+        return dict(
             data=data,
             tokenization=tokenization,
             dataloading=dataloading,
@@ -110,6 +111,10 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             study_folder=study_base_folder / dataset_folder.name,
             compile_model=compile_model,
         )
+
+    @classmethod
+    def get_canonical(cls, **kwargs: object) -> "BagOfWordsStudyBaseConfig":
+        config = cls(**cls.canonical_kwargs(**kwargs))
         config.prepare_study_folder()
         return config
 
@@ -123,7 +128,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
 
         saved = type(self).model_validate_json(config_path.read_text())
         if saved != self:
-            raise FileExistsError(
+            warnings.warn(
                 f"{config_path} already exists with different config contents"
             )
 
