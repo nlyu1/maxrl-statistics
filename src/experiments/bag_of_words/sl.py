@@ -40,7 +40,7 @@ class BagOfWordsSLState(BagOfWordsStudyBaseState):
             Float[Tensor, "batch"],
             Float[Tensor, "batch"],
         ],
-    ) -> float:
+    ) -> None:
         tokens, target, ground_truth = batch
         tokens = tokens.to(device=self.device, dtype=torch.long)
         target = target.to(device=self.device, dtype=torch.bfloat16)
@@ -72,7 +72,6 @@ class BagOfWordsSLState(BagOfWordsStudyBaseState):
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
         self.step_and_zero_grad()
-        return float(loss.detach().cpu())
 
     def run_train_epoch(self, *, epoch: int) -> None:
         self.current_epoch = epoch
