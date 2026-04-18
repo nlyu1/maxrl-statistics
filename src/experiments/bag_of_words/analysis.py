@@ -2,6 +2,7 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 import polars as pl
+from plotly.colors import qualitative
 from plotly.subplots import make_subplots
 
 from src.config.base import BaseConfig
@@ -44,6 +45,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         fig: go.Figure,
         df: pl.DataFrame,
         study_corrs: dict[str, float],
+        study_colors: dict[str, str],
         x_name: str,
         y_name: str,
         col: int,
@@ -60,6 +62,8 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                     name=study,
                     legendgroup=study,
                     showlegend=(col == 1),
+                    line=dict(color=study_colors[study]),
+                    marker=dict(color=study_colors[study]),
                     customdata=customdata,
                     hovertemplate=(
                         f"{x_name}: %{{x}}<br>"
@@ -95,7 +99,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                 best["epoch"].item(),
                 study,
             ))
-        rows.sort(key=lambda r: r[0])
+        rows.sort(key=lambda r: r[2])
         xs, ys, corrs, epochs, names = map(list, zip(*rows))
         fig.add_trace(
             go.Scatter(
@@ -141,6 +145,10 @@ class BagOfWordsAnalysisConfig(BaseConfig):
             ).data.corr
             for s, path in self.studies.items()
         }
+        palette = qualitative.Plotly
+        study_colors = {
+            study: palette[i % len(palette)] for i, study in enumerate(self.studies)
+        }
 
         fig = make_subplots(rows=1, cols=len(axes))
         for col, (x_expr, y_expr, agg) in enumerate(axes, start=1):
@@ -152,6 +160,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                     fig=fig,
                     df=evaluated,
                     study_corrs=study_corrs,
+                    study_colors=study_colors,
                     x_name=x_name,
                     y_name=y_name,
                     col=col,
