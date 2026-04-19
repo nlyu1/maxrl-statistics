@@ -1,5 +1,5 @@
-import torch
 import plotly.graph_objects as go
+import torch
 from plotly.subplots import make_subplots
 from torch import Tensor
 

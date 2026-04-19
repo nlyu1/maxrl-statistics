@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Self
 
 import torch
 from jaxtyping import Float
@@ -17,7 +18,7 @@ class MaxRLEstimatorConfig(BaseConfig):
     @classmethod
     def initialize(
         cls, *, degree: int, sup_likelihood: float, subtract_baseline: bool
-    ) -> "MaxRLEstimatorConfig":
+    ) -> Self:
         assert 1 <= degree, f"Degree must be nontrivial, got {degree}"
         return cls(
             degree=degree,
@@ -121,9 +122,7 @@ class MaxRLEstimatorConfig(BaseConfig):
             complement_normalized_likelihood = -torch.expm1(normalized_ll)
             # For each rollout j, estimate w_D(sigma_theta) via the
             # leave-one-out U-statistic omega_j over peer complements a_{-j}.
-            log_omega = self._log_leave_one_out_weight(
-                complement_normalized_likelihood
-            )
+            log_omega = self._log_leave_one_out_weight(complement_normalized_likelihood)
             # Exit log-space here: omega_j >= 0, sigma_effective_j is signed
             # when subtract_baseline=True.
             return (log_omega.exp() * sigma_effective).type_as(log_likelihoods)

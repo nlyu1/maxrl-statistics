@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Self
 
 import plotly.graph_objects as go
 import polars as pl
@@ -28,14 +29,15 @@ class BagOfWordsAnalysisConfig(BaseConfig):
             return False
         train_epochs = json.loads((path / "config.json").read_text())["train_epochs"]
         max_epoch = (
-            pl.read_parquet(path / "metrics.parquet")
+            pl
+            .read_parquet(path / "metrics.parquet")
             .select(pl.col("epoch").max())
             .item()
         )
         return max_epoch >= train_epochs - 1
 
     @classmethod
-    def from_studies(cls, studies: dict[str, Path]) -> "BagOfWordsAnalysisConfig":
+    def from_studies(cls, studies: dict[str, Path]) -> Self:
         started = {k: v for k, v in studies.items() if cls.has_study_started(v)}
         if not started:
             raise ValueError("No studies with metrics found")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from contextlib import nullcontext
+from typing import Self
 
 import torch
 from jaxtyping import Float, Int
@@ -43,7 +44,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
         gaussian_stdev: float,
         subtract_baseline: bool,
         **kwargs: object,
-    ) -> "BagOfWordsMaxRLConfig":
+    ) -> Self:
         assert num_rollouts_per_sample >= 1
         assert gaussian_stdev > 0.0
         config = cls(

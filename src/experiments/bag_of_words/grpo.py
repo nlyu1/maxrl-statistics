@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
+from typing import Self
 
 import torch
 from jaxtyping import Float, Int
@@ -38,7 +39,7 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
         num_rollouts_per_sample: int,
         gaussian_stdev: float,
         **kwargs: object,
-    ) -> "BagOfWordsGRPOConfig":
+    ) -> Self:
         config = cls(
             **cls.canonical_kwargs(**kwargs),
             num_rollouts_per_sample=num_rollouts_per_sample,

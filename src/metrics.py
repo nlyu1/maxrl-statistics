@@ -1,3 +1,5 @@
+from typing import Self
+
 import torch
 from jaxtyping import Float
 from pydantic import ConfigDict
@@ -24,7 +26,7 @@ class RegressionStatCounter:
         dim: int,
         *,
         device: torch.device | None = None,
-    ) -> "RegressionStatCounter":
+    ) -> Self:
         return cls(
             xy=torch.zeros(dim, device=device),
             xx=torch.zeros(dim, device=device),

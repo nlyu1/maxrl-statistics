@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Self
 
 import polars as pl
 import torch
@@ -145,13 +146,11 @@ def _write_tokenized_split(
     split_name: str,
     split: RegressionSplit,
 ) -> None:
-    pl.DataFrame(
-        {
-            "tokens": split.tokens.tolist(),
-            "target": split.targets.tolist(),
-            "ground_truth": split.ground_truth.tolist(),
-        }
-    ).write_parquet(work_dir / f"{split_name}.parquet")
+    pl.DataFrame({
+        "tokens": split.tokens.tolist(),
+        "target": split.targets.tolist(),
+        "ground_truth": split.ground_truth.tolist(),
+    }).write_parquet(work_dir / f"{split_name}.parquet")
 
 
 def _read_token_lengths(*, path: Path) -> Tensor:
@@ -267,7 +266,7 @@ class TokenizedParquetDataset(TokenizedRegressionDataset):
     @classmethod
     def from_folder(
         cls, *, tokenizer_model_name: str, folder: Path
-    ) -> "TokenizedParquetDataset":
+    ) -> Self:
         work_dir = _tokenizer_work_dir(
             folder=folder,
             tokenizer_model_name=tokenizer_model_name,

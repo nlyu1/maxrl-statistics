@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from contextlib import nullcontext
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import torch
 
@@ -113,7 +113,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         )
 
     @classmethod
-    def get_canonical(cls, **kwargs: object) -> "BagOfWordsStudyBaseConfig":
+    def get_canonical(cls, **kwargs: object) -> Self:
         config = cls(**cls.canonical_kwargs(**kwargs))
         config.prepare_study_folder()
         return config

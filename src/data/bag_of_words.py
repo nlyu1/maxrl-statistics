@@ -1,10 +1,11 @@
 from math import isfinite
 from pathlib import Path
+from typing import Self
 
 import numpy as np
 import polars as pl
-from numpy import ndarray as Array
 from jaxtyping import Float
+from numpy import ndarray as Array
 
 from src.config.base import BaseConfig
 from src.data.common import aux_words
@@ -48,8 +49,22 @@ canonical_bags: dict[int, list[str]] = {
 # toward log-spacing to densely sample the low-ρ learnability transition.
 # i.e. candidate_corrs[i] = round(0.25 * linspace[i] + 0.75 * geomspace[i], 2)
 candidate_corrs: list[float] = [
-    0.01, 0.03, 0.05, 0.07, 0.09, 0.12, 0.15, 0.18,
-    0.22, 0.27, 0.33, 0.40, 0.50, 0.62, 0.79, 1.00,
+    0.01,
+    0.03,
+    0.05,
+    0.07,
+    0.09,
+    0.12,
+    0.15,
+    0.18,
+    0.22,
+    0.27,
+    0.33,
+    0.40,
+    0.50,
+    0.62,
+    0.79,
+    1.00,
 ]
 
 # Canonical number of rollouts to try
@@ -217,7 +232,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
         )
 
     @classmethod
-    def initialize(cls, **base_cls_kwargs) -> "BagOfWordsDatasetConfig":
+    def initialize(cls, **base_cls_kwargs) -> Self:
         """See `_base_kwargs` for accepted kwargs."""
         return cls(**cls._base_kwargs(**base_cls_kwargs))
 
@@ -242,9 +257,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
         idx = rng.choice(len(words), size=(n, self.prompt_length), p=probs)
         raw = vals[idx].sum(axis=1)
         signal = (
-            raw
-            / ((self.prompt_length**0.5) * self.unnormalized_signal_std)
-            * self.corr
+            raw / ((self.prompt_length**0.5) * self.unnormalized_signal_std) * self.corr
         )
         noise_std = (1 - self.corr**2) ** 0.5
         targets = signal + rng.normal(0, noise_std, size=n)
@@ -269,14 +282,12 @@ class BagOfWordsDatasetConfig(BaseConfig):
         (folder / "config.json").write_text(self.model_dump_json())
 
     @classmethod
-    def load_from(cls, path: Path) -> "BagOfWordsDatasetConfig":
+    def load_from(cls, path: Path) -> Self:
         """Restores config from a folder written by write_to."""
         return cls.model_validate_json((path / "config.json").read_text())
 
     @classmethod
-    def _write_or_reuse(
-        cls, *, folder: Path, config: "BagOfWordsDatasetConfig"
-    ) -> "BagOfWordsDatasetConfig":
+    def _write_or_reuse(cls, *, folder: Path, config: Self) -> Self:
         """Reuse the cached dataset at `folder` if it matches, else (re)generate."""
         config_path = folder / "config.json"
         required_paths = (folder / "train.parquet", folder / "val.parquet")
@@ -292,8 +303,6 @@ class BagOfWordsDatasetConfig(BaseConfig):
         return config
 
     @classmethod
-    def init_or_load_from(
-        cls, *, folder: Path, **init_kwargs
-    ) -> "BagOfWordsDatasetConfig":
+    def init_or_load_from(cls, *, folder: Path, **init_kwargs) -> Self:
         """Thin wrapper: kwargs forward to `cls.initialize` (subclasses override it)."""
         return cls._write_or_reuse(folder=folder, config=cls.initialize(**init_kwargs))
