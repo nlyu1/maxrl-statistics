@@ -17,6 +17,7 @@ class BagOfWordsMaxRLonfig(BagOfWordsStudyBaseConfig):
 
     # Estimate order = num_rollouts_per_sample
     num_rollouts_per_sample: int
+    degree: int
     gaussian_stdev: float
     # We need an additional term to bound the log-expansion.
     # In the canonical bag-of-words dataset, this is [-1, 1] -> 2.0

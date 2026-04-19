@@ -5,9 +5,7 @@ date: last-modified
 title-block-banner: false
 ---
 
-Placeholder summary of research progress.
-
-## Contents
+Continuously updated research progress.
 
 - [Regression: bag of words](bag-of-words.qmd) — noise-robustness in zero-step sampling setting. WIP.
 - [Regression: DAG-reasoning](dag-reasoning.qmd) — work-not-started.

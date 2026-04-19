@@ -23,41 +23,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -187,11 +152,16 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#dataset" id="toc-dataset" class="nav-link active" data-scroll-target="#dataset">Dataset</a></li>
+  <li><a href="#dataset" id="toc-dataset" class="nav-link active" data-scroll-target="#dataset">Dataset</a>
+  <ul class="collapse">
   <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a></li>
+  </ul></li>
+  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a>
+  <ul class="collapse">
   <li><a href="#supervised-learning-benchmark" id="toc-supervised-learning-benchmark" class="nav-link" data-scroll-target="#supervised-learning-benchmark">Supervised-learning benchmark</a></li>
   <li><a href="#grpo" id="toc-grpo" class="nav-link" data-scroll-target="#grpo">GRPO</a></li>
   <li><a href="#maxrl" id="toc-maxrl" class="nav-link" data-scroll-target="#maxrl">MaxRL</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -259,9 +229,8 @@ window.Quarto = {
 \text{signal} = \frac{\rho}{\sigma\sqrt{L}} \sum_{i=1}^L v_i, \qquad
 \text{target} = \text{signal} + \mathcal{N}(0, \sqrt{1 - \rho^2})
 \]</span> where <span class="math inline">\(\sigma\)</span> is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction <span class="math inline">\(\text{Var}(\text{target}) = 1\)</span> and <span class="math inline">\(\text{corr}(\text{signal}, \text{target}) = \rho\)</span>.</p>
-</section>
-<section id="examples" class="level2">
-<h2 class="anchored" data-anchor-id="examples">Examples</h2>
+<section id="examples" class="level3">
+<h3 class="anchored" data-anchor-id="examples">Examples</h3>
 <p>Consider 8-word prompts; we compute the <em>per-word signal stdev</em> <span class="math inline">\(\sigma = 1.14\)</span>, so the per-prompt stdev <span class="math inline">\(\sqrt{L}\,\sigma = 3.21\)</span>. Semantic words are <strong>bolded</strong>:</p>
 <p><strong>Low-signal regime</strong>: <span class="math inline">\(\rho = 0.01\)</span> — multiplier <span class="math inline">\(\rho / (\sigma \sqrt{L}) = 0.0031\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} \approx 1.00\)</span>:</p>
 <blockquote class="blockquote">
@@ -279,35 +248,24 @@ window.Quarto = {
 </blockquote>
 <p><span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.277 \times 7 = 1.94\)</span>, target <span class="math inline">\(= 1.78\)</span></p>
 </section>
-<section id="supervised-learning-benchmark" class="level2">
-<h2 class="anchored" data-anchor-id="supervised-learning-benchmark">Supervised-learning benchmark</h2>
-<details>
-<summary>
-Code instructions
-</summary>
-<p>Run SL-sweep on two devices concurrently.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> experiments/bow/sl-corr/do_sweep.bash</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-Analyze experiment artifacts: <code>experiments/bow/sl-corr/analyze.ipynb</code>
-</details>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/bow/README.md"><code>experiments/bow/README.md</code></a> for sweep and single-run instructions.</p>
+<section id="supervised-learning-benchmark" class="level3">
+<h3 class="anchored" data-anchor-id="supervised-learning-benchmark">Supervised-learning benchmark</h3>
 <p>Results: WIP</p>
 </section>
-<section id="grpo" class="level2">
-<h2 class="anchored" data-anchor-id="grpo">GRPO</h2>
-<details>
-<summary>
-Code instructions
-</summary>
-<p>Coarse GRPO sweep over <code>(corr, num_rollouts_per_sample)</code> on two devices concurrently. The shuffle seed is chosen so that <code>corr=0.01, num_rollouts=4096</code> runs first — stress-tests the largest rollout group at the smallest correlation up front.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> experiments/bow/grpo-corr/do_coarse_sweep.bash</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-Analyze experiment artifacts: <code>experiments/bow/grpo-corr/analyze-coarse-sweep.ipynb</code>
-</details>
+<section id="grpo" class="level3">
+<h3 class="anchored" data-anchor-id="grpo">GRPO</h3>
 <p>Results: WIP</p>
 </section>
-<section id="maxrl" class="level2">
-<h2 class="anchored" data-anchor-id="maxrl">MaxRL</h2>
+<section id="maxrl" class="level3">
+<h3 class="anchored" data-anchor-id="maxrl">MaxRL</h3>
 <p>See <a href="./maxrl-estimator.html">MaxRL estimator: leave-one-out derivation</a> for the estimator math used here.</p>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

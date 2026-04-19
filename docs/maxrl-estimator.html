@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>MaxRL estimator: leave-one-out derivation – MaxRL Statistics</title>
+<title>MaxRL gradient estimator – MaxRL Statistics</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -164,7 +164,7 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">MaxRL estimator: leave-one-out derivation</h1>
+<h1 class="title">MaxRL gradient estimator</h1>
 </div>
 
 
@@ -213,8 +213,7 @@ C_j := \{1, \dots, j-1, j+1, \dots, R\}.
 \]</span></p>
 <p><strong>Target complexity.</strong> An exact or mathematically equivalent formulation with:</p>
 <ul>
-<li><span class="math inline">\(O(BRD)\)</span> time,</li>
-<li><span class="math inline">\(O(BRD)\)</span> memory or better,</li>
+<li><span class="math inline">\(O(BRD)\)</span> time, <span class="math inline">\(O(BRD)\)</span> memory.</li>
 <li>no subtraction of nearly equal <span class="math inline">\(O(1)\)</span> or larger terms.</li>
 </ul>
 <p>The last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then “peel off” rollout <span class="math inline">\(j\)</span> by subtraction. We empirically found that this leads to significant numerical errors for <span class="math inline">\(R \geq 32\)</span>, and digit-significance dependence grows approximately linearly in the number of rollouts.</p>
@@ -260,7 +259,7 @@ x(C_j) = M(a_R) \cdots M(a_{j+1}) \, \alpha_{j-1} \implies \omega_j = \mathbf{1}
 <li>Run a backward scan over <span class="math inline">\(j = R, \dots, 1\)</span> using the same update.</li>
 <li>Form all leave-one-out weights via <span class="math inline">\(\omega_j = \beta_j^\top \alpha_{j-1}\)</span>.</li>
 </ol>
-<p>Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs <span class="math inline">\(O(D)\)</span>. The full batched computation therefore has the target complexity <span class="math inline">\(O(BRD)\)</span> with straightforward <span class="math inline">\(O(BRD)\)</span> storage if all prefix states are materialized.</p>
+<p>Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs <span class="math inline">\(O(D)\)</span>. The full batched computation therefore has the target complexity <span class="math inline">\(O(BRD)\)</span>.</p>
 
 
 </section>

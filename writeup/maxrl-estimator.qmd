@@ -1,5 +1,5 @@
 ---
-title: "MaxRL estimator: leave-one-out derivation"
+title: "MaxRL gradient estimator"
 ---
 
 Reference implementation: [`src/maxrl_estimator.py`]({{< var repo_url >}}/src/maxrl_estimator.py).
@@ -63,8 +63,7 @@ $$
 **Target complexity.**
 An exact or mathematically equivalent formulation with:
 
-* $O(BRD)$ time,
-* $O(BRD)$ memory or better,
+* $O(BRD)$ time, $O(BRD)$ memory.
 * no subtraction of nearly equal $O(1)$ or larger terms.
 
 The last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then "peel off" rollout $j$ by subtraction. We empirically found that this leads to significant numerical errors for $R \geq 32$, and digit-significance dependence grows approximately linearly in the number of rollouts.
@@ -125,4 +124,4 @@ For one batch row, the algorithm is:
 3. Run a backward scan over $j = R, \dots, 1$ using the same update.
 4. Form all leave-one-out weights via $\omega_j = \beta_j^\top \alpha_{j-1}$.
 
-Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs $O(D)$. The full batched computation therefore has the target complexity $O(BRD)$ with straightforward $O(BRD)$ storage if all prefix states are materialized.
+Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs $O(D)$. The full batched computation therefore has the target complexity $O(BRD)$.
