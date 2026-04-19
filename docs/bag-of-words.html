@@ -155,10 +155,7 @@ window.Quarto = {
   <ul>
   <li><a href="#dataset" id="toc-dataset" class="nav-link active" data-scroll-target="#dataset">Dataset</a>
   <ul>
-  <li><a href="#homogeneous-version" id="toc-homogeneous-version" class="nav-link" data-scroll-target="#homogeneous-version">Homogeneous version</a>
-  <ul class="collapse">
-  <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a></li>
-  </ul></li>
+  <li><a href="#homogeneous-version" id="toc-homogeneous-version" class="nav-link" data-scroll-target="#homogeneous-version">Homogeneous version</a></li>
   <li><a href="#row-level-heteroskedasticity-unlearnable" id="toc-row-level-heteroskedasticity-unlearnable" class="nav-link" data-scroll-target="#row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</a></li>
   <li><a href="#word-level-heteroskedasticity-learnable" id="toc-word-level-heteroskedasticity-learnable" class="nav-link" data-scroll-target="#word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</a></li>
   </ul></li>
@@ -242,8 +239,18 @@ window.Quarto = {
 \text{signal} = \frac{\rho}{\sigma\sqrt{L}} \sum_{i=1}^L v_i, \qquad
 \text{target} = \text{signal} + \mathcal{N}(0, \sqrt{1 - \rho^2})
 \]</span> where <span class="math inline">\(\sigma\)</span> is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction <span class="math inline">\(\text{Var}(\text{target}) = 1\)</span> and <span class="math inline">\(\text{corr}(\text{signal}, \text{target}) = \rho\)</span>.</p>
-<section id="examples" class="level4">
-<h4 class="anchored" data-anchor-id="examples">Examples</h4>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-1-contents" aria-controls="callout-1" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Examples
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-1" class="callout-1-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
 <p>Consider 8-word prompts; we compute the <em>per-word signal stdev</em> <span class="math inline">\(\sigma = 1.14\)</span>, so the per-prompt stdev <span class="math inline">\(\sqrt{L}\,\sigma = 3.21\)</span>. Semantic words are <strong>bolded</strong>:</p>
 <p><strong>Low-signal regime</strong>: <span class="math inline">\(\rho = 0.01\)</span> — multiplier <span class="math inline">\(\rho / (\sigma \sqrt{L}) = 0.0031\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} \approx 1.00\)</span>:</p>
 <blockquote class="blockquote">
@@ -255,7 +262,9 @@ window.Quarto = {
 <p><strong>good</strong> <strong>good</strong> floor <strong>good</strong> <strong>good</strong> <strong>good</strong> <strong>perfect</strong> <strong>poor</strong></p>
 </blockquote>
 <p><span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.277 \times 7 = 1.94\)</span>, target <span class="math inline">\(= 1.78\)</span></p>
-</section>
+</div>
+</div>
+</div>
 </section>
 <section id="row-level-heteroskedasticity-unlearnable" class="level3">
 <h3 class="anchored" data-anchor-id="row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</h3>
@@ -306,13 +315,12 @@ window.addEventListener("DOMContentLoaded", () => {
 \tilde A(x)^2 = \frac{1}{L} \sum_{j=1}^{L} \tilde a(w_j)^2,
 \qquad
 A(x) = \tilde A(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
-\]</span> so that <span class="math inline">\(\mathbb{E}[A(x)^2] = 1\)</span> under the prompt distribution. Targets still preserve the global correlation <span class="math inline">\(rho\)</span>: <span class="math display">\[
+\]</span> so that <span class="math inline">\(\mathbb{E}[A(x)^2] = 1\)</span> under the prompt distribution. Targets still preserve the global correlation <span class="math inline">\(\rho\)</span>: <span class="math display">\[
 \text{target}(x) = \text{signal}(x) + \sqrt{1-\rho^2}\, A(x)\, \varepsilon,
 \]</span></p>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="900">
   <iframe src="assets/bow/word_heteroskedasticity.html" width="1000" height="900" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<p><em>Figure: <strong>(top)</strong> histogram of per-prompt <span class="math inline">\(\rho(x)\)</span> over 50k prompts with <span class="math inline">\(L = 128\)</span>; <strong>(bottom)</strong> semantic density <span class="math inline">\(p(w)\)</span> (grey, left axis) against the normalized hardness ratio (red, right axis, log).</em></p>
 </section>
 </section>
 <section id="experiments" class="level2">

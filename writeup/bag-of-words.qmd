@@ -35,7 +35,8 @@ $$
 $$
 where $\sigma$ is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction $\text{Var}(\text{target}) = 1$ and $\text{corr}(\text{signal}, \text{target}) = \rho$.
 
-#### Examples
+::: {.callout-note collapse="true"}
+## Examples
 
 Consider 8-word prompts; we compute the _per-word signal stdev_ $\sigma = 1.14$, so the per-prompt stdev $\sqrt{L}\,\sigma = 3.21$. Semantic words are **bolded**:
 
@@ -50,6 +51,7 @@ $\sum v_i = -6$, signal $= 0.0031 \times (-6) = -0.019$, target $= -2.54$
 > **good** **good** floor **good** **good** **good** **perfect** **poor**
 
 $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$
+:::
 
 ### Row-level heteroskedasticity (unlearnable)
 
@@ -113,7 +115,7 @@ $$
 \qquad
 A(x) = \tilde A(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 $$
-so that $\mathbb{E}[A(x)^2] = 1$ under the prompt distribution. Targets still preserve the global correlation $rho$:
+so that $\mathbb{E}[A(x)^2] = 1$ under the prompt distribution. Targets still preserve the global correlation $\rho$:
 $$
 \text{target}(x) = \text{signal}(x) + \sqrt{1-\rho^2}\, A(x)\, \varepsilon,
 $$
