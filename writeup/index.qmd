@@ -5,8 +5,9 @@ date: last-modified
 title-block-banner: false
 ---
 
-Continuously updated research progress.
+Continuously updated research progress on the rollout-likelihood generalization of [MaxRL](https://arxiv.org/pdf/2602.02710).
 
-- [Regression: bag of words](bag-of-words.qmd) — noise-robustness in zero-step sampling setting. WIP.
-- [Regression: DAG-reasoning](dag-reasoning.qmd) — work-not-started.
-- [MaxRL estimator: leave-one-out derivation](maxrl-estimator.qmd) — generalized MaxRL gradient estimator and its $O(BRD)$ stable computation (fun nontrivial algorithm design problem!).
+- [Theory](theory.qmd) — MaxRL as a compute-indexed truncation of log-likelihood, per-rollout reweighting, and the generalized leave-one-out estimator.
+- [Gradient Estimator](gradient-estimator.qmd) — numerically stable $O(BRD)$ computation of the leave-one-out weights via prefix-suffix scans of elementary symmetric polynomials.
+- [Regression: bag of words](bag-of-words.qmd) — noise-robustness in the zero-step sampling setting. WIP.
+- [Regression: DAG-reasoning](dag-reasoning.qmd) — reasoning advantage and rollout efficiency. Not started.

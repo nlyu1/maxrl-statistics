@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Regression: bag of words – MaxRL Statistics</title>
+<title>MaxRL gradient estimator details – MaxRL Statistics</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -129,11 +129,11 @@ window.Quarto = {
 <span class="menu-text">Theory</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./gradient-estimator.html"> 
+    <a class="nav-link active" href="./gradient-estimator.html" aria-current="page"> 
 <span class="menu-text">Gradient Estimator</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link active" href="./bag-of-words.html" aria-current="page"> 
+    <a class="nav-link" href="./bag-of-words.html"> 
 <span class="menu-text">Bag of Words</span></a>
   </li>  
   <li class="nav-item">
@@ -156,16 +156,12 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#dataset" id="toc-dataset" class="nav-link active" data-scroll-target="#dataset">Dataset</a>
-  <ul class="collapse">
-  <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a></li>
-  </ul></li>
-  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a>
-  <ul class="collapse">
-  <li><a href="#supervised-learning-benchmark" id="toc-supervised-learning-benchmark" class="nav-link" data-scroll-target="#supervised-learning-benchmark">Supervised-learning benchmark</a></li>
-  <li><a href="#grpo" id="toc-grpo" class="nav-link" data-scroll-target="#grpo">GRPO</a></li>
-  <li><a href="#maxrl" id="toc-maxrl" class="nav-link" data-scroll-target="#maxrl">MaxRL</a></li>
-  </ul></li>
+  <li><a href="#population-objective" id="toc-population-objective" class="nav-link active" data-scroll-target="#population-objective">Population objective</a></li>
+  <li><a href="#leave-one-out-estimator" id="toc-leave-one-out-estimator" class="nav-link" data-scroll-target="#leave-one-out-estimator">Leave-one-out estimator</a></li>
+  <li><a href="#formulating-the-problem" id="toc-formulating-the-problem" class="nav-link" data-scroll-target="#formulating-the-problem">Formulating the problem</a></li>
+  <li><a href="#state-vectors-and-matrix-view" id="toc-state-vectors-and-matrix-view" class="nav-link" data-scroll-target="#state-vectors-and-matrix-view">State vectors and matrix view</a></li>
+  <li><a href="#prefix-suffix-scans" id="toc-prefix-suffix-scans" class="nav-link" data-scroll-target="#prefix-suffix-scans">Prefix-suffix scans</a></li>
+  <li><a href="#computational-interpretation" id="toc-computational-interpretation" class="nav-link" data-scroll-target="#computational-interpretation">Computational interpretation</a></li>
   </ul>
 </nav>
     </div>
@@ -174,7 +170,7 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Regression: bag of words</h1>
+<h1 class="title">MaxRL gradient estimator details</h1>
 </div>
 
 
@@ -191,85 +187,95 @@ window.Quarto = {
 </header>
 
 
-<p>The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a <strong>zero-step rollout</strong> setting: the model sees a single prompt and predicts a scalar target, with no sequential reasoning.</p>
-<section id="dataset" class="level2">
-<h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
-<p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/bag_of_words.py"><code>src/data/bag_of_words.py</code></a>.</p>
-<p>Each prompt is <span class="math inline">\(L\)</span> words sampled iid from a mixture of <strong>semantic words</strong>, which carries signal, and <strong>auxiliary words</strong>, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by <span class="math inline">\(\rho \in (0, 1]\)</span>, the correlation between signal and target.</p>
-<p><strong>7-word vocabulary.</strong> Semantic words map to integer values centered at zero:</p>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th style="text-align: center;">grim</th>
-<th style="text-align: center;">bad</th>
-<th style="text-align: center;">poor</th>
-<th style="text-align: center;">fair</th>
-<th style="text-align: center;">good</th>
-<th style="text-align: center;">great</th>
-<th style="text-align: center;">perfect</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: center;"><span class="math inline">\(-3\)</span></td>
-<td style="text-align: center;"><span class="math inline">\(-2\)</span></td>
-<td style="text-align: center;"><span class="math inline">\(-1\)</span></td>
-<td style="text-align: center;"><span class="math inline">\(0\)</span></td>
-<td style="text-align: center;"><span class="math inline">\(+1\)</span></td>
-<td style="text-align: center;"><span class="math inline">\(+2\)</span></td>
-<td style="text-align: center;"><span class="math inline">\(+3\)</span></td>
-</tr>
-</tbody>
-</table>
-<p>The 256 auxiliary words (common function words: <em>the, a, and, if, because, …</em>) carry value 0.</p>
-<p><strong>Sampling distribution.</strong> Semantic words share mass <span class="math inline">\(1 - \alpha\)</span> (where <span class="math inline">\(\alpha\)</span> = <code>aux_words_ratio</code>), shaped by a power-law centered on the neutral word “fair”: <span class="math inline">\(p_i \propto (1 + |i - \text{center}|)^{-\gamma}\)</span>. Auxiliary words uniformly split mass <span class="math inline">\(\alpha\)</span>.</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="assets/bow/word_density.png" class="img-fluid figure-img" style="width:65.0%"></p>
-<figcaption>Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency: <span class="math inline">\(\alpha = 0.5, \gamma = 1.0\)</span></figcaption>
-</figure>
-</div>
-<p><strong>Target generation.</strong> Given a prompt of length <span class="math inline">\(L\)</span>: <span class="math display">\[
-\text{signal} = \frac{\rho}{\sigma\sqrt{L}} \sum_{i=1}^L v_i, \qquad
-\text{target} = \text{signal} + \mathcal{N}(0, \sqrt{1 - \rho^2})
-\]</span> where <span class="math inline">\(\sigma\)</span> is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction <span class="math inline">\(\text{Var}(\text{target}) = 1\)</span> and <span class="math inline">\(\text{corr}(\text{signal}, \text{target}) = \rho\)</span>.</p>
-<section id="examples" class="level3">
-<h3 class="anchored" data-anchor-id="examples">Examples</h3>
-<p>Consider 8-word prompts; we compute the <em>per-word signal stdev</em> <span class="math inline">\(\sigma = 1.14\)</span>, so the per-prompt stdev <span class="math inline">\(\sqrt{L}\,\sigma = 3.21\)</span>. Semantic words are <strong>bolded</strong>:</p>
-<p><strong>Low-signal regime</strong>: <span class="math inline">\(\rho = 0.01\)</span> — multiplier <span class="math inline">\(\rho / (\sigma \sqrt{L}) = 0.0031\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} \approx 1.00\)</span>:</p>
-<blockquote class="blockquote">
-<p>both idea <strong>fair</strong> <strong>poor</strong> rather <strong>bad</strong> <strong>grim</strong> then</p>
-</blockquote>
-<p><span class="math inline">\(\sum v_i = -6\)</span>, signal <span class="math inline">\(= 0.0031 \times (-6) = -0.019\)</span>, target <span class="math inline">\(= -2.54\)</span></p>
-<p><strong>High-signal regime</strong>: <span class="math inline">\(\rho = 0.45\)</span> — multiplier <span class="math inline">\(= 0.140\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} = 0.89\)</span>:</p>
-<blockquote class="blockquote">
-<p><strong>grim</strong> <strong>poor</strong> ask look some door do <strong>fair</strong></p>
-</blockquote>
-<p><span class="math inline">\(\sum v_i = -4\)</span>, signal <span class="math inline">\(= 0.140 \times (-4) = -0.560\)</span>, target <span class="math inline">\(= -0.707\)</span></p>
-<p><strong>Very-high-signal regime</strong>: <span class="math inline">\(\rho = 0.89\)</span> — multiplier <span class="math inline">\(= 0.277\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} = 0.46\)</span>:</p>
-<blockquote class="blockquote">
-<p><strong>good</strong> <strong>good</strong> floor <strong>good</strong> <strong>good</strong> <strong>good</strong> <strong>perfect</strong> <strong>poor</strong></p>
-</blockquote>
-<p><span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.277 \times 7 = 1.94\)</span>, target <span class="math inline">\(= 1.78\)</span></p>
+<p>Reference implementation: <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/maxrl_estimator.py"><code>src/maxrl_estimator.py</code></a>.</p>
+<p>We use the generalized MaxRL estimator in its leave-one-out form. Fix one batch row <span class="math inline">\((x, y)\)</span>, let <span class="math inline">\(L &gt; 0\)</span> be a known upper bound on the likelihood function <span class="math inline">\(l\)</span>, and draw <span class="math inline">\(R\)</span> iid rollouts <span class="math inline">\(z_1, \dots, z_R \sim m_\theta(\cdot \mid x)\)</span>. Define detached per-rollout likelihoods, their normalizations, and score vectors <span class="math display">\[
+l_j := l(y, z_j) \in [0, L], \quad \sigma_j := l_j / L \in [0, 1], \quad S_j := \nabla_\theta \log m_\theta(z_j \mid x).
+\]</span> Further define the marginal normalized likelihood and the <strong>weight function</strong> <span class="math display">\[
+\sigma_\theta := \mathbb{E}[\sigma_j] \in (0, 1], \qquad w_D(\sigma_\theta) := \sum_{k=0}^{D-1} (1 - \sigma_\theta)^k.
+\]</span></p>
+<section id="population-objective" class="level3">
+<h3 class="anchored" data-anchor-id="population-objective">Population objective</h3>
+<p>The degree-<span class="math inline">\(D\)</span> MaxRL objective is the degree-<span class="math inline">\(D\)</span> Maclaurin truncation of <span class="math inline">\(\log \sigma_\theta\)</span> about <span class="math inline">\(\sigma_\theta = 1\)</span>: <span class="math display">\[
+J_D(\theta) := -\sum_{k=1}^{D} \frac{(1 - \sigma_\theta)^k}{k}, \qquad \nabla_\theta J_D = w_D(\sigma_\theta) \, \mathbb{E}[\sigma_j \, S_j].
+\]</span> As <span class="math inline">\(D \to \infty\)</span>, <span class="math inline">\(J_D \to \log \sigma_\theta\)</span> and the gradient recovers the exact log-likelihood gradient; at finite <span class="math inline">\(D\)</span> the gradient residual is the geometric factor <span class="math inline">\(1 - (1 - \sigma_\theta)^D\)</span>.</p>
 </section>
+<section id="leave-one-out-estimator" class="level3">
+<h3 class="anchored" data-anchor-id="leave-one-out-estimator">Leave-one-out estimator</h3>
+<p>The generalized leave-one-out estimator has the form <span class="math display">\[
+\hat{g}_D(x, y) = \frac{1}{R} \sum_{j=1}^R \omega_j \, \sigma_j \, S_j,
+\]</span> where each <span class="math inline">\(\omega_j\)</span> is built from the peer rollouts <span class="math inline">\(k \neq j\)</span> only and satisfies <span class="math display">\[
+\mathbb{E}[\omega_j] = w_D(\sigma_\theta).
+\]</span></p>
 </section>
-<section id="experiments" class="level2">
-<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
-<p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/bow/README.md"><code>experiments/bow/README.md</code></a> for sweep and single-run instructions.</p>
-<section id="supervised-learning-benchmark" class="level3">
-<h3 class="anchored" data-anchor-id="supervised-learning-benchmark">Supervised-learning benchmark</h3>
-<p>Results: WIP</p>
+<section id="formulating-the-problem" class="level3">
+<h3 class="anchored" data-anchor-id="formulating-the-problem">Formulating the problem</h3>
+<p>Define the per-rollout complements <span class="math display">\[
+a_j := 1 - \sigma_j \in [0, 1] \implies w_D(\sigma_\theta) = \sum_{k=0}^{D-1} \mathbb{E}[a_j]^k.
+\]</span> For a list <span class="math inline">\(b_1, \dots, b_n\)</span>, let the <strong><span class="math inline">\(k\)</span>-th elementary symmetric polynomial</strong> be the sum of all size-<span class="math inline">\(k\)</span> products: <span class="math display">\[
+e_k(b_1, \dots, b_n) := \sum_{1 \le i_1 &lt; \cdots &lt; i_k \le n} b_{i_1} \cdots b_{i_k}, \qquad e_0 := 1.
+\]</span></p>
+<p>Fix rollout index <span class="math inline">\(j\)</span>. Its canonical leave-one-out peer set is <span class="math display">\[
+C_j := \{1, \dots, j-1, j+1, \dots, R\}.
+\]</span> Because the <span class="math inline">\(a_i\)</span> are iid, the normalized elementary symmetric polynomial <span class="math display">\[
+\frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}
+\]</span> is the U-statistic estimator of <span class="math inline">\((1-\sigma_\theta)^k\)</span>. Therefore the desired leave-one-out weight is <span class="math display">\[
+\omega_j = \sum_{k=0}^{D-1} \frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}.
+\]</span> This yields a standalone programming problem.</p>
+<p><strong>Input.</strong> A batched tensor <span class="math inline">\(a \in [0, 1]^{B \times R}\)</span> and an integer <span class="math inline">\(1 \le D \le R\)</span>.</p>
+<p><strong>Output.</strong> A batched tensor <span class="math inline">\(\omega \in \mathbb{R}^{B \times R}\)</span> with entries <span class="math display">\[
+\omega_{b, j} = \sum_{k=0}^{D-1} \frac{e_k\bigl((a_{b, i})_{i \in C_j}\bigr)}{\binom{R-1}{k}}.
+\]</span></p>
+<p><strong>Target complexity.</strong> An exact or mathematically equivalent formulation with:</p>
+<ul>
+<li><span class="math inline">\(O(BRD)\)</span> time, <span class="math inline">\(O(BRD)\)</span> memory.</li>
+<li>no subtraction of nearly equal <span class="math inline">\(O(1)\)</span> or larger terms.</li>
+</ul>
+<p>The last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then “peel off” rollout <span class="math inline">\(j\)</span> by subtraction. We empirically found that this leads to significant numerical errors for <span class="math inline">\(R \geq 32\)</span>, and digit-significance dependence grows approximately linearly in the number of rollouts.</p>
 </section>
-<section id="grpo" class="level3">
-<h3 class="anchored" data-anchor-id="grpo">GRPO</h3>
-<p>Results: WIP</p>
+<section id="state-vectors-and-matrix-view" class="level3">
+<h3 class="anchored" data-anchor-id="state-vectors-and-matrix-view">State vectors and matrix view</h3>
+<p>Instead, we define states that are already normalized by the <strong>final</strong> peer count <span class="math inline">\(R - 1\)</span>. For any canonical subset <span class="math inline">\(I \subseteq \{1, \dots, R\}\)</span>, define the state vector <span class="math display">\[
+x(I) := \bigl(x_0(I), \dots, x_{D-1}(I)\bigr)^\top, \quad x_k(I) := \frac{e_k\bigl((a_i)_{i \in I}\bigr)}{\binom{R-1}{k}}.
+\]</span></p>
+<p>Two basic facts make this a good state space:</p>
+<ol type="1">
+<li><span class="math inline">\(x_0(I) = 1\)</span>.</li>
+<li>Because each <span class="math inline">\(a_i \in [0, 1]\)</span>, every forward-state coordinate is bounded <span class="math inline">\(0 \le x_k(I) \le 1\)</span>.</li>
+</ol>
+<p>Now suppose <span class="math inline">\(I\)</span> is a canonical subset and we append one new complement value <span class="math inline">\(a\)</span>. Using <span class="math display">\[
+e_k(I \cup \{a\}) = e_k(I) + a \, e_{k-1}(I),
+\]</span> we obtain the fixed-denominator recurrence over <em>appending elements to the canonical set</em> <span class="math display">\[
+x_0' = x_0, \quad x_k' = x_k + \frac{k}{R-k} \, a \, x_{k-1}, \qquad k = 1, \dots, D-1.
+\]</span> Package the update as multiplication by a lower-bidiagonal matrix <span class="math inline">\(M(a) \in \mathbb{R}^{D \times D}\)</span>: <span class="math display">\[
+x' = M(a) \, x \quad  \text{ where } \quad M(a)_{k, k} = 1,\quad  M(a)_{k, k-1} = \frac{k}{R-k} \, a
+\]</span></p>
+<p>With the empty-set initial state <span class="math display">\[
+e_0 := (1, 0, \dots, 0)^\top,
+\]</span> the state for any canonical prefix <span class="math inline">\(I = \{1, \dots, j\}\)</span> is obtained by repeated application of these matrices.</p>
 </section>
-<section id="maxrl" class="level3">
-<h3 class="anchored" data-anchor-id="maxrl">MaxRL</h3>
-<p>See <a href="maxrl-estimator.qmd">MaxRL estimator: leave-one-out derivation</a> for the estimator math used here.</p>
+<section id="prefix-suffix-scans" class="level3">
+<h3 class="anchored" data-anchor-id="prefix-suffix-scans">Prefix-suffix scans</h3>
+<p>Define the forward prefix states so that <span class="math inline">\(\alpha_j = x(\{1, \dots, j\})\)</span>: <span class="math display">\[
+\alpha_0 := e_0, \qquad \alpha_j := M(a_j) \, \alpha_{j-1}, \qquad j = 1, \dots, R.
+\]</span> Similarly define the suffix covectors which encode the “suffix-and-sum” operation: <span class="math display">\[
+\beta_R^\top := \mathbf{1}^\top, \qquad \beta_{j-1}^\top := \beta_j^\top M(a_j), \qquad j = R, \dots, 1,
+\]</span></p>
+<p>Now fix rollout <span class="math inline">\(j\)</span>. The leave-one-out peer set <span class="math inline">\(C_j\)</span> is the union of the canonical prefix before <span class="math inline">\(j\)</span> and the canonical suffix after <span class="math inline">\(j\)</span>. Its state vector is therefore <span class="math display">\[
+x(C_j) = M(a_R) \cdots M(a_{j+1}) \, \alpha_{j-1} \implies \omega_j = \mathbf{1}^\top x(C_j) = \beta_j^\top \alpha_{j-1}.
+\]</span></p>
+</section>
+<section id="computational-interpretation" class="level3">
+<h3 class="anchored" data-anchor-id="computational-interpretation">Computational interpretation</h3>
+<p>For one batch row, the algorithm is:</p>
+<ol type="1">
+<li>Convert normalized likelihoods to complements <span class="math inline">\(a_j = 1 - \sigma_j\)</span>.</li>
+<li>Run a forward scan over <span class="math inline">\(j = 1, \dots, R\)</span> using the lower-bidiagonal update <span class="math inline">\(M(a_j)\)</span>.</li>
+<li>Run a backward scan over <span class="math inline">\(j = R, \dots, 1\)</span> using the same update.</li>
+<li>Form all leave-one-out weights via <span class="math inline">\(\omega_j = \beta_j^\top \alpha_{j-1}\)</span>.</li>
+</ol>
+<p>Each matrix-vector or covector-matrix update touches only adjacent state coordinates, so each scan step costs <span class="math inline">\(O(D)\)</span>. The full batched computation therefore has the target complexity <span class="math inline">\(O(BRD)\)</span>.</p>
 
 
-</section>
 </section>
 
 </main> <!-- /main -->

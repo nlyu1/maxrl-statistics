@@ -8,14 +8,14 @@ website:
   title: "MaxRL Statistics"
   navbar:
     left:
-      - href: index.qmd
-        text: Home
+      - href: theory.qmd
+        text: Theory
+      - href: gradient-estimator.qmd
+        text: Gradient Estimator
       - href: bag-of-words.qmd
         text: Bag of Words
       - href: dag-reasoning.qmd
         text: DAG Reasoning
-      - href: maxrl-estimator.qmd
-        text: MaxRL Estimator
 
 format:
   html:

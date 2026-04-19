@@ -1,17 +1,14 @@
 ---
-title: "Rollout likelihood generalization of maximum likelihood reinforcement learning"
-date: 2026-02-16
-summary: "A highly principled foundational RL paper with easily actionable changes. We derive the continuous generalization."
+title: "MaxRL theory"
 ---
 
-I've always wondered what happens if one applies RL to supervisable tasks. For example, given a binary classification task (x_k, y_k), maximize accuracy as the reward
+I've always wondered what happens if one applies RL to supervisable tasks. For example, given a binary classification task $(x_k, y_k)$, maximize accuracy as the reward
 $$
 R := \mathbb E\,[y\,p_\theta(x)+(1-y)(1-p_\theta(x))].
 $$
 No one does this, presumably for good reasons; how does such a model compare to a normal model trained using cross-entropy?
 
-Turns out that a highly impressive [recent paper](https://arxiv.org/pdf/2602.02710) from CMU goes *exactly* down this rabbit hole -- and comes up with actionable, principled insights.
-They point out that correctness-based RL is optimizing
+A recent [paper](https://arxiv.org/pdf/2602.02710) from CMU goes *exactly* down this rabbit hole and comes up with actionable, principled insights. They point out that correctness-based RL is optimizing
 $$
 \begin{equation}
 J_{\mathrm{RL}}(\theta)=\mathbb E_{x\sim\rho}\,p_\theta(x)
@@ -33,29 +30,15 @@ whose gradient upweights low-pass-rate inputs by a factor $1/p_\theta(x)$.
 - A **simple unbiased estimator** whose expected gradient matches the truncated objective,
 - Experiments demonstrating strong Pareto improvements over common baselines (e.g. GRPO/RLOO) including up to **(~20x)** rollout scaling efficiency gains in their reasoning setups.
 
-### What's new here
-Luckily for our understand-by-practice purposes, the authors focus on the binary, discrete-reward setting. This post unpacks the following qualitative behavior of MaxRL:
+### What's here
 
-- is *sharper* than direct objectives, admitting a natural bounded truncation that interpolates RL -> ML with rollout budget,
+The authors focus on the binary, discrete-reward setting. This post unpacks the following qualitative behavior of MaxRL:
+
+- is *sharper* than direct objectives, admitting a natural bounded truncation that interpolates RL $\to$ ML with rollout budget,
 - fixing a prompt/sample, **upweights the most successful rollouts** (soft-max / log-sum-exp behavior),
 - marginalizing over rollouts, **upweights the most difficult prompts** via inverse-probability reweighting.
 
-We also put forward a generalization that abstracts at the level of per-rollout likelihood, admitting application to e.g. regression tasks. We expect this generalization to be highly applicable to regression RL tasks with low signal-to-noise ratio.
-
-[Math is cheap, just show me the code](#pseudocode-generalized-maxrl)
-
-## Contents
-
-- [Preamble / ramble on MLE](#preamble--ramble-on-mle)
-- [Formulation, notation](#formulation-notation)
-- [Direct RL as a Maximum Likelihood approximation](#direct-rl-as-a-maximum-likelihood-approximation)
-  - [Binary reasoning setup](#binary-reasoning-setup)
-  - [Continuous regression](#continuous-regression)
-  - [Putting them together: Jensen and Taylor](#putting-them-together-jensen-and-taylor)
-- [Gradient estimators](#gradient-estimators)
-  - [Binary case](#binary-case)
-  - [Generalization](#generalization)
-- [Pseudocode: generalized MaxRL](#pseudocode-generalized-maxrl)
+We also put forward a generalization that abstracts at the level of per-rollout likelihood, admitting application to e.g. regression tasks. We expect this generalization to be highly applicable to regression RL tasks with low signal-to-noise ratio. For the numerically stable $O(BRD)$ computation of the leave-one-out weights, see [Gradient Estimator](gradient-estimator.qmd).
 
 ## Preamble / ramble on MLE
 
@@ -65,7 +48,7 @@ Maximum likelihood estimation (MLE) is a near-axiomatic principle: given data an
 - Regression is MLE: MSE corresponds to Gaussian noise MLE; L1 corresponds to Laplace noise MLE.
 - VAEs are MLE-ish too: maximize a tractable lower bound on log-likelihood, while tightening that lower bound.
 
-Given the ubiquity of MLE, it's surprising that Maximum-likelihood RL (MaxRL) is this recent.
+Given the ubiquity of MLE, it's surprising that maximum-likelihood RL (MaxRL) is this recent.
 
 Why do we supervise with cross-entropy $\mathbb E \log p_\theta(y\mid x)$ rather than accuracy-like $\mathbb E\,p_\theta(y\mid x)$? One mechanistic lens is the gradient:
 $$
@@ -75,12 +58,11 @@ So difficult cases (small $p_\theta$) get amplified by $1/p_\theta$.
 
 > Maximum likelihood upweights difficult samples aggressively, updating the model on the frontier of its understanding.
 
-*Addendum:* I would not over-interpret this as the *principle* itself. It's a side-effect interpretation. The principle is still MLE. One example of a canonical interpretation of MLE comes from an information-theory perspective, where MLE is a compression objective that minimizes expected code length under the model. In this lens, each example contributes $-\log p_\theta(y\mid x)$ nats of surprise. Hard examples are expensive in description length, so ML naturally prioritizes optimization there.
-
+*Addendum:* I would not over-interpret this as the *principle* itself. It's a side-effect interpretation. The principle is still MLE. One canonical reading comes from information theory, where MLE is a compression objective that minimizes expected code length under the model. In this lens, each example contributes $-\log p_\theta(y\mid x)$ nats of surprise. Hard examples are expensive in description length, so ML naturally prioritizes optimization there.
 
 ## Formulation, notation
 
-Let's start in the standard LLM-RL latent-generation setting.
+Start in the standard LLM-RL latent-generation setting.
 
 - Data: $(x, y) \sim \rho$.
 - Policy/sequence model: $z \sim m_\theta(\cdot \mid x)$, where $z$ is a rollout.
@@ -113,12 +95,11 @@ S(x,z) := \nabla_\theta \log m_\theta(z\mid x).
 \end{equation}
 $$
 
-This score vector is almost always **the only** intermediate through which policy parameters $\theta$ touch policy-gradient objectives. Most algorithms differ mainly in how they reweight or shift these score vectors.
-Unpacking / understanding the latent variable formulation there already goes 60% of the way towards understanding this post; also note that this formulation subsumes supervised maximum-likelihood when sampling is trivial.
+This score vector is almost always **the only** intermediate through which policy parameters $\theta$ touch policy-gradient objectives. Most algorithms differ mainly in how they reweight or shift these score vectors. Unpacking the latent-variable formulation already goes 60% of the way toward understanding this post; note that it subsumes supervised maximum likelihood when sampling is trivial.
 
-## Direct RL as a Maximum Likelihood approximation
+## Direct RL as a maximum-likelihood approximation
 
-The maximum likelihood objective (for our latent-generation likelihood) is
+The maximum-likelihood objective (for our latent-generation likelihood) is
 $$
 J(\theta)=\mathbb E_{(x,y)\sim\rho}\,\log p_\theta(y\mid x)
 =\mathbb E_{(x,y)\sim\rho}\,\log\mathbb E_{z\sim m_\theta(\cdot\mid x)} l(y,z).
@@ -179,13 +160,13 @@ Maximum likelihood instead optimizes
 $$
 \mathbb E_{(x,y)\sim\rho}\,\log\mathbb E_{z\sim m_\theta(\cdot\mid x)}\,\exp(r(y,z))
 $$
-(up to constants): a log-sum-exp, rather than a simple average, over per-rollout MSE-derived terms. So within each sample, the objective reinforces the most successful trajectories; we'll recover this same structure later in the general form.
+(up to constants): a log-sum-exp, rather than a simple average, over per-rollout MSE-derived terms. So within each sample, the objective reinforces the most successful trajectories; we recover this same structure in the general form below.
 
-(If you want this to literally satisfy $l\in(0,1]$ so the Maclaurin series below is automatic, just pick a scale so the peak density is $\le 1$; multiplying $l$ by a $\theta$-independent constant only adds a constant to $\log p_\theta$, hence doesn't change the ML gradient.)
+(If you want this to literally satisfy $l\in(0,1]$ so the Maclaurin series below is automatic, pick a scale so the peak density is $\le 1$; multiplying $l$ by a $\theta$-independent constant only adds a constant to $\log p_\theta$, hence doesn't change the ML gradient.)
 
 ### Putting them together: Jensen and Taylor
 
-From here on, fix $(x,y)$ and suppress dependencies to reduce clutter:
+Fix $(x,y)$ and suppress dependencies to reduce clutter:
 $$
 p := p_\theta(y\mid x)=\mathbb E_{z\sim m_\theta(\cdot\mid x)} l(y,z).
 $$
@@ -196,7 +177,7 @@ $$
 =
 -\sum_{k=1}^\infty \frac{(1-p)^k}{k}.
 $$
-Note that this expansion is about $p=1$ (success), so $p\to 0$ implies greater deviation between the first (direct) and full (maximum-likelihood) degrees, another perspective on larger improvements for harder tasks.
+The expansion is about $p=1$ (success), so $p\to 0$ implies greater deviation between the first (direct) and full (maximum-likelihood) degrees: another perspective on larger improvements for harder tasks.
 
 Truncating to degree $D$ gives the **compute-indexed MaxRL objective**
 $$
@@ -221,20 +202,17 @@ $$
 $$
 \begin{equation}
 w_D(p)=\sum_{k=0}^{D-1}(1-p)^k
-=\frac{1-(1-p)^D}{p}
+=\frac{1-(1-p)^D}{p}.
 \label{eq:weight}
 \end{equation}
 $$
-As $D\to\infty$, $w_D(p)\to 1/p$, recovering ML's inverse-probability reweighting.
-Now use the log-derivative trick on
+As $D\to\infty$, $w_D(p)\to 1/p$, recovering ML's inverse-probability reweighting. The log-derivative trick on $p=\mathbb E_{z\sim m_\theta}[l(y,z)]$ gives
 $$
-p=\mathbb E_{z\sim m_\theta}[l(y,z)]:
-\qquad
 \nabla_\theta p
 = \mathbb E_{z\sim m_\theta(\cdot\mid x)}\big[l(y,z)\,\nabla_\theta\log m_\theta(z\mid x)\big]
-=\mathbb E[lS].
+=\mathbb E[lS],
 $$
-Therefore
+so
 $$
 \begin{equation}
 \nabla_\theta J_D(p)
@@ -255,11 +233,9 @@ At this point we can already read off the two qualitative behaviors:
 
 ## Gradient estimators
 
-Here, you say: "all's great! There's this beautiful theory and a highly principled objective. How are we going about optimizing it?"
+All's great: we have a principled objective. How are we going about optimizing it?
 
-The MaxRL paper proposes an unbiased estimator for the truncated maximum-likelihood binary objective.
-
-Below we recap the proof and give a per-rollout-likelihood $l(y,z)$ generalization that recovers the binary construction and extends to likelihood-based objectives such as Gaussian regression.
+The MaxRL paper proposes an unbiased estimator for the truncated maximum-likelihood binary objective. Below we recap the proof and give a per-rollout-likelihood $l(y,z)$ generalization that recovers the binary construction and extends to likelihood-based objectives such as Gaussian regression.
 
 ### Binary case
 
@@ -274,7 +250,7 @@ $$
 $$
 which is unbiased for $\nabla_\theta\,\mathrm{pass@}1(x)$.
 
-- **MaxRL's key estimator** is: average scores over *successful* trajectories only,
+- **MaxRL's key estimator** averages scores over *successful* trajectories only,
 $$
 \begin{equation}
 \hat g_N^{\mathrm{bin}}(x)
@@ -287,17 +263,18 @@ $$
 \end{equation}
 $$
 
-Conditioning on $K\geq 1$, note that
+Conditioning on $K\geq 1$,
 $$
-\mathbb E_z\big[\hat g_N^{\mathrm{bin}}(x)\mid K\geq 1\big] = \mathbb E_z[S\mid l=1] = \dfrac{\mathbb E[l\cdot S]}{\mathbb E[l]} = \dfrac{\nabla p}{p} = \nabla \log p
+\mathbb E_z\big[\hat g_N^{\mathrm{bin}}(x)\mid K\geq 1\big] = \mathbb E_z[S\mid l=1] = \dfrac{\mathbb E[l\cdot S]}{\mathbb E[l]} = \dfrac{\nabla p}{p} = \nabla \log p.
 $$
-It's an unbiased ML estimator, conditioning on $K\geq 1$!! The bias comes from $K=0$ which happens with probability $(1-p)^N$. Substituting shows that this exactly equals the gradient form in $\eqref{eq:gradient-main}$.
+It's an unbiased ML estimator, conditional on $K\geq 1$! The bias comes from $K=0$, which occurs with probability $(1-p)^N$. Substituting recovers exactly the gradient form in $\eqref{eq:gradient-main}$:
 $$
-\mathbb E_z\big[\hat g_N^{\mathrm{bin}}(x)\big] = (1-(1-p)^N) \nabla \log p = w_N(p)\cdot \nabla p = \nabla J_N(p)
+\mathbb E_z\big[\hat g_N^{\mathrm{bin}}(x)\big] = (1-(1-p)^N) \nabla \log p = w_N(p)\cdot \nabla p = \nabla J_N(p).
 $$
+
 ### Generalization
 
-Now we drop the assumption $l\in\{0,1\}$ and keep only what the derivation above *actually used*:
+Drop the assumption $l\in\{0,1\}$ and keep only what the derivation above *actually used*:
 
 - $l_j := l(y,z_j)\in[0,1]$ is a per-rollout likelihood/reward signal,
 - $p = \mathbb E[l]$,
@@ -310,14 +287,13 @@ We want to **estimate the last quantity using $N$ iid rollout samples**, with $1
 - But $w_D(p)\nabla_\theta p$ is a **product** of unknowns.
 - Plugging in sample estimates makes bias because the factors are correlated.
 
-The key here is the **leave-one-out** trick. Use one sample to estimate $\nabla_\theta p$, the remaining $N-1$ samples to estimate $w_D(p)$, and average over all leave-one-outs. The product factorizes because samples are conditionally independent.
+The key is the **leave-one-out** trick. Use one sample to estimate $\nabla_\theta p$, the remaining $N-1$ samples to estimate $w_D(p)$, and average over all leave-one-outs. The product factorizes because samples are conditionally independent.
 
 Formally, **suppose we have an estimator subroutine $\omega_j$**, built from $\{l_k\}_{k\ne j}$ only, such that
 $$
 \mathbb E[\omega_j] = w_D(p).
 $$
-We know that $l_j S_j$ is an unbiased estimator for $\nabla p = \mathbb E[l\cdot S]$,
-then the leave-one-out product $\omega_j l_j \cdot S_j$ is unbiased for $w_D(p)\nabla_\theta p$. Averaging over $j$ gives the final estimator:
+We know $l_j S_j$ is an unbiased estimator for $\nabla p = \mathbb E[l\cdot S]$, so the leave-one-out product $\omega_j l_j \cdot S_j$ is unbiased for $w_D(p)\nabla_\theta p$. Averaging over $j$ gives the final estimator:
 $$
 \begin{equation}
 \hat g_D(x,y)
@@ -326,68 +302,15 @@ $$
 \label{eq:general-estimator}
 \end{equation}
 $$
-In addition, this is a particularly neat expression because it is, again, a simple reweighted average of the rollout scores! To reduce variance, we can subtract any constant baseline (since $\mathbb E[S]=0$).
+This is, again, a simple reweighted average of the rollout scores. To reduce variance, we can subtract any constant baseline (since $\mathbb E[S]=0$).
 
-**It remains to solve the problem:** given iid samples $(l_0, \dots, l_{N-1})$, estimate $w_D(p)=\sum_{k=0}^{D-1}(1-p)^k.$
+**It remains to solve:** given iid samples $(l_0, \dots, l_{N-1})$, estimate $w_D(p)=\sum_{k=0}^{D-1}(1-p)^k$.
 
 - Taking $D=N$, it suffices to obtain estimators for $(1-p)^k$ for all $1\leq k\leq N-1$.
-- Fortunately, this turns out to be a textbook problem with a known MVUE (Minimal Variance Unbiased Estimator) using U-statistics (something something elementary symmetric polynomials, you're welcome to look it up -- drop a comment!).
+- This is a textbook problem with a known MVUE (minimum-variance unbiased estimator) via U-statistics over elementary symmetric polynomials.
 
-## Pseudocode: generalized MaxRL
+See [Gradient Estimator](gradient-estimator.qmd) for the numerically stable $O(BRD)$ prefix-suffix-scan implementation used in this repo.
 
-```python
-# Generalized truncated Maximum likelihood RL for latent-generation likelihoods
-#
-# Inputs:
-#   - model m_theta(z | x)
-#   - per-rollout likelihood l(y, z) in [0, 1]   (can be scaled)
-#   - truncation degree D
-#   - number of rollouts N >= D (D=1 corresponds to REINFORCE)
+### Note: bounded $l$ suffices
 
-
-def Estimate_wD(l_loo, D):
-    """
-    Args:
-        l_loo: 1D tensor of length N-1 with values in [0,1], detached;
-              all samples from the same (x,y). loo for leave-one-out.
-        D: truncation degree.
-
-    Returns:
-        Scalar unbiased estimate of w_D(p) = sum_{k=0}^{D-1}(1-p)^k.
-    """
-    ...
-    return w_hat
-
-
-def maxrl_step(batch, model, optimizer, D, N, baseline_const=0.0):
-    # batch: list of (x, y) samples
-    optimizer.zero_grad()
-    total_loss = 0.0
-
-    for (x, y) in batch:
-        # 1) sample rollouts and log-probabilities
-        z_j, logp_j = model.sample_with_logprob(x, N)  # logp_j: [N]
-
-        # 2) per-rollout likelihoods (no grad)
-        with torch.no_grad():
-            l_j = likelihood_l(y, z_j).detach()  # [N], in [0,1]
-
-        # 3) leave-one-out weights
-        omega_j = []
-        for j in range(N):
-            l_loo = torch.cat([l_j[:j], l_j[j+1:]]).detach()
-            omega_j.append(Estimate_wD(l_loo, D))
-        omega_j = torch.stack(omega_j)  # [N]
-
-        # 4) subtract constant baseline + equivalent-loss (one backward pass)
-        with torch.no_grad():
-            adv_j = omega_j * l_j - baseline_const
-
-        # Equivalent loss: gradient is (adv_j * grad logp_j)
-        loss_x = -(adv_j.detach() * logp_j).mean()
-        total_loss = total_loss + loss_x
-
-    total_loss = total_loss / len(batch)
-    total_loss.backward()
-    optimizer.step()
-```
+We only need a known upper bound $L \geq \sup l$: set $\sigma_j := l_j/L$, then $\log\mathbb E[\sigma_j] = \log p - \log L$ differs by a $\theta$-independent constant, so the gradient is unchanged and all derivations apply with $(l_j, p) \mapsto (\sigma_j, \sigma_\theta)$. For Gaussian regression, $L = (2\pi\sigma^2)^{-1/2}$ is immediate.

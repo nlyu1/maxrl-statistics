@@ -31,22 +31,23 @@ class MaxRLEstimatorConfig(BaseConfig):
         """
         Mathematical contract
         --------------------
-        Suppress batch indexing and fix one prompt / target pair (x, y)
+        Suppress batch indexing and fix one prompt / target pair (x, y).
+        Notation matches writeup/gradient-estimator.qmd.
 
         Let
             R := num_rollouts
-            S := sup_likelihood
+            L := sup_likelihood                       (bound on l)
             D := degree
             z_j ~ m_theta(- | x) i.i.d. for j = 1 ... R
-            l_j := l(y, z_j) in (0, S)
+            l_j := l(y, z_j) in [0, L]
                 **Detached** rollout-conditional likelihood
-            rho_theta := E_z[l(y, z)]
-                Rollout-marginal likelihood
-            sigma_theta := rho_theta / S
-                Within (0, 1] under assumptions.
-            score_j := grad_theta log m_theta(z_j | x).
-                Note that this is the gradient of **policy score**,
-                    not of the provided log-likelihoods
+            sigma_j := l_j / L in [0, 1]
+                Normalized per-rollout likelihood
+            sigma_theta := E_z[sigma_j] = E_z[l_j] / L
+                Marginal normalized likelihood, in (0, 1] under assumptions
+            S_j := grad_theta log m_theta(z_j | x)
+                Per-rollout policy score vector (gradient of log-policy,
+                not of the provided log-likelihoods)
 
         Key assumptions: these are not checked
         - 0 < sigma_theta <= 1
@@ -54,41 +55,48 @@ class MaxRLEstimatorConfig(BaseConfig):
             - To estimate to degree-D, we only need the (D-1)-th power
             - Leaving one out yields R-1 samples, so D-1 <= R-1 ==> D <= R
 
-        Population-objective
+        Population objective
         --------------------
-        The returned weights target the degree-D Maclaurin truncation
-            of log(sigma_theta) about sigma_theta = 1:
+        The returned weights target the degree-D Maclaurin truncation of
+        log(sigma_theta) about sigma_theta = 1:
 
-        J_D(theta) := -sum_{k=1}^D (1 - sigma_theta)^k / k
+            J_D(theta) := -sum_{k=1}^D (1 - sigma_theta)^k / k
 
-        Its sigma-derivative is
-            omega_D(sigma) := sum_{d=0}^{D-1} (1-sigma)^d
+        Its sigma-derivative is the weight function
+            w_D(sigma) := sum_{d=0}^{D-1} (1 - sigma)^d,
 
-        The exact log-likelihood gradient is recovered in the limit D -> infty.
-            For finite order, the discrepancy is the geometric factor
-            1 - (1 - sigma_theta)^D
+        so grad_theta J_D = w_D(sigma_theta) * E[sigma_j * S_j]. As D -> infty
+        this recovers the exact log-likelihood gradient of log sigma_theta;
+        at finite D the gradient residual is the geometric factor
+        1 - (1 - sigma_theta)^D.
 
         Estimator returned by this function
         -----------------------------------
-        This function returns log of detached per-rollout score weights `w_j` such that
+        This function returns log of detached per-rollout score coefficients
+        log(omega_j * sigma_j), so that
 
-            g_hat(theta) := (1 / R) * sum_j (w_j * score_j)
+            g_hat(theta) := (1 / R) * sum_j (omega_j * sigma_j * S_j)
 
-        is an unbiased estimator of grad_theta J_D(theta)
+        is an unbiased estimator of grad_theta J_D(theta). Each omega_j is a
+        leave-one-out U-statistic built from the peer complements
+        a_{-j} = (1 - sigma_i)_{i != j}, satisfying E[omega_j] = w_D(sigma_theta).
         """
         num_rollouts = log_likelihoods.shape[1]
         assert self.degree <= num_rollouts
 
         with torch.no_grad():
+            # log(sigma_j) = log(l_j) - log(L)
             normalized_ll = log_likelihoods - math.log(self.sup_likelihood)
-            # 1 - sigma_theta samples
+            # Per-rollout complements a_j = 1 - sigma_j, in [0, 1]
             complement_normalized_likelihood = -torch.expm1(normalized_ll)
 
             if num_rollouts == 1:
-                # zeroth-degree expansion omega_1(sigma) is just 1
+                # Degree-1 weight function w_1(sigma) = 1, so the coefficient
+                # is just sigma_j and the log coefficient is log(sigma_j).
                 return normalized_ll
             else:
-                # For each rollout, estimate omega_D(sigma) using leave-one-out complements
+                # For each rollout j, estimate w_D(sigma_theta) via the
+                # leave-one-out U-statistic omega_j over peer complements a_{-j}.
                 log_omega = self._log_leave_one_out_weight(
                     complement_normalized_likelihood
                 )
@@ -98,26 +106,34 @@ class MaxRLEstimatorConfig(BaseConfig):
         self, complement_nl: Float[Tensor, "batch rollout"]
     ) -> Float[Tensor, "batch rollout"]:
         """
-        Given samples of (1 - sigma), estimates log omega_D(sigma)
-        for each sample using leave-one-out's
+        Given per-rollout complements a_j = 1 - sigma_j (batched as
+        `complement_nl`), compute log(omega_j) for each rollout j, where
 
-        log_llo_weight_j = log - sum_{d=0}^{D-1} ()
+            omega_j := sum_{d=0}^{D-1} e_d(a_{-j}) / C(R - 1, d)
+
+        is the leave-one-out U-statistic satisfying E[omega_j] = w_D(sigma_theta).
+        Here e_d(a_{-j}) is the d-th elementary symmetric polynomial in the
+        R-1 peer complements a_{-j} = (a_i)_{i != j}, so
+        e_d(a_{-j}) / C(R-1, d) is the U-statistic estimator of (1-sigma_theta)^d.
+
+        Implementation follows the state-vector / prefix-suffix-scan formulation
+        in writeup/gradient-estimator.qmd. For any subset I of rollouts, let
+
+            x_k(I) := e_k((a_i)_{i in I}) / C(R - 1, k),   k = 0, ..., D-1
+
+        be the normalized elementary-symmetric state. Appending one complement
+        a to I updates the state by the lower-bidiagonal matrix M(a) in R^{DxD}:
+
+            M(a)_{k, k} = 1,   M(a)_{k, k-1} = (k / (R - k)) * a,
+
+        so x(I u {a}) = M(a) * x(I). Forward prefix states alpha_j = x({1..j})
+        are built by a forward scan; suffix covectors beta_j (with beta_R = 1^T)
+        are built by a backward scan; and the leave-one-out weight is
+
+            omega_j = beta_j^T * alpha_{j-1}.
 
         The DP is carried out entirely in log-space (logaddexp / logsumexp);
-            every per-step linear-space identity is annotated in-line below.
-
-        -------------
-        Mathematically, we compute u-statistics matrix
-        u_j^k = e_k(sigma_{-j}) / Binom(R - 1, k)
-
-        Here, e_k(sigma_{-j}) is the symmetric polynomial
-            w.r.t. R-1 rollouts ignoring j.
-
-        e_k(sigma_{-j}) = sum_{|J|=k} prod_{j in J} a_j
-
-        Intuitively, this just estimates the product by averaging across all subsets.
-
-        See `README.md` for implementation semantics.
+        every per-step linear-space identity is annotated in-line below.
         """
         batch_size, num_rollouts = complement_nl.shape
         degree = self.degree
@@ -168,9 +184,7 @@ class MaxRLEstimatorConfig(BaseConfig):
         #                           + (k+1)/(R-k-1) * a_{j-1} * beta_j[k+1]
         # Pair log_beta_j with log_alpha_{j-1} to emit log_omega[j-1],
         # then step with logaddexp.
-        log_beta = torch.zeros(
-            batch_size, degree, device=device, dtype=compute_dtype
-        )
+        log_beta = torch.zeros(batch_size, degree, device=device, dtype=compute_dtype)
         log_omega = torch.empty(
             batch_size, num_rollouts, device=device, dtype=compute_dtype
         )

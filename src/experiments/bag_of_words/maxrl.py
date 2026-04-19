@@ -1,30 +1,36 @@
 from __future__ import annotations
 
+import math
+from contextlib import nullcontext
+
+import torch
+from jaxtyping import Float, Int
+from pydantic import ConfigDict
+from pydantic.dataclasses import dataclass
+from torch import Tensor
+from tqdm.autonotebook import tqdm
+
 from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
+from src.experiments.bag_of_words.state import BagOfWordsStudyBaseState
+from src.maxrl_estimator import MaxRLEstimatorConfig
 
 
-class BagOfWordsMaxRLonfig(BagOfWordsStudyBaseConfig):
+class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
     """
-    Zero-step rollout, fully on-policy MaxRL config
+    Zero-step rollout, fully on-policy MaxRL config.
 
     The policy is a Gaussian on the scalar output,
-        m_theta(z | x) = Normal(f_theta(x), gaussian_stdev^2),
-    so "rollouts" are Gaussian samples around the model prediction and
-    the score function is (z - f_theta(x)) / sigma^2 * grad f_theta(x).
-    Advantages are standard GRPO group-standardized negative MSE rewards
-    against the (noisy) target.
+        m_theta(z | x) = Normal(f_theta(x), gaussian_stdev^2).
+    MaxRL weights use the Gaussian likelihood of the noisy target under each
+    rollout as l(y, z), with maximum likelihood backed out from gaussian_stdev.
     """
 
-    # Estimate order = num_rollouts_per_sample
     num_rollouts_per_sample: int
     degree: int
     gaussian_stdev: float
-    # We need an additional term to bound the log-expansion.
-    # In the canonical bag-of-words dataset, this is [-1, 1] -> 2.0
-    reward_range: float
 
-    def get_state_cls(self) -> type["BagOfWordsGRPOState"]:
-        return BagOfWordsGRPOState
+    def get_state_cls(self) -> type["BagOfWordsMaxRLState"]:
+        return BagOfWordsMaxRLState
 
     @classmethod
     def get_canonical(
@@ -33,10 +39,13 @@ class BagOfWordsMaxRLonfig(BagOfWordsStudyBaseConfig):
         num_rollouts_per_sample: int,
         gaussian_stdev: float,
         **kwargs: object,
-    ) -> "BagOfWordsGRPOConfig":
+    ) -> "BagOfWordsMaxRLConfig":
+        assert num_rollouts_per_sample >= 1
+        assert gaussian_stdev > 0.0
         config = cls(
-            **cls._canonical_kwargs(**kwargs),
+            **cls.canonical_kwargs(**kwargs),
             num_rollouts_per_sample=num_rollouts_per_sample,
+            degree=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,
         )
         config.prepare_study_folder()
@@ -56,6 +65,29 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
         # this projects from the final padded position, not the last non-pad token.
         return self.model(tokens=context).squeeze(-1)
 
+    def _compute_score_weights(
+        self,
+        *,
+        rollouts: Float[Tensor, "batch rollout"],
+        target: Float[Tensor, "batch"],
+    ) -> Float[Tensor, "batch rollout"]:
+        sigma = self.config.gaussian_stdev
+        assert sigma > 0.0
+        sup_likelihood = 1.0 / (math.sqrt(2.0 * math.pi) * sigma)
+        estimator_config = MaxRLEstimatorConfig.initialize(
+            degree=self.config.degree,
+            sup_likelihood=sup_likelihood,
+        )
+        with torch.no_grad():
+            rollouts_f = rollouts.float()
+            target_f = target.float()
+            log_target_likelihoods: Float[Tensor, "batch rollout"] = -0.5 * (
+                (target_f.unsqueeze(-1) - rollouts_f) / sigma
+            ).pow(2) + math.log(sup_likelihood)
+        return estimator_config.compute_log_score_weights(
+            log_likelihoods=log_target_likelihoods,
+        ).exp()
+
     def train_step(
         self,
         *,
@@ -74,6 +106,8 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
 
         num_rollouts = self.config.num_rollouts_per_sample
         sigma = self.config.gaussian_stdev
+        assert 1 <= self.config.degree <= num_rollouts
+        assert sigma > 0.0
 
         device_context = (
             torch.cuda.device(self.device)
@@ -88,29 +122,25 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
                 context=tokens
             )
 
-            # Rollouts are Gaussian samples around the deterministic prediction.
-            # They are treated as fixed samples from m_theta(.|x); no gradient flows
-            # through z itself -- the policy-gradient signal must come from logp.
+            # Rollouts are fixed samples from m_theta(.|x); no gradient flows
+            # through z itself. The policy-gradient signal comes from logp.
             with torch.no_grad():
-                noise: Float[Tensor, "batch rollouts"] = torch.randn(
+                noise: Float[Tensor, "batch rollout"] = torch.randn(
                     prediction.shape[0],
                     num_rollouts,
                     device=prediction.device,
                     dtype=prediction.dtype,
                 )
-                rollouts: Float[Tensor, "batch rollouts"] = (
+                rollouts: Float[Tensor, "batch rollout"] = (
                     prediction.unsqueeze(-1) + sigma * noise
                 )
 
-            # log m_theta(z|x) up to theta-independent constants. Constants drop
-            # out because GRPO advantages sum to zero within each rollout group.
-            logp_rollouts: Float[Tensor, "batch rollouts"] = -0.5 * (
+            logp_rollouts: Float[Tensor, "batch rollout"] = -0.5 * (
                 (rollouts - prediction.unsqueeze(-1)) / sigma
             ).pow(2)
-
-            # Compute score weights
-            score_weights: Float[Tensor, "batch rollouts"] = (
-                self._compute_score_weights(rollouts=rollouts, target=target)
+            score_weights = self._compute_score_weights(
+                rollouts=rollouts,
+                target=target,
             )
 
             loss = -(logp_rollouts * score_weights.detach()).mean()
@@ -137,7 +167,7 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
         self.train_corr_ground_truth_counter.empty_()
         self.model.train()
 
-        pbar = tqdm(self.train_dl, desc=f"grpo epoch {epoch}")
+        pbar = tqdm(self.train_dl, desc=f"maxrl epoch {epoch}")
         for batch in pbar:
             self.train_step(batch=batch)
             train_corr_target = float(

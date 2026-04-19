@@ -1,0 +1,897 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - link "MaxRL Statistics" [ref=e7] [cursor=pointer]:
+          - /url: http://localhost:7029/
+        - generic "Search" [ref=e8]:
+          - combobox "Search" [ref=e9]:
+            - button "Search" [ref=e10] [cursor=pointer]:
+              - img [ref=e12]
+        - list [ref=e15]:
+          - listitem [ref=e16]:
+            - link "Home" [ref=e17] [cursor=pointer]:
+              - /url: http://localhost:7029/
+          - listitem [ref=e18]:
+            - link "Bag of Words" [ref=e19] [cursor=pointer]:
+              - /url: http://localhost:7029/bag-of-words.html
+          - listitem [ref=e20]:
+            - link "DAG Reasoning" [ref=e21] [cursor=pointer]:
+              - /url: http://localhost:7029/dag-reasoning.html
+          - listitem [ref=e22]:
+            - link "MaxRL Estimator" [ref=e23] [cursor=pointer]:
+              - /url: http://localhost:7029/maxrl-estimator.html
+  - generic [ref=e24]:
+    - navigation [ref=e26]:
+      - heading "On this page" [level=2] [ref=e27]
+      - list [ref=e28]:
+        - listitem [ref=e29]:
+          - link "Dataset" [ref=e30] [cursor=pointer]:
+            - /url: http://localhost:7029/bag-of-words.html#dataset
+          - list [ref=e31]:
+            - listitem [ref=e32]:
+              - link "Examples" [ref=e33] [cursor=pointer]:
+                - /url: http://localhost:7029/bag-of-words.html#examples
+        - listitem [ref=e34]:
+          - link "Experiments" [ref=e35] [cursor=pointer]:
+            - /url: http://localhost:7029/bag-of-words.html#experiments
+    - main [ref=e36]:
+      - 'heading "Regression: bag of words" [level=1] [ref=e39]'
+      - paragraph [ref=e40]:
+        - text: The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a
+        - strong [ref=e41]: zero-step rollout
+        - text: "setting: the model sees a single prompt and predicts a scalar target, with no sequential reasoning."
+      - generic [ref=e42]:
+        - heading "DatasetAnchor" [level=2] [ref=e43]:
+          - text: Dataset
+          - link "Anchor" [ref=e44] [cursor=pointer]:
+            - /url: "#dataset"
+            - text: 
+        - paragraph [ref=e45]:
+          - text: See
+          - link "src/data/bag_of_words.py" [ref=e46] [cursor=pointer]:
+            - /url: https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/bag_of_words.py
+            - code [ref=e47]: src/data/bag_of_words.py
+          - text: .
+        - paragraph [ref=e48]:
+          - text: Each prompt is
+          - generic [ref=e50]:
+            - generic [ref=e53]: L
+            - math [ref=e55]:
+              - generic [ref=e56]: L
+          - text: words sampled iid from a mixture of
+          - strong [ref=e57]: semantic words
+          - text: ", which carries signal, and"
+          - strong [ref=e58]: auxiliary words
+          - text: ", which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by"
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e63]: ρ
+              - generic [ref=e65]: ∈
+              - generic [ref=e67]: (
+              - generic [ref=e69]: "0"
+              - generic [ref=e71]: ","
+              - generic [ref=e73]: "1"
+              - generic [ref=e75]: "]"
+            - math [ref=e77]:
+              - generic [ref=e78]: ρ
+              - generic [ref=e79]: ∈
+              - generic [ref=e80]: (
+              - generic [ref=e81]: "0"
+              - generic [ref=e82]: ","
+              - generic [ref=e83]: "1"
+              - generic [ref=e84]: "]"
+          - text: ", the correlation between signal and target."
+        - paragraph [ref=e85]:
+          - strong [ref=e86]: 7-word vocabulary.
+          - text: "Semantic words map to integer values centered at zero:"
+        - table [ref=e87]:
+          - rowgroup [ref=e88]:
+            - row "grim bad poor fair good great perfect" [ref=e89]:
+              - columnheader "grim" [ref=e90]
+              - columnheader "bad" [ref=e91]
+              - columnheader "poor" [ref=e92]
+              - columnheader "fair" [ref=e93]
+              - columnheader "good" [ref=e94]
+              - columnheader "great" [ref=e95]
+              - columnheader "perfect" [ref=e96]
+          - rowgroup [ref=e97]:
+            - row [ref=e98]:
+              - cell [ref=e99]:
+                - generic [ref=e101]:
+                  - generic [ref=e102]:
+                    - generic [ref=e104]: −
+                    - generic [ref=e106]: "3"
+                  - math [ref=e108]:
+                    - generic [ref=e109]: −
+                    - generic [ref=e110]: "3"
+              - cell [ref=e111]:
+                - generic [ref=e113]:
+                  - generic [ref=e114]:
+                    - generic [ref=e116]: −
+                    - generic [ref=e118]: "2"
+                  - math [ref=e120]:
+                    - generic [ref=e121]: −
+                    - generic [ref=e122]: "2"
+              - cell [ref=e123]:
+                - generic [ref=e125]:
+                  - generic [ref=e126]:
+                    - generic [ref=e128]: −
+                    - generic [ref=e130]: "1"
+                  - math [ref=e132]:
+                    - generic [ref=e133]: −
+                    - generic [ref=e134]: "1"
+              - cell [ref=e135]:
+                - generic [ref=e137]:
+                  - generic [ref=e140]: "0"
+                  - math [ref=e142]:
+                    - generic [ref=e143]: "0"
+              - cell [ref=e144]:
+                - generic [ref=e146]:
+                  - generic [ref=e147]:
+                    - generic [ref=e149]: +
+                    - generic [ref=e151]: "1"
+                  - math [ref=e153]:
+                    - generic [ref=e154]: +
+                    - generic [ref=e155]: "1"
+              - cell [ref=e156]:
+                - generic [ref=e158]:
+                  - generic [ref=e159]:
+                    - generic [ref=e161]: +
+                    - generic [ref=e163]: "2"
+                  - math [ref=e165]:
+                    - generic [ref=e166]: +
+                    - generic [ref=e167]: "2"
+              - cell [ref=e168]:
+                - generic [ref=e170]:
+                  - generic [ref=e171]:
+                    - generic [ref=e173]: +
+                    - generic [ref=e175]: "3"
+                  - math [ref=e177]:
+                    - generic [ref=e178]: +
+                    - generic [ref=e179]: "3"
+        - paragraph [ref=e180]:
+          - text: "The 256 auxiliary words (common function words:"
+          - emphasis [ref=e181]: the, a, and, if, because, …
+          - text: ) carry value 0.
+        - paragraph [ref=e182]:
+          - strong [ref=e183]: Sampling distribution.
+          - text: Semantic words share mass
+          - generic [ref=e185]:
+            - generic [ref=e186]:
+              - generic [ref=e188]: "1"
+              - generic [ref=e190]: −
+              - generic [ref=e192]: α
+            - math [ref=e194]:
+              - generic [ref=e195]: "1"
+              - generic [ref=e196]: −
+              - generic [ref=e197]: α
+          - text: (where
+          - generic [ref=e199]:
+            - generic [ref=e202]: α
+            - math [ref=e204]:
+              - generic [ref=e205]: α
+          - text: =
+          - code [ref=e206]: aux_words_ratio
+          - text: "), shaped by a power-law centered on the neutral word “fair”:"
+          - generic [ref=e208]:
+            - generic [ref=e209]:
+              - generic [ref=e210]:
+                - generic [ref=e212]: p
+                - generic [ref=e215]: i
+              - generic [ref=e217]: ∝
+              - generic [ref=e219]: (
+              - generic [ref=e221]: "1"
+              - generic [ref=e223]: +
+              - generic [ref=e225]: "|"
+              - generic [ref=e227]: i
+              - generic [ref=e229]: −
+              - generic [ref=e230]:
+                - generic [ref=e231]: c
+                - generic [ref=e232]: e
+                - generic [ref=e233]: "n"
+                - generic [ref=e234]: t
+                - generic [ref=e235]: e
+                - generic [ref=e236]: r
+              - generic [ref=e238]: "|"
+              - generic [ref=e239]:
+                - generic [ref=e241]: )
+                - generic [ref=e243]:
+                  - generic [ref=e245]: −
+                  - generic [ref=e247]: γ
+            - math [ref=e249]:
+              - generic [ref=e250]:
+                - generic [ref=e251]: p
+                - generic [ref=e252]: i
+              - generic [ref=e253]: ∝
+              - generic [ref=e254]: (
+              - generic [ref=e255]: "1"
+              - generic [ref=e256]: +
+              - generic [ref=e257]: "|"
+              - generic [ref=e258]: i
+              - generic [ref=e259]: −
+              - generic [ref=e260]: center
+              - generic [ref=e261]: "|"
+              - generic [ref=e262]:
+                - generic [ref=e263]: )
+                - generic [ref=e264]:
+                  - generic [ref=e265]: −
+                  - generic [ref=e266]: γ
+          - text: . Auxiliary words uniformly split mass
+          - generic [ref=e268]:
+            - generic [ref=e271]: α
+            - math [ref=e273]:
+              - generic [ref=e274]: α
+          - text: .
+        - 'figure "Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency: α = 0.5 , γ = 1.0" [ref=e276]':
+          - paragraph [ref=e277]:
+            - img [ref=e278]
+          - generic [ref=e279]:
+            - text: "Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency:"
+            - generic [ref=e281]:
+              - generic [ref=e282]:
+                - generic [ref=e284]: α
+                - generic [ref=e286]: =
+                - generic [ref=e287]:
+                  - generic [ref=e288]: "0"
+                  - generic [ref=e289]: .
+                  - generic [ref=e290]: "5"
+                - generic [ref=e292]: ","
+                - generic [ref=e294]: γ
+                - generic [ref=e296]: =
+                - generic [ref=e297]:
+                  - generic [ref=e298]: "1"
+                  - generic [ref=e299]: .
+                  - generic [ref=e300]: "0"
+              - math [ref=e302]:
+                - generic [ref=e303]: α
+                - generic [ref=e304]: =
+                - generic [ref=e305]: "0.5"
+                - generic [ref=e306]: ","
+                - generic [ref=e307]: γ
+                - generic [ref=e308]: =
+                - generic [ref=e309]: "1.0"
+        - paragraph [ref=e310]:
+          - strong [ref=e311]: Target generation.
+          - text: Given a prompt of length
+          - generic [ref=e313]:
+            - generic [ref=e316]: L
+            - math [ref=e318]:
+              - generic [ref=e319]: L
+          - text: ":"
+          - generic [ref=e321]:
+            - generic [ref=e322]:
+              - generic [ref=e323]:
+                - generic [ref=e324]: s
+                - generic [ref=e325]: i
+                - generic [ref=e326]: g
+                - generic [ref=e327]: "n"
+                - generic [ref=e328]: a
+                - generic [ref=e329]: l
+              - generic [ref=e331]: =
+              - generic [ref=e333]:
+                - generic [ref=e336]: ρ
+                - generic [ref=e342]:
+                  - generic [ref=e344]: σ
+                  - generic [ref=e346]:
+                    - generic [ref=e349]: √
+                    - generic [ref=e352]: L
+              - generic [ref=e353]:
+                - generic [ref=e356]: L
+                - generic [ref=e358]:
+                  - generic [ref=e362]: ∑
+                  - generic [ref=e365]:
+                    - generic [ref=e367]: i
+                    - generic [ref=e369]: =
+                    - generic [ref=e371]: "1"
+              - generic [ref=e372]:
+                - generic [ref=e374]: v
+                - generic [ref=e377]: i
+              - generic [ref=e379]: ","
+              - generic [ref=e380]:
+                - generic [ref=e381]: t
+                - generic [ref=e382]: a
+                - generic [ref=e383]: r
+                - generic [ref=e384]: g
+                - generic [ref=e385]: e
+                - generic [ref=e386]: t
+              - generic [ref=e388]: =
+              - generic [ref=e389]:
+                - generic [ref=e390]: s
+                - generic [ref=e391]: i
+                - generic [ref=e392]: g
+                - generic [ref=e393]: "n"
+                - generic [ref=e394]: a
+                - generic [ref=e395]: l
+              - generic [ref=e397]: +
+              - generic [ref=e400]: "N"
+              - generic [ref=e402]: (
+              - generic [ref=e404]: "0"
+              - generic [ref=e406]: ","
+              - generic [ref=e408]:
+                - generic [ref=e411]: √
+                - generic [ref=e412]:
+                  - generic [ref=e414]: "1"
+                  - generic [ref=e416]: −
+                  - generic [ref=e417]:
+                    - generic [ref=e419]: ρ
+                    - generic [ref=e422]: "2"
+              - generic [ref=e424]: )
+            - math [ref=e426]:
+              - generic [ref=e427]: signal
+              - generic [ref=e428]: =
+              - generic [ref=e429]:
+                - generic [ref=e430]: ρ
+                - generic [ref=e431]:
+                  - generic [ref=e432]: σ
+                  - generic [ref=e434]: L
+              - generic [ref=e435]:
+                - generic [ref=e436]: ∑
+                - generic [ref=e437]:
+                  - generic [ref=e438]: i
+                  - generic [ref=e439]: =
+                  - generic [ref=e440]: "1"
+                - generic [ref=e441]: L
+              - generic [ref=e442]:
+                - generic [ref=e443]: v
+                - generic [ref=e444]: i
+              - generic [ref=e445]: ","
+              - generic [ref=e446]: target
+              - generic [ref=e447]: =
+              - generic [ref=e448]: signal
+              - generic [ref=e449]: +
+              - generic [ref=e451]: "N"
+              - generic [ref=e452]: (
+              - generic [ref=e453]: "0"
+              - generic [ref=e454]: ","
+              - generic [ref=e455]:
+                - generic [ref=e456]: "1"
+                - generic [ref=e457]: −
+                - generic [ref=e458]:
+                  - generic [ref=e459]: ρ
+                  - generic [ref=e460]: "2"
+              - generic [ref=e461]: )
+          - text: where
+          - generic [ref=e463]:
+            - generic [ref=e466]: σ
+            - math [ref=e468]:
+              - generic [ref=e469]: σ
+          - text: is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction
+          - generic [ref=e471]:
+            - generic [ref=e472]:
+              - generic [ref=e473]:
+                - generic [ref=e474]: V
+                - generic [ref=e475]: a
+                - generic [ref=e476]: r
+              - generic [ref=e478]: (
+              - generic [ref=e479]:
+                - generic [ref=e480]: t
+                - generic [ref=e481]: a
+                - generic [ref=e482]: r
+                - generic [ref=e483]: g
+                - generic [ref=e484]: e
+                - generic [ref=e485]: t
+              - generic [ref=e487]: )
+              - generic [ref=e489]: =
+              - generic [ref=e491]: "1"
+            - math [ref=e493]:
+              - generic [ref=e494]: Var
+              - generic [ref=e495]: (
+              - generic [ref=e496]: target
+              - generic [ref=e497]: )
+              - generic [ref=e498]: =
+              - generic [ref=e499]: "1"
+          - text: and
+          - generic [ref=e501]:
+            - generic [ref=e502]:
+              - generic [ref=e503]:
+                - generic [ref=e504]: c
+                - generic [ref=e505]: o
+                - generic [ref=e506]: r
+                - generic [ref=e507]: r
+              - generic [ref=e509]: (
+              - generic [ref=e510]:
+                - generic [ref=e511]: s
+                - generic [ref=e512]: i
+                - generic [ref=e513]: g
+                - generic [ref=e514]: "n"
+                - generic [ref=e515]: a
+                - generic [ref=e516]: l
+              - generic [ref=e518]: ","
+              - generic [ref=e519]:
+                - generic [ref=e520]: t
+                - generic [ref=e521]: a
+                - generic [ref=e522]: r
+                - generic [ref=e523]: g
+                - generic [ref=e524]: e
+                - generic [ref=e525]: t
+              - generic [ref=e527]: )
+              - generic [ref=e529]: =
+              - generic [ref=e531]: ρ
+            - math [ref=e533]:
+              - generic [ref=e534]: corr
+              - generic [ref=e535]: (
+              - generic [ref=e536]: signal
+              - generic [ref=e537]: ","
+              - generic [ref=e538]: target
+              - generic [ref=e539]: )
+              - generic [ref=e540]: =
+              - generic [ref=e541]: ρ
+          - text: .
+        - generic [ref=e542]:
+          - heading "ExamplesAnchor" [level=3] [ref=e543]:
+            - text: Examples
+            - link "Anchor" [ref=e544] [cursor=pointer]:
+              - /url: "#examples"
+              - text: 
+          - paragraph [ref=e545]:
+            - text: Consider 8-word prompts; we compute the
+            - emphasis [ref=e546]: per-word signal stdev
+            - generic [ref=e548]:
+              - generic [ref=e549]:
+                - generic [ref=e551]: σ
+                - generic [ref=e553]: =
+                - generic [ref=e554]:
+                  - generic [ref=e555]: "1"
+                  - generic [ref=e556]: .
+                  - generic [ref=e557]: "1"
+                  - generic [ref=e558]: "4"
+              - math [ref=e560]:
+                - generic [ref=e561]: σ
+                - generic [ref=e562]: =
+                - generic [ref=e563]: "1.14"
+            - text: ", so the per-prompt stdev"
+            - generic [ref=e565]:
+              - generic [ref=e566]:
+                - generic [ref=e568]:
+                  - generic [ref=e571]: √
+                  - generic [ref=e574]: L
+                - generic [ref=e576]: σ
+                - generic [ref=e578]: =
+                - generic [ref=e579]:
+                  - generic [ref=e580]: "3"
+                  - generic [ref=e581]: .
+                  - generic [ref=e582]: "2"
+                  - generic [ref=e583]: "1"
+              - math [ref=e585]:
+                - generic [ref=e587]: L
+                - generic [ref=e588]: σ
+                - generic [ref=e589]: =
+                - generic [ref=e590]: "3.21"
+            - text: . Semantic words are
+            - strong [ref=e591]: bolded
+            - text: ":"
+          - paragraph [ref=e592]:
+            - strong [ref=e593]: Low-signal regime
+            - text: ":"
+            - generic [ref=e595]:
+              - generic [ref=e596]:
+                - generic [ref=e598]: ρ
+                - generic [ref=e600]: =
+                - generic [ref=e601]:
+                  - generic [ref=e602]: "0"
+                  - generic [ref=e603]: .
+                  - generic [ref=e604]: "0"
+                  - generic [ref=e605]: "1"
+              - math [ref=e607]:
+                - generic [ref=e608]: ρ
+                - generic [ref=e609]: =
+                - generic [ref=e610]: "0.01"
+            - text: — multiplier
+            - generic [ref=e612]:
+              - generic [ref=e613]:
+                - generic [ref=e615]: ρ
+                - generic [ref=e618]: /
+                - generic [ref=e620]: (
+                - generic [ref=e622]: σ
+                - generic [ref=e624]:
+                  - generic [ref=e627]: √
+                  - generic [ref=e630]: L
+                - generic [ref=e632]: )
+                - generic [ref=e634]: =
+                - generic [ref=e635]:
+                  - generic [ref=e636]: "0"
+                  - generic [ref=e637]: .
+                  - generic [ref=e638]: "0"
+                  - generic [ref=e639]: "0"
+                  - generic [ref=e640]: "3"
+                  - generic [ref=e641]: "1"
+              - math [ref=e643]:
+                - generic [ref=e644]: ρ
+                - generic [ref=e646]: /
+                - generic [ref=e647]: (
+                - generic [ref=e648]: σ
+                - generic [ref=e650]: L
+                - generic [ref=e651]: )
+                - generic [ref=e652]: =
+                - generic [ref=e653]: "0.0031"
+            - text: ", noise stdev"
+            - generic [ref=e655]:
+              - generic [ref=e656]:
+                - generic [ref=e658]:
+                  - generic [ref=e661]: √
+                  - generic [ref=e662]:
+                    - generic [ref=e664]: "1"
+                    - generic [ref=e666]: −
+                    - generic [ref=e667]:
+                      - generic [ref=e669]: ρ
+                      - generic [ref=e672]: "2"
+                - generic [ref=e674]: ≈
+                - generic [ref=e675]:
+                  - generic [ref=e676]: "1"
+                  - generic [ref=e677]: .
+                  - generic [ref=e678]: "0"
+                  - generic [ref=e679]: "0"
+              - math [ref=e681]:
+                - generic [ref=e682]:
+                  - generic [ref=e683]: "1"
+                  - generic [ref=e684]: −
+                  - generic [ref=e685]:
+                    - generic [ref=e686]: ρ
+                    - generic [ref=e687]: "2"
+                - generic [ref=e688]: ≈
+                - generic [ref=e689]: "1.00"
+            - text: ":"
+          - blockquote [ref=e690]:
+            - paragraph [ref=e691]:
+              - text: both idea
+              - strong [ref=e692]: fair
+              - strong [ref=e693]: poor
+              - text: rather
+              - strong [ref=e694]: bad
+              - strong [ref=e695]: grim
+              - text: then
+          - paragraph [ref=e696]:
+            - generic [ref=e698]:
+              - generic [ref=e699]:
+                - generic [ref=e701]: ∑
+                - generic [ref=e702]:
+                  - generic [ref=e704]: v
+                  - generic [ref=e707]: i
+                - generic [ref=e709]: =
+                - generic [ref=e711]: −
+                - generic [ref=e713]: "6"
+              - math [ref=e715]:
+                - generic [ref=e716]: ∑
+                - generic [ref=e717]:
+                  - generic [ref=e718]: v
+                  - generic [ref=e719]: i
+                - generic [ref=e720]: =
+                - generic [ref=e721]: −
+                - generic [ref=e722]: "6"
+            - text: ", signal"
+            - generic [ref=e724]:
+              - generic [ref=e725]:
+                - generic [ref=e727]: =
+                - generic [ref=e728]:
+                  - generic [ref=e729]: "0"
+                  - generic [ref=e730]: .
+                  - generic [ref=e731]: "0"
+                  - generic [ref=e732]: "0"
+                  - generic [ref=e733]: "3"
+                  - generic [ref=e734]: "1"
+                - generic [ref=e736]: ×
+                - generic [ref=e738]: (
+                - generic [ref=e740]: −
+                - generic [ref=e742]: "6"
+                - generic [ref=e744]: )
+                - generic [ref=e746]: =
+                - generic [ref=e748]: −
+                - generic [ref=e749]:
+                  - generic [ref=e750]: "0"
+                  - generic [ref=e751]: .
+                  - generic [ref=e752]: "0"
+                  - generic [ref=e753]: "1"
+                  - generic [ref=e754]: "9"
+              - math [ref=e756]:
+                - generic [ref=e757]: =
+                - generic [ref=e758]: "0.0031"
+                - generic [ref=e759]: ×
+                - generic [ref=e760]: (
+                - generic [ref=e761]: −
+                - generic [ref=e762]: "6"
+                - generic [ref=e763]: )
+                - generic [ref=e764]: =
+                - generic [ref=e765]: −
+                - generic [ref=e766]: "0.019"
+            - text: ", target"
+            - generic [ref=e768]:
+              - generic [ref=e769]:
+                - generic [ref=e771]: =
+                - generic [ref=e773]: −
+                - generic [ref=e774]:
+                  - generic [ref=e775]: "2"
+                  - generic [ref=e776]: .
+                  - generic [ref=e777]: "5"
+                  - generic [ref=e778]: "4"
+              - math [ref=e780]:
+                - generic [ref=e781]: =
+                - generic [ref=e782]: −
+                - generic [ref=e783]: "2.54"
+          - paragraph [ref=e784]:
+            - strong [ref=e785]: High-signal regime
+            - text: ":"
+            - generic [ref=e787]:
+              - generic [ref=e788]:
+                - generic [ref=e790]: ρ
+                - generic [ref=e792]: =
+                - generic [ref=e793]:
+                  - generic [ref=e794]: "0"
+                  - generic [ref=e795]: .
+                  - generic [ref=e796]: "4"
+                  - generic [ref=e797]: "5"
+              - math [ref=e799]:
+                - generic [ref=e800]: ρ
+                - generic [ref=e801]: =
+                - generic [ref=e802]: "0.45"
+            - text: — multiplier
+            - generic [ref=e804]:
+              - generic [ref=e805]:
+                - generic [ref=e807]: =
+                - generic [ref=e808]:
+                  - generic [ref=e809]: "0"
+                  - generic [ref=e810]: .
+                  - generic [ref=e811]: "1"
+                  - generic [ref=e812]: "4"
+                  - generic [ref=e813]: "0"
+              - math [ref=e815]:
+                - generic [ref=e816]: =
+                - generic [ref=e817]: "0.140"
+            - text: ", noise stdev"
+            - generic [ref=e819]:
+              - generic [ref=e820]:
+                - generic [ref=e822]:
+                  - generic [ref=e825]: √
+                  - generic [ref=e826]:
+                    - generic [ref=e828]: "1"
+                    - generic [ref=e830]: −
+                    - generic [ref=e831]:
+                      - generic [ref=e833]: ρ
+                      - generic [ref=e836]: "2"
+                - generic [ref=e838]: =
+                - generic [ref=e839]:
+                  - generic [ref=e840]: "0"
+                  - generic [ref=e841]: .
+                  - generic [ref=e842]: "8"
+                  - generic [ref=e843]: "9"
+              - math [ref=e845]:
+                - generic [ref=e846]:
+                  - generic [ref=e847]: "1"
+                  - generic [ref=e848]: −
+                  - generic [ref=e849]:
+                    - generic [ref=e850]: ρ
+                    - generic [ref=e851]: "2"
+                - generic [ref=e852]: =
+                - generic [ref=e853]: "0.89"
+            - text: ":"
+          - blockquote [ref=e854]:
+            - paragraph [ref=e855]:
+              - strong [ref=e856]: grim
+              - strong [ref=e857]: poor
+              - text: ask look some door do
+              - strong [ref=e858]: fair
+          - paragraph [ref=e859]:
+            - generic [ref=e861]:
+              - generic [ref=e862]:
+                - generic [ref=e864]: ∑
+                - generic [ref=e865]:
+                  - generic [ref=e867]: v
+                  - generic [ref=e870]: i
+                - generic [ref=e872]: =
+                - generic [ref=e874]: −
+                - generic [ref=e876]: "4"
+              - math [ref=e878]:
+                - generic [ref=e879]: ∑
+                - generic [ref=e880]:
+                  - generic [ref=e881]: v
+                  - generic [ref=e882]: i
+                - generic [ref=e883]: =
+                - generic [ref=e884]: −
+                - generic [ref=e885]: "4"
+            - text: ", signal"
+            - generic [ref=e887]:
+              - generic [ref=e888]:
+                - generic [ref=e890]: =
+                - generic [ref=e891]:
+                  - generic [ref=e892]: "0"
+                  - generic [ref=e893]: .
+                  - generic [ref=e894]: "1"
+                  - generic [ref=e895]: "4"
+                  - generic [ref=e896]: "0"
+                - generic [ref=e898]: ×
+                - generic [ref=e900]: (
+                - generic [ref=e902]: −
+                - generic [ref=e904]: "4"
+                - generic [ref=e906]: )
+                - generic [ref=e908]: =
+                - generic [ref=e910]: −
+                - generic [ref=e911]:
+                  - generic [ref=e912]: "0"
+                  - generic [ref=e913]: .
+                  - generic [ref=e914]: "5"
+                  - generic [ref=e915]: "6"
+                  - generic [ref=e916]: "0"
+              - math [ref=e918]:
+                - generic [ref=e919]: =
+                - generic [ref=e920]: "0.140"
+                - generic [ref=e921]: ×
+                - generic [ref=e922]: (
+                - generic [ref=e923]: −
+                - generic [ref=e924]: "4"
+                - generic [ref=e925]: )
+                - generic [ref=e926]: =
+                - generic [ref=e927]: −
+                - generic [ref=e928]: "0.560"
+            - text: ", target"
+            - generic [ref=e930]:
+              - generic [ref=e931]:
+                - generic [ref=e933]: =
+                - generic [ref=e935]: −
+                - generic [ref=e936]:
+                  - generic [ref=e937]: "0"
+                  - generic [ref=e938]: .
+                  - generic [ref=e939]: "7"
+                  - generic [ref=e940]: "0"
+                  - generic [ref=e941]: "7"
+              - math [ref=e943]:
+                - generic [ref=e944]: =
+                - generic [ref=e945]: −
+                - generic [ref=e946]: "0.707"
+          - paragraph [ref=e947]:
+            - strong [ref=e948]: Very-high-signal regime
+            - text: ":"
+            - generic [ref=e950]:
+              - generic [ref=e951]:
+                - generic [ref=e953]: ρ
+                - generic [ref=e955]: =
+                - generic [ref=e956]:
+                  - generic [ref=e957]: "0"
+                  - generic [ref=e958]: .
+                  - generic [ref=e959]: "8"
+                  - generic [ref=e960]: "9"
+              - math [ref=e962]:
+                - generic [ref=e963]: ρ
+                - generic [ref=e964]: =
+                - generic [ref=e965]: "0.89"
+            - text: — multiplier
+            - generic [ref=e967]:
+              - generic [ref=e968]:
+                - generic [ref=e970]: =
+                - generic [ref=e971]:
+                  - generic [ref=e972]: "0"
+                  - generic [ref=e973]: .
+                  - generic [ref=e974]: "2"
+                  - generic [ref=e975]: "7"
+                  - generic [ref=e976]: "7"
+              - math [ref=e978]:
+                - generic [ref=e979]: =
+                - generic [ref=e980]: "0.277"
+            - text: ", noise stdev"
+            - generic [ref=e982]:
+              - generic [ref=e983]:
+                - generic [ref=e985]:
+                  - generic [ref=e988]: √
+                  - generic [ref=e989]:
+                    - generic [ref=e991]: "1"
+                    - generic [ref=e993]: −
+                    - generic [ref=e994]:
+                      - generic [ref=e996]: ρ
+                      - generic [ref=e999]: "2"
+                - generic [ref=e1001]: =
+                - generic [ref=e1002]:
+                  - generic [ref=e1003]: "0"
+                  - generic [ref=e1004]: .
+                  - generic [ref=e1005]: "4"
+                  - generic [ref=e1006]: "6"
+              - math [ref=e1008]:
+                - generic [ref=e1009]:
+                  - generic [ref=e1010]: "1"
+                  - generic [ref=e1011]: −
+                  - generic [ref=e1012]:
+                    - generic [ref=e1013]: ρ
+                    - generic [ref=e1014]: "2"
+                - generic [ref=e1015]: =
+                - generic [ref=e1016]: "0.46"
+            - text: ":"
+          - blockquote [ref=e1017]:
+            - paragraph [ref=e1018]:
+              - strong [ref=e1019]: good
+              - strong [ref=e1020]: good
+              - text: floor
+              - strong [ref=e1021]: good
+              - strong [ref=e1022]: good
+              - strong [ref=e1023]: good
+              - strong [ref=e1024]: perfect
+              - strong [ref=e1025]: poor
+          - paragraph [ref=e1026]:
+            - generic [ref=e1028]:
+              - generic [ref=e1029]:
+                - generic [ref=e1031]: ∑
+                - generic [ref=e1032]:
+                  - generic [ref=e1034]: v
+                  - generic [ref=e1037]: i
+                - generic [ref=e1039]: =
+                - generic [ref=e1041]: +
+                - generic [ref=e1043]: "7"
+              - math [ref=e1045]:
+                - generic [ref=e1046]: ∑
+                - generic [ref=e1047]:
+                  - generic [ref=e1048]: v
+                  - generic [ref=e1049]: i
+                - generic [ref=e1050]: =
+                - generic [ref=e1051]: +
+                - generic [ref=e1052]: "7"
+            - text: ", signal"
+            - generic [ref=e1054]:
+              - generic [ref=e1055]:
+                - generic [ref=e1057]: =
+                - generic [ref=e1058]:
+                  - generic [ref=e1059]: "0"
+                  - generic [ref=e1060]: .
+                  - generic [ref=e1061]: "2"
+                  - generic [ref=e1062]: "7"
+                  - generic [ref=e1063]: "7"
+                - generic [ref=e1065]: ×
+                - generic [ref=e1067]: "7"
+                - generic [ref=e1069]: =
+                - generic [ref=e1070]:
+                  - generic [ref=e1071]: "1"
+                  - generic [ref=e1072]: .
+                  - generic [ref=e1073]: "9"
+                  - generic [ref=e1074]: "4"
+              - math [ref=e1076]:
+                - generic [ref=e1077]: =
+                - generic [ref=e1078]: "0.277"
+                - generic [ref=e1079]: ×
+                - generic [ref=e1080]: "7"
+                - generic [ref=e1081]: =
+                - generic [ref=e1082]: "1.94"
+            - text: ", target"
+            - generic [ref=e1084]:
+              - generic [ref=e1085]:
+                - generic [ref=e1087]: =
+                - generic [ref=e1088]:
+                  - generic [ref=e1089]: "1"
+                  - generic [ref=e1090]: .
+                  - generic [ref=e1091]: "7"
+                  - generic [ref=e1092]: "8"
+              - math [ref=e1094]:
+                - generic [ref=e1095]: =
+                - generic [ref=e1096]: "1.78"
+      - generic [ref=e1097]:
+        - heading "ExperimentsAnchor" [level=2] [ref=e1098]:
+          - text: Experiments
+          - link "Anchor" [ref=e1099] [cursor=pointer]:
+            - /url: "#experiments"
+            - text: 
+        - paragraph [ref=e1100]:
+          - text: See
+          - link "experiments/bow/README.md" [ref=e1101] [cursor=pointer]:
+            - /url: https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/bow/README.md
+            - code [ref=e1102]: experiments/bow/README.md
+          - text: for sweep and single-run instructions.
+        - generic [ref=e1103]:
+          - heading "Supervised-learning benchmarkAnchor" [level=3] [ref=e1104]:
+            - text: Supervised-learning benchmark
+            - link "Anchor" [ref=e1105] [cursor=pointer]:
+              - /url: "#supervised-learning-benchmark"
+              - text: 
+          - paragraph [ref=e1106]: "Results: WIP"
+        - generic [ref=e1107]:
+          - heading "GRPOAnchor" [level=3] [ref=e1108]:
+            - text: GRPO
+            - link "Anchor" [ref=e1109] [cursor=pointer]:
+              - /url: "#grpo"
+              - text: 
+          - paragraph [ref=e1110]: "Results: WIP"
+        - generic [ref=e1111]:
+          - heading "MaxRLAnchor" [level=3] [ref=e1112]:
+            - text: MaxRL
+            - link "Anchor" [ref=e1113] [cursor=pointer]:
+              - /url: "#maxrl"
+              - text: 
+          - paragraph [ref=e1114]:
+            - text: See
+            - 'link "MaxRL estimator: leave-one-out derivation" [ref=e1115] [cursor=pointer]':
+              - /url: http://localhost:7029/maxrl-estimator.html
+            - text: for the estimator math used here.

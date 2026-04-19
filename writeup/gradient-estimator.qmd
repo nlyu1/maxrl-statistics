@@ -1,35 +1,42 @@
 ---
-title: "MaxRL gradient estimator"
+title: "MaxRL gradient estimator details"
 ---
 
 Reference implementation: [`src/maxrl_estimator.py`]({{< var repo_url >}}/src/maxrl_estimator.py).
 
-We use the generalized MaxRL estimator in its leave-one-out form. Fix one batch row $(x, y)$, draw $R$ iid rollouts $z_1, \dots, z_R \sim m_\theta(\cdot \mid x)$, define detached per-rollout likelihoods and score vectors
+We use the generalized MaxRL estimator in its leave-one-out form. Fix one batch row $(x, y)$, let $L > 0$ be a known upper bound on the likelihood function $l$, and draw $R$ iid rollouts $z_1, \dots, z_R \sim m_\theta(\cdot \mid x)$. Define detached per-rollout likelihoods, their normalizations, and score vectors
 $$
-l_j := l(y, z_j) \in [0, 1], \quad S_j := \nabla_\theta \log m_\theta(z_j \mid x).
+l_j := l(y, z_j) \in [0, L], \quad \sigma_j := l_j / L \in [0, 1], \quad S_j := \nabla_\theta \log m_\theta(z_j \mid x).
 $$
-Further define the marginal rollout likelihood and weight function
+Further define the marginal normalized likelihood and the **weight function**
 $$
-p := \mathbb{E}[l_j], \qquad w_D(p) := \sum_{k=0}^{D-1} (1-p)^k,
+\sigma_\theta := \mathbb{E}[\sigma_j] \in (0, 1], \qquad w_D(\sigma_\theta) := \sum_{k=0}^{D-1} (1 - \sigma_\theta)^k.
 $$
-then the degree-$D$ truncated MaxRL gradient estimator is
+
+### Population objective
+
+The degree-$D$ MaxRL objective is the degree-$D$ Maclaurin truncation of $\log \sigma_\theta$ about $\sigma_\theta = 1$:
 $$
-\nabla_\theta J_D(p) = w_D(p) \, \mathbb{E}[l_j S_j].
+J_D(\theta) := -\sum_{k=1}^{D} \frac{(1 - \sigma_\theta)^k}{k}, \qquad \nabla_\theta J_D = w_D(\sigma_\theta) \, \mathbb{E}[\sigma_j \, S_j].
 $$
-The generalized leave-one-out estimator therefore has the form
+As $D \to \infty$, $J_D \to \log \sigma_\theta$ and the gradient recovers the exact log-likelihood gradient; at finite $D$ the gradient residual is the geometric factor $1 - (1 - \sigma_\theta)^D$.
+
+### Leave-one-out estimator
+
+The generalized leave-one-out estimator has the form
 $$
-\hat{g}_D(x, y) = \frac{1}{R} \sum_{j=1}^R \omega_j \, l_j \, S_j,
+\hat{g}_D(x, y) = \frac{1}{R} \sum_{j=1}^R \omega_j \, \sigma_j \, S_j,
 $$
 where each $\omega_j$ is built from the peer rollouts $k \neq j$ only and satisfies
 $$
-\mathbb{E}[\omega_j] = w_D(p).
+\mathbb{E}[\omega_j] = w_D(\sigma_\theta).
 $$
 
 ### Formulating the problem
 
 Define the per-rollout complements
 $$
-a_j := 1 - l_j \in [0, 1] \implies w_D(p) = \sum_{k=0}^{D-1} \mathbb{E}[a_j]^k.
+a_j := 1 - \sigma_j \in [0, 1] \implies w_D(\sigma_\theta) = \sum_{k=0}^{D-1} \mathbb{E}[a_j]^k.
 $$
 For a list $b_1, \dots, b_n$, let the **$k$-th elementary symmetric polynomial** be the sum of all size-$k$ products:
 $$
@@ -44,7 +51,7 @@ Because the $a_i$ are iid, the normalized elementary symmetric polynomial
 $$
 \frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}
 $$
-is the U-statistic estimator of $(1-p)^k$. Therefore the desired leave-one-out weight is
+is the U-statistic estimator of $(1-\sigma_\theta)^k$. Therefore the desired leave-one-out weight is
 $$
 \omega_j = \sum_{k=0}^{D-1} \frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}.
 $$
@@ -119,7 +126,7 @@ $$
 
 For one batch row, the algorithm is:
 
-1. Convert likelihoods to complements $a_j = 1 - l_j$.
+1. Convert normalized likelihoods to complements $a_j = 1 - \sigma_j$.
 2. Run a forward scan over $j = 1, \dots, R$ using the lower-bidiagonal update $M(a_j)$.
 3. Run a backward scan over $j = R, \dots, 1$ using the same update.
 4. Form all leave-one-out weights via $\omega_j = \beta_j^\top \alpha_{j-1}$.
