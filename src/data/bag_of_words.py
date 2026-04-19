@@ -42,6 +42,19 @@ canonical_bags: dict[int, list[str]] = {
     ],
 }
 
+# 15 corrs over [0.01, 1.0], weighted 1/4 toward uniform covering and 3/4
+# toward log-spacing to densely sample the low-ρ learnability transition.
+# i.e. candidate_corrs[i] = round(0.25 * linspace[i] + 0.75 * geomspace[i], 2)
+candidate_corrs: list[float] = [
+    0.01, 0.03, 0.05, 0.08, 0.10, 0.13, 0.16, 0.20,
+    0.25, 0.31, 0.38, 0.48, 0.60, 0.77, 1.00,
+]
+
+# Canonical number of rollouts to try
+candidate_rollout_steps: list[int] = [4, 16, 64, 128, 256, 1024]
+
+candidate_seeds: list[int] = [51, 61, 121, 153, 228]
+
 
 def _power_law_density(*, num_words: int, decay_power: float) -> list[float]:
     """Normalized power-law weights over semantic words only."""
@@ -220,9 +233,11 @@ class BagOfWordsDatasetConfig(BaseConfig):
             )
             targets = signal + rng.normal(0, noise_std, size=n)
             prompts = [" ".join(vocab[row]) for row in idx]
-            pl.DataFrame(
-                {"prompt": prompts, "target": targets, "signal": signal}
-            ).write_parquet(folder / f"{split}.parquet")
+            pl.DataFrame({
+                "prompt": prompts,
+                "target": targets,
+                "signal": signal,
+            }).write_parquet(folder / f"{split}.parquet")
 
         (folder / "config.json").write_text(self.model_dump_json())
 
