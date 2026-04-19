@@ -155,7 +155,12 @@ window.Quarto = {
   <ul>
   <li><a href="#dataset" id="toc-dataset" class="nav-link active" data-scroll-target="#dataset">Dataset</a>
   <ul>
+  <li><a href="#homogeneous-version" id="toc-homogeneous-version" class="nav-link" data-scroll-target="#homogeneous-version">Homogeneous version</a>
+  <ul class="collapse">
   <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a></li>
+  </ul></li>
+  <li><a href="#row-level-heteroskedasticity-unlearnable" id="toc-row-level-heteroskedasticity-unlearnable" class="nav-link" data-scroll-target="#row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</a></li>
+  <li><a href="#word-level-heteroskedasticity-learnable" id="toc-word-level-heteroskedasticity-learnable" class="nav-link" data-scroll-target="#word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</a></li>
   </ul></li>
   <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a>
   <ul>
@@ -188,11 +193,18 @@ window.Quarto = {
 </header>
 
 
-<p>The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a <strong>zero-step rollout</strong> setting: the model sees a single prompt and predicts a scalar target, with no sequential reasoning.</p>
+<p>The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a <strong>zero-step rollout</strong> setting: the model sees a single prompt and predicts a scalar target with no sequential reasoning. There are three versions of the dataset:</p>
+<ol type="1">
+<li><strong>Homogeneous hardness</strong>: a single, global signal-to-target corr <span class="math inline">\(\rho\)</span>.</li>
+<li><strong>Unlearnable heteroskedasticity</strong>: global signal corr <span class="math inline">\(\rho\)</span>, together with a random by-row noise skew.</li>
+<li><strong>Learnable heteroskedasticity</strong>: global signal corr <span class="math inline">\(\rho\)</span>, and a learnable, by-semantic-word noise skew.</li>
+</ol>
 <section id="dataset" class="level2">
 <h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
+<section id="homogeneous-version" class="level3">
+<h3 class="anchored" data-anchor-id="homogeneous-version">Homogeneous version</h3>
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/bag_of_words.py"><code>src/data/bag_of_words.py</code></a>.</p>
-<p>Each prompt is <span class="math inline">\(L\)</span> words sampled iid from a mixture of <strong>semantic words</strong>, which carries signal, and <strong>auxiliary words</strong>, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by <span class="math inline">\(\rho \in (0, 1]\)</span>, the correlation between signal and target.</p>
+<p>Each prompt is <span class="math inline">\(L\)</span> words sampled iid from a mixture of <strong>semantic words</strong>, which carries signal, and <strong>auxiliary words</strong>, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by the correlation between signal and target <span class="math inline">\(\rho \in (0, 1]\)</span>.</p>
 <p><strong>7-word vocabulary.</strong> Semantic words map to integer values centered at zero:</p>
 <table class="caption-top table">
 <thead>
@@ -218,7 +230,7 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>The 256 auxiliary words (common function words: <em>the, a, and, if, because, …</em>) carry value 0.</p>
+<p>The 256 auxiliary words (common function words: <em>the, a, and, if, because, …</em>) carry value 0. We also define variants with more (e.g.&nbsp;<span class="math inline">\(11\)</span>, <span class="math inline">\(15\)</span>) semantic words.</p>
 <p><strong>Sampling distribution.</strong> Semantic words share mass <span class="math inline">\(1 - \alpha\)</span> (where <span class="math inline">\(\alpha\)</span> = <code>aux_words_ratio</code>), shaped by a power-law centered on the neutral word “fair”: <span class="math inline">\(p_i \propto (1 + |i - \text{center}|)^{-\gamma}\)</span>. Auxiliary words uniformly split mass <span class="math inline">\(\alpha\)</span>.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
@@ -238,16 +250,20 @@ window.Quarto = {
 <p>both idea <strong>fair</strong> <strong>poor</strong> rather <strong>bad</strong> <strong>grim</strong> then</p>
 </blockquote>
 <p><span class="math inline">\(\sum v_i = -6\)</span>, signal <span class="math inline">\(= 0.0031 \times (-6) = -0.019\)</span>, target <span class="math inline">\(= -2.54\)</span></p>
-<!-- **High-signal regime**: $\rho = 0.45$ — multiplier $= 0.140$, noise stdev $\sqrt{1 - \rho^2} = 0.89$:
-
-> **grim** **poor** ask look some door do **fair**
-
-$\sum v_i = -4$, signal $= 0.140 \times (-4) = -0.560$, target $= -0.707$ -->
 <p><strong>High-signal regime</strong>: <span class="math inline">\(\rho = 0.89\)</span> — multiplier <span class="math inline">\(= 0.277\)</span>, noise stdev <span class="math inline">\(\sqrt{1 - \rho^2} = 0.46\)</span>:</p>
 <blockquote class="blockquote">
 <p><strong>good</strong> <strong>good</strong> floor <strong>good</strong> <strong>good</strong> <strong>good</strong> <strong>perfect</strong> <strong>poor</strong></p>
 </blockquote>
 <p><span class="math inline">\(\sum v_i = +7\)</span>, signal <span class="math inline">\(= 0.277 \times 7 = 1.94\)</span>, target <span class="math inline">\(= 1.78\)</span></p>
+</section>
+</section>
+<section id="row-level-heteroskedasticity-unlearnable" class="level3">
+<h3 class="anchored" data-anchor-id="row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</h3>
+<p>…</p>
+</section>
+<section id="word-level-heteroskedasticity-learnable" class="level3">
+<h3 class="anchored" data-anchor-id="word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</h3>
+<p>…</p>
 </section>
 </section>
 <section id="experiments" class="level2">

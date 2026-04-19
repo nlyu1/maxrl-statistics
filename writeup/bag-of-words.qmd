@@ -2,13 +2,19 @@
 title: "Regression: bag of words"
 ---
 
-The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a **zero-step rollout** setting: the model sees a single prompt and predicts a scalar target, with no sequential reasoning.
+The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a **zero-step rollout** setting: the model sees a single prompt and predicts a scalar target with no sequential reasoning. There are three versions of the dataset:
+
+1. **Homogeneous hardness**: a single, global signal-to-target corr $\rho$.
+2. **Unlearnable heteroskedasticity**: global signal corr $\rho$, together with a random by-row noise skew.
+3. **Learnable heteroskedasticity**: global signal corr $\rho$, and a learnable, by-semantic-word noise skew.
 
 ## Dataset
 
+### Homogeneous version
+
 See [`src/data/bag_of_words.py`]({{< var repo_url >}}/src/data/bag_of_words.py).
 
-Each prompt is $L$ words sampled iid from a mixture of **semantic words**, which carries signal, and **auxiliary words**, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by $\rho \in (0, 1]$, the correlation between signal and target.
+Each prompt is $L$ words sampled iid from a mixture of **semantic words**, which carries signal, and **auxiliary words**, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by the correlation between signal and target $\rho \in (0, 1]$.
 
 **7-word vocabulary.** Semantic words map to integer values centered at zero:
 
@@ -16,7 +22,7 @@ Each prompt is $L$ words sampled iid from a mixture of **semantic words**, which
 |:----:|:---:|:----:|:----:|:----:|:-----:|:-------:|
 | $-3$ | $-2$ | $-1$ | $0$ | $+1$ | $+2$ | $+3$ |
 
-The 256 auxiliary words (common function words: *the, a, and, if, because, ...*) carry value 0.
+The 256 auxiliary words (common function words: *the, a, and, if, because, ...*) carry value 0. We also define variants with more (e.g. $11$, $15$) semantic words.
 
 **Sampling distribution.** Semantic words share mass $1 - \alpha$ (where $\alpha$ = `aux_words_ratio`), shaped by a power-law centered on the neutral word "fair": $p_i \propto (1 + |i - \text{center}|)^{-\gamma}$. Auxiliary words uniformly split mass $\alpha$.
 
@@ -39,17 +45,20 @@ Consider 8-word prompts; we compute the _per-word signal stdev_ $\sigma = 1.14$,
 
 $\sum v_i = -6$, signal $= 0.0031 \times (-6) = -0.019$, target $= -2.54$
 
-<!-- **High-signal regime**: $\rho = 0.45$ — multiplier $= 0.140$, noise stdev $\sqrt{1 - \rho^2} = 0.89$:
-
-> **grim** **poor** ask look some door do **fair**
-
-$\sum v_i = -4$, signal $= 0.140 \times (-4) = -0.560$, target $= -0.707$ -->
-
 **High-signal regime**: $\rho = 0.89$ — multiplier $= 0.277$, noise stdev $\sqrt{1 - \rho^2} = 0.46$:
 
 > **good** **good** floor **good** **good** **good** **perfect** **poor**
 
 $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$
+
+### Row-level heteroskedasticity (unlearnable)
+
+...
+
+### Word-level heteroskedasticity (learnable)
+
+...
+
 
 ## Experiments
 

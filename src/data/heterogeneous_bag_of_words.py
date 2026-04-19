@@ -39,6 +39,19 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
             snr_halflife_in_quantile=snr_halflife_in_quantile,
         )
 
+    @classmethod
+    def raw_noise_schedule(
+        cls, *, quantiles: np.ndarray, snr_halflife_in_quantile: float
+    ) -> np.ndarray:
+        """
+        Raw median-pegged exponential multiplier ã(u) = 2^((u - 1/2) / halflife).
+
+        Pre RMS-normalization. Expose it so visualization and writeup scripts
+        can evaluate the same schedule on any quantile grid without rebuilding
+        the sampling pipeline.
+        """
+        return 2.0 ** ((quantiles - 0.5) / snr_halflife_in_quantile)
+
     def _compute_split(
         self, *, split: str, rng: np.random.Generator
     ) -> "BagOfWordsDatasetConfig.SplitArtifact":
@@ -56,7 +69,9 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
 
         # Median-pegged exponential schedule on stratified hardness quantiles.
         u = (rng.permutation(n) + 0.5) / n
-        tilde_a = 2.0 ** ((u - 0.5) / self.snr_halflife_in_quantile)
+        tilde_a = type(self).raw_noise_schedule(
+            quantiles=u, snr_halflife_in_quantile=self.snr_halflife_in_quantile
+        )
         a = tilde_a / np.sqrt(np.mean(tilde_a**2))
 
         noise_std_global = (1 - self.corr**2) ** 0.5
@@ -98,3 +113,92 @@ class SignalHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
     """
 
     snr_halflife_in_word_quantile: float
+
+    @classmethod
+    def initialize(
+        cls,
+        *,
+        snr_halflife_in_word_quantile: float,
+        **base_cls_kwargs,
+    ) -> Self:
+        if (
+            not isfinite(snr_halflife_in_word_quantile)
+            or snr_halflife_in_word_quantile <= 0
+        ):
+            raise ValueError(
+                "snr_halflife_in_word_quantile must be finite and positive"
+            )
+        return cls(
+            **cls._base_kwargs(**base_cls_kwargs),
+            snr_halflife_in_word_quantile=snr_halflife_in_word_quantile,
+        )
+
+    @classmethod
+    def word_multipliers(
+        cls,
+        *,
+        word_assignments: tuple[str, ...],
+        word_values: dict[str, int],
+        snr_halflife_in_word_quantile: float,
+    ) -> dict[str, float]:
+        """
+        Pre-normalization ã(w) for every word in `word_values`.
+
+        Semantic words (those in `word_assignments`) are ranked by |value|;
+        words sharing the same |value| share the same quantile (average rank
+        within their tie group), preserving sign symmetry. Any word in
+        `word_values` but not in `word_assignments` is treated as auxiliary
+        and gets ã = 0.
+
+        Exposed so visualization and writeup scripts can recover the per-word
+        difficulty directly from a config without rerunning the sampling
+        pipeline.
+        """
+        semantic = list(word_assignments)
+        num_semantic = len(semantic)
+        groups_by_abs: dict[int, list[int]] = {}
+        for i, word in enumerate(semantic):
+            groups_by_abs.setdefault(abs(int(word_values[word])), []).append(i)
+        result: dict[str, float] = {word: 0.0 for word in word_values}
+        cumulative = 0
+        for abs_val in sorted(groups_by_abs):
+            group = groups_by_abs[abs_val]
+            avg_rank = cumulative + (len(group) - 1) / 2
+            q = (avg_rank + 0.5) / num_semantic
+            multiplier = 2.0 ** ((q - 0.5) / snr_halflife_in_word_quantile)
+            for i in group:
+                result[semantic[i]] = multiplier
+            cumulative += len(group)
+        return result
+
+    def _compute_split(
+        self, *, split: str, rng: np.random.Generator
+    ) -> "BagOfWordsDatasetConfig.SplitArtifact":
+        n = {"train": self.num_train_samples, "val": self.num_val_samples}[split]
+        words = list(self.word_density)
+        probs = np.array([self.word_density[w] for w in words], dtype=float)
+        vals = np.array([self.word_values[w] for w in words], dtype=float)
+        vocab = np.asarray(words, dtype=object)
+
+        tilde_a_per_word = type(self).word_multipliers(
+            word_assignments=self.word_assignments,
+            word_values=self.word_values,
+            snr_halflife_in_word_quantile=self.snr_halflife_in_word_quantile,
+        )
+        tilde_a = np.array([tilde_a_per_word[w] for w in words], dtype=float)
+
+        idx = rng.choice(len(words), size=(n, self.prompt_length), p=probs)
+        raw = vals[idx].sum(axis=1)
+        signal = (
+            raw / ((self.prompt_length**0.5) * self.unnormalized_signal_std) * self.corr
+        )
+
+        # Prompt-level variance multiplier, RMS-normalized so E[A²] = 1.
+        expected_tilde_sq = float(np.sum(probs * tilde_a**2))
+        tilde_A_sq = (tilde_a[idx] ** 2).mean(axis=1)
+        A = np.sqrt(tilde_A_sq / expected_tilde_sq)
+
+        noise_std_global = (1 - self.corr**2) ** 0.5
+        targets = signal + noise_std_global * A * rng.standard_normal(n)
+        prompts = [" ".join(vocab[row]) for row in idx]
+        return self.SplitArtifact(prompts=prompts, signal=signal, targets=targets)
