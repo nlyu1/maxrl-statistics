@@ -77,7 +77,15 @@ def build_figure() -> go.Figure:
     ]
 
     fig.update_layout(
-        xaxis=dict(title="per-row corr(signal, target)", range=[0.0, 1.0]),
+        title=dict(
+            text="per-row corr(signal, target)",
+            font=dict(size=14),
+            x=0.5,
+            xanchor="center",
+            y=0.97,
+            yanchor="top",
+        ),
+        xaxis=dict(range=[0.0, 1.0]),
         yaxis=dict(title="count"),
         bargap=0.02,
         sliders=[
@@ -102,7 +110,7 @@ def build_figure() -> go.Figure:
         ],
         width=SOURCE_WIDTH,
         height=SOURCE_HEIGHT,
-        margin=dict(l=60, r=30, t=20, b=110),
+        margin=dict(l=60, r=30, t=35, b=95),
     )
     return fig
 

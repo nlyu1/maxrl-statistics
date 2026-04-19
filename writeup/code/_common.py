@@ -1,6 +1,8 @@
 """Shared constants and helpers for heteroskedasticity visualizations."""
 
-HALFLIVES: tuple[float, ...] = (0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0, 2.0)
+HALFLIVES: tuple[float, ...] = (
+    0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 1.0, 1.5, 2.0,
+)
 
 # Log-spaced correlations on [0.01, 1.0]; mirror the 16-point canonical grid
 # but with a clean geometric progression so the slider itself reads as log.

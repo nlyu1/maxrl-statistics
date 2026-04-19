@@ -36,7 +36,7 @@ from writeup.code._common import (
     coordinated_slider_js,
 )
 
-# Word-level hardness at h=0.05 explodes visually; skip it locally.
+# Drop h=0.05 locally; word-level hardness at that halflife explodes visually.
 WORD_HALFLIVES: tuple[float, ...] = tuple(h for h in HALFLIVES if h != 0.05)
 
 OUTPUT = (
@@ -71,7 +71,11 @@ def per_halflife_stats(
     values: dict[str, int],
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return A_sq (50k prompts) and normalized hardness a_norm[w] over semantic words."""
+    """Return `(A_sq, semantic_a_norm)` for one halflife.
+
+    `A_sq[n]` is the RMS-normalized prompt variance multiplier (50k prompts);
+    `semantic_a_norm[w]` is the per-semantic-word normalized hardness.
+    """
     mults = SignalHeterogeneousBagOfWordsDatasetConfig.word_multipliers(
         word_assignments=semantic,
         word_values=values,
@@ -89,7 +93,10 @@ def per_halflife_stats(
 def build_figure() -> go.Figure:
     semantic, words, probs, values = _prepare_vocab()
     semantic_density = np.array([probs[words.index(w)] for w in semantic])
-    h_default = WORD_HALFLIVES.index(DEFAULT_HALFLIFE)
+    h_default = min(
+        range(len(WORD_HALFLIVES)),
+        key=lambda i: abs(WORD_HALFLIVES[i] - DEFAULT_HALFLIFE),
+    )
     c_default = min(range(len(CORRS)), key=lambda i: abs(CORRS[i] - DEFAULT_CORR))
     rng = np.random.default_rng(RNG_SEED)
 
@@ -97,10 +104,10 @@ def build_figure() -> go.Figure:
         rows=2,
         cols=1,
         row_heights=[0.5, 0.5],
-        vertical_spacing=0.18,
+        vertical_spacing=0.08,
         specs=[[{}], [{"secondary_y": True}]],
         subplot_titles=(
-            "Per-prompt correlation rho(x)",
+            "Per-prompt correlation",
             "Semantic-word density vs normalized hardness",
         ),
     )
@@ -108,7 +115,6 @@ def build_figure() -> go.Figure:
     edges = np.linspace(0.0, 1.0, 101)
     centers = 0.5 * (edges[:-1] + edges[1:])
 
-    # Histogram traces: one per (halflife, corr); compute A_sq once per halflife.
     hardness_by_halflife: list[np.ndarray] = []
     for i, h in enumerate(WORD_HALFLIVES):
         A_sq, semantic_a_norm = per_halflife_stats(
@@ -195,8 +201,6 @@ def build_figure() -> go.Figure:
     fig.update_yaxes(title_text="density p(w)", row=2, col=1, secondary_y=False)
     fig.update_yaxes(
         title_text="hardness a(w)",
-        tickmode="array",
-        tickvals=[0.15, 0.25, 0.35, 0.45],
         row=2,
         col=1,
         secondary_y=True,

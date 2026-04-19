@@ -259,16 +259,12 @@ window.Quarto = {
 </section>
 <section id="row-level-heteroskedasticity-unlearnable" class="level3">
 <h3 class="anchored" data-anchor-id="row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</h3>
-<p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/heterogeneous_bag_of_words.py"><code>src/data/heterogeneous_bag_of_words.py</code></a> (<code>RowHeterogeneousBagOfWordsDatasetConfig</code>).</p>
-<p>Row <span class="math inline">\(i\)</span> is assigned a stratified hardness quantile <span class="math inline">\(u_i \in (0, 1)\)</span> (uniformly permuted) and a <strong>median-pegged exponential</strong> noise multiplier <span class="math display">\[
+<p>The first heteroskedastic variant has unlearnable per-sample hardness: sample <span class="math inline">\(i\)</span> is assigned a stratified hardness quantile <span class="math inline">\(u_i \in (0, 1)\)</span> (uniformly permuted) and a <strong>median-pegged exponential</strong> noise multiplier <span class="math display">\[
 \tilde a(u) = 2^{(u - 1/2) \,/\, h_{\text{row}}}, \qquad
 a_i = \tilde a(u_i) \,/\, \sqrt{\mathbb{E}_u[\tilde a(u)^2]},
 \]</span> where <span class="math inline">\(h_{\text{row}}\)</span> = <code>snr_halflife_in_quantile</code> is the quantile distance over which SNR halves. The RMS normalization fixes <span class="math inline">\(\mathbb{E}[a_i^2] = 1\)</span>, so the target model <span class="math display">\[
 \text{target}_i = \text{signal}_i + \sqrt{1-\rho^2}\, a_i\, \varepsilon_i
-\]</span> preserves the <strong>global</strong> correlation <span class="math inline">\(\text{Corr}(\text{signal}, \text{target}) = \rho\)</span> while inducing a per-row conditional correlation <span class="math display">\[
-\rho_i \;=\; \frac{\rho}{\sqrt{\rho^2 + (1-\rho^2)\, a_i^2}}.
-\]</span> Nothing in the prompt identifies <span class="math inline">\(a_i\)</span>, so the model cannot route capacity to easy rows — hence <em>unlearnable</em>: the schedule controls the spread of <span class="math inline">\(\rho_i\)</span> around <span class="math inline">\(\rho\)</span> but the optimal predictor is still the marginal conditional mean.</p>
-<p>At small <span class="math inline">\(h_{\text{row}}\)</span>, a few rows are essentially noiseless and most are very hard; at <span class="math inline">\(h_{\text{row}} \gtrsim 2\)</span> the per-row distribution collapses toward the homogeneous case.</p>
+\]</span> preserves the <strong>global</strong> correlation <span class="math inline">\(\text{Corr}(\text{signal}, \text{target}) = \rho\)</span>.</p>
 <script>
 window.fitScaledIframeContainer = window.fitScaledIframeContainer || function(frame) {
   const iframe = frame.querySelector("iframe");
@@ -301,33 +297,22 @@ window.addEventListener("DOMContentLoaded", () => {
 <div class="scaled-plotly-frame" data-source-width="900" data-source-height="620">
   <iframe src="assets/bow/row_heteroskedasticity.html" width="900" height="620" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<p><em>Figure: histogram of per-row <span class="math inline">\(\rho_i\)</span> over 50k samples. Top slider: <span class="math inline">\(h_{\text{row}}\)</span>. Bottom slider: global <span class="math inline">\(\rho\)</span> on a log-spaced grid over <span class="math inline">\([0.01, 1]\)</span>.</em></p>
 </section>
 <section id="word-level-heteroskedasticity-learnable" class="level3">
 <h3 class="anchored" data-anchor-id="word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</h3>
-<p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/heterogeneous_bag_of_words.py"><code>src/data/heterogeneous_bag_of_words.py</code></a> (<code>SignalHeterogeneousBagOfWordsDatasetConfig</code>).</p>
-<p>Here hardness is tied to <strong>word content</strong>, so it is in principle recoverable from the prompt. Semantic words are ranked by <span class="math inline">\(|v(w)|\)</span> (ties share their average rank, preserving sign symmetry) and assigned a quantile <span class="math inline">\(q(w) \in (0, 1)\)</span>; auxiliary words carry zero hardness. The raw per-word multiplier is <span class="math display">\[
+<p>We propose another heteroskedastic variation where hardness is tied to <strong>word content</strong>, so it is in principle recoverable from the prompt. Semantic words are ranked by <span class="math inline">\(|v(w)|\)</span> (ties share their average rank, preserving sign symmetry) and assigned a quantile <span class="math inline">\(q(w) \in (0, 1)\)</span>; auxiliary words carry zero hardness. The raw per-word multiplier is <span class="math display">\[
 \tilde a(w) \;=\; \begin{cases} 2^{(q(w) - 1/2)\,/\,h_{\text{word}}} &amp; w \text{ semantic},\\ 0 &amp; w \text{ auxiliary}, \end{cases}
 \]</span> with <span class="math inline">\(h_{\text{word}}\)</span> = <code>snr_halflife_in_word_quantile</code>. For a prompt <span class="math inline">\(x = (w_1, \dots, w_L)\)</span> the prompt-level multiplier is the per-token RMS <span class="math display">\[
 \tilde A(x)^2 = \frac{1}{L} \sum_{j=1}^{L} \tilde a(w_j)^2,
 \qquad
 A(x) = \tilde A(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
-\]</span> so that <span class="math inline">\(\mathbb{E}[A(x)^2] = 1\)</span> under the prompt distribution. Targets become <span class="math display">\[
+\]</span> so that <span class="math inline">\(\mathbb{E}[A(x)^2] = 1\)</span> under the prompt distribution. Targets still preserve the global correlation <span class="math inline">\(rho\)</span>: <span class="math display">\[
 \text{target}(x) = \text{signal}(x) + \sqrt{1-\rho^2}\, A(x)\, \varepsilon,
-\]</span> again preserving global correlation <span class="math inline">\(\rho\)</span>, with per-prompt conditional correlation <span class="math display">\[
-\rho(x) \;=\; \frac{\rho}{\sqrt{\rho^2 + (1-\rho^2)\, A(x)^2}}.
 \]</span></p>
-<p>Two tensions shape the induced distribution of <span class="math inline">\(\rho(x)\)</span>:</p>
-<ul>
-<li><strong>Signal / hardness alignment.</strong> Because hardness is ranked by <span class="math inline">\(|v(w)|\)</span>, the <em>informative</em> semantic words (large <span class="math inline">\(|v|\)</span>) are also the <em>noisy</em> ones. A learner that upweights them pays in conditional variance.</li>
-<li><strong>Density vs hardness.</strong> The power-law density concentrates mass on the neutral word <em>fair</em> (<span class="math inline">\(v = 0\)</span>, smallest <span class="math inline">\(|v|\)</span>, smallest hardness) and drops off toward the signed extremes. Rare words are simultaneously the highest-signal and highest-noise tokens — so most prompts have <span class="math inline">\(A(x) \approx 1\)</span> and a heavy right tail as extreme words appear.</li>
-</ul>
-<p>At small <span class="math inline">\(h_{\text{word}}\)</span> a handful of tokens dominate the variance budget and <span class="math inline">\(\rho(x)\)</span> is sharply bimodal (the rare-extreme prompts vs the bulk). At large <span class="math inline">\(h_{\text{word}}\)</span> all semantic words have <span class="math inline">\(\tilde a \to 1\)</span> and the distribution collapses to the homogeneous limit.</p>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="900">
   <iframe src="assets/bow/word_heteroskedasticity.html" width="1000" height="900" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<p><em>Figure: <strong>(top)</strong> histogram of per-prompt <span class="math inline">\(\rho(x)\)</span> over 50k prompts with <span class="math inline">\(L = 128\)</span>; <strong>(bottom)</strong> semantic density <span class="math inline">\(p(w)\)</span> (grey, left axis) against the normalized hardness ratio <span class="math inline">\(a(w) = \tilde a(w) / \sqrt{\mathbb{E}[\tilde a^2]}\)</span> (red, right axis, log). Top slider: <span class="math inline">\(h_{\text{word}}\)</span> (moves both panels). Bottom slider: global <span class="math inline">\(\rho\)</span> (moves only the histogram). Density bars are invariant under both.</em></p>
-<p>Generator scripts for both figures live in <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/writeup/code"><code>writeup/code/</code></a>; see <code>writeup/code/README.md</code>.</p>
+<p><em>Figure: <strong>(top)</strong> histogram of per-prompt <span class="math inline">\(\rho(x)\)</span> over 50k prompts with <span class="math inline">\(L = 128\)</span>; <strong>(bottom)</strong> semantic density <span class="math inline">\(p(w)\)</span> (grey, left axis) against the normalized hardness ratio (red, right axis, log).</em></p>
 </section>
 </section>
 <section id="experiments" class="level2">

@@ -14,7 +14,6 @@ from src.data.bag_of_words import (
     candidate_seeds,
 )
 
-
 # Canonical dataset-folder defaults shared by all single_run scripts.
 # Must match BagOfWordsStudyBaseConfig.canonical_kwargs.
 _CANONICAL_NUM_WORDS = 7
@@ -71,9 +70,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         return max_epoch >= train_epochs - 1
 
     @classmethod
-    def from_grouped(
-        cls, grouped: dict[str, list[tuple[int, Path]]]
-    ) -> Self | None:
+    def from_grouped(cls, grouped: dict[str, list[tuple[int, Path]]]) -> Self | None:
         """
         Build an analysis config from a group-name -> [(seed, path), ...] mapping.
         Drops paths without `has_study_started`; drops groups that end up empty.
@@ -150,9 +147,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         group keys — surface it in the figure title instead)."""
         if not study_base.exists():
             return None
-        baseline_folder = _maxrl_baseline_folder(
-            subtract_baseline=subtract_baseline
-        )
+        baseline_folder = _maxrl_baseline_folder(subtract_baseline=subtract_baseline)
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for corr in candidate_corrs:
             for r in candidate_rollout_steps:
@@ -411,7 +406,7 @@ def corr_expr(*, split: str, y: str) -> pl.Expr:
 
 
 def mse_expr(*, split: str, y: str) -> pl.Expr:
-    """Mean squared error: Σ(x − y)² / n."""
+    """Mean squared error: Σ(x - y)² / n."""
     xx = pl.col(f"{split}_{y}_xx")
     xy = pl.col(f"{split}_{y}_xy")
     yy = pl.col(f"{split}_{y}_yy")

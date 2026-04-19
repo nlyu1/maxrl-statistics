@@ -53,9 +53,7 @@ $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$
 
 ### Row-level heteroskedasticity (unlearnable)
 
-See [`src/data/heterogeneous_bag_of_words.py`]({{< var repo_url >}}/src/data/heterogeneous_bag_of_words.py) (`RowHeterogeneousBagOfWordsDatasetConfig`).
-
-Row $i$ is assigned a stratified hardness quantile $u_i \in (0, 1)$ (uniformly permuted) and a **median-pegged exponential** noise multiplier
+The first heteroskedastic variant has unlearnable per-sample hardness: sample $i$ is assigned a stratified hardness quantile $u_i \in (0, 1)$ (uniformly permuted) and a **median-pegged exponential** noise multiplier
 $$
 \tilde a(u) = 2^{(u - 1/2) \,/\, h_{\text{row}}}, \qquad
 a_i = \tilde a(u_i) \,/\, \sqrt{\mathbb{E}_u[\tilde a(u)^2]},
@@ -64,13 +62,7 @@ where $h_{\text{row}}$ = `snr_halflife_in_quantile` is the quantile distance ove
 $$
 \text{target}_i = \text{signal}_i + \sqrt{1-\rho^2}\, a_i\, \varepsilon_i
 $$
-preserves the **global** correlation $\text{Corr}(\text{signal}, \text{target}) = \rho$ while inducing a per-row conditional correlation
-$$
-\rho_i \;=\; \frac{\rho}{\sqrt{\rho^2 + (1-\rho^2)\, a_i^2}}.
-$$
-Nothing in the prompt identifies $a_i$, so the model cannot route capacity to easy rows — hence *unlearnable*: the schedule controls the spread of $\rho_i$ around $\rho$ but the optimal predictor is still the marginal conditional mean.
-
-At small $h_{\text{row}}$, a few rows are essentially noiseless and most are very hard; at $h_{\text{row}} \gtrsim 2$ the per-row distribution collapses toward the homogeneous case.
+preserves the **global** correlation $\text{Corr}(\text{signal}, \text{target}) = \rho$.
 
 ```{=html}
 <script>
@@ -109,13 +101,9 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 ```
 
-*Figure: histogram of per-row $\rho_i$ over 50k samples. Top slider: $h_{\text{row}}$. Bottom slider: global $\rho$ on a log-spaced grid over $[0.01, 1]$.*
-
 ### Word-level heteroskedasticity (learnable)
 
-See [`src/data/heterogeneous_bag_of_words.py`]({{< var repo_url >}}/src/data/heterogeneous_bag_of_words.py) (`SignalHeterogeneousBagOfWordsDatasetConfig`).
-
-Here hardness is tied to **word content**, so it is in principle recoverable from the prompt. Semantic words are ranked by $|v(w)|$ (ties share their average rank, preserving sign symmetry) and assigned a quantile $q(w) \in (0, 1)$; auxiliary words carry zero hardness. The raw per-word multiplier is
+We propose another heteroskedastic variation where hardness is tied to **word content**, so it is in principle recoverable from the prompt. Semantic words are ranked by $|v(w)|$ (ties share their average rank, preserving sign symmetry) and assigned a quantile $q(w) \in (0, 1)$; auxiliary words carry zero hardness. The raw per-word multiplier is
 $$
 \tilde a(w) \;=\; \begin{cases} 2^{(q(w) - 1/2)\,/\,h_{\text{word}}} & w \text{ semantic},\\ 0 & w \text{ auxiliary}, \end{cases}
 $$
@@ -137,8 +125,6 @@ $$
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 ```
-
-*Figure: **(top)** histogram of per-prompt $\rho(x)$ over 50k prompts with $L = 128$; **(bottom)** semantic density $p(w)$ (grey, left axis) against the normalized hardness ratio $a(w) = \tilde a(w) / \sqrt{\mathbb{E}[\tilde a^2]}$ (red, right axis, log).*
 
 ## Experiments
 
