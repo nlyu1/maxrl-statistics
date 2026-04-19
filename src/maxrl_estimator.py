@@ -12,18 +12,20 @@ from src.config.base import BaseConfig
 class MaxRLEstimatorConfig(BaseConfig):
     degree: int
     sup_likelihood: float
+    subtract_baseline: bool
 
     @classmethod
     def initialize(
-        cls, *, degree: int, sup_likelihood: float
+        cls, *, degree: int, sup_likelihood: float, subtract_baseline: bool
     ) -> "MaxRLEstimatorConfig":
         assert 1 <= degree, f"Degree must be nontrivial, got {degree}"
         return cls(
             degree=degree,
             sup_likelihood=sup_likelihood,
+            subtract_baseline=subtract_baseline,
         )
 
-    def compute_log_score_weights(
+    def compute_score_weights(
         self,
         *,
         log_likelihoods: Float[Tensor, "batch rollout"],
@@ -72,35 +74,87 @@ class MaxRLEstimatorConfig(BaseConfig):
 
         Estimator returned by this function
         -----------------------------------
-        This function returns log of detached per-rollout score coefficients
-        log(omega_j * sigma_j), so that
+        Returns the detached signed per-rollout coefficient c_j such that
 
-            g_hat(theta) := (1 / R) * sum_j (omega_j * sigma_j * S_j)
+            g_hat(theta) := (1 / R) * sum_j c_j * S_j
 
         is an unbiased estimator of grad_theta J_D(theta). Each omega_j is a
         leave-one-out U-statistic built from the peer complements
         a_{-j} = (1 - sigma_i)_{i != j}, satisfying E[omega_j] = w_D(sigma_theta).
+
+        If subtract_baseline is False,
+            c_j = omega_j * sigma_j                      (always >= 0).
+        If subtract_baseline is True (requires R >= 2),
+            c_j = omega_j * (sigma_j - sigma_bar_{-j})
+                = omega_j * (R / (R - 1)) * (sigma_j - sigma_bar),
+        where sigma_bar = mean_i sigma_i and sigma_bar_{-j} is the peer-only
+        mean (sum_{i != j} sigma_i) / (R - 1). The baseline b_j := omega_j *
+        sigma_bar_{-j} is a function of z_{-j} alone; since omega_j is already
+        leave-one-out and sigma_j is fresh, E[b_j | z_{-j}] = omega_j *
+        sigma_theta and E[b_j * S_j] = 0, so subtracting it preserves
+        unbiasedness and typically reduces variance.
+
+        The leave-one-out DP for log(omega_j) is run entirely in log-space;
+        we only exit to linear space at the very end, when forming the
+        signed product omega_j * sigma_effective_j.
         """
         num_rollouts = log_likelihoods.shape[1]
         assert self.degree <= num_rollouts
+        if self.subtract_baseline:
+            assert num_rollouts >= 2, (
+                "subtract_baseline=True requires at least 2 rollouts; "
+                f"got num_rollouts={num_rollouts}"
+            )
 
         with torch.no_grad():
             # log(sigma_j) = log(l_j) - log(L)
             normalized_ll = log_likelihoods - math.log(self.sup_likelihood)
-            # Per-rollout complements a_j = 1 - sigma_j, in [0, 1]
-            complement_normalized_likelihood = -torch.expm1(normalized_ll)
+            sigma_effective = self._maybe_subtract_baseline_from_normalized_ll(
+                normalized_ll=normalized_ll
+            )
 
             if num_rollouts == 1:
-                # Degree-1 weight function w_1(sigma) = 1, so the coefficient
-                # is just sigma_j and the log coefficient is log(sigma_j).
-                return normalized_ll
-            else:
-                # For each rollout j, estimate w_D(sigma_theta) via the
-                # leave-one-out U-statistic omega_j over peer complements a_{-j}.
-                log_omega = self._log_leave_one_out_weight(
-                    complement_normalized_likelihood
-                )
-                return (log_omega + normalized_ll).type_as(log_likelihoods)
+                # Degree-1 weight function w_1(sigma) = 1, so c_j = sigma_j.
+                return sigma_effective.type_as(log_likelihoods)
+
+            # Per-rollout complements a_j = 1 - sigma_j, in [0, 1]
+            complement_normalized_likelihood = -torch.expm1(normalized_ll)
+            # For each rollout j, estimate w_D(sigma_theta) via the
+            # leave-one-out U-statistic omega_j over peer complements a_{-j}.
+            log_omega = self._log_leave_one_out_weight(
+                complement_normalized_likelihood
+            )
+            # Exit log-space here: omega_j >= 0, sigma_effective_j is signed
+            # when subtract_baseline=True.
+            return (log_omega.exp() * sigma_effective).type_as(log_likelihoods)
+
+    def _maybe_subtract_baseline_from_normalized_ll(
+        self,
+        *,
+        normalized_ll: Float[Tensor, "batch rollout"],
+    ) -> Float[Tensor, "batch rollout"]:
+        """
+        Convert normalized_ll_j = log(sigma_j) into the sigma-factor that
+        multiplies omega_j in the final score coefficient c_j.
+
+        subtract_baseline=False:
+            sigma_effective_j = sigma_j = exp(normalized_ll_j),  in [0, 1].
+        subtract_baseline=True (R >= 2):
+            sigma_effective_j = sigma_j - sigma_bar_{-j}
+                              = (R / (R - 1)) * (sigma_j - sigma_bar),
+            which is signed. See `compute_score_weights` for unbiasedness.
+
+        The DP that produces log(omega_j) stays in log-space; this helper is
+        where (and the only place where) the pipeline leaves log-space.
+        """
+        compute_dtype = torch.promote_types(normalized_ll.dtype, torch.float32)
+        sigma = normalized_ll.to(compute_dtype).exp()
+        if not self.subtract_baseline:
+            return sigma
+        num_rollouts = sigma.shape[-1]
+        sigma_bar = sigma.mean(dim=-1, keepdim=True)
+        scale = num_rollouts / (num_rollouts - 1)
+        return scale * (sigma - sigma_bar)
 
     def _log_leave_one_out_weight(
         self, complement_nl: Float[Tensor, "batch rollout"]

@@ -6,8 +6,8 @@ barrier between seeds. The rollout axis is partitioned across devices, and each
 device traverses the full corr list.
 
 Usage:
-    uv run python experiments/bow/maxrl-corr/orchestrate.py
-    uv run python experiments/bow/maxrl-corr/orchestrate.py --dry-run
+    uv run python experiments/bow/maxrl-corr/orchestrate.py --subtract-baseline
+    uv run python experiments/bow/maxrl-corr/orchestrate.py --subtract-baseline --dry-run
 """
 
 import subprocess
@@ -29,6 +29,12 @@ from src.data.bag_of_words import (  # noqa: E402
 
 SINGLE_RUN = repo_root / "experiments" / "bow" / "maxrl-corr" / "single_run.py"
 LOG_BASE = repo_root / "artifacts" / "bow-maxrl-sweep" / "logs"
+
+
+def baseline_mode_folder(*, subtract_baseline: bool) -> str:
+    if subtract_baseline:
+        return "subtract-baseline"
+    return "no-subtract-baseline"
 
 
 def stride_4_top_down(n: int) -> list[int]:
@@ -54,10 +60,24 @@ def build_jobs(*, device_id: int) -> list[Job]:
     return [(corr, r) for corr in corr_order for r in rollouts]
 
 
-def run_jobs(*, jobs: list[Job], device_id: int, seed: int, log_path: Path) -> None:
+def run_jobs(
+    *,
+    jobs: list[Job],
+    device_id: int,
+    seed: int,
+    log_path: Path,
+    subtract_baseline: bool,
+) -> None:
     device = f"cuda:{device_id}"
+    baseline_flag = "--subtract-baseline"
+    if not subtract_baseline:
+        baseline_flag = "--no-subtract-baseline"
     with log_path.open("ab") as log_fh:
-        header = f"\n===== seed={seed} device={device} ({len(jobs)} jobs) =====\n"
+        baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)
+        header = (
+            f"\n===== seed={seed} device={device} baseline={baseline_mode} "
+            f"({len(jobs)} jobs) =====\n"
+        )
         log_fh.write(header.encode())
         log_fh.flush()
         for corr, num_rollouts in jobs:
@@ -74,8 +94,12 @@ def run_jobs(*, jobs: list[Job], device_id: int, seed: int, log_path: Path) -> N
                 str(seed),
                 "--device",
                 device,
+                baseline_flag,
             ]
-            tag = f"[{device} seed={seed} corr={corr} rollouts={num_rollouts}]"
+            tag = (
+                f"[{device} seed={seed} corr={corr} rollouts={num_rollouts} "
+                f"baseline={baseline_mode}]"
+            )
             print(f"{tag} launching", flush=True)
             returncode = subprocess.call(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
             status = "done" if returncode == 0 else f"FAILED rc={returncode}"
@@ -84,9 +108,12 @@ def run_jobs(*, jobs: list[Job], device_id: int, seed: int, log_path: Path) -> N
 
 @click.command()
 @click.option("--dry-run", is_flag=True, help="Print the planned job lists and exit.")
-def main(dry_run: bool) -> None:
+@click.option("--subtract-baseline/--no-subtract-baseline", required=True)
+def main(dry_run: bool, subtract_baseline: bool) -> None:
     jobs_by_device = {dev: build_jobs(device_id=dev) for dev in (0, 1)}
+    baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)
 
+    print(f"baseline mode: {baseline_mode}")
     for dev, jobs in jobs_by_device.items():
         print(f"device {dev}: {len(jobs)} jobs per seed")
         for corr, r in jobs:
@@ -97,7 +124,8 @@ def main(dry_run: bool) -> None:
     if dry_run:
         return
 
-    LOG_BASE.mkdir(parents=True, exist_ok=True)
+    log_base = LOG_BASE / baseline_mode
+    log_base.mkdir(parents=True, exist_ok=True)
 
     for seed in candidate_seeds:
         threads = [
@@ -107,7 +135,8 @@ def main(dry_run: bool) -> None:
                     jobs=jobs_by_device[dev],
                     device_id=dev,
                     seed=seed,
-                    log_path=LOG_BASE / f"device_{dev}.log",
+                    log_path=log_base / f"device_{dev}.log",
+                    subtract_baseline=subtract_baseline,
                 ),
                 daemon=True,
                 name=f"device-{dev}-seed-{seed}",

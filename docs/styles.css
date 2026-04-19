@@ -1,0 +1,19 @@
+#title-block-header.quarto-title-block.default {
+  margin-block-end: 2rem;
+  padding-block-end: 1.1rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+#title-block-header.quarto-title-block.default .quarto-title .title {
+  margin-block-end: 0;
+  line-height: 1.15;
+}
+
+main.content {
+  line-height: 1.65;
+}
+
+main.content p,
+main.content li {
+  line-height: inherit;
+}

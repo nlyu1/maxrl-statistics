@@ -101,6 +101,7 @@ window.Quarto = {
 };
 </script>
 
+<link rel="stylesheet" href="styles.css">
 </head>
 
 <body class="nav-fixed quarto-light">
@@ -152,21 +153,19 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#whats-in-the-paper" id="toc-whats-in-the-paper" class="nav-link active" data-scroll-target="#whats-in-the-paper">What’s in the paper</a></li>
-  <li><a href="#whats-here" id="toc-whats-here" class="nav-link" data-scroll-target="#whats-here">What’s here</a></li>
-  <li><a href="#preamble-ramble-on-mle" id="toc-preamble-ramble-on-mle" class="nav-link" data-scroll-target="#preamble-ramble-on-mle">Preamble / ramble on MLE</a></li>
+  <li><a href="#preamble-ramble-on-mle" id="toc-preamble-ramble-on-mle" class="nav-link active" data-scroll-target="#preamble-ramble-on-mle">Preamble / ramble on MLE</a></li>
   <li><a href="#formulation-notation" id="toc-formulation-notation" class="nav-link" data-scroll-target="#formulation-notation">Formulation, notation</a></li>
   <li><a href="#direct-rl-as-a-maximum-likelihood-approximation" id="toc-direct-rl-as-a-maximum-likelihood-approximation" class="nav-link" data-scroll-target="#direct-rl-as-a-maximum-likelihood-approximation">Direct RL as a maximum-likelihood approximation</a>
-  <ul class="collapse">
+  <ul>
   <li><a href="#binary-reasoning-setup" id="toc-binary-reasoning-setup" class="nav-link" data-scroll-target="#binary-reasoning-setup">Binary reasoning setup</a></li>
   <li><a href="#continuous-regression" id="toc-continuous-regression" class="nav-link" data-scroll-target="#continuous-regression">Continuous regression</a></li>
-  <li><a href="#putting-them-together-jensen-and-taylor" id="toc-putting-them-together-jensen-and-taylor" class="nav-link" data-scroll-target="#putting-them-together-jensen-and-taylor">Putting them together: Jensen and Taylor</a></li>
+  <li><a href="#jenson-and-taylor" id="toc-jenson-and-taylor" class="nav-link" data-scroll-target="#jenson-and-taylor">Jenson and Taylor</a></li>
   </ul></li>
   <li><a href="#gradient-estimators" id="toc-gradient-estimators" class="nav-link" data-scroll-target="#gradient-estimators">Gradient estimators</a>
-  <ul class="collapse">
+  <ul>
   <li><a href="#binary-case" id="toc-binary-case" class="nav-link" data-scroll-target="#binary-case">Binary case</a></li>
   <li><a href="#generalization" id="toc-generalization" class="nav-link" data-scroll-target="#generalization">Generalization</a></li>
-  <li><a href="#note-bounded-l-suffices" id="toc-note-bounded-l-suffices" class="nav-link" data-scroll-target="#note-bounded-l-suffices">Note: bounded <span class="math inline">\(l\)</span> suffices</a></li>
+  <li><a href="#generalized-baseline-subtraction" id="toc-generalized-baseline-subtraction" class="nav-link" data-scroll-target="#generalized-baseline-subtraction">Generalized baseline subtraction</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -193,47 +192,14 @@ window.Quarto = {
 </header>
 
 
-<p>I’ve always wondered what happens if one applies RL to supervisable tasks. For example, given a binary classification task <span class="math inline">\((x_k, y_k)\)</span>, maximize accuracy as the reward <span class="math display">\[
-R := \mathbb E\,[y\,p_\theta(x)+(1-y)(1-p_\theta(x))].
-\]</span> No one does this, presumably for good reasons; how does such a model compare to a normal model trained using cross-entropy?</p>
-<p>A recent <a href="https://arxiv.org/pdf/2602.02710">paper</a> from CMU goes <em>exactly</em> down this rabbit hole and comes up with actionable, principled insights. They point out that correctness-based RL is optimizing <span class="math display">\[
-\begin{equation}
-J_{\mathrm{RL}}(\theta)=\mathbb E_{x\sim\rho}\,p_\theta(x)
-\label{eq:j-rl}
-\end{equation}
-\]</span> where <span class="math inline">\(p_\theta(x)\)</span> is the success probability (“pass rate”), while the likelihood principle suggests optimizing <span class="math display">\[
-\begin{equation}
-J_{\mathrm{ML}}(\theta)=\mathbb E_{x\sim\rho}\,\log p_\theta(x),
-\label{eq:j-ml}
-\end{equation}
-\]</span> whose gradient upweights low-pass-rate inputs by a factor <span class="math inline">\(1/p_\theta(x)\)</span>.</p>
-<section id="whats-in-the-paper" class="level3">
-<h3 class="anchored" data-anchor-id="whats-in-the-paper">What’s in the paper</h3>
-<ul>
-<li>A <strong>compute-indexed</strong> family of truncated objectives interpolating between RL and ML,</li>
-<li>A <strong>simple unbiased estimator</strong> whose expected gradient matches the truncated objective,</li>
-<li>Experiments demonstrating strong Pareto improvements over common baselines (e.g.&nbsp;GRPO/RLOO) including up to <strong>(~20x)</strong> rollout scaling efficiency gains in their reasoning setups.</li>
-</ul>
-</section>
-<section id="whats-here" class="level3">
-<h3 class="anchored" data-anchor-id="whats-here">What’s here</h3>
-<p>The authors focus on the binary, discrete-reward setting. This post unpacks the following qualitative behavior of MaxRL:</p>
-<ul>
-<li>is <em>sharper</em> than direct objectives, admitting a natural bounded truncation that interpolates RL <span class="math inline">\(\to\)</span> ML with rollout budget,</li>
-<li>fixing a prompt/sample, <strong>upweights the most successful rollouts</strong> (soft-max / log-sum-exp behavior),</li>
-<li>marginalizing over rollouts, <strong>upweights the most difficult prompts</strong> via inverse-probability reweighting.</li>
-</ul>
-<p>We also put forward a generalization that abstracts at the level of per-rollout likelihood, admitting application to e.g.&nbsp;regression tasks. We expect this generalization to be highly applicable to regression RL tasks with low signal-to-noise ratio. For the numerically stable <span class="math inline">\(O(BRD)\)</span> computation of the leave-one-out weights, see <a href="./gradient-estimator.html">Gradient Estimator</a>.</p>
-</section>
 <section id="preamble-ramble-on-mle" class="level2">
 <h2 class="anchored" data-anchor-id="preamble-ramble-on-mle">Preamble / ramble on MLE</h2>
-<p>Maximum likelihood estimation (MLE) is a near-axiomatic principle: given data and a parametric family, choose parameters that maximize the probability (likelihood) of observed data.</p>
+<p>Maximum likelihood estimation (MLE) is a near-axiomatic principle: given data and a parametric family, choose parameters that maximize the probability (likelihood) of observed data. Given the ubiquity of MLE, it’s surprising that maximum-likelihood RL is this recent.</p>
 <ul>
 <li>Classification is MLE: data-label pairs <span class="math inline">\((x, y) \sim \rho\)</span>, model <span class="math inline">\(p_\theta(y \mid x)\)</span>.</li>
 <li>Regression is MLE: MSE corresponds to Gaussian noise MLE; L1 corresponds to Laplace noise MLE.</li>
-<li>VAEs are MLE-ish too: maximize a tractable lower bound on log-likelihood, while tightening that lower bound.</li>
+<li>Diffusion (score-matching) is MLE, as shown in this <a href="https://snakamoto404.github.io/blogs/machine-learning/ot-generative-3-diffusion/">post</a>.</li>
 </ul>
-<p>Given the ubiquity of MLE, it’s surprising that maximum-likelihood RL (MaxRL) is this recent.</p>
 <p>Why do we supervise with cross-entropy <span class="math inline">\(\mathbb E \log p_\theta(y\mid x)\)</span> rather than accuracy-like <span class="math inline">\(\mathbb E\,p_\theta(y\mid x)\)</span>? One mechanistic lens is the gradient: <span class="math display">\[
 \nabla_\theta \log p_\theta(y\mid x) = \frac{1}{p_\theta(y\mid x)}\,\nabla_\theta p_\theta(y\mid x).
 \]</span> So difficult cases (small <span class="math inline">\(p_\theta\)</span>) get amplified by <span class="math inline">\(1/p_\theta\)</span>.</p>
@@ -280,8 +246,8 @@ S(x,z) := \nabla_\theta \log m_\theta(z\mid x).
 J(\theta)=\mathbb E_{(x,y)\sim\rho}\,\log p_\theta(y\mid x)
 =\mathbb E_{(x,y)\sim\rho}\,\log\mathbb E_{z\sim m_\theta(\cdot\mid x)} l(y,z).
 \]</span> This is the exact analogue of cross-entropy: the log is outside the expectation because <span class="math inline">\(p_\theta(y\mid x)\)</span> is a <em>marginal likelihood</em>.</p>
-<section id="binary-reasoning-setup" class="level3">
-<h3 class="anchored" data-anchor-id="binary-reasoning-setup">Binary reasoning setup</h3>
+<section id="binary-reasoning-setup" class="level4">
+<h4 class="anchored" data-anchor-id="binary-reasoning-setup">Binary reasoning setup</h4>
 <p>In the binary reasoning setup, typical reward is the expected pass rate: <span class="math display">\[
 J_{\mathrm{pass}}
 =
@@ -295,11 +261,10 @@ J_{\mathrm{ML}}
 \mathbb E_{(x,y)\sim\rho}\,\log p_\theta(y\mid x)
 =
 \mathbb E_{(x,y)\sim\rho}\,\log\mathbb E_{z\sim m_\theta(\cdot\mid x)} \mathbf 1[\hat y(z)=y].
-\]</span> This is <em>exactly</em> the paper’s core distinction: RL maximizes <span class="math inline">\(\eqref{eq:j-rl}\)</span>, ML maximizes <span class="math inline">\(\eqref{eq:j-ml}\)</span>.</p>
-<p>(Also: yes, <span class="math inline">\(\log\mathbb E[\mathbf 1[\cdot]]\)</span> is a little silly-looking, but that’s <em>kind of the point</em>: we’re doing maximum likelihood on a Bernoulli observation whose success probability is induced by a non-differentiable latent generator.)</p>
+\]</span></p>
 </section>
-<section id="continuous-regression" class="level3">
-<h3 class="anchored" data-anchor-id="continuous-regression">Continuous regression</h3>
+<section id="continuous-regression" class="level4">
+<h4 class="anchored" data-anchor-id="continuous-regression">Continuous regression</h4>
 <p>Specialize to a Gaussian noise model with <span class="math inline">\(\sigma=1\)</span>: <span class="math display">\[
 l(y,z)=\hat P(y\mid z)=\mathcal N(\hat y(z))(y)
 =
@@ -318,12 +283,11 @@ r(y,z):=-\frac{(y-\hat y(z))^2}{2}.
 \]</span> A direct analogue would average these rollout rewards: <span class="math display">\[
 \mathbb E_{(x,y)\sim\rho}\,\mathbb E_{z\sim m_\theta(\cdot\mid x)}\,r(y,z).
 \]</span> Maximum likelihood instead optimizes <span class="math display">\[
-\mathbb E_{(x,y)\sim\rho}\,\log\mathbb E_{z\sim m_\theta(\cdot\mid x)}\,\exp(r(y,z))
-\]</span> (up to constants): a log-sum-exp, rather than a simple average, over per-rollout MSE-derived terms. So within each sample, the objective reinforces the most successful trajectories; we recover this same structure in the general form below.</p>
-<p>(If you want this to literally satisfy <span class="math inline">\(l\in(0,1]\)</span> so the Maclaurin series below is automatic, pick a scale so the peak density is <span class="math inline">\(\le 1\)</span>; multiplying <span class="math inline">\(l\)</span> by a <span class="math inline">\(\theta\)</span>-independent constant only adds a constant to <span class="math inline">\(\log p_\theta\)</span>, hence doesn’t change the ML gradient.)</p>
+\mathbb E_{(x,y)\sim\rho}\,\log\mathbb E_{z\sim m_\theta(\cdot\mid x)}\,e^{r(y,z)}
+\]</span> this is (up to constants) a log-sum-exp, rather than a simple average, over per-rollout MSE-derived terms. So within each sample, the objective reinforces the most successful trajectories; we recover this same structure in the general form below.</p>
 </section>
-<section id="putting-them-together-jensen-and-taylor" class="level3">
-<h3 class="anchored" data-anchor-id="putting-them-together-jensen-and-taylor">Putting them together: Jensen and Taylor</h3>
+<section id="jenson-and-taylor" class="level4">
+<h4 class="anchored" data-anchor-id="jenson-and-taylor">Jenson and Taylor</h4>
 <p>Fix <span class="math inline">\((x,y)\)</span> and suppress dependencies to reduce clutter: <span class="math display">\[
 p := p_\theta(y\mid x)=\mathbb E_{z\sim m_\theta(\cdot\mid x)} l(y,z).
 \]</span></p>
@@ -367,7 +331,7 @@ w_D(p)\,\mathbb E_{z\sim m_\theta(\cdot\mid x)}\big[l(y,z)\,S(x,z)\big].
 \label{eq:gradient-main}
 \end{equation}
 \]</span></p>
-<p>At this point we can already read off the two qualitative behaviors:</p>
+<p>We can read off two qualitative behaviors:</p>
 <p><strong>Remark 1 (per-prompt):</strong> inside <span class="math inline">\(\mathbb E[lS]\)</span>, trajectories with larger likelihood <span class="math inline">\(l(y,z)\)</span> get more weight.</p>
 <ul>
 <li>Binary case: only successful rollouts contribute (<span class="math inline">\(l\in\{0,1\}\)</span>).</li>
@@ -379,9 +343,8 @@ w_D(p)\,\mathbb E_{z\sim m_\theta(\cdot\mid x)}\big[l(y,z)\,S(x,z)\big].
 <section id="gradient-estimators" class="level2">
 <h2 class="anchored" data-anchor-id="gradient-estimators">Gradient estimators</h2>
 <p>All’s great: we have a principled objective. How are we going about optimizing it?</p>
-<p>The MaxRL paper proposes an unbiased estimator for the truncated maximum-likelihood binary objective. Below we recap the proof and give a per-rollout-likelihood <span class="math inline">\(l(y,z)\)</span> generalization that recovers the binary construction and extends to likelihood-based objectives such as Gaussian regression.</p>
-<section id="binary-case" class="level3">
-<h3 class="anchored" data-anchor-id="binary-case">Binary case</h3>
+<section id="binary-case" class="level4">
+<h4 class="anchored" data-anchor-id="binary-case">Binary case</h4>
 <p>In the binary setting <span class="math inline">\(l(y,z)\in\{0,1\}\)</span>, draw <span class="math inline">\(N\)</span> trajectories <span class="math inline">\(z_1,\dots,z_N\sim m_\theta(\cdot\mid x)\)</span>, define <span class="math display">\[
 l_j:=l(y,z_j),\qquad S_j:=\nabla_\theta\log m_\theta(z_j\mid x),\qquad K:=\sum_{j=1}^N l_j.
 \]</span></p>
@@ -403,12 +366,12 @@ l_j:=l(y,z_j),\qquad S_j:=\nabla_\theta\log m_\theta(z_j\mid x),\qquad K:=\sum_{
 </ul>
 <p>Conditioning on <span class="math inline">\(K\geq 1\)</span>, <span class="math display">\[
 \mathbb E_z\big[\hat g_N^{\mathrm{bin}}(x)\mid K\geq 1\big] = \mathbb E_z[S\mid l=1] = \dfrac{\mathbb E[l\cdot S]}{\mathbb E[l]} = \dfrac{\nabla p}{p} = \nabla \log p.
-\]</span> It’s an unbiased ML estimator, conditional on <span class="math inline">\(K\geq 1\)</span>! The bias comes from <span class="math inline">\(K=0\)</span>, which occurs with probability <span class="math inline">\((1-p)^N\)</span>. Substituting recovers exactly the gradient form in <span class="math inline">\(\eqref{eq:gradient-main}\)</span>: <span class="math display">\[
+\]</span> It’s an unbiased ML estimator, conditional on <span class="math inline">\(K\geq 1\)</span>! The bias comes from <span class="math inline">\(K=0\)</span>, which occurs with probability <span class="math inline">\((1-p)^N\)</span>. Substituting recovers exactly the gradient form: <span class="math display">\[
 \mathbb E_z\big[\hat g_N^{\mathrm{bin}}(x)\big] = (1-(1-p)^N) \nabla \log p = w_N(p)\cdot \nabla p = \nabla J_N(p).
 \]</span></p>
 </section>
-<section id="generalization" class="level3">
-<h3 class="anchored" data-anchor-id="generalization">Generalization</h3>
+<section id="generalization" class="level4">
+<h4 class="anchored" data-anchor-id="generalization">Generalization</h4>
 <p>Drop the assumption <span class="math inline">\(l\in\{0,1\}\)</span> and keep only what the derivation above <em>actually used</em>:</p>
 <ul>
 <li><span class="math inline">\(l_j := l(y,z_j)\in[0,1]\)</span> is a per-rollout likelihood/reward signal,</li>
@@ -423,6 +386,9 @@ l_j:=l(y,z_j),\qquad S_j:=\nabla_\theta\log m_\theta(z_j\mid x),\qquad K:=\sum_{
 <li>Plugging in sample estimates makes bias because the factors are correlated.</li>
 </ul>
 <p>The key is the <strong>leave-one-out</strong> trick. Use one sample to estimate <span class="math inline">\(\nabla_\theta p\)</span>, the remaining <span class="math inline">\(N-1\)</span> samples to estimate <span class="math inline">\(w_D(p)\)</span>, and average over all leave-one-outs. The product factorizes because samples are conditionally independent.</p>
+<blockquote class="blockquote">
+<p>We only need a known upper bound <span class="math inline">\(L \geq \max l\)</span>: set <span class="math inline">\(\sigma_j := l_j/L\)</span>, then <span class="math inline">\(\log\mathbb E[\sigma_j] = \log p - \log L\)</span> differs by a <span class="math inline">\(\theta\)</span>-independent constant, so the gradient is unchanged and all derivations apply with <span class="math inline">\((l_j, p) \mapsto (\sigma_j, \sigma_\theta)\)</span>. For Gaussian regression, <span class="math inline">\(L = (2\pi\sigma^2)^{-1/2}\)</span>.</p>
+</blockquote>
 <p>Formally, <strong>suppose we have an estimator subroutine <span class="math inline">\(\omega_j\)</span></strong>, built from <span class="math inline">\(\{l_k\}_{k\ne j}\)</span> only, such that <span class="math display">\[
 \mathbb E[\omega_j] = w_D(p).
 \]</span> We know <span class="math inline">\(l_j S_j\)</span> is an unbiased estimator for <span class="math inline">\(\nabla p = \mathbb E[l\cdot S]\)</span>, so the leave-one-out product <span class="math inline">\(\omega_j l_j \cdot S_j\)</span> is unbiased for <span class="math inline">\(w_D(p)\nabla_\theta p\)</span>. Averaging over <span class="math inline">\(j\)</span> gives the final estimator: <span class="math display">\[
@@ -436,13 +402,22 @@ l_j:=l(y,z_j),\qquad S_j:=\nabla_\theta\log m_\theta(z_j\mid x),\qquad K:=\sum_{
 <p><strong>It remains to solve:</strong> given iid samples <span class="math inline">\((l_0, \dots, l_{N-1})\)</span>, estimate <span class="math inline">\(w_D(p)=\sum_{k=0}^{D-1}(1-p)^k\)</span>.</p>
 <ul>
 <li>Taking <span class="math inline">\(D=N\)</span>, it suffices to obtain estimators for <span class="math inline">\((1-p)^k\)</span> for all <span class="math inline">\(1\leq k\leq N-1\)</span>.</li>
-<li>This is a textbook problem with a known MVUE (minimum-variance unbiased estimator) via U-statistics over elementary symmetric polynomials.</li>
+<li>This is a textbook problem with a known MVUE (minimum-variance unbiased estimator). See <a href="./gradient-estimator.html">Gradient Estimator</a> for the numerically stable <span class="math inline">\(O(BRD)\)</span> prefix-suffix-scan implementation used in this repo.</li>
 </ul>
-<p>See <a href="./gradient-estimator.html">Gradient Estimator</a> for the numerically stable <span class="math inline">\(O(BRD)\)</span> prefix-suffix-scan implementation used in this repo.</p>
 </section>
-<section id="note-bounded-l-suffices" class="level3">
-<h3 class="anchored" data-anchor-id="note-bounded-l-suffices">Note: bounded <span class="math inline">\(l\)</span> suffices</h3>
-<p>We only need a known upper bound <span class="math inline">\(L \geq \sup l\)</span>: set <span class="math inline">\(\sigma_j := l_j/L\)</span>, then <span class="math inline">\(\log\mathbb E[\sigma_j] = \log p - \log L\)</span> differs by a <span class="math inline">\(\theta\)</span>-independent constant, so the gradient is unchanged and all derivations apply with <span class="math inline">\((l_j, p) \mapsto (\sigma_j, \sigma_\theta)\)</span>. For Gaussian regression, <span class="math inline">\(L = (2\pi\sigma^2)^{-1/2}\)</span> is immediate.</p>
+<section id="generalized-baseline-subtraction" class="level4">
+<h4 class="anchored" data-anchor-id="generalized-baseline-subtraction">Generalized baseline subtraction</h4>
+<p>Here, we explain the semantics of <code>MaxRLEstimatorConfig.subtract_baseline</code> flag.</p>
+<p>The leave-one-out construction admits more than a constant baseline. Since <span class="math inline">\(\omega_j\)</span> is built from the peers <span class="math inline">\(z_{-j} := (z_i)_{i \ne j}\)</span> only, <strong>any <span class="math inline">\(b_j\)</span> measurable with respect to <span class="math inline">\(z_{-j}\)</span></strong> preserves unbiasedness, and replacing the per-rollout coefficient <span class="math inline">\(c_j := \omega_j l_j\)</span> by <span class="math inline">\(c_j - b_j\)</span> leaves an unbiased estimator of <span class="math inline">\(\nabla_\theta J_D(p)\)</span>. Consider the peer-only baseline <span class="math display">\[
+b_j := \omega_j\,\bar l_{-j}, \qquad \bar l_{-j} := \frac{1}{N-1}\sum_{i\ne j} l_i,
+\]</span> and the centered coefficient becomes <span class="math display">\[
+a_j := c_j - b_j = \omega_j\,(l_j - \bar l_{-j}) = \omega_j \cdot \frac{N}{N-1}\,(l_j - \bar l),
+\]</span> with <span class="math inline">\(\bar l := \frac{1}{N}\sum_i l_i\)</span>, via the identity <span class="math inline">\(l_j - \bar l_{-j} = \frac{N}{N-1}(l_j - \bar l)\)</span>. The baseline-subtracted estimator <span class="math display">\[
+\hat g_D^{\mathrm c}(x, y) := \frac{1}{N}\sum_{j=1}^N a_j\,S_j
+\]</span> is unbiased for <span class="math inline">\(\nabla_\theta J_D(p)\)</span>, and strip the common <span class="math inline">\(\omega_j p\)</span> level shared across rollouts.</p>
+<blockquote class="blockquote">
+<p>A tempting alterantive is the leave-one-out average of <span class="math inline">\((\omega l)_{-j}\)</span>, but this quantity is measurable w.r.t. <span class="math inline">\(z_j\)</span> because <span class="math inline">\(\omega_{k\neq j}\)</span> is dependent upon <span class="math inline">\(z_j\)</span>, resulting in a biased estimator.</p>
+</blockquote>
 
 
 </section>

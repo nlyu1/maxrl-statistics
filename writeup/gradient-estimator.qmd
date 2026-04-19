@@ -13,7 +13,7 @@ $$
 \sigma_\theta := \mathbb{E}[\sigma_j] \in (0, 1], \qquad w_D(\sigma_\theta) := \sum_{k=0}^{D-1} (1 - \sigma_\theta)^k.
 $$
 
-### Population objective
+#### Population objective
 
 The degree-$D$ MaxRL objective is the degree-$D$ Maclaurin truncation of $\log \sigma_\theta$ about $\sigma_\theta = 1$:
 $$
@@ -21,7 +21,7 @@ J_D(\theta) := -\sum_{k=1}^{D} \frac{(1 - \sigma_\theta)^k}{k}, \qquad \nabla_\t
 $$
 As $D \to \infty$, $J_D \to \log \sigma_\theta$ and the gradient recovers the exact log-likelihood gradient; at finite $D$ the gradient residual is the geometric factor $1 - (1 - \sigma_\theta)^D$.
 
-### Leave-one-out estimator
+#### Leave-one-out estimator
 
 The generalized leave-one-out estimator has the form
 $$
@@ -32,28 +32,24 @@ $$
 \mathbb{E}[\omega_j] = w_D(\sigma_\theta).
 $$
 
-### Formulating the problem
+#### Formulating the problem
 
 Define the per-rollout complements
 $$
 a_j := 1 - \sigma_j \in [0, 1] \implies w_D(\sigma_\theta) = \sum_{k=0}^{D-1} \mathbb{E}[a_j]^k.
 $$
-For a list $b_1, \dots, b_n$, let the **$k$-th elementary symmetric polynomial** be the sum of all size-$k$ products:
+For a list $(a_1, \dots, a_R) \in [0, 1]^R$, its **$k$-th elementary symmetric polynomial** is the sum of all size-$k$ products:
 $$
-e_k(b_1, \dots, b_n) := \sum_{1 \le i_1 < \cdots < i_k \le n} b_{i_1} \cdots b_{i_k}, \qquad e_0 := 1.
+e_k(a_1, \dots, a_R) := \sum_{1 \le i_1 < \cdots < i_k \le R} a_{i_1} \cdots a_{i_k}, \qquad e_0 := 1.
 $$
 
-Fix rollout index $j$. Its canonical leave-one-out peer set is
+Fix index $j$. Its canonical leave-one-out peer set is
 $$
 C_j := \{1, \dots, j-1, j+1, \dots, R\}.
 $$
-Because the $a_i$ are iid, the normalized elementary symmetric polynomial
+We care about the normalized elementary symmetric polynomial for each element on its leave-one-out peer set, and, in particular, its sum; our gradient estimator depends on this weighting:
 $$
-\frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}
-$$
-is the U-statistic estimator of $(1-\sigma_\theta)^k$. Therefore the desired leave-one-out weight is
-$$
-\omega_j = \sum_{k=0}^{D-1} \frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}.
+\omega_j = \sum_{k=0}^{D-1} \frac{e_k\bigl((a_i)_{i \in C_j}\bigr)}{\binom{R-1}{k}}
 $$
 This yields a standalone programming problem.
 
@@ -75,7 +71,7 @@ An exact or mathematically equivalent formulation with:
 
 The last requirement is the key numerical design constraint. A natural but unstable route is to compute full-sample coefficients and then "peel off" rollout $j$ by subtraction. We empirically found that this leads to significant numerical errors for $R \geq 32$, and digit-significance dependence grows approximately linearly in the number of rollouts.
 
-### State vectors and matrix view
+#### State vectors and matrix view
 
 Instead, we define states that are already normalized by the **final** peer count $R - 1$. For any canonical subset $I \subseteq \{1, \dots, R\}$, define the state vector
 $$
@@ -106,7 +102,7 @@ e_0 := (1, 0, \dots, 0)^\top,
 $$
 the state for any canonical prefix $I = \{1, \dots, j\}$ is obtained by repeated application of these matrices.
 
-### Prefix-suffix scans
+#### Prefix-suffix scans
 
 Define the forward prefix states so that $\alpha_j = x(\{1, \dots, j\})$:
 $$
@@ -122,7 +118,7 @@ $$
 x(C_j) = M(a_R) \cdots M(a_{j+1}) \, \alpha_{j-1} \implies \omega_j = \mathbf{1}^\top x(C_j) = \beta_j^\top \alpha_{j-1}.
 $$
 
-### Computational interpretation
+#### Algorithm
 
 For one batch row, the algorithm is:
 

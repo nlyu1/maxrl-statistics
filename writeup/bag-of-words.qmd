@@ -29,7 +29,7 @@ $$
 $$
 where $\sigma$ is the per-token standard deviation under the full mixture (zero mean by symmetry). By construction $\text{Var}(\text{target}) = 1$ and $\text{corr}(\text{signal}, \text{target}) = \rho$.
 
-### Examples
+#### Examples
 
 Consider 8-word prompts; we compute the _per-word signal stdev_ $\sigma = 1.14$, so the per-prompt stdev $\sqrt{L}\,\sigma = 3.21$. Semantic words are **bolded**:
 
@@ -39,13 +39,13 @@ Consider 8-word prompts; we compute the _per-word signal stdev_ $\sigma = 1.14$,
 
 $\sum v_i = -6$, signal $= 0.0031 \times (-6) = -0.019$, target $= -2.54$
 
-**High-signal regime**: $\rho = 0.45$ — multiplier $= 0.140$, noise stdev $\sqrt{1 - \rho^2} = 0.89$:
+<!-- **High-signal regime**: $\rho = 0.45$ — multiplier $= 0.140$, noise stdev $\sqrt{1 - \rho^2} = 0.89$:
 
 > **grim** **poor** ask look some door do **fair**
 
-$\sum v_i = -4$, signal $= 0.140 \times (-4) = -0.560$, target $= -0.707$
+$\sum v_i = -4$, signal $= 0.140 \times (-4) = -0.560$, target $= -0.707$ -->
 
-**Very-high-signal regime**: $\rho = 0.89$ — multiplier $= 0.277$, noise stdev $\sqrt{1 - \rho^2} = 0.46$:
+**High-signal regime**: $\rho = 0.89$ — multiplier $= 0.277$, noise stdev $\sqrt{1 - \rho^2} = 0.46$:
 
 > **good** **good** floor **good** **good** **good** **perfect** **poor**
 

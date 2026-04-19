@@ -3,6 +3,8 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+from numpy import ndarray as Array
+from jaxtyping import Float
 
 from src.config.base import BaseConfig
 from src.data.common import aux_words
@@ -160,8 +162,15 @@ class BagOfWordsDatasetConfig(BaseConfig):
     word_values: dict[str, int]  # aux words have value 0
     unnormalized_signal_std: float  # per-token std under full token distribution
 
+    class SplitArtifact(BaseConfig):
+        """One split's prompts, clean signal, and noisy targets."""
+
+        prompts: list[str]
+        signal: Float[Array, "n"]
+        targets: Float[Array, "n"]
+
     @classmethod
-    def initialize(
+    def _base_kwargs(
         cls,
         *,
         corr: float,
@@ -171,7 +180,14 @@ class BagOfWordsDatasetConfig(BaseConfig):
         word_assignments: list[str],
         aux_words_ratio: float,
         word_decay_power: float,
-    ) -> "BagOfWordsDatasetConfig":
+    ) -> dict:
+        """Validate user inputs and derive stored fields.
+
+        Returns a kwargs dict ready to splat into the base model constructor.
+        Subclasses use this to avoid re-implementing validation/derivation —
+        they call `cls._base_kwargs(**base_cls_kwargs)` and merge in their
+        own extra fields.
+        """
         word_assignments_tuple = tuple(word_assignments)
         _validate_inputs(
             corr=corr,
@@ -187,7 +203,7 @@ class BagOfWordsDatasetConfig(BaseConfig):
             aux_words_ratio=aux_words_ratio,
             word_decay_power=word_decay_power,
         )
-        return cls(
+        return dict(
             corr=corr,
             num_train_samples=num_train_samples,
             num_val_samples=num_val_samples,
@@ -200,45 +216,56 @@ class BagOfWordsDatasetConfig(BaseConfig):
             unnormalized_signal_std=std,
         )
 
-    def write_to(self, *, folder: Path):
+    @classmethod
+    def initialize(cls, **base_cls_kwargs) -> "BagOfWordsDatasetConfig":
+        """See `_base_kwargs` for accepted kwargs."""
+        return cls(**cls._base_kwargs(**base_cls_kwargs))
+
+    def _compute_split(
+        self, *, split: str, rng: np.random.Generator
+    ) -> "BagOfWordsDatasetConfig.SplitArtifact":
         """
-        Writes train.parquet, val.parquet, and config.json to folder.
-        Each parquet has columns: "prompt" (space-separated words), "target" (float).
+        Sample prompts and compute (signal, target) for one split.
 
         Per-token mean is identically 0 by construction (symmetric word_values
         and symmetric power-law density), so normalization drops the mean term:
             raw    = sum of prompt word values
             signal = raw / (sqrt(L)·σ) · corr
-            target = signal + N(0, sqrt(1 - corr²))
+            target = signal + N(0, sqrt(1 - corr²))   (homoskedastic)
         """
-        folder.mkdir(parents=True, exist_ok=True)
+        n = {"train": self.num_train_samples, "val": self.num_val_samples}[split]
         words = list(self.word_density)
         probs = np.array([self.word_density[word] for word in words], dtype=float)
         vals = np.array([self.word_values[word] for word in words], dtype=float)
         vocab = np.asarray(words, dtype=object)
 
-        rng = np.random.default_rng()
+        idx = rng.choice(len(words), size=(n, self.prompt_length), p=probs)
+        raw = vals[idx].sum(axis=1)
+        signal = (
+            raw
+            / ((self.prompt_length**0.5) * self.unnormalized_signal_std)
+            * self.corr
+        )
         noise_std = (1 - self.corr**2) ** 0.5
+        targets = signal + rng.normal(0, noise_std, size=n)
+        prompts = [" ".join(vocab[row]) for row in idx]
+        return self.SplitArtifact(prompts=prompts, signal=signal, targets=targets)
 
-        for split, n in [
-            ("train", self.num_train_samples),
-            ("val", self.num_val_samples),
-        ]:
-            idx = rng.choice(len(words), size=(n, self.prompt_length), p=probs)
-            raw = vals[idx].sum(axis=1)
-            signal = (
-                raw
-                / ((self.prompt_length**0.5) * self.unnormalized_signal_std)
-                * self.corr
-            )
-            targets = signal + rng.normal(0, noise_std, size=n)
-            prompts = [" ".join(vocab[row]) for row in idx]
+    def write_to(self, *, folder: Path):
+        """
+        Writes train.parquet, val.parquet, and config.json to folder.
+        Each parquet has columns: "prompt" (space-separated words), "target" (float),
+        "signal" (float).
+        """
+        folder.mkdir(parents=True, exist_ok=True)
+        rng = np.random.default_rng()
+        for split in ("train", "val"):
+            out = self._compute_split(split=split, rng=rng)
             pl.DataFrame({
-                "prompt": prompts,
-                "target": targets,
-                "signal": signal,
+                "prompt": out.prompts,
+                "target": out.targets,
+                "signal": out.signal,
             }).write_parquet(folder / f"{split}.parquet")
-
         (folder / "config.json").write_text(self.model_dump_json())
 
     @classmethod
@@ -247,28 +274,10 @@ class BagOfWordsDatasetConfig(BaseConfig):
         return cls.model_validate_json((path / "config.json").read_text())
 
     @classmethod
-    def init_or_load_from(
-        cls,
-        *,
-        folder: Path,
-        corr: float,
-        num_train_samples: int,
-        num_val_samples: int,
-        prompt_length: int,
-        word_assignments: list[str],
-        aux_words_ratio: float,
-        word_decay_power: float,
+    def _write_or_reuse(
+        cls, *, folder: Path, config: "BagOfWordsDatasetConfig"
     ) -> "BagOfWordsDatasetConfig":
-        config = cls.initialize(
-            corr=corr,
-            num_train_samples=num_train_samples,
-            num_val_samples=num_val_samples,
-            prompt_length=prompt_length,
-            word_assignments=word_assignments,
-            aux_words_ratio=aux_words_ratio,
-            word_decay_power=word_decay_power,
-        )
-
+        """Reuse the cached dataset at `folder` if it matches, else (re)generate."""
         config_path = folder / "config.json"
         required_paths = (folder / "train.parquet", folder / "val.parquet")
         if config_path.exists():
@@ -279,6 +288,12 @@ class BagOfWordsDatasetConfig(BaseConfig):
                 print("Cached config mismatch — re-generating dataset.")
             else:
                 print("Cached dataset files missing — re-generating dataset.")
-
         config.write_to(folder=folder)
         return config
+
+    @classmethod
+    def init_or_load_from(
+        cls, *, folder: Path, **init_kwargs
+    ) -> "BagOfWordsDatasetConfig":
+        """Thin wrapper: kwargs forward to `cls.initialize` (subclasses override it)."""
+        return cls._write_or_reuse(folder=folder, config=cls.initialize(**init_kwargs))

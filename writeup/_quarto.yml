@@ -20,8 +20,9 @@ website:
 format:
   html:
     theme: default
+    css: styles.css
     toc: true
-    toc-depth: 3
+    toc-depth: 4
 
 execute:
   echo: false

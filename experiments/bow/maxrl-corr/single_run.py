@@ -3,9 +3,10 @@ Single MaxRL training run on the bag-of-words task.
 
 Usage:
     uv run python experiments/bow/maxrl-corr/single_run.py \
-        --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0
+        --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0 \
+        --subtract-baseline
 
-Artifacts -> artifacts/bow-maxrl-sweep/seed-{S}/rollouts-{N}/{dataset_name}/
+Artifacts -> artifacts/bow-maxrl-sweep/seed-{S}/rollouts-{N}/{baseline_mode}/{dataset_name}/
 """
 
 import gc
@@ -31,6 +32,12 @@ AUX_WORDS_RATIO = 0.5
 GAUSSIAN_STDEV = 1.0
 
 
+def baseline_mode_folder(*, subtract_baseline: bool) -> str:
+    if subtract_baseline:
+        return "subtract-baseline"
+    return "no-subtract-baseline"
+
+
 def cleanup_cuda(device: torch.device) -> None:
     gc.collect()
     if device.type != "cuda":
@@ -47,18 +54,23 @@ def cleanup_cuda(device: torch.device) -> None:
 @click.option("--seed", type=int, required=True)
 @click.option("--device", type=str, required=True)
 @click.option("--train-epochs", type=int, default=20, show_default=True)
+@click.option("--subtract-baseline/--no-subtract-baseline", required=True)
 def main(
     corr: float,
     num_rollouts: int,
     seed: int,
     device: str,
     train_epochs: int,
+    subtract_baseline: bool,
 ) -> None:
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
-    study_base = STUDY_BASE / f"seed-{seed}" / f"rollouts-{num_rollouts}"
+    baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)
+    study_base = (
+        STUDY_BASE / f"seed-{seed}" / f"rollouts-{num_rollouts}" / baseline_mode
+    )
     torch_device = torch.device(device)
 
     config = BagOfWordsMaxRLConfig.get_canonical(
@@ -69,8 +81,12 @@ def main(
         train_epochs=train_epochs,
         num_rollouts_per_sample=num_rollouts,
         gaussian_stdev=GAUSSIAN_STDEV,
+        subtract_baseline=subtract_baseline,
     )
-    tag = f"seed={seed} corr={corr:.4f} rollouts={num_rollouts}"
+    tag = (
+        f"seed={seed} corr={corr:.4f} rollouts={num_rollouts} "
+        f"baseline={baseline_mode}"
+    )
     study_folder = config.study_folder
 
     if BagOfWordsAnalysisConfig.is_study_complete(study_folder):

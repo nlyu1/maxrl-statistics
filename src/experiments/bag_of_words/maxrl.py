@@ -27,7 +27,10 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
 
     num_rollouts_per_sample: int
     degree: int
+    # Please note that this Gaussian stdev denotes the mode's implied
+    # distribution's Gaussian stdev, **not the data's Gaussian stdev**.
     gaussian_stdev: float
+    subtract_baseline: bool
 
     def get_state_cls(self) -> type["BagOfWordsMaxRLState"]:
         return BagOfWordsMaxRLState
@@ -38,6 +41,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
         *,
         num_rollouts_per_sample: int,
         gaussian_stdev: float,
+        subtract_baseline: bool,
         **kwargs: object,
     ) -> "BagOfWordsMaxRLConfig":
         assert num_rollouts_per_sample >= 1
@@ -47,6 +51,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
             num_rollouts_per_sample=num_rollouts_per_sample,
             degree=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,
+            subtract_baseline=subtract_baseline,
         )
         config.prepare_study_folder()
         return config
@@ -77,6 +82,7 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
         estimator_config = MaxRLEstimatorConfig.initialize(
             degree=self.config.degree,
             sup_likelihood=sup_likelihood,
+            subtract_baseline=self.config.subtract_baseline,
         )
         with torch.no_grad():
             rollouts_f = rollouts.float()
@@ -84,9 +90,9 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
             log_target_likelihoods: Float[Tensor, "batch rollout"] = -0.5 * (
                 (target_f.unsqueeze(-1) - rollouts_f) / sigma
             ).pow(2) + math.log(sup_likelihood)
-        return estimator_config.compute_log_score_weights(
+        return estimator_config.compute_score_weights(
             log_likelihoods=log_target_likelihoods,
-        ).exp()
+        )
 
     def train_step(
         self,
