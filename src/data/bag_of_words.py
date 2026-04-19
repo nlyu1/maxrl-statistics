@@ -42,12 +42,12 @@ canonical_bags: dict[int, list[str]] = {
     ],
 }
 
-# 15 corrs over [0.01, 1.0], weighted 1/4 toward uniform covering and 3/4
+# 16 corrs over [0.01, 1.0], weighted 1/4 toward uniform covering and 3/4
 # toward log-spacing to densely sample the low-ρ learnability transition.
 # i.e. candidate_corrs[i] = round(0.25 * linspace[i] + 0.75 * geomspace[i], 2)
 candidate_corrs: list[float] = [
-    0.01, 0.03, 0.05, 0.08, 0.10, 0.13, 0.16, 0.20,
-    0.25, 0.31, 0.38, 0.48, 0.60, 0.77, 1.00,
+    0.01, 0.03, 0.05, 0.07, 0.09, 0.12, 0.15, 0.18,
+    0.22, 0.27, 0.33, 0.40, 0.50, 0.62, 0.79, 1.00,
 ]
 
 # Canonical number of rollouts to try
