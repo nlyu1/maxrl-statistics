@@ -51,8 +51,6 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
 class BagOfWordsGRPOState(BagOfWordsStudyBaseState):
-    last_pred_norm: float = 0.0
-
     def compute_last_step_projections(
         self,
         *,
@@ -124,7 +122,6 @@ class BagOfWordsGRPOState(BagOfWordsStudyBaseState):
             loss = -(logp_rollouts * advantages.detach()).mean()
 
             with torch.no_grad():
-                self.last_pred_norm = float(prediction.detach().float().norm().cpu())
                 pred_cpu = prediction.detach().float().cpu()[:, None]
                 self.train_corr_target_counter.tick(
                     x=pred_cpu,
@@ -157,7 +154,6 @@ class BagOfWordsGRPOState(BagOfWordsStudyBaseState):
             pbar.set_postfix(
                 train_corr_target=f"{train_corr_target:.4f}",
                 train_corr_ground_truth=f"{train_corr_ground_truth:.4f}",
-                pred_norm=f"{self.last_pred_norm:.4f}",
             )
 
     def run_training(self) -> None:

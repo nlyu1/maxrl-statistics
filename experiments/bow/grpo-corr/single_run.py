@@ -8,13 +8,9 @@ Usage:
 Artifacts → artifacts/bow-grpo-sweep/seed-{S}/rollouts-{N}/{dataset_name}/
 """
 
-import gc
-import random
-import shutil
 import sys
 
 import click
-import numpy as np
 import torch
 
 from src import chdir_repo_base, get_repo_base
@@ -22,23 +18,13 @@ from src import chdir_repo_base, get_repo_base
 chdir_repo_base()
 repo_root = get_repo_base()
 
-from src.experiments.bag_of_words.analysis import BagOfWordsAnalysisConfig  # noqa: E402
 from src.experiments.bag_of_words.grpo import BagOfWordsGRPOConfig  # noqa: E402
+from src.experiments.utils import cleanup_cuda, prepare_study_folder, set_seeds  # noqa: E402
 
 STUDY_BASE = repo_root / "artifacts" / "bow-grpo-sweep"
 DATA_BASE = repo_root / "artifacts" / "bow-data"
 AUX_WORDS_RATIO = 0.5
 GAUSSIAN_STDEV = 1.0
-
-
-def cleanup_cuda(device: torch.device) -> None:
-    gc.collect()
-    if device.type != "cuda":
-        return
-    with torch.cuda.device(device):
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
-    torch.compiler.reset()
 
 
 @click.command()
@@ -54,9 +40,7 @@ def main(
     device: str,
     train_epochs: int,
 ) -> None:
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+    set_seeds(seed)
 
     study_base = STUDY_BASE / f"seed-{seed}" / f"rollouts-{num_rollouts}"
     torch_device = torch.device(device)
@@ -73,12 +57,8 @@ def main(
     tag = f"seed={seed} corr={corr:.4f} rollouts={num_rollouts}"
     study_folder = config.study_folder
 
-    if BagOfWordsAnalysisConfig.is_study_complete(study_folder):
-        print(f"!!! {tag} already complete, skipping ({study_folder})")
+    if not prepare_study_folder(study_folder=study_folder, tag=tag):
         sys.exit(0)
-    if BagOfWordsAnalysisConfig.has_study_started(study_folder):
-        print(f"=== {tag} partial → wiping {study_folder} ===")
-        shutil.rmtree(study_folder)
 
     print(f"=== {tag}  folder={study_folder} ===")
     state = None

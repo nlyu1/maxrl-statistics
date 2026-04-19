@@ -36,6 +36,19 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
     def get_state_cls(self) -> type["BagOfWordsMaxRLState"]:
         return BagOfWordsMaxRLState
 
+    def _build_estimator_config(self) -> MaxRLEstimatorConfig:
+        sigma = self.gaussian_stdev
+        assert sigma > 0.0
+        sup_likelihood = 1.0 / (math.sqrt(2.0 * math.pi) * sigma)
+        return MaxRLEstimatorConfig.initialize(
+            degree=self.degree,
+            sup_likelihood=sup_likelihood,
+            subtract_baseline=self.subtract_baseline,
+        )
+
+    def _extra_state_kwargs(self) -> dict:
+        return {"estimator_config": self._build_estimator_config()}
+
     @classmethod
     def get_canonical(
         cls,
@@ -60,7 +73,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
 class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
-    last_pred_norm: float = 0.0
+    estimator_config: MaxRLEstimatorConfig
 
     def compute_last_step_projections(
         self,
@@ -78,20 +91,13 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
         target: Float[Tensor, "batch"],
     ) -> Float[Tensor, "batch rollout"]:
         sigma = self.config.gaussian_stdev
-        assert sigma > 0.0
-        sup_likelihood = 1.0 / (math.sqrt(2.0 * math.pi) * sigma)
-        estimator_config = MaxRLEstimatorConfig.initialize(
-            degree=self.config.degree,
-            sup_likelihood=sup_likelihood,
-            subtract_baseline=self.config.subtract_baseline,
-        )
         with torch.no_grad():
             rollouts_f = rollouts.float()
             target_f = target.float()
             log_target_likelihoods: Float[Tensor, "batch rollout"] = -0.5 * (
                 (target_f.unsqueeze(-1) - rollouts_f) / sigma
-            ).pow(2) + math.log(sup_likelihood)
-        return estimator_config.compute_score_weights(
+            ).pow(2) + math.log(self.estimator_config.sup_likelihood)
+        return self.estimator_config.compute_score_weights(
             log_likelihoods=log_target_likelihoods,
         )
 
@@ -153,7 +159,6 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
             loss = -(logp_rollouts * score_weights.detach()).mean()
 
             with torch.no_grad():
-                self.last_pred_norm = float(prediction.detach().float().norm().cpu())
                 pred_cpu = prediction.detach().float().cpu()[:, None]
                 self.train_corr_target_counter.tick(
                     x=pred_cpu,
@@ -186,7 +191,6 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
             pbar.set_postfix(
                 train_corr_target=f"{train_corr_target:.4f}",
                 train_corr_ground_truth=f"{train_corr_ground_truth:.4f}",
-                pred_norm=f"{self.last_pred_norm:.4f}",
             )
 
     def run_training(self) -> None:

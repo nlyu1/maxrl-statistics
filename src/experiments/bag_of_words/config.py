@@ -137,11 +137,11 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
 
         return BagOfWordsStudyBaseState
 
-    def initialize(
+    def _build_common_state_kwargs(
         self,
         *,
         device: torch.device,
-    ) -> BagOfWordsStudyBaseState:
+    ) -> dict:
         torch.set_float32_matmul_precision("medium")
         self.prepare_study_folder()
         dataset = self.tokenization.init_or_load_dataset()
@@ -157,7 +157,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             if self.compile_model and device.type == "cuda":
                 model = torch.compile(model, mode=self.compile_mode)
 
-        return self.get_state_cls()(
+        return dict(
             config=self,
             model=model,
             optimizer=optimizer,
@@ -166,3 +166,15 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             val_dl=val_dl,
             device=device,
         )
+
+    def _extra_state_kwargs(self) -> dict:
+        """Subclass hook: extra kwargs appended to the state constructor call."""
+        return {}
+
+    def initialize(
+        self,
+        *,
+        device: torch.device,
+    ) -> BagOfWordsStudyBaseState:
+        common = self._build_common_state_kwargs(device=device)
+        return self.get_state_cls()(**common, **self._extra_state_kwargs())
