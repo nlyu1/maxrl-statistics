@@ -53,12 +53,92 @@ $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$
 
 ### Row-level heteroskedasticity (unlearnable)
 
-...
+See [`src/data/heterogeneous_bag_of_words.py`]({{< var repo_url >}}/src/data/heterogeneous_bag_of_words.py) (`RowHeterogeneousBagOfWordsDatasetConfig`).
+
+Row $i$ is assigned a stratified hardness quantile $u_i \in (0, 1)$ (uniformly permuted) and a **median-pegged exponential** noise multiplier
+$$
+\tilde a(u) = 2^{(u - 1/2) \,/\, h_{\text{row}}}, \qquad
+a_i = \tilde a(u_i) \,/\, \sqrt{\mathbb{E}_u[\tilde a(u)^2]},
+$$
+where $h_{\text{row}}$ = `snr_halflife_in_quantile` is the quantile distance over which SNR halves. The RMS normalization fixes $\mathbb{E}[a_i^2] = 1$, so the target model
+$$
+\text{target}_i = \text{signal}_i + \sqrt{1-\rho^2}\, a_i\, \varepsilon_i
+$$
+preserves the **global** correlation $\text{Corr}(\text{signal}, \text{target}) = \rho$ while inducing a per-row conditional correlation
+$$
+\rho_i \;=\; \frac{\rho}{\sqrt{\rho^2 + (1-\rho^2)\, a_i^2}}.
+$$
+Nothing in the prompt identifies $a_i$, so the model cannot route capacity to easy rows — hence *unlearnable*: the schedule controls the spread of $\rho_i$ around $\rho$ but the optimal predictor is still the marginal conditional mean.
+
+At small $h_{\text{row}}$, a few rows are essentially noiseless and most are very hard; at $h_{\text{row}} \gtrsim 2$ the per-row distribution collapses toward the homogeneous case.
+
+```{=html}
+<script>
+window.fitScaledIframeContainer = window.fitScaledIframeContainer || function(frame) {
+  const iframe = frame.querySelector("iframe");
+  const sourceWidth = Number(frame.dataset.sourceWidth);
+  const sourceHeight = Number(frame.dataset.sourceHeight);
+  if (!iframe || !sourceWidth || !sourceHeight) return;
+  const displayWidth = frame.clientWidth || sourceWidth;
+  const scale = Math.min(1, displayWidth / sourceWidth);
+  frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
+  iframe.style.width = `${sourceWidth}px`;
+  iframe.style.height = `${sourceHeight}px`;
+  iframe.style.transform = `scale(${scale})`;
+};
+window.addEventListener("DOMContentLoaded", () => {
+  const frames = document.querySelectorAll(".scaled-plotly-frame");
+  frames.forEach(window.fitScaledIframeContainer);
+  if ("ResizeObserver" in window) {
+    const obs = new ResizeObserver((es) =>
+      es.forEach((e) => window.fitScaledIframeContainer(e.target))
+    );
+    frames.forEach((f) => obs.observe(f));
+  } else {
+    window.addEventListener("resize", () =>
+      frames.forEach(window.fitScaledIframeContainer)
+    );
+  }
+});
+</script>
+
+<div class="scaled-plotly-frame" data-source-width="900" data-source-height="620">
+  <iframe src="assets/bow/row_heteroskedasticity.html"
+          width="900" height="620" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+*Figure: histogram of per-row $\rho_i$ over 50k samples. Top slider: $h_{\text{row}}$. Bottom slider: global $\rho$ on a log-spaced grid over $[0.01, 1]$.*
 
 ### Word-level heteroskedasticity (learnable)
 
-...
+See [`src/data/heterogeneous_bag_of_words.py`]({{< var repo_url >}}/src/data/heterogeneous_bag_of_words.py) (`SignalHeterogeneousBagOfWordsDatasetConfig`).
 
+Here hardness is tied to **word content**, so it is in principle recoverable from the prompt. Semantic words are ranked by $|v(w)|$ (ties share their average rank, preserving sign symmetry) and assigned a quantile $q(w) \in (0, 1)$; auxiliary words carry zero hardness. The raw per-word multiplier is
+$$
+\tilde a(w) \;=\; \begin{cases} 2^{(q(w) - 1/2)\,/\,h_{\text{word}}} & w \text{ semantic},\\ 0 & w \text{ auxiliary}, \end{cases}
+$$
+with $h_{\text{word}}$ = `snr_halflife_in_word_quantile`. For a prompt $x = (w_1, \dots, w_L)$ the prompt-level multiplier is the per-token RMS
+$$
+\tilde A(x)^2 = \frac{1}{L} \sum_{j=1}^{L} \tilde a(w_j)^2,
+\qquad
+A(x) = \tilde A(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
+$$
+so that $\mathbb{E}[A(x)^2] = 1$ under the prompt distribution. Targets still preserve the global correlation $rho$:
+$$
+\text{target}(x) = \text{signal}(x) + \sqrt{1-\rho^2}\, A(x)\, \varepsilon,
+$$
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="900">
+  <iframe src="assets/bow/word_heteroskedasticity.html"
+          width="1000" height="900" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+*Figure: **(top)** histogram of per-prompt $\rho(x)$ over 50k prompts with $L = 128$; **(bottom)** semantic density $p(w)$ (grey, left axis) against the normalized hardness ratio $a(w) = \tilde a(w) / \sqrt{\mathbb{E}[\tilde a^2]}$ (red, right axis, log).*
 
 ## Experiments
 
