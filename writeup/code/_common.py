@@ -18,8 +18,8 @@ WORD_DECAY_POWER: float = 1.0
 NUM_SEMANTIC_WORDS: int = 15
 RNG_SEED: int = 0
 
-DEFAULT_HALFLIFE: float = 0.5
-DEFAULT_CORR: float = 0.3
+DEFAULT_HALFLIFE: float = 0.15
+DEFAULT_CORR: float = 0.1
 
 
 def default_indices() -> tuple[int, int]:

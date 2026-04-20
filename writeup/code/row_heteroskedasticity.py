@@ -4,9 +4,9 @@ Slider axes:
 - `row_hardness_eta` (9-step canonical visualization grid)
 - `corr` (log-scaled labels, 16 steps over [0.01, 1.0])
 
-`a_i²` is drawn per (eta, corr) cell from the harmonic-beta law and empirically
-renormalized so mean(a_i²) = 1 exactly on the cell. The beta parameters depend
-on both eta and m = corr², so draws cannot be shared across corrs.
+`a_i²` is drawn per (eta, corr) cell from the harmonic-beta law (theoretical
+E[a²] = 1 by construction; no empirical renormalization). The beta parameters
+depend on both eta and corr, so draws cannot be shared across corrs.
 
 Titles carry empirical mean(ρ_j) and max(|target|); visibility and title text
 are coordinated by a JS post-script that reads both sliders, with each trace
@@ -30,7 +30,7 @@ from writeup.code._common import (
 )
 
 ETAS: tuple[float, ...] = (2, 4, 8, 16, 32, 64, 128, 256, 512)
-DEFAULT_ETA: float = 16.0
+DEFAULT_ETA: float = 8.0
 
 OUTPUT = (
     Path(__file__).resolve().parents[1] / "assets" / "bow" / "row_heteroskedasticity.html"
@@ -46,15 +46,6 @@ def default_indices() -> tuple[int, int]:
     return e_idx, c_idx
 
 
-def a_sq_per_cell(
-    *, corr: float, eta: float, rng: np.random.Generator, n: int
-) -> np.ndarray:
-    raw = RowHeterogeneousBagOfWordsDatasetConfig.raw_noise_schedule(
-        corr=corr, row_hardness_eta=eta, rng=rng, n=n,
-    )
-    return raw / np.mean(raw)
-
-
 def build_figure() -> go.Figure:
     e_default, c_default = default_indices()
     edges = np.linspace(0.0, 1.0, 101)
@@ -64,7 +55,9 @@ def build_figure() -> go.Figure:
     fig = go.Figure()
     for i, eta in enumerate(ETAS):
         for j, rho0 in enumerate(CORRS):
-            a_sq = a_sq_per_cell(corr=rho0, eta=eta, rng=rng, n=NUM_SAMPLES)
+            a_sq = RowHeterogeneousBagOfWordsDatasetConfig.sample_noise_variance_multiplier(
+                corr=rho0, row_hardness_eta=eta, rng=rng, n=NUM_SAMPLES,
+            )
             if rho0 >= 1.0:
                 rho = np.ones(NUM_SAMPLES)
             else:

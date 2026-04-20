@@ -168,6 +168,16 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                 grouped[name] = pairs
         return cls.from_grouped(grouped)
 
+    def describe(self, label: str) -> None:
+        """Print a one-line summary: run count, group count, max seeds/group."""
+        n_runs = sum(len(v) for v in self.studies.values())
+        n_groups = len(self.studies)
+        max_seeds = max(len(v) for v in self.studies.values())
+        print(
+            f"{label:<32s}  {n_runs:>4d} runs   {n_groups:>3d} groups   "
+            f"up to {max_seeds} seeds/group"
+        )
+
     def get_metric_dataframe(self) -> pl.DataFrame:
         """Vertical concat of per-(study, seed) metrics.parquet files."""
         frames: list[pl.DataFrame] = []
@@ -385,27 +395,38 @@ class BagOfWordsAnalysisConfig(BaseConfig):
     ) -> go.Figure:
         """Best-epoch (argmax seed-averaged y) vs dataset correlation.
 
-        For GRPO/MaxRL sweeps, one curve per rollouts value. For SL, a single
-        curve. `x_scale="log"` uses a plotly log x-axis on the real corr values.
-        `x_scale="uniform"` places each study at its rank in
+        For GRPO/MaxRL sweeps, one curve per rollouts value — by default only
+        rollouts in `_DEFAULT_VISIBLE_ROLLOUTS` are drawn; the rest start as
+        'legendonly' (click the legend entry to reveal). For SL, a single
+        curve is drawn. `x_scale="log"` uses a plotly log x-axis on the real
+        corr values. `x_scale="uniform"` places each study at its rank in
         `src.data.bag_of_words.candidate_corrs` and labels ticks with the real
         corr values — giving equal visual spacing across the canonical grid.
         """
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
+        curve_groups: list[tuple[str, int | None, list[str]]]
         if rollouts is None:
-            curve_groups: dict[str, list[str]] = {"all": list(self.studies.keys())}
+            curve_groups = [("all", None, list(self.studies.keys()))]
         else:
-            curve_groups = {f"r={r}": names for r, names in rollouts.items()}
+            curve_groups = [(f"r={r}", r, names) for r, names in rollouts.items()]
 
         fig = make_subplots(rows=1, cols=len(y_exprs))
         for col, y_expr in enumerate(y_exprs, start=1):
             y_name = y_expr.meta.output_name()
             evaluated = df.with_columns(y_expr)
             agg_df = self._aggregate_by_epoch(df=evaluated, y_name=y_name)
-            for i, (curve_name, names) in enumerate(curve_groups.items()):
+            for i, (curve_name, r_value, names) in enumerate(curve_groups):
                 color = palette[i % len(palette)]
+                visible_kwargs = (
+                    dict(visible="legendonly")
+                    if (
+                        r_value is not None
+                        and r_value not in self._DEFAULT_VISIBLE_ROLLOUTS
+                    )
+                    else {}
+                )
                 rows: list[tuple[float, float, float, float, int, int, str]] = []
                 for study in names:
                     sub = agg_df.filter(pl.col("study") == study)
@@ -446,6 +467,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                         name=curve_name,
                         legendgroup=curve_name,
                         showlegend=(rollouts is not None) and (col == 1),
+                        **visible_kwargs,
                         line=dict(color=color),
                         marker=dict(color=color),
                         customdata=customdata,

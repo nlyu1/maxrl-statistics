@@ -26,6 +26,7 @@ class MaxRLEstimatorConfig(BaseConfig):
             subtract_baseline=subtract_baseline,
         )
 
+    @torch.compile(mode="reduce-overhead")
     def compute_score_weights(
         self,
         *,

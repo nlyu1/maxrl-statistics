@@ -131,11 +131,11 @@ window.Quarto = {
   </li>  
   <li class="nav-item">
     <a class="nav-link active" href="./bag-of-words.html" aria-current="page"> 
-<span class="menu-text">Bag of Words</span></a>
+<span class="menu-text">Bag of Words (WIP)</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="./dag-reasoning.html"> 
-<span class="menu-text">DAG Reasoning</span></a>
+<span class="menu-text">DAG Reasoning (Empty)</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -153,9 +153,10 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#dataset" id="toc-dataset" class="nav-link active" data-scroll-target="#dataset">Dataset</a>
+  <li><a href="#tl-dr" id="toc-tl-dr" class="nav-link active" data-scroll-target="#tl-dr">TL; DR</a></li>
+  <li><a href="#dataset" id="toc-dataset" class="nav-link" data-scroll-target="#dataset">Dataset</a>
   <ul>
-  <li><a href="#homogeneous-version" id="toc-homogeneous-version" class="nav-link" data-scroll-target="#homogeneous-version">Homogeneous version</a></li>
+  <li><a href="#homogeneous-baseline" id="toc-homogeneous-baseline" class="nav-link" data-scroll-target="#homogeneous-baseline">Homogeneous baseline</a></li>
   <li><a href="#row-level-heteroskedasticity-unlearnable" id="toc-row-level-heteroskedasticity-unlearnable" class="nav-link" data-scroll-target="#row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</a></li>
   <li><a href="#word-level-heteroskedasticity-learnable" id="toc-word-level-heteroskedasticity-learnable" class="nav-link" data-scroll-target="#word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</a></li>
   </ul></li>
@@ -190,16 +191,22 @@ window.Quarto = {
 </header>
 
 
-<p>The bag-of-words (BoW) setup isolates noise-robustness of SL, REINFORCE, GRPO, and MaxRL in a <strong>zero-step rollout</strong> setting: the model sees a single prompt and predicts a scalar target with no sequential reasoning. There are three versions of the dataset:</p>
+<p>The bag-of-words (BoW) setup isolates noise-robustness of SL, GRPO, and MaxRL in a <strong>zero-step rollout</strong> setting: the model sees a single prompt and predicts a scalar target with no sequential reasoning. There are three versions of the dataset:</p>
 <ol type="1">
 <li><strong>Homogeneous hardness</strong>: a single, global signal-to-target corr <span class="math inline">\(\rho\)</span>.</li>
-<li><strong>Unlearnable heteroskedasticity</strong>: global signal corr <span class="math inline">\(\rho\)</span>, together with a random by-row noise skew.</li>
-<li><strong>Learnable heteroskedasticity</strong>: global signal corr <span class="math inline">\(\rho\)</span>, and a learnable, by-semantic-word noise skew.</li>
+<li><strong>Unlearnable heteroskedasticity</strong>: global signal corr <span class="math inline">\(\rho\)</span>; random by-row noise variability.</li>
+<li><strong>Learnable heteroskedasticity</strong>: global signal corr <span class="math inline">\(\rho\)</span>; semantically learnable by-semantic-word noise variability (some words are harder to learn than others).</li>
 </ol>
+<section id="tl-dr" class="level3">
+<h3 class="anchored" data-anchor-id="tl-dr">TL; DR</h3>
+<ol type="1">
+<li>We didn’t find SL and GRPO (by corollary, MaxRL) different</li>
+</ol>
+</section>
 <section id="dataset" class="level2">
 <h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
-<section id="homogeneous-version" class="level3">
-<h3 class="anchored" data-anchor-id="homogeneous-version">Homogeneous version</h3>
+<section id="homogeneous-baseline" class="level3">
+<h3 class="anchored" data-anchor-id="homogeneous-baseline">Homogeneous baseline</h3>
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/bag_of_words.py"><code>src/data/bag_of_words.py</code></a>.</p>
 <p>Each prompt is <span class="math inline">\(L\)</span> words sampled iid from a mixture of <strong>semantic words</strong>, which carries signal, and <strong>auxiliary words</strong>, which are pure fillers. The target is a noise-corrupted linear function of word content, parameterized by the correlation between signal and target <span class="math inline">\(\rho \in (0, 1]\)</span>.</p>
 <p><strong>7-word vocabulary.</strong> Semantic words map to integer values centered at zero:</p>
@@ -268,12 +275,35 @@ window.Quarto = {
 </section>
 <section id="row-level-heteroskedasticity-unlearnable" class="level3">
 <h3 class="anchored" data-anchor-id="row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</h3>
-<p>The first heteroskedastic variant has unlearnable per-sample hardness: sample <span class="math inline">\(i\)</span> is assigned a stratified hardness quantile <span class="math inline">\(u_i \in (0, 1)\)</span> (uniformly permuted) and a <strong>median-pegged exponential</strong> noise multiplier <span class="math display">\[
-\tilde a(u) = 2^{(u - 1/2) \,/\, h_{\text{row}}}, \qquad
-a_i = \tilde a(u_i) \,/\, \sqrt{\mathbb{E}_u[\tilde a(u)^2]},
-\]</span> where <span class="math inline">\(h_{\text{row}}\)</span> = <code>snr_halflife_in_quantile</code> is the quantile distance over which SNR halves. The RMS normalization fixes <span class="math inline">\(\mathbb{E}[a_i^2] = 1\)</span>, so the target model <span class="math display">\[
+<p>The row-level heteroskedastic variant has unlearnable per-sample hardness. We parameterize the label as follows: fixing a global signal-to-target correlation budget <span class="math inline">\(\rho \in [0, 1]\)</span>, we parameterize <span class="math display">\[
 \text{target}_i = \text{signal}_i + \sqrt{1-\rho^2}\, a_i\, \varepsilon_i
-\]</span> preserves the <strong>global</strong> correlation <span class="math inline">\(\text{Corr}(\text{signal}, \text{target}) = \rho\)</span>.</p>
+\]</span> So long as we choose <span class="math inline">\(\mathbb E[a_j^2] = 1\)</span>, we can satisfy the global correlation budget while varying the by-sample correlation (hardness).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Details on per-sample noise v. signal distribution
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-2" class="callout-2-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The per-sample local correlation is <span class="math display">\[
+  \rho_j = \dfrac{\rho}{\sqrt{\rho^2 + (1-\rho^2) a_j^2}} \in [0, 1] \iff
+  a_j^2 = \dfrac{\rho^2}{1-\rho^2}\Big(\dfrac{1}{\rho_j^2} - 1\Big)
+\]</span> The budget <span class="math inline">\(\mathbb E[a_j^2] = 1\)</span> becomes the harmonic-mean constraint <span class="math inline">\(\mathbb E[1/\rho_j^2] = 1/\rho^2\)</span>.</p>
+<p>Because <span class="math inline">\(\rho_j\)</span> is bounded, a natural candidate is to draw the variance <span class="math inline">\(\rho_j^2 \sim \mathrm{Beta}(\alpha, \beta)\)</span>; this reads <span class="math inline">\((\alpha + \beta - 1)/(\alpha - 1) = 1/\rho^2\)</span>, pinning <span class="math inline">\(\beta\)</span> from <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\rho\)</span>. Writing <span class="math inline">\(\eta = \alpha - 1 =\)</span> <code>row_hardness_eta</code>, <span class="math display">\[
+  \alpha = 1 + \eta, \qquad \beta = \eta\,(1 - \rho^2)\,/\,\rho^2,
+\]</span> leaves one concentration knob. Substituting into the stock Beta variance gives <span class="math display">\[
+  \mathrm{Var}(\rho_j^2) \;=\; \dfrac{\alpha\,\beta}{(\alpha + \beta)^2\,(\alpha + \beta + 1)}
+  \;=\; \dfrac{(1+\eta)\,\eta\,(1-\rho^2)\,\rho^4}{(\rho^2 + \eta)^2\,(2\rho^2 + \eta)}
+  \;\xrightarrow{\eta \to \infty}\; \dfrac{(1-\rho^2)\,\rho^4}{\eta}.
+\]</span> We require <span class="math inline">\(\eta &gt; 1\)</span> so that the inverted <span class="math inline">\(a_j^2\)</span> has finite population variance.</p>
+</div>
+</div>
+</div>
 <script>
 window.fitScaledIframeContainer = window.fitScaledIframeContainer || function(frame) {
   const iframe = frame.querySelector("iframe");
@@ -309,15 +339,31 @@ window.addEventListener("DOMContentLoaded", () => {
 </section>
 <section id="word-level-heteroskedasticity-learnable" class="level3">
 <h3 class="anchored" data-anchor-id="word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</h3>
-<p>We propose another heteroskedastic variation where hardness is tied to <strong>word content</strong>, so it is in principle recoverable from the prompt. Semantic words are ranked by <span class="math inline">\(|v(w)|\)</span> (ties share their average rank, preserving sign symmetry) and assigned a quantile <span class="math inline">\(q(w) \in (0, 1)\)</span>; auxiliary words carry zero hardness. The raw per-word multiplier is <span class="math display">\[
+<p>We propose another heteroskedastic variation where hardness is tied to <strong>word content</strong>, so it is in principle recoverable from the prompt. Semantic words are ranked by <span class="math inline">\(|v(w)|\)</span> and assigned a quantile <span class="math inline">\(q(w) \in (0, 1)\)</span>; auxiliary words carry zero hardness. The dataset is parameterized by global signal-to-target correlation <span class="math inline">\(\rho\)</span>, and a difficulty skew <code>snr_halflife_in_word_quantile</code></p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Construction details
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The raw per-word multiplier is <span class="math display">\[
 \tilde a(w) \;=\; \begin{cases} 2^{(q(w) - 1/2)\,/\,h_{\text{word}}} &amp; w \text{ semantic},\\ 0 &amp; w \text{ auxiliary}, \end{cases}
 \]</span> with <span class="math inline">\(h_{\text{word}}\)</span> = <code>snr_halflife_in_word_quantile</code>. For a prompt <span class="math inline">\(x = (w_1, \dots, w_L)\)</span> the prompt-level multiplier is the per-token RMS <span class="math display">\[
-\tilde A(x)^2 = \frac{1}{L} \sum_{j=1}^{L} \tilde a(w_j)^2,
+\tilde a(x)^2 = \frac{1}{L} \sum_{j=1}^{L} \tilde a(w_j)^2,
 \qquad
-A(x) = \tilde A(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
-\]</span> so that <span class="math inline">\(\mathbb{E}[A(x)^2] = 1\)</span> under the prompt distribution. Targets still preserve the global correlation <span class="math inline">\(\rho\)</span>: <span class="math display">\[
-\text{target}(x) = \text{signal}(x) + \sqrt{1-\rho^2}\, A(x)\, \varepsilon,
+a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
+\]</span> so that <span class="math inline">\(\mathbb{E}[a(x)^2] = 1\)</span> under the prompt distribution. Targets still preserve the global correlation <span class="math inline">\(\rho\)</span>: <span class="math display">\[
+\text{target}(x) = \text{signal}(x) + \sqrt{1-\rho^2}\, a(x)\, \varepsilon,
 \]</span></p>
+</div>
+</div>
+</div>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="900">
   <iframe src="assets/bow/word_heteroskedasticity.html" width="1000" height="900" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>

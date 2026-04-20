@@ -13,21 +13,21 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
     The base bag-of-words has homoskedastic noise.
 
     This variant injects **row-level heteroskedastic noise** via the harmonic-beta
-    law on the local squared correlation q_i = rho_i². With m = corr²,
+    law on the local squared correlation q_i = rho_i²:
         α = 1 + row_hardness_eta
-        β = row_hardness_eta · (1 - m) / m
+        β = row_hardness_eta · (1 - corr²) / corr²
         q_i ~ Beta(α, β)
-        ã_i² = m / (1 - m) · (1 / q_i - 1)
-    and the realized split is empirically renormalized to a_i² = ã_i² / mean_i(ã_i²)
-    so that mean_i(a_i²) = 1. This preserves the **global** correlation
-    Corr(signal, target) = corr exactly; per-row local correlation
-    rho_i = corr / sqrt(corr² + (1 - corr²) · a_i²).
+        a_i² = corr² / (1 - corr²) · (1 / q_i - 1)
+    By construction E[a_i²] = 1, so the target model
+        target_i = signal_i + sqrt(1 - corr²) · a_i · ε_i
+    preserves the **global** correlation Corr(signal, target) = corr. Per-row
+    local correlation is rho_i = corr / sqrt(corr² + (1 - corr²) · a_i²).
 
     row_hardness_eta controls the tail of a_i²: small eta → heavy tail (rare
     very hard rows), large eta → near-homogeneous. Require eta > 1 so the
     population variance of a_i² is finite. corr = 0 is disallowed (the
-    harmonic-beta coordinate requires division by m); corr = 1 collapses to a
-    point mass a_i = 1.
+    harmonic-beta coordinate requires division by corr²); corr = 1 collapses
+    to a point mass a_i = 1.
     """
 
     row_hardness_eta: float
@@ -47,7 +47,7 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
         return cls(**base_kwargs, row_hardness_eta=row_hardness_eta)
 
     @classmethod
-    def raw_noise_schedule(
+    def sample_noise_variance_multiplier(
         cls,
         *,
         corr: float,
@@ -56,19 +56,19 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
         n: int,
     ) -> np.ndarray:
         """
-        Draw n samples of ã_i² (pre mean-normalization) from the harmonic-beta
-        law. At corr = 1 the distribution collapses to a point mass at 1.
+        Draw n samples of a_i² from the harmonic-beta law. Population
+        E[a_i²] = 1 by construction; no empirical renormalization is applied.
+        At corr = 1 the distribution collapses to a point mass at 1.
 
-        Pre mean-normalization. Expose it so visualization and writeup scripts
-        can evaluate the same schedule without rebuilding the sampling pipeline.
+        Exposed so visualization and writeup scripts can evaluate the same
+        schedule without rebuilding the sampling pipeline.
         """
         if corr == 1.0:
             return np.ones(n, dtype=float)
-        m = corr**2
         alpha = 1.0 + row_hardness_eta
-        beta = row_hardness_eta * (1.0 - m) / m
-        q_raw = rng.beta(alpha, beta, size=n)
-        return (m / (1.0 - m)) * (1.0 / q_raw - 1.0)
+        beta = row_hardness_eta * (1.0 - corr**2) / corr**2
+        q = rng.beta(alpha, beta, size=n)
+        return (corr**2 / (1.0 - corr**2)) * (1.0 / q - 1.0)
 
     def _compute_split(
         self, *, split: str, rng: np.random.Generator
@@ -85,14 +85,13 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
             raw / ((self.prompt_length**0.5) * self.unnormalized_signal_std) * self.corr
         )
 
-        # Harmonic-beta schedule, empirically renormalized so mean(a²) = 1.
-        a_sq_raw = type(self).raw_noise_schedule(
+        # Harmonic-beta schedule with theoretical E[a²] = 1.
+        a = np.sqrt(type(self).sample_noise_variance_multiplier(
             corr=self.corr,
             row_hardness_eta=self.row_hardness_eta,
             rng=rng,
             n=n,
-        )
-        a = np.sqrt(a_sq_raw / np.mean(a_sq_raw))
+        ))
 
         noise_std_global = (1 - self.corr**2) ** 0.5
         targets = signal + noise_std_global * a * rng.standard_normal(n)
