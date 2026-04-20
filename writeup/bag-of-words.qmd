@@ -191,7 +191,9 @@ This dataset tests the hypothesis:
 </div>
 ```
 
-Note that the x-axis is not uniformly scaled above! Some other findings of interest:
+Note that the x-axis is not uniformly scaled above! Figures will be completed as more experiments complete (sweep undergoing).
+
+Some other findings of interest:
 
 1. From the GRPO graph above: the number of rollouts don't appear to matter that much.
 2. The dataset has desired properties -- we observe overfitting as well as general fitting difficulty as noise increases.
