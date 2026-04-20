@@ -50,7 +50,9 @@ SOURCE_WIDTH = 1000
 SOURCE_HEIGHT = 900
 
 
-def _prepare_vocab() -> tuple[tuple[str, ...], list[str], np.ndarray, dict[str, int]]:
+def _prepare_vocab() -> tuple[
+    tuple[str, ...], list[str], np.ndarray, dict[str, int], dict[str, float]
+]:
     semantic = tuple(canonical_bags[NUM_SEMANTIC_WORDS])
     density, values, _ = _derived_fields(
         word_assignments=semantic,
@@ -59,16 +61,15 @@ def _prepare_vocab() -> tuple[tuple[str, ...], list[str], np.ndarray, dict[str, 
     )
     words = list(density)
     probs = np.array([density[w] for w in words], dtype=float)
-    return semantic, words, probs, values
+    return semantic, words, probs, values, density
 
 
 def per_halflife_stats(
     *,
     halflife: float,
     semantic: tuple[str, ...],
-    words: list[str],
-    probs: np.ndarray,
     values: dict[str, int],
+    density: dict[str, float],
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return `(A_sq, semantic_a_norm)` for one halflife.
@@ -76,22 +77,23 @@ def per_halflife_stats(
     `A_sq[n]` is the RMS-normalized prompt variance multiplier (50k prompts);
     `semantic_a_norm[w]` is the per-semantic-word normalized hardness.
     """
-    mults = SignalHeterogeneousBagOfWordsDatasetConfig.word_multipliers(
-        word_assignments=semantic,
-        word_values=values,
-        snr_halflife_in_word_quantile=halflife,
+    A_sq, normalized_mults = (
+        SignalHeterogeneousBagOfWordsDatasetConfig.sample_prompt_variance_multiplier(
+            word_assignments=semantic,
+            word_values=values,
+            word_density=density,
+            snr_halflife_in_word_quantile=halflife,
+            prompt_length=PROMPT_LENGTH,
+            n=NUM_SAMPLES,
+            rng=rng,
+        )
     )
-    tilde_a = np.array([mults[w] for w in words], dtype=float)
-    expected_sq = float((probs * tilde_a**2).sum())
-    idx = rng.choice(len(words), size=(NUM_SAMPLES, PROMPT_LENGTH), p=probs)
-    A_sq = (tilde_a[idx] ** 2).mean(axis=1) / expected_sq
-    a_norm = tilde_a / np.sqrt(expected_sq)
-    semantic_a_norm = np.array([a_norm[words.index(w)] for w in semantic])
+    semantic_a_norm = np.array([normalized_mults[w] for w in semantic])
     return A_sq, semantic_a_norm
 
 
 def build_figure() -> go.Figure:
-    semantic, words, probs, values = _prepare_vocab()
+    semantic, words, probs, values, density = _prepare_vocab()
     semantic_density = np.array([probs[words.index(w)] for w in semantic])
     h_default = min(
         range(len(WORD_HALFLIVES)),
@@ -104,10 +106,10 @@ def build_figure() -> go.Figure:
         rows=2,
         cols=1,
         row_heights=[0.5, 0.5],
-        vertical_spacing=0.08,
+        vertical_spacing=0.10,
         specs=[[{}], [{"secondary_y": True}]],
         subplot_titles=(
-            "Per-prompt correlation",
+            "per-prompt corr(signal, target)",
             "Semantic-word density vs normalized hardness",
         ),
     )
@@ -120,15 +122,30 @@ def build_figure() -> go.Figure:
         A_sq, semantic_a_norm = per_halflife_stats(
             halflife=h,
             semantic=semantic,
-            words=words,
-            probs=probs,
             values=values,
+            density=density,
             rng=rng,
         )
         hardness_by_halflife.append(semantic_a_norm)
         for j, rho0 in enumerate(CORRS):
-            rho = rho0 / np.sqrt(rho0**2 + (1 - rho0**2) * A_sq)
+            if rho0 >= 1.0:
+                rho = np.ones(NUM_SAMPLES)
+            else:
+                rho = rho0 / np.sqrt(rho0**2 + (1 - rho0**2) * A_sq)
+            signal = rng.normal(0.0, rho0, size=NUM_SAMPLES)
+            noise = (
+                np.sqrt(max(1 - rho0**2, 0.0))
+                * np.sqrt(A_sq)
+                * rng.standard_normal(NUM_SAMPLES)
+            )
+            target = signal + noise
+            mean_rho = float(np.mean(rho))
+            max_abs_target = float(np.max(np.abs(target)))
             counts, _ = np.histogram(rho, bins=edges)
+            title = (
+                "per-prompt corr(signal, target) — "
+                f"mean(ρ_j)={mean_rho:.3f}, max|target|={max_abs_target:.2f}"
+            )
             fig.add_trace(
                 go.Bar(
                     x=centers,
@@ -138,7 +155,7 @@ def build_figure() -> go.Figure:
                     marker=dict(color="#2e6fb7"),
                     showlegend=False,
                     hovertemplate="rho=%{x:.2f}<br>count=%{y}<extra></extra>",
-                    meta=dict(kind="hist", h=i, c=j),
+                    meta=dict(kind="hist", h=i, c=j, title=title),
                 ),
                 row=1,
                 col=1,
@@ -243,7 +260,7 @@ def main() -> None:
         OUTPUT,
         include_plotlyjs="cdn",
         full_html=True,
-        post_script=coordinated_slider_js(),
+        post_script=coordinated_slider_js(title_path="annotations[0].text"),
     )
     print(f"wrote {OUTPUT} (source {SOURCE_WIDTH}x{SOURCE_HEIGHT})")
 

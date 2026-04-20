@@ -6,8 +6,8 @@ barrier between seeds. The rollout axis is partitioned across devices, and each
 device traverses the full corr list.
 
 Usage:
-    uv run python experiments/bow/maxrl-corr/orchestrate.py --subtract-baseline
-    uv run python experiments/bow/maxrl-corr/orchestrate.py --subtract-baseline --dry-run
+    uv run python experiments/bow/maxrl-corr/orchestrate.py --subtract-baseline True
+    uv run python experiments/bow/maxrl-corr/orchestrate.py --subtract-baseline True --dry-run
 """
 
 import subprocess
@@ -69,9 +69,6 @@ def run_jobs(
     subtract_baseline: bool,
 ) -> None:
     device = f"cuda:{device_id}"
-    baseline_flag = "--subtract-baseline"
-    if not subtract_baseline:
-        baseline_flag = "--no-subtract-baseline"
     with log_path.open("ab") as log_fh:
         baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)
         header = (
@@ -94,7 +91,8 @@ def run_jobs(
                 str(seed),
                 "--device",
                 device,
-                baseline_flag,
+                "--subtract-baseline",
+                str(subtract_baseline),
             ]
             tag = (
                 f"[{device} seed={seed} corr={corr} rollouts={num_rollouts} "
@@ -108,7 +106,7 @@ def run_jobs(
 
 @click.command()
 @click.option("--dry-run", is_flag=True, help="Print the planned job lists and exit.")
-@click.option("--subtract-baseline/--no-subtract-baseline", required=True)
+@click.option("--subtract-baseline", type=bool, required=True)
 def main(dry_run: bool, subtract_baseline: bool) -> None:
     jobs_by_device = {dev: build_jobs(device_id=dev) for dev in (0, 1)}
     baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)

@@ -8,49 +8,67 @@ from src.data.bag_of_words import BagOfWordsDatasetConfig
 
 class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
     """
-    Bag-of-words with median-pegged exponential row-noise heteroskedasticity.
+    Bag-of-words with harmonic-beta row-noise heteroskedasticity.
 
     The base bag-of-words has homoskedastic noise.
 
-    This variant injects **row-level heteroskedastic noise** along a hardness
-    quantile. Each row i is assigned a quantile u_i on a random stratified grid,
-    giving a median-pegged exponential noise-std multiplier
-        ã(u) = 2 ** ((u - 1/2) / snr_halflife_in_quantile)
-    which is then RMS-normalized so E[a²] = 1. This preserves the **global**
-    correlation Corr(signal, target) = corr exactly; per-row local correlation
+    This variant injects **row-level heteroskedastic noise** via the harmonic-beta
+    law on the local squared correlation q_i = rho_i². With m = corr²,
+        α = 1 + row_hardness_eta
+        β = row_hardness_eta · (1 - m) / m
+        q_i ~ Beta(α, β)
+        ã_i² = m / (1 - m) · (1 / q_i - 1)
+    and the realized split is empirically renormalized to a_i² = ã_i² / mean_i(ã_i²)
+    so that mean_i(a_i²) = 1. This preserves the **global** correlation
+    Corr(signal, target) = corr exactly; per-row local correlation
     rho_i = corr / sqrt(corr² + (1 - corr²) · a_i²).
 
-    snr_halflife_in_quantile is the quantile-distance over which SNR halves / doubles.
+    row_hardness_eta controls the tail of a_i²: small eta → heavy tail (rare
+    very hard rows), large eta → near-homogeneous. Require eta > 1 so the
+    population variance of a_i² is finite. corr = 0 is disallowed (the
+    harmonic-beta coordinate requires division by m); corr = 1 collapses to a
+    point mass a_i = 1.
     """
 
-    snr_halflife_in_quantile: float
+    row_hardness_eta: float
 
     @classmethod
     def initialize(
         cls,
         *,
-        snr_halflife_in_quantile: float,
+        row_hardness_eta: float,
         **base_cls_kwargs,
     ) -> Self:
-        if not isfinite(snr_halflife_in_quantile) or snr_halflife_in_quantile <= 0:
-            raise ValueError("snr_halflife_in_quantile must be finite and positive")
-        return cls(
-            **cls._base_kwargs(**base_cls_kwargs),
-            snr_halflife_in_quantile=snr_halflife_in_quantile,
-        )
+        if not isfinite(row_hardness_eta) or row_hardness_eta <= 1:
+            raise ValueError("row_hardness_eta must be finite and > 1")
+        base_kwargs = cls._base_kwargs(**base_cls_kwargs)
+        if base_kwargs["corr"] <= 0:
+            raise ValueError("corr must be > 0 for harmonic-beta heteroskedasticity")
+        return cls(**base_kwargs, row_hardness_eta=row_hardness_eta)
 
     @classmethod
     def raw_noise_schedule(
-        cls, *, quantiles: np.ndarray, snr_halflife_in_quantile: float
+        cls,
+        *,
+        corr: float,
+        row_hardness_eta: float,
+        rng: np.random.Generator,
+        n: int,
     ) -> np.ndarray:
         """
-        Raw median-pegged exponential multiplier ã(u) = 2^((u - 1/2) / halflife).
+        Draw n samples of ã_i² (pre mean-normalization) from the harmonic-beta
+        law. At corr = 1 the distribution collapses to a point mass at 1.
 
-        Pre RMS-normalization. Expose it so visualization and writeup scripts
-        can evaluate the same schedule on any quantile grid without rebuilding
-        the sampling pipeline.
+        Pre mean-normalization. Expose it so visualization and writeup scripts
+        can evaluate the same schedule without rebuilding the sampling pipeline.
         """
-        return 2.0 ** ((quantiles - 0.5) / snr_halflife_in_quantile)
+        if corr == 1.0:
+            return np.ones(n, dtype=float)
+        m = corr**2
+        alpha = 1.0 + row_hardness_eta
+        beta = row_hardness_eta * (1.0 - m) / m
+        q_raw = rng.beta(alpha, beta, size=n)
+        return (m / (1.0 - m)) * (1.0 / q_raw - 1.0)
 
     def _compute_split(
         self, *, split: str, rng: np.random.Generator
@@ -67,12 +85,14 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
             raw / ((self.prompt_length**0.5) * self.unnormalized_signal_std) * self.corr
         )
 
-        # Median-pegged exponential schedule on stratified hardness quantiles.
-        u = (rng.permutation(n) + 0.5) / n
-        tilde_a = type(self).raw_noise_schedule(
-            quantiles=u, snr_halflife_in_quantile=self.snr_halflife_in_quantile
+        # Harmonic-beta schedule, empirically renormalized so mean(a²) = 1.
+        a_sq_raw = type(self).raw_noise_schedule(
+            corr=self.corr,
+            row_hardness_eta=self.row_hardness_eta,
+            rng=rng,
+            n=n,
         )
-        a = tilde_a / np.sqrt(np.mean(tilde_a**2))
+        a = np.sqrt(a_sq_raw / np.mean(a_sq_raw))
 
         noise_std_global = (1 - self.corr**2) ** 0.5
         targets = signal + noise_std_global * a * rng.standard_normal(n)
@@ -171,6 +191,46 @@ class SignalHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
             cumulative += len(group)
         return result
 
+    @classmethod
+    def sample_prompt_variance_multiplier(
+        cls,
+        *,
+        word_assignments: tuple[str, ...],
+        word_values: dict[str, int],
+        word_density: dict[str, float],
+        snr_halflife_in_word_quantile: float,
+        prompt_length: int,
+        n: int,
+        rng: np.random.Generator,
+    ) -> tuple[np.ndarray, dict[str, float]]:
+        """
+        Sample n prompts and return the normalized prompt-level variance
+        multiplier A²(x) alongside the normalized per-word hardness
+        a(w) = ã(w) / sqrt(E_w[ã²]). Both normalizations use the same
+        expected raw variance, so E[A²] = 1 and E_w[a(w)²] = 1 under the
+        word distribution.
+
+        Exposed so visualization and writeup scripts can evaluate the same
+        prompt-level schedule without re-implementing its sampling and
+        normalization.
+        """
+        words = list(word_density)
+        probs = np.array([word_density[w] for w in words], dtype=float)
+        tilde_a_per_word = cls.word_multipliers(
+            word_assignments=word_assignments,
+            word_values=word_values,
+            snr_halflife_in_word_quantile=snr_halflife_in_word_quantile,
+        )
+        tilde_a = np.array([tilde_a_per_word[w] for w in words], dtype=float)
+        expected_tilde_sq = float(np.sum(probs * tilde_a**2))
+        idx = rng.choice(len(words), size=(n, prompt_length), p=probs)
+        A_sq = (tilde_a[idx] ** 2).mean(axis=1) / expected_tilde_sq
+        scale = float(np.sqrt(expected_tilde_sq))
+        normalized_word_hardness = {
+            word: tilde_a_per_word[word] / scale for word in tilde_a_per_word
+        }
+        return A_sq, normalized_word_hardness
+
     def _compute_split(
         self, *, split: str, rng: np.random.Generator
     ) -> "BagOfWordsDatasetConfig.SplitArtifact":
@@ -180,13 +240,6 @@ class SignalHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
         vals = np.array([self.word_values[w] for w in words], dtype=float)
         vocab = np.asarray(words, dtype=object)
 
-        tilde_a_per_word = type(self).word_multipliers(
-            word_assignments=self.word_assignments,
-            word_values=self.word_values,
-            snr_halflife_in_word_quantile=self.snr_halflife_in_word_quantile,
-        )
-        tilde_a = np.array([tilde_a_per_word[w] for w in words], dtype=float)
-
         idx = rng.choice(len(words), size=(n, self.prompt_length), p=probs)
         raw = vals[idx].sum(axis=1)
         signal = (
@@ -194,9 +247,14 @@ class SignalHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
         )
 
         # Prompt-level variance multiplier, RMS-normalized so E[A²] = 1.
+        tilde_a_per_word = type(self).word_multipliers(
+            word_assignments=self.word_assignments,
+            word_values=self.word_values,
+            snr_halflife_in_word_quantile=self.snr_halflife_in_word_quantile,
+        )
+        tilde_a = np.array([tilde_a_per_word[w] for w in words], dtype=float)
         expected_tilde_sq = float(np.sum(probs * tilde_a**2))
-        tilde_A_sq = (tilde_a[idx] ** 2).mean(axis=1)
-        A = np.sqrt(tilde_A_sq / expected_tilde_sq)
+        A = np.sqrt((tilde_a[idx] ** 2).mean(axis=1) / expected_tilde_sq)
 
         noise_std_global = (1 - self.corr**2) ** 0.5
         targets = signal + noise_std_global * A * rng.standard_normal(n)

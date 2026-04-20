@@ -32,25 +32,8 @@ uv run python experiments/bow/grpo-corr/single_run.py \
 # MaxRL: (corr, num_rollouts, seed)
 uv run python experiments/bow/maxrl-corr/single_run.py \
     --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0 \
-    --subtract-baseline
+    --subtract-baseline True
 ```
-
-All single-run scripts accept `--train-epochs INT` (default 20). MaxRL also requires
-exactly one of `--subtract-baseline` or `--no-subtract-baseline`.
-
-## Artifact layout
-
-```
-artifacts/
-├── bow-data/{dataset_name}/                       # parquets, shared across seeds
-├── bow-sl-sweep/seed-{S}/{dataset_name}/
-├── bow-grpo-sweep/seed-{S}/rollouts-{N}/{dataset_name}/
-└── bow-maxrl-sweep/seed-{S}/rollouts-{N}/{baseline_mode}/{dataset_name}/
-```
-
-`{dataset_name} = {W}-words_corr-{c}_len-{L}_pow-{p}_ar-{a}`.
-`{baseline_mode}` is either `subtract-baseline` or `no-subtract-baseline`.
-Each study folder contains `config.json`, `metrics.parquet`, and `{epoch}/validation.parquet`.
 
 ## Sharding strategy
 

@@ -1,6 +1,7 @@
 import json
+import re
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 import plotly.graph_objects as go
 import polars as pl
@@ -20,6 +21,8 @@ _CANONICAL_NUM_WORDS = 7
 _CANONICAL_PROMPT_LENGTH = 128
 _CANONICAL_WORD_DECAY_POWER = 1.0
 _CANONICAL_AUX_WORDS_RATIO = 0.5
+
+_ROLLOUTS_RE = re.compile(r" r=(\d+)")
 
 
 def _dataset_folder_name(*, corr: float) -> str:
@@ -180,15 +183,23 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         stat_cols = [c for c in frames[0].columns if c not in ("study", "seed")]
         return pl.concat(frames).select(["study", "seed", *stat_cols])
 
-    def _aggregate_by_epoch(
-        self, *, df: pl.DataFrame, x_name: str, y_name: str
-    ) -> pl.DataFrame:
-        """Collapse across seed: (study, epoch) -> mean_x, mean_y, min_y, max_y, n_seeds."""
+    def _rollouts_groups(self) -> dict[int, list[str]] | None:
+        """Split studies by the ` r=(\\d+)` suffix. Returns None if any study
+        lacks the suffix (e.g. SL sweeps)."""
+        groups: dict[int, list[str]] = {}
+        for name in self.studies:
+            m = _ROLLOUTS_RE.search(name)
+            if m is None:
+                return None
+            groups.setdefault(int(m.group(1)), []).append(name)
+        return dict(sorted(groups.items()))
+
+    def _aggregate_by_epoch(self, *, df: pl.DataFrame, y_name: str) -> pl.DataFrame:
+        """Collapse across seed: (study, epoch) -> mean_y, min_y, max_y, n_seeds."""
         return (
             df
             .group_by(["study", "epoch"])
             .agg(
-                pl.col(x_name).mean().alias("mean_x"),
                 pl.col(y_name).mean().alias("mean_y"),
                 pl.col(y_name).min().alias("min_y"),
                 pl.col(y_name).max().alias("max_y"),
@@ -197,195 +208,271 @@ class BagOfWordsAnalysisConfig(BaseConfig):
             .sort(["study", "epoch"])
         )
 
-    def _add_per_epoch_traces(
-        self,
-        *,
-        fig: go.Figure,
-        agg: pl.DataFrame,
-        study_colors: dict[str, str],
-        x_name: str,
-        y_name: str,
-        col: int,
-        show_seed_bar: bool,
-    ) -> None:
-        for study in self.studies:
-            sub = agg.filter(pl.col("study") == study).sort("epoch")
-            if sub.is_empty():
-                continue
-            ds_corr = self.study_corrs[study]
-            xs = sub["mean_x"].to_list()
-            ys = sub["mean_y"].to_list()
-            mins = sub["min_y"].to_list()
-            maxs = sub["max_y"].to_list()
-            n_seeds = sub["n_seeds"].to_list()
-            epochs = sub["epoch"].to_list()
-            customdata = [
-                [ds_corr, e, n] for (e, n) in zip(epochs, n_seeds, strict=True)
-            ]
-            error_kwargs = {}
-            if show_seed_bar:
-                error_kwargs = dict(
-                    error_y=dict(
-                        type="data",
-                        symmetric=False,
-                        array=[mx - my for mx, my in zip(maxs, ys, strict=True)],
-                        arrayminus=[my - mn for my, mn in zip(ys, mins, strict=True)],
-                        thickness=1,
-                        width=3,
-                    )
-                )
-            fig.add_trace(
-                go.Scatter(
-                    x=xs,
-                    y=ys,
-                    mode="lines+markers",
-                    name=study,
-                    legendgroup=study,
-                    showlegend=(col == 1),
-                    line=dict(color=study_colors[study]),
-                    marker=dict(color=study_colors[study]),
-                    customdata=customdata,
-                    hovertemplate=(
-                        f"{x_name}: %{{x}}<br>"
-                        f"{y_name}: %{{y}}<br>"
-                        "dataset corr: %{customdata[0]}<br>"
-                        "epoch: %{customdata[1]}<br>"
-                        "n_seeds: %{customdata[2]}"
-                        "<extra>%{fullData.name}</extra>"
-                    ),
-                    **error_kwargs,
-                ),
-                row=1,
-                col=col,
+    @staticmethod
+    def _seed_bar_error_kwargs(
+        *, ys: list[float], mins: list[float], maxs: list[float]
+    ) -> dict:
+        return dict(
+            error_y=dict(
+                type="data",
+                symmetric=False,
+                array=[mx - my for mx, my in zip(maxs, ys, strict=True)],
+                arrayminus=[my - mn for my, mn in zip(ys, mins, strict=True)],
+                thickness=1,
+                width=3,
             )
-
-    def _add_agg_trace(
-        self,
-        *,
-        fig: go.Figure,
-        agg: pl.DataFrame,
-        x_name: str,
-        y_name: str,
-        col: int,
-        argmax: bool,
-        show_seed_bar: bool,
-    ) -> None:
-        # Per study: pick the epoch that argmax/argmin mean_y on the seed-averaged curve.
-        rows: list[tuple[float, float, float, float, float, int, int, str]] = []
-        for study in self.studies:
-            sub = agg.filter(pl.col("study") == study)
-            if sub.is_empty():
-                continue
-            best = sub.sort("mean_y", descending=argmax).head(1)
-            rows.append((
-                best["mean_x"].item(),
-                best["mean_y"].item(),
-                best["min_y"].item(),
-                best["max_y"].item(),
-                self.study_corrs[study],
-                best["epoch"].item(),
-                best["n_seeds"].item(),
-                study,
-            ))
-        rows.sort(key=lambda r: r[4])  # sort by dataset corr for monotone legend
-        xs = [r[0] for r in rows]
-        ys = [r[1] for r in rows]
-        mins = [r[2] for r in rows]
-        maxs = [r[3] for r in rows]
-        customdata = [(r[4], r[5], r[6], r[7]) for r in rows]
-        error_kwargs = {}
-        if show_seed_bar:
-            error_kwargs = dict(
-                error_y=dict(
-                    type="data",
-                    symmetric=False,
-                    array=[mx - my for mx, my in zip(maxs, ys, strict=True)],
-                    arrayminus=[my - mn for my, mn in zip(ys, mins, strict=True)],
-                    thickness=1,
-                    width=3,
-                )
-            )
-        fig.add_trace(
-            go.Scatter(
-                x=xs,
-                y=ys,
-                mode="lines+markers",
-                name=f"{x_name} vs {y_name}",
-                showlegend=False,
-                customdata=customdata,
-                hovertemplate=(
-                    f"{x_name}: %{{x}}<br>"
-                    f"{y_name}: %{{y}}<br>"
-                    "dataset corr: %{customdata[0]}<br>"
-                    "epoch: %{customdata[1]}<br>"
-                    "n_seeds: %{customdata[2]}"
-                    "<extra>%{customdata[3]}</extra>"
-                ),
-                **error_kwargs,
-            ),
-            row=1,
-            col=col,
         )
 
-    def xy_plots(
+    # Rollouts kept visible by default in per-epoch plots on rollout sweeps
+    # (others start as 'legendonly'). Intersected with the max-corr default,
+    # this gives a small but representative set of curves on first render.
+    _DEFAULT_VISIBLE_ROLLOUTS: frozenset[int] = frozenset({4, 128, 1024})
+
+    _DASH_STYLES: tuple[str, ...] = ("solid", "dash", "dashdot", "dot")
+
+    def plot_vs_epoch(
         self,
-        axes: list[tuple[pl.Expr, pl.Expr, bool | None]],
+        y_exprs: list[pl.Expr | list[pl.Expr]],
         *,
         title: str | None = None,
         show_seed_bar: bool = False,
     ) -> go.Figure:
+        """Per-epoch traces, one per study.
+
+        Each entry in `y_exprs` is one panel. An entry may be either a single
+        polars expression (one line per study) or a list of expressions (one
+        line per (study, expression) — expressions are distinguished by line
+        dash: solid, dash, dashdot, dot).
+
+        For GRPO/MaxRL sweeps (study names carry a ` r=<N>` suffix), traces are
+        *colored* by rollouts value and *legend-grouped* by dataset correlation.
+        `legend.groupclick='togglegroup'` is set so clicking any entry in a
+        `corr=...` group toggles every rollout for that corr on/off at once. To
+        keep the initial view uncluttered, only traces in the highest-corr
+        group whose rollouts value is in `_DEFAULT_VISIBLE_ROLLOUTS` are drawn;
+        the rest start as 'legendonly'. For SL sweeps, each study gets its own
+        color and every trace is visible by default.
+
+        Expressions must carry their display name via `.alias(...)` — the
+        helpers `corr_expr`, `rsq_expr`, `mse_expr`, `beta_expr` already do
+        this. Seeds are averaged per (study, epoch); with `show_seed_bar=True`,
+        asymmetric min/max-of-seeds error bars are drawn.
         """
-        Horizontally laid-out xy subplots, one per (x_expr, y_expr, agg) triple.
+        panels: list[list[pl.Expr]] = [
+            [e] if isinstance(e, pl.Expr) else list(e) for e in y_exprs
+        ]
 
-        Each expression must carry its display name via `.alias(...)` — the
-        helpers in this module (`corr_expr`, `mse_expr`, `rsq_expr`, `beta_expr`)
-        already do this. Metrics are first evaluated per (study, seed, epoch)
-        and then averaged across seeds per (study, epoch). Hover reports the
-        number of seeds averaged at that point. `agg` controls epoch aggregation:
+        df = self.get_metric_dataframe()
+        rollouts = self._rollouts_groups()
+        palette = qualitative.Plotly
+        if rollouts is None:
+            study_colors = {
+                s: palette[i % len(palette)] for i, s in enumerate(self.studies)
+            }
+            study_legendgroups = {s: s for s in self.studies}
+            study_legend_names = {s: s for s in self.studies}
+            study_rollouts: dict[str, int | None] = {s: None for s in self.studies}
+            show_group_title = False
+            default_visible_group: str | None = None
+        else:
+            rollouts_colors = {
+                r: palette[i % len(palette)] for i, r in enumerate(rollouts.keys())
+            }
+            study_colors: dict[str, str] = {}
+            study_legendgroups: dict[str, str] = {}
+            study_legend_names: dict[str, str] = {}
+            study_rollouts = {}
+            for r, names in rollouts.items():
+                for n in names:
+                    study_colors[n] = rollouts_colors[r]
+                    study_legendgroups[n] = f"corr={self.study_corrs[n]:.3f}"
+                    study_legend_names[n] = f"r={r}"
+                    study_rollouts[n] = r
+            show_group_title = True
+            max_corr = max(self.study_corrs.values())
+            default_visible_group = f"corr={max_corr:.3f}"
 
-        agg=None:  per-epoch traces, one line per group.
-        agg=True:  one point per group at the epoch maximizing the seed-averaged y.
-        agg=False: one point per group at the epoch minimizing the seed-averaged y.
+        def is_default_visible(study: str) -> bool:
+            if default_visible_group is None:
+                return True
+            if study_legendgroups[study] != default_visible_group:
+                return False
+            return study_rollouts[study] in self._DEFAULT_VISIBLE_ROLLOUTS
 
-        When `show_seed_bar=True`, each point carries an asymmetric min/max-of-seeds
-        error bar.
+        fig = make_subplots(rows=1, cols=len(panels))
+        for col, panel_y_exprs in enumerate(panels, start=1):
+            multi_y = len(panel_y_exprs) > 1
+            y_names = [y.meta.output_name() for y in panel_y_exprs]
+            evaluated = df.with_columns(*panel_y_exprs)
+            for y_idx, (y_expr, y_name) in enumerate(
+                zip(panel_y_exprs, y_names, strict=True)
+            ):
+                dash = self._DASH_STYLES[y_idx % len(self._DASH_STYLES)]
+                agg_df = self._aggregate_by_epoch(df=evaluated, y_name=y_name)
+                for study in self.studies:
+                    sub = agg_df.filter(pl.col("study") == study).sort("epoch")
+                    if sub.is_empty():
+                        continue
+                    ds_corr = self.study_corrs[study]
+                    epochs = sub["epoch"].to_list()
+                    ys = sub["mean_y"].to_list()
+                    mins = sub["min_y"].to_list()
+                    maxs = sub["max_y"].to_list()
+                    n_seeds = sub["n_seeds"].to_list()
+                    customdata = [[ds_corr, n] for n in n_seeds]
+                    error_kwargs = (
+                        self._seed_bar_error_kwargs(ys=ys, mins=mins, maxs=maxs)
+                        if show_seed_bar
+                        else {}
+                    )
+                    group_title_kwargs = (
+                        dict(legendgrouptitle_text=study_legendgroups[study])
+                        if show_group_title
+                        else {}
+                    )
+                    visible_kwargs = (
+                        {} if is_default_visible(study) else dict(visible="legendonly")
+                    )
+                    trace_name = (
+                        f"{study_legend_names[study]} · {y_name}"
+                        if multi_y
+                        else study_legend_names[study]
+                    )
+                    fig.add_trace(
+                        go.Scatter(
+                            x=epochs,
+                            y=ys,
+                            mode="lines+markers",
+                            name=trace_name,
+                            legendgroup=study_legendgroups[study],
+                            showlegend=(col == 1),
+                            **group_title_kwargs,
+                            **visible_kwargs,
+                            line=dict(color=study_colors[study], dash=dash),
+                            marker=dict(color=study_colors[study]),
+                            customdata=customdata,
+                            hovertemplate=(
+                                "epoch: %{x}<br>"
+                                f"{y_name}: %{{y}}<br>"
+                                "dataset corr: %{customdata[0]}<br>"
+                                "n_seeds: %{customdata[1]}"
+                                f"<extra>{study}</extra>"
+                            ),
+                            **error_kwargs,
+                        ),
+                        row=1,
+                        col=col,
+                    )
+            fig.update_xaxes(title_text="epoch", row=1, col=col)
+            fig.update_yaxes(
+                title_text=" / ".join(y_names) if multi_y else y_names[0],
+                row=1,
+                col=col,
+            )
+        if rollouts is not None:
+            fig.update_layout(legend=dict(groupclick="togglegroup"))
+        if title is not None:
+            fig.update_layout(title=title)
+        return fig
+
+    def plot_vs_corr(
+        self,
+        y_exprs: list[pl.Expr],
+        *,
+        title: str | None = None,
+        x_scale: Literal["log", "uniform"] = "log",
+        show_seed_bar: bool = False,
+    ) -> go.Figure:
+        """Best-epoch (argmax seed-averaged y) vs dataset correlation.
+
+        For GRPO/MaxRL sweeps, one curve per rollouts value. For SL, a single
+        curve. `x_scale="log"` uses a plotly log x-axis on the real corr values.
+        `x_scale="uniform"` places each study at its rank in
+        `src.data.bag_of_words.candidate_corrs` and labels ticks with the real
+        corr values — giving equal visual spacing across the canonical grid.
         """
         df = self.get_metric_dataframe()
+        rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
-        study_colors = {
-            study: palette[i % len(palette)] for i, study in enumerate(self.studies)
-        }
+        if rollouts is None:
+            curve_groups: dict[str, list[str]] = {"all": list(self.studies.keys())}
+        else:
+            curve_groups = {f"r={r}": names for r, names in rollouts.items()}
 
-        fig = make_subplots(rows=1, cols=len(axes))
-        for col, (x_expr, y_expr, agg) in enumerate(axes, start=1):
-            x_name = x_expr.meta.output_name()
+        fig = make_subplots(rows=1, cols=len(y_exprs))
+        for col, y_expr in enumerate(y_exprs, start=1):
             y_name = y_expr.meta.output_name()
-            evaluated = df.with_columns(x_expr, y_expr)
-            agg_df = self._aggregate_by_epoch(
-                df=evaluated, x_name=x_name, y_name=y_name
-            )
-            if agg is None:
-                self._add_per_epoch_traces(
-                    fig=fig,
-                    agg=agg_df,
-                    study_colors=study_colors,
-                    x_name=x_name,
-                    y_name=y_name,
-                    col=col,
-                    show_seed_bar=show_seed_bar,
+            evaluated = df.with_columns(y_expr)
+            agg_df = self._aggregate_by_epoch(df=evaluated, y_name=y_name)
+            for i, (curve_name, names) in enumerate(curve_groups.items()):
+                color = palette[i % len(palette)]
+                rows: list[tuple[float, float, float, float, int, int, str]] = []
+                for study in names:
+                    sub = agg_df.filter(pl.col("study") == study)
+                    if sub.is_empty():
+                        continue
+                    best = sub.sort("mean_y", descending=True).head(1)
+                    rows.append((
+                        self.study_corrs[study],
+                        best["mean_y"].item(),
+                        best["min_y"].item(),
+                        best["max_y"].item(),
+                        best["epoch"].item(),
+                        best["n_seeds"].item(),
+                        study,
+                    ))
+                if not rows:
+                    continue
+                rows.sort(key=lambda r: r[0])
+                ds_corrs = [r[0] for r in rows]
+                if x_scale == "uniform":
+                    xs = [candidate_corrs.index(c) for c in ds_corrs]
+                else:
+                    xs = ds_corrs
+                ys = [r[1] for r in rows]
+                mins = [r[2] for r in rows]
+                maxs = [r[3] for r in rows]
+                customdata = [(r[0], r[4], r[5], r[6]) for r in rows]
+                error_kwargs = (
+                    self._seed_bar_error_kwargs(ys=ys, mins=mins, maxs=maxs)
+                    if show_seed_bar
+                    else {}
                 )
-            else:
-                self._add_agg_trace(
-                    fig=fig,
-                    agg=agg_df,
-                    x_name=x_name,
-                    y_name=y_name,
+                fig.add_trace(
+                    go.Scatter(
+                        x=xs,
+                        y=ys,
+                        mode="lines+markers",
+                        name=curve_name,
+                        legendgroup=curve_name,
+                        showlegend=(rollouts is not None) and (col == 1),
+                        line=dict(color=color),
+                        marker=dict(color=color),
+                        customdata=customdata,
+                        hovertemplate=(
+                            "dataset_corr: %{customdata[0]}<br>"
+                            f"{y_name}: %{{y}}<br>"
+                            "epoch: %{customdata[1]}<br>"
+                            "n_seeds: %{customdata[2]}"
+                            "<extra>%{customdata[3]}</extra>"
+                        ),
+                        **error_kwargs,
+                    ),
+                    row=1,
                     col=col,
-                    argmax=agg,
-                    show_seed_bar=show_seed_bar,
                 )
-            fig.update_xaxes(title_text=x_name, row=1, col=col)
+            fig.update_xaxes(title_text="dataset_corr", row=1, col=col)
             fig.update_yaxes(title_text=y_name, row=1, col=col)
+            if x_scale == "log":
+                fig.update_xaxes(type="log", row=1, col=col)
+            else:
+                fig.update_xaxes(
+                    tickmode="array",
+                    tickvals=list(range(len(candidate_corrs))),
+                    ticktext=[f"{c:.2f}" for c in candidate_corrs],
+                    row=1,
+                    col=col,
+                )
         if title is not None:
             fig.update_layout(title=title)
         return fig

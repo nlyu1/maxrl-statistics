@@ -4,7 +4,7 @@ Single MaxRL training run on the bag-of-words task.
 Usage:
     uv run python experiments/bow/maxrl-corr/single_run.py \
         --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0 \
-        --subtract-baseline
+        --subtract-baseline True
 
 Artifacts -> artifacts/bow-maxrl-sweep/seed-{S}/rollouts-{N}/{baseline_mode}/{dataset_name}/
 """
@@ -40,7 +40,7 @@ def baseline_mode_folder(*, subtract_baseline: bool) -> str:
 @click.option("--seed", type=int, required=True)
 @click.option("--device", type=str, required=True)
 @click.option("--train-epochs", type=int, default=20, show_default=True)
-@click.option("--subtract-baseline/--no-subtract-baseline", required=True)
+@click.option("--subtract-baseline", type=bool, required=True)
 def main(
     corr: float,
     num_rollouts: int,

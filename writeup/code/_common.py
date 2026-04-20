@@ -31,29 +31,44 @@ def default_indices() -> tuple[int, int]:
     return h_idx, c_idx
 
 
-def coordinated_slider_js() -> str:
+def coordinated_slider_js(*, title_path: str = "title.text") -> str:
     """Post-script JS that keeps trace visibility in sync with two sliders.
 
     Each trace must carry `meta = {"kind": "hist"|"hardness"|"density",
-    "h": h_idx, "c": c_idx (hist only)}`. Density traces are always visible;
-    hardness traces respond to the halflife slider; histogram traces respond
-    to both. Uses plotly's `{plot_id}` substitution.
+    "h": h_idx, "c": c_idx (hist only), "title": str (hist only, optional)}`.
+    Density traces are always visible; hardness traces respond to the halflife
+    slider; histogram traces respond to both. When the visible hist trace
+    carries a `title`, it is written to `title_path` on the layout (e.g.
+    `"title.text"` for a top-level layout title, `"annotations[0].text"` for
+    the first subplot-title annotation). Uses plotly's `{plot_id}` substitution.
     """
-    return """
+    tmpl = """
 var gd = document.getElementById('{plot_id}');
+var TITLE_PATH = '__TITLE_PATH__';
 
 function syncVisibility() {
     var h = gd.layout.sliders[0].active;
     var c = gd.layout.sliders[1].active;
+    var title = null;
     var vis = gd.data.map(function(trace) {
         var m = trace.meta || {};
-        if (m.kind === 'hist') return (m.h === h && m.c === c);
+        if (m.kind === 'hist') {
+            var on = (m.h === h && m.c === c);
+            if (on && m.title) title = m.title;
+            return on;
+        }
         if (m.kind === 'hardness') return (m.h === h);
         return true;
     });
     Plotly.restyle(gd, {visible: vis});
+    if (title !== null) {
+        var update = {};
+        update[TITLE_PATH] = title;
+        Plotly.relayout(gd, update);
+    }
 }
 
 gd.on('plotly_sliderchange', syncVisibility);
 syncVisibility();
 """
+    return tmpl.replace("__TITLE_PATH__", title_path)
