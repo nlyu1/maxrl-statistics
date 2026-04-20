@@ -198,13 +198,8 @@ window.Quarto = {
 <section id="tl-dr" class="level3">
 <h3 class="anchored" data-anchor-id="tl-dr">TL; DR</h3>
 <ol type="1">
-<li>We didn’t find SL and GRPO (by corollary, MaxRL) different on the bag-of-words baseline.</li>
-<li>The next step is to sharpen the hypothesis that SL (maximum-likelihood) is better on harder-tasks.</li>
+<li>We didn’t find SL and GRPO (by corollary, MaxRL) different</li>
 </ol>
-<p>New hypothesis: SL and GRPO differentiates only when there is <strong>variation</strong> in task difficulty.</p>
-<ul>
-<li>Does random per-row difficulty suffice, or do we need semantic, learnable variation in difficulty?</li>
-</ul>
 </section>
 <section id="dataset" class="level2">
 <h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
@@ -367,8 +362,8 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 </div>
 </div>
-<div class="scaled-plotly-frame" data-source-width="900" data-source-height="900">
-  <iframe src="assets/bow/word_heteroskedasticity.html" width="900" height="900" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="900">
+  <iframe src="assets/bow/word_heteroskedasticity.html" width="1000" height="900" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 </section>
 </section>
@@ -397,20 +392,20 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 <p>Is SL (or MaxRL) more robust than GRPO at harder, i.e.&nbsp;lower signal-to-noise, tasks?</p>
 </blockquote>
 <p><u>Null finding</u>: <strong>not if the samples are <em>uniformly hard</em></strong>.</p>
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/sl_vs_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/sl_vs_corr.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/grpo_vs_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/grpo_vs_corr.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/maxrl_sub_vs_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/maxrl_sub_vs_corr.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<p>Note that the x-axis is not uniformly scaled above! Figures will be completed as more experiments complete (sweep undergoing).</p>
-<p>Some other findings of interest:</p>
+<p>Note that the x-axis is not uniformly scaled above! Some other findings of interest:</p>
 <ol type="1">
 <li>From the GRPO graph above: the number of rollouts don’t appear to matter that much.</li>
 <li>The dataset has desired properties – we observe overfitting as well as general fitting difficulty as noise increases.</li>
+<li>SL and GRPO are both <strong>remarkably robust</strong>:</li>
 </ol>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="false" aria-label="Toggle callout">
@@ -424,11 +419,11 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div id="callout-5" class="callout-5-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/sl_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/sl_per_epoch_rsq.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/sl_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/sl_per_epoch_corr.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 </div>
 </div>
@@ -445,11 +440,11 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div id="callout-7" class="callout-7-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/grpo_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/grpo_per_epoch_rsq.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/grpo_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/grpo_per_epoch_corr.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-6-contents" aria-controls="callout-6" aria-expanded="false" aria-label="Toggle callout">
@@ -464,11 +459,11 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 <div id="callout-6" class="callout-6-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <p>See <a href="maxrl-estimator.qmd">MaxRL estimator: leave-one-out derivation</a> for the estimator math used here.</p>
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/maxrl_sub_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/maxrl_sub_per_epoch_rsq.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/bow/maxrl_sub_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="400">
+  <iframe src="assets/bow/maxrl_sub_per_epoch_corr.html" width="1000" height="400" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 
 

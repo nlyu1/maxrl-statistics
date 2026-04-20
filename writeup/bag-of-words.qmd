@@ -95,16 +95,24 @@ We require $\eta > 1$ so that the inverted $a_j^2$ has finite population varianc
 
 ```{=html}
 <script>
-window.fitScaledIframeContainer = window.fitScaledIframeContainer || function(frame) {
+window.fitScaledIframeContainer = function(frame) {
   const iframe = frame.querySelector("iframe");
   const sourceWidth = Number(frame.dataset.sourceWidth);
   const sourceHeight = Number(frame.dataset.sourceHeight);
   if (!iframe || !sourceWidth || !sourceHeight) return;
-  const displayWidth = frame.clientWidth || sourceWidth;
+
+  const displayWidth = frame.clientWidth;
+  if (!displayWidth) return;
+
   const scale = Math.min(1, displayWidth / sourceWidth);
+  frame.style.maxWidth = "100%";
+  frame.style.overflow = "hidden";
   frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
   iframe.style.width = `${sourceWidth}px`;
   iframe.style.height = `${sourceHeight}px`;
+  iframe.style.display = "block";
+  iframe.style.border = "0";
+  iframe.style.transformOrigin = "top left";
   iframe.style.transform = `scale(${scale})`;
 };
 window.addEventListener("DOMContentLoaded", () => {
@@ -120,6 +128,13 @@ window.addEventListener("DOMContentLoaded", () => {
       frames.forEach(window.fitScaledIframeContainer)
     );
   }
+  document.addEventListener("shown.bs.collapse", (event) => {
+    event.target
+      .querySelectorAll(".scaled-plotly-frame")
+      .forEach((frame) => {
+        requestAnimationFrame(() => window.fitScaledIframeContainer(frame));
+      });
+  });
 });
 </script>
 
@@ -230,6 +245,7 @@ Some other findings of interest:
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 ```
+:::
 
 ::: {.callout-note collapse="true"}
 ## (Graphics): MaxRL training rsq and correlation
@@ -246,4 +262,4 @@ See [MaxRL estimator: leave-one-out derivation](maxrl-estimator.qmd) for the est
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 ```
-
+:::

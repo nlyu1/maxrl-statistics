@@ -244,16 +244,24 @@ class BagOfWordsAnalysisConfig(BaseConfig):
     def _apply_compact_layout(fig: go.Figure, *, has_title: bool) -> None:
         """Tighten margins/fonts so figures embed well in the writeup. No
         explicit width is set so the saved HTML renders responsively and fills
-        the embedding iframe; ``margin.autoexpand`` (plotly default) still
-        pushes the plot area aside to fit the right-hand legend."""
+        the embedding iframe. The right margin is explicit because the writeup
+        wraps figures in scaled iframes; relying on Plotly's auto-expanded
+        legend margin is fragile when the figure is first rendered while hidden
+        inside a collapsed callout."""
         fig.update_layout(
             height=320,
-            margin=dict(l=50, r=15, t=40 if has_title else 15, b=40),
+            margin=dict(l=50, r=105, t=40 if has_title else 15, b=40),
             title=dict(font=dict(size=13), x=0.02, xanchor="left", y=0.98, yanchor="top")
             if has_title
             else None,
             font=dict(size=11),
-            legend=dict(font=dict(size=10)),
+            legend=dict(
+                font=dict(size=10),
+                x=1.01,
+                xanchor="left",
+                y=1.0,
+                yanchor="top",
+            ),
         )
         fig.update_xaxes(title_font=dict(size=11), tickfont=dict(size=10))
         fig.update_yaxes(title_font=dict(size=11), tickfont=dict(size=10))
