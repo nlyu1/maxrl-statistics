@@ -240,12 +240,41 @@ class BagOfWordsAnalysisConfig(BaseConfig):
 
     _DASH_STYLES: tuple[str, ...] = ("solid", "dash", "dashdot", "dot")
 
+    @staticmethod
+    def _apply_compact_layout(fig: go.Figure, *, has_title: bool) -> None:
+        """Tighten margins/fonts so figures embed well in the writeup. No
+        explicit width is set so the saved HTML renders responsively and fills
+        the embedding iframe; ``margin.autoexpand`` (plotly default) still
+        pushes the plot area aside to fit the right-hand legend."""
+        fig.update_layout(
+            height=320,
+            margin=dict(l=50, r=15, t=40 if has_title else 15, b=40),
+            title=dict(font=dict(size=13), x=0.02, xanchor="left", y=0.98, yanchor="top")
+            if has_title
+            else None,
+            font=dict(size=11),
+            legend=dict(font=dict(size=10)),
+        )
+        fig.update_xaxes(title_font=dict(size=11), tickfont=dict(size=10))
+        fig.update_yaxes(title_font=dict(size=11), tickfont=dict(size=10))
+
+    @staticmethod
+    def _save_html(fig: go.Figure, save_path: Path) -> None:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.write_html(
+            save_path,
+            include_plotlyjs="cdn",
+            full_html=True,
+            config={"responsive": True},
+        )
+
     def plot_vs_epoch(
         self,
         y_exprs: list[pl.Expr | list[pl.Expr]],
         *,
         title: str | None = None,
         show_seed_bar: bool = False,
+        save_path: Path | None = None,
     ) -> go.Figure:
         """Per-epoch traces, one per study.
 
@@ -309,7 +338,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                 return False
             return study_rollouts[study] in self._DEFAULT_VISIBLE_ROLLOUTS
 
-        fig = make_subplots(rows=1, cols=len(panels))
+        fig = make_subplots(rows=1, cols=len(panels), horizontal_spacing=0.08)
         for col, panel_y_exprs in enumerate(panels, start=1):
             multi_y = len(panel_y_exprs) > 1
             y_names = [y.meta.output_name() for y in panel_y_exprs]
@@ -383,6 +412,9 @@ class BagOfWordsAnalysisConfig(BaseConfig):
             fig.update_layout(legend=dict(groupclick="togglegroup"))
         if title is not None:
             fig.update_layout(title=title)
+        self._apply_compact_layout(fig, has_title=title is not None)
+        if save_path is not None:
+            self._save_html(fig, save_path)
         return fig
 
     def plot_vs_corr(
@@ -392,6 +424,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         title: str | None = None,
         x_scale: Literal["log", "uniform"] = "log",
         show_seed_bar: bool = False,
+        save_path: Path | None = None,
     ) -> go.Figure:
         """Best-epoch (argmax seed-averaged y) vs dataset correlation.
 
@@ -412,8 +445,11 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         else:
             curve_groups = [(f"r={r}", r, names) for r, names in rollouts.items()]
 
-        fig = make_subplots(rows=1, cols=len(y_exprs))
-        for col, y_expr in enumerate(y_exprs, start=1):
+        n_panels = len(y_exprs)
+        fig = make_subplots(rows=1, cols=n_panels, horizontal_spacing=0.08)
+        for panel_idx, y_expr in enumerate(y_exprs):
+            row, col = 1, panel_idx + 1
+            is_first_panel = panel_idx == 0
             y_name = y_expr.meta.output_name()
             evaluated = df.with_columns(y_expr)
             agg_df = self._aggregate_by_epoch(df=evaluated, y_name=y_name)
@@ -466,7 +502,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                         mode="lines+markers",
                         name=curve_name,
                         legendgroup=curve_name,
-                        showlegend=(rollouts is not None) and (col == 1),
+                        showlegend=(rollouts is not None) and is_first_panel,
                         **visible_kwargs,
                         line=dict(color=color),
                         marker=dict(color=color),
@@ -480,23 +516,27 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                         ),
                         **error_kwargs,
                     ),
-                    row=1,
+                    row=row,
                     col=col,
                 )
-            fig.update_xaxes(title_text="dataset_corr", row=1, col=col)
-            fig.update_yaxes(title_text=y_name, row=1, col=col)
+            fig.update_xaxes(title_text="dataset_corr", row=row, col=col)
+            fig.update_yaxes(title_text=y_name, row=row, col=col)
             if x_scale == "log":
-                fig.update_xaxes(type="log", row=1, col=col)
+                fig.update_xaxes(type="log", row=row, col=col)
             else:
                 fig.update_xaxes(
                     tickmode="array",
                     tickvals=list(range(len(candidate_corrs))),
                     ticktext=[f"{c:.2f}" for c in candidate_corrs],
-                    row=1,
+                    tickangle=-90,
+                    row=row,
                     col=col,
                 )
         if title is not None:
             fig.update_layout(title=title)
+        self._apply_compact_layout(fig, has_title=title is not None)
+        if save_path is not None:
+            self._save_html(fig, save_path)
         return fig
 
 
