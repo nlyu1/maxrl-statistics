@@ -10,7 +10,10 @@ The bag-of-words (BoW) setup isolates noise-robustness of SL, GRPO, and MaxRL in
 
 ### TL; DR
 
-1. We didn't find SL and GRPO (by corollary, MaxRL) different
+1. We didn't find SL and GRPO (by corollary, MaxRL) different on the bag-of-words baseline.
+2. The next step is to sharpen the hypothesis that SL (maximum-likelihood) is better on harder-tasks.
+  - Hypothesis: SL and GRPO differentiates only when there is **variation** in task difficulty.
+  - Does random per-row difficulty suffice, or do we need semantic, learnable variation in difficulty?
 
 ## Dataset
 
