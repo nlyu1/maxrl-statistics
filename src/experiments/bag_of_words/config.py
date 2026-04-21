@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+import shutil
 import warnings
 from contextlib import nullcontext
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Literal, Self, get_args
 
+import polars as pl
 import torch
 
 from src.config.base import BaseConfig
@@ -18,58 +21,30 @@ from src.data.parquet import TokenizedParquetDatasetConfig
 from src.model.minimal import CausalLMConfig
 from src.model.optimizer import CausalLMWithLinearHeadOptimizerConfig
 
-# Het-first so pydantic validates the extra het field (required, extra='forbid')
-# before falling back to the homoskedastic base. Without this, `data`
-# reloads as the base class and downstream sampling reverts to homoskedastic.
+# Each member inherits BaseConfig's extra='forbid', so exactly one class
+# validates a given payload (the one whose required het fields match). Order
+# is not load-bearing — a homoskedastic payload fails both het members on
+# missing required fields, and a het payload fails the base on the forbidden
+# extra field.
 BagOfWordsDatasetConfigUnion = (
-    RowHeterogeneousBagOfWordsDatasetConfig
+    BagOfWordsDatasetConfig
+    | RowHeterogeneousBagOfWordsDatasetConfig
     | SignalHeterogeneousBagOfWordsDatasetConfig
-    | BagOfWordsDatasetConfig
 )
 
 if TYPE_CHECKING:
     from src.experiments.bag_of_words.state import BagOfWordsStudyBaseState
 
 
-def _ceil_to_multiple(*, value: int, multiple: int) -> int:
-    return ((value + multiple - 1) // multiple) * multiple
+DatasetKind = Literal["homoskedastic", "row_heteroskedastic", "word_heteroskedastic"]
+DATASET_KINDS: tuple[str, ...] = get_args(DatasetKind)
 
 
-def canonical_dataset_folder_name(
-    *,
-    dataset: str,
-    corr: float,
-    aux_words_ratio: float,
-    num_words: int | None = None,
-    prompt_length: int = 128,
-    word_decay_power: float = 1.0,
-    row_hardness_eta: float = 8.0,
-    snr_halflife_in_word_quantile: float = 0.15,
-) -> str:
-    """Compute the dataset folder name that a `canonical_*_kwargs` call would
-    produce with otherwise-default arguments. Mirrors the folder-name format
-    string in `_canonical_kwargs_impl`; keep the two in sync."""
-    if dataset == "homoskedastic":
-        resolved_num_words = 7 if num_words is None else num_words
-        suffix = ""
-    elif dataset == "row_heteroskedastic":
-        resolved_num_words = 15 if num_words is None else num_words
-        suffix = f"_eta-{row_hardness_eta}"
-    elif dataset == "word_heteroskedastic":
-        resolved_num_words = 15 if num_words is None else num_words
-        suffix = f"_hl-{snr_halflife_in_word_quantile}"
-    else:
-        raise ValueError(f"unknown dataset {dataset!r}")
-    return (
-        f"{resolved_num_words}-words_corr-{corr}_len-{prompt_length}"
-        f"_pow-{word_decay_power}_ar-{aux_words_ratio}{suffix}"
-    )
-
-
-# Orchestrator exit code when no work remains at invocation time. Distinct
-# from 0 (ran a chunk or nothing to do but work may remain elsewhere) and 1
-# (error) so the bash driver can detect a truly-empty pass.
-EXIT_NO_WORK_REMAINING = 10
+# Canonical sweep-time defaults. Changing these changes the dataset folder
+# name and invalidates every `bow-*-sweep` artifact layout.
+CANONICAL_AUX_WORDS_RATIO: float = 0.5
+_CANONICAL_ROW_HARDNESS_ETA: float = 8.0
+_CANONICAL_SNR_HALFLIFE: float = 0.15
 
 
 SWEEP_ROOT_SUFFIX_BY_DATASET: dict[str, str] = {
@@ -79,7 +54,80 @@ SWEEP_ROOT_SUFFIX_BY_DATASET: dict[str, str] = {
 }
 
 
-def sweep_root_name(*, method: str, dataset: str) -> str:
+def _ceil_to_multiple(*, value: int, multiple: int) -> int:
+    return ((value + multiple - 1) // multiple) * multiple
+
+
+def _default_num_words(dataset: DatasetKind) -> int:
+    return 7 if dataset == "homoskedastic" else 15
+
+
+def _dataset_config_cls(dataset: DatasetKind) -> type[BagOfWordsDatasetConfig]:
+    if dataset == "homoskedastic":
+        return BagOfWordsDatasetConfig
+    if dataset == "row_heteroskedastic":
+        return RowHeterogeneousBagOfWordsDatasetConfig
+    if dataset == "word_heteroskedastic":
+        return SignalHeterogeneousBagOfWordsDatasetConfig
+    raise ValueError(f"unknown dataset {dataset!r}")
+
+
+def _dataset_extra_kwargs(
+    *,
+    dataset: DatasetKind,
+    row_hardness_eta: float,
+    snr_halflife_in_word_quantile: float,
+) -> dict:
+    if dataset == "homoskedastic":
+        return {}
+    if dataset == "row_heteroskedastic":
+        return {"row_hardness_eta": row_hardness_eta}
+    if dataset == "word_heteroskedastic":
+        return {"snr_halflife_in_word_quantile": snr_halflife_in_word_quantile}
+    raise ValueError(f"unknown dataset {dataset!r}")
+
+
+def _dataset_folder_suffix(
+    *,
+    dataset: DatasetKind,
+    row_hardness_eta: float,
+    snr_halflife_in_word_quantile: float,
+) -> str:
+    if dataset == "homoskedastic":
+        return ""
+    if dataset == "row_heteroskedastic":
+        return f"_eta-{row_hardness_eta}"
+    if dataset == "word_heteroskedastic":
+        return f"_hl-{snr_halflife_in_word_quantile}"
+    raise ValueError(f"unknown dataset {dataset!r}")
+
+
+def canonical_dataset_folder_name(
+    *,
+    dataset: DatasetKind,
+    corr: float,
+    aux_words_ratio: float,
+    num_words: int | None = None,
+    prompt_length: int = 128,
+    word_decay_power: float = 1.0,
+    row_hardness_eta: float = _CANONICAL_ROW_HARDNESS_ETA,
+    snr_halflife_in_word_quantile: float = _CANONICAL_SNR_HALFLIFE,
+) -> str:
+    """Single source of truth for the dataset subfolder name. Shared by
+    `canonical_kwargs` (run time) and analysis.py (discovery time)."""
+    resolved_num_words = _default_num_words(dataset) if num_words is None else num_words
+    suffix = _dataset_folder_suffix(
+        dataset=dataset,
+        row_hardness_eta=row_hardness_eta,
+        snr_halflife_in_word_quantile=snr_halflife_in_word_quantile,
+    )
+    return (
+        f"{resolved_num_words}-words_corr-{corr}_len-{prompt_length}"
+        f"_pow-{word_decay_power}_ar-{aux_words_ratio}{suffix}"
+    )
+
+
+def sweep_root_name(*, method: str, dataset: DatasetKind) -> str:
     """Name of the top-level artifacts folder for a given (method, dataset).
 
     Example: method='maxrl', dataset='word_heteroskedastic' -> 'bow-maxrl-word-het-sweep'.
@@ -91,6 +139,54 @@ def sweep_root_name(*, method: str, dataset: str) -> str:
             f"{sorted(SWEEP_ROOT_SUFFIX_BY_DATASET)}"
         )
     return f"bow-{method}{SWEEP_ROOT_SUFFIX_BY_DATASET[dataset]}"
+
+
+def baseline_mode_folder(*, subtract_baseline: bool) -> str:
+    return "subtract-baseline" if subtract_baseline else "no-subtract-baseline"
+
+
+def stride_4_top_down(n: int) -> list[int]:
+    return [i for offset in range(4) for i in range(offset, n, 4)]
+
+
+def stride_4_bottom_up(n: int) -> list[int]:
+    return list(reversed(stride_4_top_down(n)))
+
+
+def has_study_started(study_folder: Path) -> bool:
+    return (study_folder / "metrics.parquet").exists() and (
+        study_folder / "config.json"
+    ).exists()
+
+
+def is_study_complete(study_folder: Path) -> bool:
+    """True iff the study at *study_folder* has completed all its training epochs."""
+    if not has_study_started(study_folder):
+        return False
+    train_epochs = json.loads((study_folder / "config.json").read_text())[
+        "train_epochs"
+    ]
+    max_epoch = (
+        pl
+        .read_parquet(study_folder / "metrics.parquet")
+        .select(pl.col("epoch").max())
+        .item()
+    )
+    return max_epoch >= train_epochs - 1
+
+
+def prepare_study_folder(*, study_folder: Path, tag: str) -> bool:
+    """Return True if the study should run; False if it's already complete.
+
+    Wipes any partial artifacts so a retry starts clean.
+    """
+    if is_study_complete(study_folder):
+        print(f"!!! {tag} already complete, skipping ({study_folder})")
+        return False
+    if has_study_started(study_folder):
+        print(f"=== {tag} partial → wiping {study_folder} ===")
+        shutil.rmtree(study_folder)
+    return True
 
 
 class BagOfWordsStudyBaseConfig(BaseConfig):
@@ -107,18 +203,16 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
     compile_mode: str = "reduce-overhead"
 
     @classmethod
-    def _canonical_kwargs_impl(
+    def canonical_kwargs(
         cls,
         *,
-        dataset_cls: type[BagOfWordsDatasetConfig],
-        dataset_extra_kwargs: dict,
-        folder_suffix: str,
-        num_words: int,
+        dataset: DatasetKind,
         dataset_base_folder: Path,
         study_base_folder: Path,
         corr: float,
         aux_words_ratio: float,
         num_samples: int = 50_000,
+        num_words: int | None = None,
         prompt_length: int = 128,
         filter_samples_above_n_tokens: int = 384,
         word_decay_power: float = 1.0,
@@ -132,25 +226,40 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         train_epochs: int = 20,
         clip_grad_norm: float = 1.0,
         compile_model: bool = True,
+        row_hardness_eta: float = _CANONICAL_ROW_HARDNESS_ETA,
+        snr_halflife_in_word_quantile: float = _CANONICAL_SNR_HALFLIFE,
     ) -> dict:
-        if num_words not in canonical_bags:
+        resolved_num_words = (
+            _default_num_words(dataset) if num_words is None else num_words
+        )
+        if resolved_num_words not in canonical_bags:
             supported = ", ".join(str(n) for n in sorted(canonical_bags))
             raise ValueError(f"num_words must be one of {{{supported}}}")
 
-        dataset_folder = dataset_base_folder / (
-            f"{num_words}-words_corr-{corr}_len-{prompt_length}"
-            f"_pow-{word_decay_power}_ar-{aux_words_ratio}{folder_suffix}"
+        dataset_folder = dataset_base_folder / canonical_dataset_folder_name(
+            dataset=dataset,
+            corr=corr,
+            aux_words_ratio=aux_words_ratio,
+            num_words=resolved_num_words,
+            prompt_length=prompt_length,
+            word_decay_power=word_decay_power,
+            row_hardness_eta=row_hardness_eta,
+            snr_halflife_in_word_quantile=snr_halflife_in_word_quantile,
         )
-        data = dataset_cls.init_or_load_from(
+        data = _dataset_config_cls(dataset).init_or_load_from(
             folder=dataset_folder,
             corr=corr,
             num_train_samples=num_samples,
             num_val_samples=num_samples,
             prompt_length=prompt_length,
-            word_assignments=list(canonical_bags[num_words]),
+            word_assignments=list(canonical_bags[resolved_num_words]),
             aux_words_ratio=aux_words_ratio,
             word_decay_power=word_decay_power,
-            **dataset_extra_kwargs,
+            **_dataset_extra_kwargs(
+                dataset=dataset,
+                row_hardness_eta=row_hardness_eta,
+                snr_halflife_in_word_quantile=snr_halflife_in_word_quantile,
+            ),
         )
 
         tokenization = TokenizedParquetDatasetConfig(
@@ -188,70 +297,14 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         )
 
     @classmethod
-    def canonical_kwargs(cls, *, num_words: int = 7, **base_kwargs) -> dict:
-        return cls._canonical_kwargs_impl(
-            dataset_cls=BagOfWordsDatasetConfig,
-            dataset_extra_kwargs={},
-            folder_suffix="",
-            num_words=num_words,
-            **base_kwargs,
-        )
-
-    @classmethod
-    def canonical_row_heteroskedastic_kwargs(
-        cls,
-        *,
-        row_hardness_eta: float = 8.0,
-        num_words: int = 15,
-        **base_kwargs,
-    ) -> dict:
-        return cls._canonical_kwargs_impl(
-            dataset_cls=RowHeterogeneousBagOfWordsDatasetConfig,
-            dataset_extra_kwargs={"row_hardness_eta": row_hardness_eta},
-            folder_suffix=f"_eta-{row_hardness_eta}",
-            num_words=num_words,
-            **base_kwargs,
-        )
-
-    @classmethod
-    def canonical_word_heteroskedastic_kwargs(
-        cls,
-        *,
-        snr_halflife_in_word_quantile: float = 0.15,
-        num_words: int = 15,
-        **base_kwargs,
-    ) -> dict:
-        return cls._canonical_kwargs_impl(
-            dataset_cls=SignalHeterogeneousBagOfWordsDatasetConfig,
-            dataset_extra_kwargs={
-                "snr_halflife_in_word_quantile": snr_halflife_in_word_quantile
-            },
-            folder_suffix=f"_hl-{snr_halflife_in_word_quantile}",
-            num_words=num_words,
-            **base_kwargs,
-        )
-
-    @classmethod
-    def dispatch_canonical_kwargs(cls, *, dataset: str, **kwargs) -> dict:
-        """Pick the right `canonical_*_kwargs` factory by dataset name."""
-        factories = {
-            "homoskedastic": cls.canonical_kwargs,
-            "row_heteroskedastic": cls.canonical_row_heteroskedastic_kwargs,
-            "word_heteroskedastic": cls.canonical_word_heteroskedastic_kwargs,
-        }
-        if dataset not in factories:
-            raise ValueError(
-                f"unknown dataset {dataset!r}; expected one of {sorted(factories)}"
-            )
-        return factories[dataset](**kwargs)
-
-    @classmethod
-    def get_canonical(cls, *, dataset: str, **kwargs: object) -> Self:
-        config = cls(**cls.dispatch_canonical_kwargs(dataset=dataset, **kwargs))
-        config.prepare_study_folder()
+    def get_canonical(cls, *, dataset: DatasetKind, **kwargs: object) -> Self:
+        config = cls(**cls.canonical_kwargs(dataset=dataset, **kwargs))
+        config.save_config_json()
         return config
 
-    def prepare_study_folder(self) -> None:
+    def save_config_json(self) -> None:
+        """Create the study folder and persist `config.json`. If the file
+        already exists, verify it matches `self` and warn on mismatch."""
         self.study_folder.mkdir(parents=True, exist_ok=True)
         config_path = self.study_folder / "config.json"
         config_json = self.model_dump_json(indent=2)
@@ -276,7 +329,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         device: torch.device,
     ) -> dict:
         torch.set_float32_matmul_precision("medium")
-        self.prepare_study_folder()
+        self.save_config_json()
         dataset = self.tokenization.init_or_load_dataset()
         train_dl = self.dataloading.get_train_dataloader(dataset)
         val_dl = self.dataloading.get_val_dataloader(dataset)

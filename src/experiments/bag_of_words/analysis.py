@@ -15,31 +15,26 @@ from src.data.bag_of_words import (
     candidate_seeds,
 )
 from src.experiments.bag_of_words.config import (
+    CANONICAL_AUX_WORDS_RATIO,
+    DatasetKind,
+    baseline_mode_folder,
     canonical_dataset_folder_name,
     sweep_root_name,
 )
 
 _ROLLOUTS_RE = re.compile(r" r=(\d+)")
 
-# Canonical sweep-time value; matches AUX_WORDS_RATIO in every single_run.py.
-# If a sweep ever uses a different ratio, the factories below won't find it.
-_SWEEP_AUX_WORDS_RATIO = 0.5
-
 
 def _seed_folder_name(seed: int) -> str:
     return f"seed-{seed}"
 
 
-def _dataset_folder_name(*, dataset: str, corr: float) -> str:
+def _dataset_folder_name(*, dataset: DatasetKind, corr: float) -> str:
     return canonical_dataset_folder_name(
         dataset=dataset,
         corr=corr,
-        aux_words_ratio=_SWEEP_AUX_WORDS_RATIO,
+        aux_words_ratio=CANONICAL_AUX_WORDS_RATIO,
     )
-
-
-def _maxrl_baseline_folder(*, subtract_baseline: bool) -> str:
-    return "subtract-baseline" if subtract_baseline else "no-subtract-baseline"
 
 
 class BagOfWordsAnalysisConfig(BaseConfig):
@@ -54,24 +49,6 @@ class BagOfWordsAnalysisConfig(BaseConfig):
     study_seeds: dict[str, list[int]]
     study_corrs: dict[str, float]
 
-    @staticmethod
-    def has_study_started(path: Path) -> bool:
-        return (path / "metrics.parquet").exists() and (path / "config.json").exists()
-
-    @staticmethod
-    def is_study_complete(path: Path) -> bool:
-        """True iff the study at *path* has completed all its training epochs."""
-        if not BagOfWordsAnalysisConfig.has_study_started(path):
-            return False
-        train_epochs = json.loads((path / "config.json").read_text())["train_epochs"]
-        max_epoch = (
-            pl
-            .read_parquet(path / "metrics.parquet")
-            .select(pl.col("epoch").max())
-            .item()
-        )
-        return max_epoch >= train_epochs - 1
-
     @classmethod
     def from_grouped(cls, grouped: dict[str, list[tuple[int, Path]]]) -> Self | None:
         """
@@ -83,7 +60,11 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         study_seeds: dict[str, list[int]] = {}
         study_corrs: dict[str, float] = {}
         for name, pairs in grouped.items():
-            kept = [(s, p) for (s, p) in pairs if cls.has_study_started(p)]
+            kept = [
+                (s, p)
+                for (s, p) in pairs
+                if (p / "metrics.parquet").exists() and (p / "config.json").exists()
+            ]
             if not kept:
                 continue
             studies[name] = [p for (_, p) in kept]
@@ -105,7 +86,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         cls,
         *,
         artifacts_root: Path,
-        dataset: str = "homoskedastic",
+        dataset: DatasetKind = "homoskedastic",
     ) -> Self | None:
         """Discover SL runs under
         `<artifacts_root>/bow-sl-<suffix>-sweep/seed-{S}/{dataset_folder}/`."""
@@ -131,7 +112,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         cls,
         *,
         artifacts_root: Path,
-        dataset: str = "homoskedastic",
+        dataset: DatasetKind = "homoskedastic",
     ) -> Self | None:
         """Discover GRPO runs under
         `<artifacts_root>/bow-grpo-<suffix>-sweep/seed-{S}/rollouts-{N}/{dataset_folder}/`."""
@@ -160,7 +141,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         *,
         artifacts_root: Path,
         subtract_baseline: bool,
-        dataset: str = "homoskedastic",
+        dataset: DatasetKind = "homoskedastic",
     ) -> Self | None:
         """Discover MaxRL runs under
         `<artifacts_root>/bow-maxrl-<suffix>-sweep/seed-{S}/rollouts-{N}/{baseline_mode}/{dataset_folder}/`.
@@ -169,7 +150,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         study_base = artifacts_root / sweep_root_name(method="maxrl", dataset=dataset)
         if not study_base.exists():
             return None
-        baseline_folder = _maxrl_baseline_folder(subtract_baseline=subtract_baseline)
+        baseline_folder = baseline_mode_folder(subtract_baseline=subtract_baseline)
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for corr in candidate_corrs:
             for r in candidate_rollout_steps:

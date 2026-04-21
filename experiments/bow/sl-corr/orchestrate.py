@@ -25,20 +25,16 @@ chdir_repo_base()
 repo_root = get_repo_base()
 
 from src.data.bag_of_words import candidate_corrs  # noqa: E402
-from src.experiments.bag_of_words.config import sweep_root_name  # noqa: E402
+from src.experiments.bag_of_words.config import (  # noqa: E402
+    DATASET_KINDS,
+    stride_4_bottom_up,
+    stride_4_top_down,
+    sweep_root_name,
+)
 
 SINGLE_RUN = repo_root / "experiments" / "bow" / "sl-corr" / "single_run.py"
 ARTIFACTS_ROOT = repo_root / "artifacts"
 METHOD = "sl"
-DATASET_CHOICES = ("homoskedastic", "row_heteroskedastic", "word_heteroskedastic")
-
-
-def stride_4_top_down(n: int) -> list[int]:
-    return [i for offset in range(4) for i in range(offset, n, 4)]
-
-
-def stride_4_bottom_up(n: int) -> list[int]:
-    return list(reversed(stride_4_top_down(n)))
 
 
 def build_jobs(*, device_id: int) -> list[float]:
@@ -77,7 +73,7 @@ def run_jobs(
 
 
 @click.command()
-@click.option("--dataset", type=click.Choice(DATASET_CHOICES), required=True)
+@click.option("--dataset", type=click.Choice(DATASET_KINDS), required=True)
 @click.option("--seed", type=int, required=True)
 @click.option("--dry-run", is_flag=True, help="Print the planned job lists and exit.")
 def main(dataset: str, seed: int, dry_run: bool) -> None:

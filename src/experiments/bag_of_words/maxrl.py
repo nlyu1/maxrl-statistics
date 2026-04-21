@@ -11,7 +11,7 @@ from pydantic.dataclasses import dataclass
 from torch import Tensor
 from tqdm.autonotebook import tqdm
 
-from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig
+from src.experiments.bag_of_words.config import BagOfWordsStudyBaseConfig, DatasetKind
 from src.experiments.bag_of_words.state import BagOfWordsStudyBaseState
 from src.maxrl_estimator import MaxRLEstimatorConfig
 
@@ -53,7 +53,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
     def get_canonical(
         cls,
         *,
-        dataset: str,
+        dataset: DatasetKind,
         num_rollouts_per_sample: int,
         gaussian_stdev: float,
         subtract_baseline: bool,
@@ -62,7 +62,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
         assert num_rollouts_per_sample >= 1
         assert gaussian_stdev > 0.0
         config = cls(
-            **cls.dispatch_canonical_kwargs(dataset=dataset, **kwargs),
+            **cls.canonical_kwargs(dataset=dataset, **kwargs),
             num_rollouts_per_sample=num_rollouts_per_sample,
             degree=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,

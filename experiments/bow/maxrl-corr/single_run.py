@@ -19,26 +19,24 @@ from src import chdir_repo_base, get_repo_base
 chdir_repo_base()
 repo_root = get_repo_base()
 
-from src.experiments.bag_of_words.config import sweep_root_name  # noqa: E402
+from src.experiments.bag_of_words.config import (  # noqa: E402
+    CANONICAL_AUX_WORDS_RATIO,
+    DATASET_KINDS,
+    baseline_mode_folder,
+    prepare_study_folder,
+    sweep_root_name,
+)
 from src.experiments.bag_of_words.maxrl import BagOfWordsMaxRLConfig  # noqa: E402
-from src.experiments.utils import cleanup_cuda, prepare_study_folder, set_seeds  # noqa: E402
+from src.experiments.utils import cleanup_cuda, set_seeds  # noqa: E402
 
 ARTIFACTS_ROOT = repo_root / "artifacts"
 DATA_BASE = ARTIFACTS_ROOT / "bow-data"
 METHOD = "maxrl"
-AUX_WORDS_RATIO = 0.5
 GAUSSIAN_STDEV = 1.0
-DATASET_CHOICES = ("homoskedastic", "row_heteroskedastic", "word_heteroskedastic")
-
-
-def baseline_mode_folder(*, subtract_baseline: bool) -> str:
-    if subtract_baseline:
-        return "subtract-baseline"
-    return "no-subtract-baseline"
 
 
 @click.command()
-@click.option("--dataset", type=click.Choice(DATASET_CHOICES), required=True)
+@click.option("--dataset", type=click.Choice(DATASET_KINDS), required=True)
 @click.option("--corr", type=float, required=True)
 @click.option("--num-rollouts", type=int, required=True)
 @click.option("--seed", type=int, required=True)
@@ -71,7 +69,7 @@ def main(
         dataset_base_folder=DATA_BASE,
         study_base_folder=study_base,
         corr=corr,
-        aux_words_ratio=AUX_WORDS_RATIO,
+        aux_words_ratio=CANONICAL_AUX_WORDS_RATIO,
         train_epochs=train_epochs,
         num_rollouts_per_sample=num_rollouts,
         gaussian_stdev=GAUSSIAN_STDEV,
