@@ -1,9 +1,9 @@
 """
 Orchestrator for the canonical MaxRL bag-of-words sweep.
 
-Hardcodes cuda:0 and cuda:1. Seeds are the outermost loop with a cross-device
-barrier between seeds. The rollout axis is partitioned across devices, and each
-device traverses the full corr list.
+Hardcodes cuda:0 and cuda:1. Each device thread iterates over the full
+(seed, job) product independently — no cross-device barrier. The rollout axis
+is partitioned across devices, and each device traverses the full corr list.
 
 Usage:
     uv run python experiments/bow/maxrl-corr/orchestrate.py --subtract-baseline True
@@ -64,44 +64,47 @@ def run_jobs(
     *,
     jobs: list[Job],
     device_id: int,
-    seed: int,
+    seeds: list[int],
     log_path: Path,
     subtract_baseline: bool,
 ) -> None:
     device = f"cuda:{device_id}"
+    baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)
     with log_path.open("ab") as log_fh:
-        baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)
-        header = (
-            f"\n===== seed={seed} device={device} baseline={baseline_mode} "
-            f"({len(jobs)} jobs) =====\n"
-        )
-        log_fh.write(header.encode())
-        log_fh.flush()
-        for corr, num_rollouts in jobs:
-            cmd = [
-                "uv",
-                "run",
-                "python",
-                str(SINGLE_RUN),
-                "--corr",
-                str(corr),
-                "--num-rollouts",
-                str(num_rollouts),
-                "--seed",
-                str(seed),
-                "--device",
-                device,
-                "--subtract-baseline",
-                str(subtract_baseline),
-            ]
-            tag = (
-                f"[{device} seed={seed} corr={corr} rollouts={num_rollouts} "
-                f"baseline={baseline_mode}]"
+        for seed in seeds:
+            header = (
+                f"\n===== seed={seed} device={device} baseline={baseline_mode} "
+                f"({len(jobs)} jobs) =====\n"
             )
-            print(f"{tag} launching", flush=True)
-            returncode = subprocess.call(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
-            status = "done" if returncode == 0 else f"FAILED rc={returncode}"
-            print(f"{tag} {status}", flush=True)
+            log_fh.write(header.encode())
+            log_fh.flush()
+            for corr, num_rollouts in jobs:
+                cmd = [
+                    "uv",
+                    "run",
+                    "python",
+                    str(SINGLE_RUN),
+                    "--corr",
+                    str(corr),
+                    "--num-rollouts",
+                    str(num_rollouts),
+                    "--seed",
+                    str(seed),
+                    "--device",
+                    device,
+                    "--subtract-baseline",
+                    str(subtract_baseline),
+                ]
+                tag = (
+                    f"[{device} seed={seed} corr={corr} rollouts={num_rollouts} "
+                    f"baseline={baseline_mode}]"
+                )
+                print(f"{tag} launching", flush=True)
+                returncode = subprocess.call(
+                    cmd, stdout=log_fh, stderr=subprocess.STDOUT
+                )
+                status = "done" if returncode == 0 else f"FAILED rc={returncode}"
+                print(f"{tag} {status}", flush=True)
 
 
 @click.command()
@@ -125,27 +128,25 @@ def main(dry_run: bool, subtract_baseline: bool) -> None:
     log_base = LOG_BASE / baseline_mode
     log_base.mkdir(parents=True, exist_ok=True)
 
-    for seed in candidate_seeds:
-        threads = [
-            Thread(
-                target=run_jobs,
-                kwargs=dict(
-                    jobs=jobs_by_device[dev],
-                    device_id=dev,
-                    seed=seed,
-                    log_path=log_base / f"device_{dev}.log",
-                    subtract_baseline=subtract_baseline,
-                ),
-                daemon=True,
-                name=f"device-{dev}-seed-{seed}",
-            )
-            for dev in (0, 1)
-        ]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        print(f"\n===== seed {seed} complete on both devices =====\n")
+    threads = [
+        Thread(
+            target=run_jobs,
+            kwargs=dict(
+                jobs=jobs_by_device[dev],
+                device_id=dev,
+                seeds=list(candidate_seeds),
+                log_path=log_base / f"device_{dev}.log",
+                subtract_baseline=subtract_baseline,
+            ),
+            daemon=True,
+            name=f"device-{dev}",
+        )
+        for dev in (0, 1)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
 
     print("All seeds done.")
 

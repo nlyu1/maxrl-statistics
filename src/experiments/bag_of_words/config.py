@@ -10,9 +10,22 @@ import torch
 from src.config.base import BaseConfig
 from src.data.bag_of_words import BagOfWordsDatasetConfig, canonical_bags
 from src.data.dataloading import DataloadingConfig
+from src.data.heterogeneous_bag_of_words import (
+    RowHeterogeneousBagOfWordsDatasetConfig,
+    SignalHeterogeneousBagOfWordsDatasetConfig,
+)
 from src.data.parquet import TokenizedParquetDatasetConfig
 from src.model.minimal import CausalLMConfig
 from src.model.optimizer import CausalLMWithLinearHeadOptimizerConfig
+
+# Het-first so pydantic validates the extra het field (required, extra='forbid')
+# before falling back to the homoskedastic base. Without this, `data`
+# reloads as the base class and downstream sampling reverts to homoskedastic.
+BagOfWordsDatasetConfigUnion = (
+    RowHeterogeneousBagOfWordsDatasetConfig
+    | SignalHeterogeneousBagOfWordsDatasetConfig
+    | BagOfWordsDatasetConfig
+)
 
 if TYPE_CHECKING:
     from src.experiments.bag_of_words.state import BagOfWordsStudyBaseState
@@ -23,7 +36,7 @@ def _ceil_to_multiple(*, value: int, multiple: int) -> int:
 
 
 class BagOfWordsStudyBaseConfig(BaseConfig):
-    data: BagOfWordsDatasetConfig
+    data: BagOfWordsDatasetConfigUnion
     tokenization: TokenizedParquetDatasetConfig
     dataloading: DataloadingConfig
 

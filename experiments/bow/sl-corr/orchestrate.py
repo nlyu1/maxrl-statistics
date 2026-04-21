@@ -1,10 +1,11 @@
 """
 Orchestrator for the canonical SL bag-of-words sweep.
 
-Hardcodes cuda:0 and cuda:1. Seeds are the outermost loop (cross-device
-barrier). Within a seed, corrs are partitioned between devices: GPU0 gets
-candidate_corrs[:len//2] in stride-4 top-to-bottom order, GPU1 gets
-candidate_corrs[len//2:] in stride-4 bottom-to-top order.
+Hardcodes cuda:0 and cuda:1. Each device thread iterates over the full
+(seed, job) product independently — no cross-device barrier. Corrs are
+partitioned between devices: GPU0 gets candidate_corrs[:len//2] in stride-4
+top-to-bottom order, GPU1 gets candidate_corrs[len//2:] in stride-4
+bottom-to-top order.
 
 Usage:
     uv run python experiments/bow/sl-corr/orchestrate.py
@@ -45,24 +46,29 @@ def build_jobs(*, device_id: int) -> list[float]:
     return [high[i] for i in stride_4_bottom_up(len(high))]
 
 
-def run_jobs(*, jobs: list[float], device_id: int, seed: int, log_path: Path) -> None:
+def run_jobs(
+    *, jobs: list[float], device_id: int, seeds: list[int], log_path: Path
+) -> None:
     device = f"cuda:{device_id}"
     with log_path.open("ab") as log_fh:
-        header = f"\n===== seed={seed} device={device} ({len(jobs)} jobs) =====\n"
-        log_fh.write(header.encode())
-        log_fh.flush()
-        for corr in jobs:
-            cmd = [
-                "uv", "run", "python", str(SINGLE_RUN),
-                "--corr", str(corr),
-                "--seed", str(seed),
-                "--device", device,
-            ]
-            tag = f"[{device} seed={seed} corr={corr}]"
-            print(f"{tag} launching", flush=True)
-            returncode = subprocess.call(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
-            status = "done" if returncode == 0 else f"FAILED rc={returncode}"
-            print(f"{tag} {status}", flush=True)
+        for seed in seeds:
+            header = f"\n===== seed={seed} device={device} ({len(jobs)} jobs) =====\n"
+            log_fh.write(header.encode())
+            log_fh.flush()
+            for corr in jobs:
+                cmd = [
+                    "uv", "run", "python", str(SINGLE_RUN),
+                    "--corr", str(corr),
+                    "--seed", str(seed),
+                    "--device", device,
+                ]
+                tag = f"[{device} seed={seed} corr={corr}]"
+                print(f"{tag} launching", flush=True)
+                returncode = subprocess.call(
+                    cmd, stdout=log_fh, stderr=subprocess.STDOUT
+                )
+                status = "done" if returncode == 0 else f"FAILED rc={returncode}"
+                print(f"{tag} {status}", flush=True)
 
 
 @click.command()
@@ -82,26 +88,24 @@ def main(dry_run: bool) -> None:
 
     LOG_BASE.mkdir(parents=True, exist_ok=True)
 
-    for seed in candidate_seeds:
-        threads = [
-            Thread(
-                target=run_jobs,
-                kwargs=dict(
-                    jobs=jobs_by_device[dev],
-                    device_id=dev,
-                    seed=seed,
-                    log_path=LOG_BASE / f"device_{dev}.log",
-                ),
-                daemon=True,
-                name=f"device-{dev}-seed-{seed}",
-            )
-            for dev in (0, 1)
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        print(f"\n===== seed {seed} complete on both devices =====\n")
+    threads = [
+        Thread(
+            target=run_jobs,
+            kwargs=dict(
+                jobs=jobs_by_device[dev],
+                device_id=dev,
+                seeds=list(candidate_seeds),
+                log_path=LOG_BASE / f"device_{dev}.log",
+            ),
+            daemon=True,
+            name=f"device-{dev}",
+        )
+        for dev in (0, 1)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
     print("All seeds done.")
 
