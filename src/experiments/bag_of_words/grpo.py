@@ -36,12 +36,13 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
     def get_canonical(
         cls,
         *,
+        dataset: str,
         num_rollouts_per_sample: int,
         gaussian_stdev: float,
         **kwargs: object,
     ) -> Self:
         config = cls(
-            **cls.canonical_kwargs(**kwargs),
+            **cls.dispatch_canonical_kwargs(dataset=dataset, **kwargs),
             num_rollouts_per_sample=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,
         )

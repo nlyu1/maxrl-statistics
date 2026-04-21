@@ -53,6 +53,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
     def get_canonical(
         cls,
         *,
+        dataset: str,
         num_rollouts_per_sample: int,
         gaussian_stdev: float,
         subtract_baseline: bool,
@@ -61,7 +62,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
         assert num_rollouts_per_sample >= 1
         assert gaussian_stdev > 0.0
         config = cls(
-            **cls.canonical_kwargs(**kwargs),
+            **cls.dispatch_canonical_kwargs(dataset=dataset, **kwargs),
             num_rollouts_per_sample=num_rollouts_per_sample,
             degree=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,

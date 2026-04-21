@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-DATASET="homoskedastic"
+DATASET="word_heteroskedastic"
 SEEDS=(51 61 121 153 228)
 
 for seed in "${SEEDS[@]}"; do

@@ -3,7 +3,7 @@ Single SL training run on the bag-of-words task.
 
 Usage:
     uv run python experiments/bow/sl-corr/single_run.py \\
-        --corr 0.22 --seed 51 --device cuda:0
+        --dataset homoskedastic --corr 0.22 --seed 51 --device cuda:0
 
 Artifacts → artifacts/bow-sl-sweep/seed-{S}/{dataset_name}/
 """
@@ -24,14 +24,17 @@ from src.experiments.utils import cleanup_cuda, prepare_study_folder, set_seeds 
 STUDY_BASE = repo_root / "artifacts" / "bow-sl-sweep"
 DATA_BASE = repo_root / "artifacts" / "bow-data"
 AUX_WORDS_RATIO = 0.5
+DATASET_CHOICES = ("homoskedastic", "row_heteroskedastic", "word_heteroskedastic")
 
 
 @click.command()
+@click.option("--dataset", type=click.Choice(DATASET_CHOICES), required=True)
 @click.option("--corr", type=float, required=True)
 @click.option("--seed", type=int, required=True)
 @click.option("--device", type=str, required=True)
 @click.option("--train-epochs", type=int, default=20, show_default=True)
 def main(
+    dataset: str,
     corr: float,
     seed: int,
     device: str,
@@ -43,13 +46,14 @@ def main(
     torch_device = torch.device(device)
 
     config = BagOfWordsSLConfig.get_canonical(
+        dataset=dataset,
         dataset_base_folder=DATA_BASE,
         study_base_folder=study_base,
         corr=corr,
         aux_words_ratio=AUX_WORDS_RATIO,
         train_epochs=train_epochs,
     )
-    tag = f"seed={seed} corr={corr:.4f}"
+    tag = f"dataset={dataset} seed={seed} corr={corr:.4f}"
     study_folder = config.study_folder
 
     if not prepare_study_folder(study_folder=study_folder, tag=tag):

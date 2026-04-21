@@ -174,8 +174,22 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
         )
 
     @classmethod
-    def get_canonical(cls, **kwargs: object) -> Self:
-        config = cls(**cls.canonical_kwargs(**kwargs))
+    def dispatch_canonical_kwargs(cls, *, dataset: str, **kwargs) -> dict:
+        """Pick the right `canonical_*_kwargs` factory by dataset name."""
+        factories = {
+            "homoskedastic": cls.canonical_kwargs,
+            "row_heteroskedastic": cls.canonical_row_heteroskedastic_kwargs,
+            "word_heteroskedastic": cls.canonical_word_heteroskedastic_kwargs,
+        }
+        if dataset not in factories:
+            raise ValueError(
+                f"unknown dataset {dataset!r}; expected one of {sorted(factories)}"
+            )
+        return factories[dataset](**kwargs)
+
+    @classmethod
+    def get_canonical(cls, *, dataset: str, **kwargs: object) -> Self:
+        config = cls(**cls.dispatch_canonical_kwargs(dataset=dataset, **kwargs))
         config.prepare_study_folder()
         return config
 

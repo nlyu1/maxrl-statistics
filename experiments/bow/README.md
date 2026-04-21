@@ -1,37 +1,37 @@
 # Bag-of-words experiments
 
-Each flavor (`sl-corr/`, `grpo-corr/`, `maxrl-corr/`) has two scripts:
+Each flavor (`sl-corr/`, `grpo-corr/`, `maxrl-corr/`) has a `single_run.py` (one training run) and an `orchestrate.py` (one `(dataset, seed)` fanned across `cuda:0`/`cuda:1`). Seed iteration lives in the bash drivers. Dataset choices: `homoskedastic`, `row_heteroskedastic`, `word_heteroskedastic`.
 
-- `single_run.py` — one training run. Resumable: loudly skips if the study folder already has `metrics.parquet` for all epochs; wipes and retries otherwise. Manually delete the study folder to overwrite.
-- `orchestrate.py` — hard-codes `cuda:0` and `cuda:1`, partitions work across both GPUs, spawns one `single_run.py` subprocess per job. Seeds are outermost with a cross-device barrier.
-
-Canonical grids live in [`src/data/bag_of_words.py`](../../src/data/bag_of_words.py).
-
-## Run the full sweeps
+## Sweeps
 
 ```bash
-uv run python experiments/bow/sl-corr/orchestrate.py
-uv run python experiments/bow/grpo-corr/orchestrate.py
-...
+experiments/bow/sweep_homoskedastic.bash
+experiments/bow/sweep_row_heteroskedastic.bash
+experiments/bow/sweep_word_heteroskedastic.bash
 ```
 
-Add `--dry-run` to print the per-device job lists and exit without training.
-For MaxRL, choose exactly one of `--subtract-baseline` or `--no-subtract-baseline`.
-
-## Run a single experiment
+## Single orchestrator call
 
 ```bash
-# SL: (corr, seed)
+uv run python experiments/bow/sl-corr/orchestrate.py \
+    --dataset homoskedastic --seed 51
+uv run python experiments/bow/grpo-corr/orchestrate.py \
+    --dataset word_heteroskedastic --seed 51
+uv run python experiments/bow/maxrl-corr/orchestrate.py \
+    --dataset row_heteroskedastic --seed 51 --subtract-baseline True
+```
+
+Add `--dry-run` to print per-device job lists.
+
+## Single experiment
+
+```bash
 uv run python experiments/bow/sl-corr/single_run.py \
-    --corr 0.22 --seed 51 --device cuda:0
-
-# GRPO: (corr, num_rollouts, seed)
+    --dataset homoskedastic --corr 0.22 --seed 51 --device cuda:0
 uv run python experiments/bow/grpo-corr/single_run.py \
-    --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0
-
-# MaxRL: (corr, num_rollouts, seed)
+    --dataset homoskedastic --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0
 uv run python experiments/bow/maxrl-corr/single_run.py \
-    --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0 \
+    --dataset homoskedastic --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0 \
     --subtract-baseline True
 ```
 
