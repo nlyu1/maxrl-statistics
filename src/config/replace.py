@@ -284,6 +284,3 @@ def replace_in_nested_config(config: Any, *, path: str, replacement: Any) -> Any
         return replacement
 
     return _replace_tokens(config, tokens=tokens, replacement=replacement, path=path)
-
-
-__all__ = ["PathToken", "child_path", "parse_path", "replace_in_nested_config"]

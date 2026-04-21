@@ -175,9 +175,3 @@ class BagOfWordsStudyBaseState(ABC):
         )
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
-
-
-__all__ = [
-    "BagOfWordsStudyBaseState",
-    "ValidationOutput",
-]

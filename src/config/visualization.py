@@ -429,39 +429,3 @@ def visualize_nested_config(
     container, render_context = solara.render(_panel())
     setattr(container, "_solara_render_context", render_context)
     return container
-
-
-def _tree_root_component(
-    *,
-    config: Any,
-    root_name: Optional[str],
-    expand_top_level: bool,
-    max_repr_len: int,
-    max_items_per_container: int,
-    max_depth: Optional[int],
-    large_container_threshold: int,
-    max_container_height_px: int,
-) -> None:
-    _validate_tree_args(
-        max_repr_len=max_repr_len,
-        max_items_per_container=max_items_per_container,
-        max_depth=max_depth,
-        large_container_threshold=large_container_threshold,
-        max_container_height_px=max_container_height_px,
-    )
-    root = _root_tree(
-        config=config,
-        root_name=root_name,
-        max_repr_len=max_repr_len,
-        max_items_per_container=max_items_per_container,
-        max_depth=max_depth,
-    )
-    _render_tree_root(
-        root=root,
-        expand_top_level=expand_top_level,
-        large_container_threshold=large_container_threshold,
-        max_container_height_px=max_container_height_px,
-    )
-
-
-__all__ = ["visualize_nested_config"]

@@ -35,6 +35,43 @@ def _ceil_to_multiple(*, value: int, multiple: int) -> int:
     return ((value + multiple - 1) // multiple) * multiple
 
 
+def canonical_dataset_folder_name(
+    *,
+    dataset: str,
+    corr: float,
+    aux_words_ratio: float,
+    num_words: int | None = None,
+    prompt_length: int = 128,
+    word_decay_power: float = 1.0,
+    row_hardness_eta: float = 8.0,
+    snr_halflife_in_word_quantile: float = 0.15,
+) -> str:
+    """Compute the dataset folder name that a `canonical_*_kwargs` call would
+    produce with otherwise-default arguments. Mirrors the folder-name format
+    string in `_canonical_kwargs_impl`; keep the two in sync."""
+    if dataset == "homoskedastic":
+        resolved_num_words = 7 if num_words is None else num_words
+        suffix = ""
+    elif dataset == "row_heteroskedastic":
+        resolved_num_words = 15 if num_words is None else num_words
+        suffix = f"_eta-{row_hardness_eta}"
+    elif dataset == "word_heteroskedastic":
+        resolved_num_words = 15 if num_words is None else num_words
+        suffix = f"_hl-{snr_halflife_in_word_quantile}"
+    else:
+        raise ValueError(f"unknown dataset {dataset!r}")
+    return (
+        f"{resolved_num_words}-words_corr-{corr}_len-{prompt_length}"
+        f"_pow-{word_decay_power}_ar-{aux_words_ratio}{suffix}"
+    )
+
+
+# Orchestrator exit code when no work remains at invocation time. Distinct
+# from 0 (ran a chunk or nothing to do but work may remain elsewhere) and 1
+# (error) so the bash driver can detect a truly-empty pass.
+EXIT_NO_WORK_REMAINING = 10
+
+
 class BagOfWordsStudyBaseConfig(BaseConfig):
     data: BagOfWordsDatasetConfigUnion
     tokenization: TokenizedParquetDatasetConfig

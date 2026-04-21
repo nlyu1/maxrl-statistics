@@ -22,15 +22,6 @@ DEFAULT_HALFLIFE: float = 0.15
 DEFAULT_CORR: float = 0.1
 
 
-def default_indices() -> tuple[int, int]:
-    h_idx = HALFLIVES.index(DEFAULT_HALFLIFE)
-    c_idx = min(
-        range(len(CORRS)),
-        key=lambda i: abs(CORRS[i] - DEFAULT_CORR),
-    )
-    return h_idx, c_idx
-
-
 def coordinated_slider_js(*, title_path: str = "title.text") -> str:
     """Post-script JS that keeps trace visibility in sync with two sliders.
 
