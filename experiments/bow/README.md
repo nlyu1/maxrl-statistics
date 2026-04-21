@@ -35,11 +35,6 @@ uv run python experiments/bow/maxrl-corr/single_run.py \
     --subtract-baseline True
 ```
 
-## Sharding strategy
+## Analysis
 
-Both orchestrators enforce: finish seed *k* on both devices before starting seed *k+1*.
-
-- **GRPO / MaxRL** — both devices traverse all 16 corrs (disjoint rollout halves, no collision). GPU0 walks stride-4 top-down × `rollouts[:3]` natural; GPU1 walks stride-4 bottom-up × `rollouts[3:]` reversed. Prioritizes rollout-axis coverage first, then corr.
-- **SL** — corrs are partitioned: GPU0 gets `corrs[:8]` stride-4 top-down, GPU1 gets `corrs[8:]` stride-4 bottom-up.
-
-Stride-4 ordering means if a run is interrupted early, both ends of the corr range are still sampled — good coverage-under-time.
+Run `analyze.ipynb` top-to-bottom to visualize and save the experiment artifacts.

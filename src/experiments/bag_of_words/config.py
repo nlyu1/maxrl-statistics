@@ -49,14 +49,17 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
     compile_mode: str = "reduce-overhead"
 
     @classmethod
-    def canonical_kwargs(
+    def _canonical_kwargs_impl(
         cls,
         *,
+        dataset_cls: type[BagOfWordsDatasetConfig],
+        dataset_extra_kwargs: dict,
+        folder_suffix: str,
+        num_words: int,
         dataset_base_folder: Path,
         study_base_folder: Path,
         corr: float,
         aux_words_ratio: float,
-        num_words: int = 7,
         num_samples: int = 50_000,
         prompt_length: int = 128,
         filter_samples_above_n_tokens: int = 384,
@@ -78,9 +81,9 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
 
         dataset_folder = dataset_base_folder / (
             f"{num_words}-words_corr-{corr}_len-{prompt_length}"
-            f"_pow-{word_decay_power}_ar-{aux_words_ratio}"
+            f"_pow-{word_decay_power}_ar-{aux_words_ratio}{folder_suffix}"
         )
-        data = BagOfWordsDatasetConfig.init_or_load_from(
+        data = dataset_cls.init_or_load_from(
             folder=dataset_folder,
             corr=corr,
             num_train_samples=num_samples,
@@ -89,6 +92,7 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             word_assignments=list(canonical_bags[num_words]),
             aux_words_ratio=aux_words_ratio,
             word_decay_power=word_decay_power,
+            **dataset_extra_kwargs,
         )
 
         tokenization = TokenizedParquetDatasetConfig(
@@ -123,6 +127,50 @@ class BagOfWordsStudyBaseConfig(BaseConfig):
             train_epochs=train_epochs,
             study_folder=study_base_folder / dataset_folder.name,
             compile_model=compile_model,
+        )
+
+    @classmethod
+    def canonical_kwargs(cls, *, num_words: int = 7, **base_kwargs) -> dict:
+        return cls._canonical_kwargs_impl(
+            dataset_cls=BagOfWordsDatasetConfig,
+            dataset_extra_kwargs={},
+            folder_suffix="",
+            num_words=num_words,
+            **base_kwargs,
+        )
+
+    @classmethod
+    def canonical_row_heteroskedastic_kwargs(
+        cls,
+        *,
+        row_hardness_eta: float = 8.0,
+        num_words: int = 15,
+        **base_kwargs,
+    ) -> dict:
+        return cls._canonical_kwargs_impl(
+            dataset_cls=RowHeterogeneousBagOfWordsDatasetConfig,
+            dataset_extra_kwargs={"row_hardness_eta": row_hardness_eta},
+            folder_suffix=f"_eta-{row_hardness_eta}",
+            num_words=num_words,
+            **base_kwargs,
+        )
+
+    @classmethod
+    def canonical_word_heteroskedastic_kwargs(
+        cls,
+        *,
+        snr_halflife_in_word_quantile: float = 0.15,
+        num_words: int = 15,
+        **base_kwargs,
+    ) -> dict:
+        return cls._canonical_kwargs_impl(
+            dataset_cls=SignalHeterogeneousBagOfWordsDatasetConfig,
+            dataset_extra_kwargs={
+                "snr_halflife_in_word_quantile": snr_halflife_in_word_quantile
+            },
+            folder_suffix=f"_hl-{snr_halflife_in_word_quantile}",
+            num_words=num_words,
+            **base_kwargs,
         )
 
     @classmethod
