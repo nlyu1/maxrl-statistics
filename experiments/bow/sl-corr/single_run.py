@@ -5,7 +5,7 @@ Usage:
     uv run python experiments/bow/sl-corr/single_run.py \\
         --dataset homoskedastic --corr 0.22 --seed 51 --device cuda:0
 
-Artifacts → artifacts/bow-sl-sweep/seed-{S}/{dataset_name}/
+Artifacts → artifacts/bow-sl-{hom,row-het,word-het}-sweep/seed-{S}/{dataset_name}/
 """
 
 import sys
@@ -18,11 +18,13 @@ from src import chdir_repo_base, get_repo_base
 chdir_repo_base()
 repo_root = get_repo_base()
 
+from src.experiments.bag_of_words.config import sweep_root_name  # noqa: E402
 from src.experiments.bag_of_words.sl import BagOfWordsSLConfig  # noqa: E402
 from src.experiments.utils import cleanup_cuda, prepare_study_folder, set_seeds  # noqa: E402
 
-STUDY_BASE = repo_root / "artifacts" / "bow-sl-sweep"
-DATA_BASE = repo_root / "artifacts" / "bow-data"
+ARTIFACTS_ROOT = repo_root / "artifacts"
+DATA_BASE = ARTIFACTS_ROOT / "bow-data"
+METHOD = "sl"
 AUX_WORDS_RATIO = 0.5
 DATASET_CHOICES = ("homoskedastic", "row_heteroskedastic", "word_heteroskedastic")
 
@@ -42,7 +44,11 @@ def main(
 ) -> None:
     set_seeds(seed)
 
-    study_base = STUDY_BASE / f"seed-{seed}"
+    study_base = (
+        ARTIFACTS_ROOT
+        / sweep_root_name(method=METHOD, dataset=dataset)
+        / f"seed-{seed}"
+    )
     torch_device = torch.device(device)
 
     config = BagOfWordsSLConfig.get_canonical(

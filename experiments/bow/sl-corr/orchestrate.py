@@ -25,9 +25,11 @@ chdir_repo_base()
 repo_root = get_repo_base()
 
 from src.data.bag_of_words import candidate_corrs  # noqa: E402
+from src.experiments.bag_of_words.config import sweep_root_name  # noqa: E402
 
 SINGLE_RUN = repo_root / "experiments" / "bow" / "sl-corr" / "single_run.py"
-LOG_BASE = repo_root / "artifacts" / "bow-sl-sweep" / "logs"
+ARTIFACTS_ROOT = repo_root / "artifacts"
+METHOD = "sl"
 DATASET_CHOICES = ("homoskedastic", "row_heteroskedastic", "word_heteroskedastic")
 
 
@@ -91,7 +93,7 @@ def main(dataset: str, seed: int, dry_run: bool) -> None:
     if dry_run:
         return
 
-    log_dir = LOG_BASE / dataset
+    log_dir = ARTIFACTS_ROOT / sweep_root_name(method=METHOD, dataset=dataset) / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     threads = [

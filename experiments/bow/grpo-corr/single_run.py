@@ -5,7 +5,7 @@ Usage:
     uv run python experiments/bow/grpo-corr/single_run.py \\
         --dataset homoskedastic --corr 0.22 --num-rollouts 64 --seed 51 --device cuda:0
 
-Artifacts → artifacts/bow-grpo-sweep/seed-{S}/rollouts-{N}/{dataset_name}/
+Artifacts → artifacts/bow-grpo-{hom,row-het,word-het}-sweep/seed-{S}/rollouts-{N}/{dataset_name}/
 """
 
 import sys
@@ -18,11 +18,13 @@ from src import chdir_repo_base, get_repo_base
 chdir_repo_base()
 repo_root = get_repo_base()
 
+from src.experiments.bag_of_words.config import sweep_root_name  # noqa: E402
 from src.experiments.bag_of_words.grpo import BagOfWordsGRPOConfig  # noqa: E402
 from src.experiments.utils import cleanup_cuda, prepare_study_folder, set_seeds  # noqa: E402
 
-STUDY_BASE = repo_root / "artifacts" / "bow-grpo-sweep"
-DATA_BASE = repo_root / "artifacts" / "bow-data"
+ARTIFACTS_ROOT = repo_root / "artifacts"
+DATA_BASE = ARTIFACTS_ROOT / "bow-data"
+METHOD = "grpo"
 AUX_WORDS_RATIO = 0.5
 GAUSSIAN_STDEV = 1.0
 DATASET_CHOICES = ("homoskedastic", "row_heteroskedastic", "word_heteroskedastic")
@@ -45,7 +47,12 @@ def main(
 ) -> None:
     set_seeds(seed)
 
-    study_base = STUDY_BASE / f"seed-{seed}" / f"rollouts-{num_rollouts}"
+    study_base = (
+        ARTIFACTS_ROOT
+        / sweep_root_name(method=METHOD, dataset=dataset)
+        / f"seed-{seed}"
+        / f"rollouts-{num_rollouts}"
+    )
     torch_device = torch.device(device)
 
     config = BagOfWordsGRPOConfig.get_canonical(

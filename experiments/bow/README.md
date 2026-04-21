@@ -2,6 +2,12 @@
 
 Each flavor (`sl-corr/`, `grpo-corr/`, `maxrl-corr/`) has a `single_run.py` (one training run) and an `orchestrate.py` (one `(dataset, seed)` fanned across `cuda:0`/`cuda:1`). Seed iteration lives in the bash drivers. Dataset choices: `homoskedastic`, `row_heteroskedastic`, `word_heteroskedastic`.
 
+Each (method, dataset) pair writes to its own artifacts root:
+
+```
+artifacts/bow-{sl,grpo,maxrl}-{hom,row-het,word-het}-sweep/
+```
+
 ## Sweeps
 
 ```bash

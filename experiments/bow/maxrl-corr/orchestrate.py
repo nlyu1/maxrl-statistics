@@ -29,9 +29,11 @@ chdir_repo_base()
 repo_root = get_repo_base()
 
 from src.data.bag_of_words import candidate_corrs, candidate_rollout_steps  # noqa: E402
+from src.experiments.bag_of_words.config import sweep_root_name  # noqa: E402
 
 SINGLE_RUN = repo_root / "experiments" / "bow" / "maxrl-corr" / "single_run.py"
-LOG_BASE = repo_root / "artifacts" / "bow-maxrl-sweep" / "logs"
+ARTIFACTS_ROOT = repo_root / "artifacts"
+METHOD = "maxrl"
 DATASET_CHOICES = ("homoskedastic", "row_heteroskedastic", "word_heteroskedastic")
 
 
@@ -119,7 +121,12 @@ def main(dataset: str, seed: int, subtract_baseline: bool, dry_run: bool) -> Non
     if dry_run:
         return
 
-    log_dir = LOG_BASE / dataset / baseline_mode
+    log_dir = (
+        ARTIFACTS_ROOT
+        / sweep_root_name(method=METHOD, dataset=dataset)
+        / "logs"
+        / baseline_mode
+    )
     log_dir.mkdir(parents=True, exist_ok=True)
 
     threads = [

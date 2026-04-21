@@ -72,6 +72,27 @@ def canonical_dataset_folder_name(
 EXIT_NO_WORK_REMAINING = 10
 
 
+SWEEP_ROOT_SUFFIX_BY_DATASET: dict[str, str] = {
+    "homoskedastic": "-hom-sweep",
+    "row_heteroskedastic": "-row-het-sweep",
+    "word_heteroskedastic": "-word-het-sweep",
+}
+
+
+def sweep_root_name(*, method: str, dataset: str) -> str:
+    """Name of the top-level artifacts folder for a given (method, dataset).
+
+    Example: method='maxrl', dataset='word_heteroskedastic' -> 'bow-maxrl-word-het-sweep'.
+    Mirrors the layout used by single_run / orchestrate / analysis.
+    """
+    if dataset not in SWEEP_ROOT_SUFFIX_BY_DATASET:
+        raise ValueError(
+            f"unknown dataset {dataset!r}; expected one of "
+            f"{sorted(SWEEP_ROOT_SUFFIX_BY_DATASET)}"
+        )
+    return f"bow-{method}{SWEEP_ROOT_SUFFIX_BY_DATASET[dataset]}"
+
+
 class BagOfWordsStudyBaseConfig(BaseConfig):
     data: BagOfWordsDatasetConfigUnion
     tokenization: TokenizedParquetDatasetConfig

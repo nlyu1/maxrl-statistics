@@ -14,28 +14,28 @@ from src.data.bag_of_words import (
     candidate_rollout_steps,
     candidate_seeds,
 )
-
-# Canonical dataset-folder defaults shared by all single_run scripts.
-# Must match BagOfWordsStudyBaseConfig.canonical_kwargs.
-_CANONICAL_NUM_WORDS = 7
-_CANONICAL_PROMPT_LENGTH = 128
-_CANONICAL_WORD_DECAY_POWER = 1.0
-_CANONICAL_AUX_WORDS_RATIO = 0.5
+from src.experiments.bag_of_words.config import (
+    canonical_dataset_folder_name,
+    sweep_root_name,
+)
 
 _ROLLOUTS_RE = re.compile(r" r=(\d+)")
 
-
-def _dataset_folder_name(*, corr: float) -> str:
-    return (
-        f"{_CANONICAL_NUM_WORDS}-words_corr-{corr}"
-        f"_len-{_CANONICAL_PROMPT_LENGTH}"
-        f"_pow-{_CANONICAL_WORD_DECAY_POWER}"
-        f"_ar-{_CANONICAL_AUX_WORDS_RATIO}"
-    )
+# Canonical sweep-time value; matches AUX_WORDS_RATIO in every single_run.py.
+# If a sweep ever uses a different ratio, the factories below won't find it.
+_SWEEP_AUX_WORDS_RATIO = 0.5
 
 
 def _seed_folder_name(seed: int) -> str:
     return f"seed-{seed}"
+
+
+def _dataset_folder_name(*, dataset: str, corr: float) -> str:
+    return canonical_dataset_folder_name(
+        dataset=dataset,
+        corr=corr,
+        aux_words_ratio=_SWEEP_AUX_WORDS_RATIO,
+    )
 
 
 def _maxrl_baseline_folder(*, subtract_baseline: bool) -> str:
@@ -101,8 +101,15 @@ class BagOfWordsAnalysisConfig(BaseConfig):
         )
 
     @classmethod
-    def from_sl_sweep(cls, *, study_base: Path) -> Self | None:
-        """Discover SL runs under `study_base/seed-{S}/{dataset_name}/`."""
+    def from_sl_sweep(
+        cls,
+        *,
+        artifacts_root: Path,
+        dataset: str = "homoskedastic",
+    ) -> Self | None:
+        """Discover SL runs under
+        `<artifacts_root>/bow-sl-<suffix>-sweep/seed-{S}/{dataset_folder}/`."""
+        study_base = artifacts_root / sweep_root_name(method="sl", dataset=dataset)
         if not study_base.exists():
             return None
         grouped: dict[str, list[tuple[int, Path]]] = {}
@@ -113,15 +120,22 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                 path = (
                     study_base
                     / _seed_folder_name(seed)
-                    / _dataset_folder_name(corr=corr)
+                    / _dataset_folder_name(dataset=dataset, corr=corr)
                 )
                 pairs.append((seed, path))
             grouped[name] = pairs
         return cls.from_grouped(grouped)
 
     @classmethod
-    def from_grpo_sweep(cls, *, study_base: Path) -> Self | None:
-        """Discover GRPO runs under `study_base/seed-{S}/rollouts-{N}/{dataset_name}/`."""
+    def from_grpo_sweep(
+        cls,
+        *,
+        artifacts_root: Path,
+        dataset: str = "homoskedastic",
+    ) -> Self | None:
+        """Discover GRPO runs under
+        `<artifacts_root>/bow-grpo-<suffix>-sweep/seed-{S}/rollouts-{N}/{dataset_folder}/`."""
+        study_base = artifacts_root / sweep_root_name(method="grpo", dataset=dataset)
         if not study_base.exists():
             return None
         grouped: dict[str, list[tuple[int, Path]]] = {}
@@ -134,7 +148,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                         study_base
                         / _seed_folder_name(seed)
                         / f"rollouts-{r}"
-                        / _dataset_folder_name(corr=corr)
+                        / _dataset_folder_name(dataset=dataset, corr=corr)
                     )
                     pairs.append((seed, path))
                 grouped[name] = pairs
@@ -142,12 +156,17 @@ class BagOfWordsAnalysisConfig(BaseConfig):
 
     @classmethod
     def from_maxrl_sweep(
-        cls, *, study_base: Path, subtract_baseline: bool
+        cls,
+        *,
+        artifacts_root: Path,
+        subtract_baseline: bool,
+        dataset: str = "homoskedastic",
     ) -> Self | None:
         """Discover MaxRL runs under
-        `study_base/seed-{S}/rollouts-{N}/{baseline_mode}/{dataset_name}/`.
+        `<artifacts_root>/bow-maxrl-<suffix>-sweep/seed-{S}/rollouts-{N}/{baseline_mode}/{dataset_folder}/`.
         The baseline mode is fixed per factory call (and hence absent from
         group keys — surface it in the figure title instead)."""
+        study_base = artifacts_root / sweep_root_name(method="maxrl", dataset=dataset)
         if not study_base.exists():
             return None
         baseline_folder = _maxrl_baseline_folder(subtract_baseline=subtract_baseline)
@@ -162,7 +181,7 @@ class BagOfWordsAnalysisConfig(BaseConfig):
                         / _seed_folder_name(seed)
                         / f"rollouts-{r}"
                         / baseline_folder
-                        / _dataset_folder_name(corr=corr)
+                        / _dataset_folder_name(dataset=dataset, corr=corr)
                     )
                     pairs.append((seed, path))
                 grouped[name] = pairs
