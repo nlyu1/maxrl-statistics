@@ -1,6 +1,7 @@
 # MaxRL-statistics
 
 Research code for maximum-likelihood reinforcement learning for statistical estimation.
+See [project page](https://nlyu1.github.io/maxrl-statistics/) for more details.
 
 ## Layout
 
