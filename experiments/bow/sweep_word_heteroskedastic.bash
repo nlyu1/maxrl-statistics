@@ -8,10 +8,10 @@ DATASET="word_heteroskedastic"
 SEEDS=(51 61 121 153 228)
 
 for seed in "${SEEDS[@]}"; do
-    uv run python experiments/bow/maxrl-corr/orchestrate.py \
-        --dataset "${DATASET}" --seed "${seed}" --subtract-baseline True
     uv run python experiments/bow/grpo-corr/orchestrate.py \
         --dataset "${DATASET}" --seed "${seed}"
+    uv run python experiments/bow/maxrl-corr/orchestrate.py \
+        --dataset "${DATASET}" --seed "${seed}" --subtract-baseline True
     uv run python experiments/bow/sl-corr/orchestrate.py \
         --dataset "${DATASET}" --seed "${seed}"
 done

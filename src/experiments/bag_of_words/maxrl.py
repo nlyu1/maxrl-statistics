@@ -68,7 +68,7 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
             gaussian_stdev=gaussian_stdev,
             subtract_baseline=subtract_baseline,
         )
-        config.prepare_study_folder()
+        config.save_config_json()
         return config
 
 

@@ -46,7 +46,7 @@ class BagOfWordsGRPOConfig(BagOfWordsStudyBaseConfig):
             num_rollouts_per_sample=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,
         )
-        config.prepare_study_folder()
+        config.save_config_json()
         return config
 
 
