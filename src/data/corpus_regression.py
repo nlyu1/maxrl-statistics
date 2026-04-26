@@ -29,10 +29,10 @@ _DATASET_CONFIG = "sample-10BT"
 _SEED = 42
 
 
-# Canonical sweep grid for the corpus-regression experiments. 16 lookforward
-# horizons spanning short (next-token) to long (32-token skip-ahead).
+# Canonical sweep grid for the corpus-regression experiments. 8 lookforward
+# horizons spanning next-token to 8-token skip-ahead.
 candidate_lookforward_tokens: list[int] = [
-    1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32,
+    1, 2, 3, 4, 5, 6, 7, 8,
 ]
 
 # Rollout counts for RL sweeps.
@@ -101,7 +101,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     def canonical_kwargs(cls) -> dict[str, Any]:
         return {
             "prefix_length": 128,
-            "num_samples": 50_000,
+            "num_samples": 100_000,
             "pretrained_tokenizer_model_name": "HuggingFaceTB/SmolLM2-135M",
             "num_lookforward_tokens": 1,
             "embedding_dim": 32,

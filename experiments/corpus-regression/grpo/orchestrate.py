@@ -1,7 +1,7 @@
 """
 Orchestrator for one GRPO corpus-regression sweep (single seed).
 
-Hardcodes cuda:0 and cuda:1. Both devices traverse the full 16-element
+Hardcodes cuda:0 and cuda:1. Both devices traverse the full
 `candidate_lookforward_tokens` grid (GPU0 top-down, GPU1 bottom-up) and the
 rollout axis is partitioned by extremes-vs-middles:
     GPU0 -> [1024, 4]   (max + min)

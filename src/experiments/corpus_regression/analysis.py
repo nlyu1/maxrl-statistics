@@ -276,7 +276,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     ]:
         """For SL: each study gets a unique color, no group title. For rollout
         sweeps: color by rollouts, legend-group by lookforward, default-visible
-        is the max-look group."""
+        is the min-look group available (so partial sweeps still show
+        something on first render)."""
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
         if rollouts is None:
@@ -297,13 +298,13 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 study_colors[n] = rollouts_colors[r]
                 study_legendgroups[n] = f"look={self.study_lookforwards[n]}"
                 study_legend_names[n] = f"r={r}"
-        max_look = max(self.study_lookforwards.values())
+        min_look = min(self.study_lookforwards.values())
         return (
             study_colors,
             study_legendgroups,
             study_legend_names,
             True,
-            f"look={max_look}",
+            f"look={min_look}",
         )
 
     def plot_vs_epoch(
@@ -316,7 +317,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     ) -> go.Figure:
         """Two panels (train left, val right) of `{train,val}_{metric}` per
         epoch, one line per study (seed-mean). Rollout sweeps default-show
-        the max-look group with rollouts in `_DEFAULT_VISIBLE_ROLLOUTS`."""
+        the min-look group with rollouts in `_DEFAULT_VISIBLE_ROLLOUTS`."""
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         (

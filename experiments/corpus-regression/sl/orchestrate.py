@@ -1,9 +1,9 @@
 """
 Orchestrator for one SL corpus-regression sweep (single seed).
 
-Hardcodes cuda:0 and cuda:1. The 16-element `candidate_lookforward_tokens`
-grid is split 50/50: GPU0 walks the first half top-down, GPU1 walks the
-second half bottom-up. Seed iteration is the caller's responsibility.
+Hardcodes cuda:0 and cuda:1. The `candidate_lookforward_tokens` grid is
+split 50/50: GPU0 walks the first half top-down, GPU1 walks the second
+half bottom-up. Seed iteration is the caller's responsibility.
 
 Usage:
     uv run python experiments/corpus-regression/sl/orchestrate.py --seed 51

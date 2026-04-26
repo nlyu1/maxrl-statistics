@@ -41,7 +41,7 @@ GAUSSIAN_STDEV = 1.0
 @click.option("--device", type=str, required=True)
 @click.option("--subtract-baseline", type=bool, required=True)
 @click.option("--use-factorized-likelihoods", type=bool, required=True)
-@click.option("--train-epochs", type=int, default=20, show_default=True)
+@click.option("--train-epochs", type=int, default=5, show_default=True)
 def main(
     num_lookforward_tokens: int,
     num_rollouts: int,

@@ -74,7 +74,7 @@
     "href": "index.html",
     "title": "MaxRL Statistics",
     "section": "",
-    "text": "Continuously updated research progress on the rollout-likelihood generalization of maximum likelihood reinforcement learning.\nTheory:\n\nTheory — MaxRL as a compute-indexed truncation of log-likelihood, per-rollout reweighting, and the generalized leave-one-out estimator.\nGradient Estimator — numerically stable \\(O(BRD)\\) computation of the leave-one-out weights via prefix-suffix scans of elementary symmetric polynomials.\n\nExperiments:\n\nRegression: bag of words — noise-robustness in the zero-step sampling setting.\nRegression: corpus regression — same zero-step setting on natural-language prefixes. WIP.\nRegression: DAG-reasoning — reasoning advantage and rollout efficiency. Not started."
+    "text": "Continuously updated research progress on the rollout-likelihood generalization of maximum likelihood reinforcement learning.\nTheory:\n\nTheory — MaxRL as a compute-indexed truncation of log-likelihood, per-rollout reweighting, and the generalized leave-one-out estimator.\nGradient Estimator — numerically stable \\(O(BRD)\\) computation of the leave-one-out weights via prefix-suffix scans of elementary symmetric polynomials.\n\nExperiments:\n\nRegression: bag of words — noise-robustness in the zero-step sampling setting. WIP.\nRegression: corpus regression — same zero-step setting on natural-language prefixes. WIP.\nRegression: DAG-reasoning — reasoning advantage and rollout efficiency. Not started."
   },
   {
     "objectID": "corpus-regression.html",
