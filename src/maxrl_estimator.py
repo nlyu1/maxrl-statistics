@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from typing import Self
 
 import torch
@@ -12,17 +11,17 @@ from src.config.base import BaseConfig
 
 class MaxRLEstimatorConfig(BaseConfig):
     degree: int
-    sup_likelihood: float
+    log_sup_likelihood: float
     subtract_baseline: bool
 
     @classmethod
     def initialize(
-        cls, *, degree: int, sup_likelihood: float, subtract_baseline: bool
+        cls, *, degree: int, log_sup_likelihood: float, subtract_baseline: bool
     ) -> Self:
         assert 1 <= degree, f"Degree must be nontrivial, got {degree}"
         return cls(
             degree=degree,
-            sup_likelihood=sup_likelihood,
+            log_sup_likelihood=log_sup_likelihood,
             subtract_baseline=subtract_baseline,
         )
 
@@ -39,7 +38,7 @@ class MaxRLEstimatorConfig(BaseConfig):
 
         Let
             R := num_rollouts
-            L := sup_likelihood                       (bound on l)
+            L := exp(log_sup_likelihood)              (bound on l)
             D := degree
             z_j ~ m_theta(- | x) i.i.d. for j = 1 ... R
             l_j := l(y, z_j) in [0, L]
@@ -109,7 +108,7 @@ class MaxRLEstimatorConfig(BaseConfig):
 
         with torch.no_grad():
             # log(sigma_j) = log(l_j) - log(L)
-            normalized_ll = log_likelihoods - math.log(self.sup_likelihood)
+            normalized_ll = log_likelihoods - self.log_sup_likelihood
             sigma_effective = self._maybe_subtract_baseline_from_normalized_ll(
                 normalized_ll=normalized_ll
             )

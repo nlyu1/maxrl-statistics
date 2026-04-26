@@ -39,10 +39,10 @@ class BagOfWordsMaxRLConfig(BagOfWordsStudyBaseConfig):
     def _build_estimator_config(self) -> MaxRLEstimatorConfig:
         sigma = self.gaussian_stdev
         assert sigma > 0.0
-        sup_likelihood = 1.0 / (math.sqrt(2.0 * math.pi) * sigma)
+        log_sup_likelihood = -math.log(math.sqrt(2.0 * math.pi) * sigma)
         return MaxRLEstimatorConfig.initialize(
             degree=self.degree,
-            sup_likelihood=sup_likelihood,
+            log_sup_likelihood=log_sup_likelihood,
             subtract_baseline=self.subtract_baseline,
         )
 
@@ -97,7 +97,7 @@ class BagOfWordsMaxRLState(BagOfWordsStudyBaseState):
             target_f = target.float()
             log_target_likelihoods: Float[Tensor, "batch rollout"] = -0.5 * (
                 (target_f.unsqueeze(-1) - rollouts_f) / sigma
-            ).pow(2) + math.log(self.estimator_config.sup_likelihood)
+            ).pow(2) + self.estimator_config.log_sup_likelihood
         return self.estimator_config.compute_score_weights(
             log_likelihoods=log_target_likelihoods,
         )

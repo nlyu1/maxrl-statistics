@@ -54,7 +54,7 @@ def _score_weights(
 ) -> torch.Tensor:
     config = MaxRLEstimatorConfig.initialize(
         degree=degree,
-        sup_likelihood=sup_likelihood,
+        log_sup_likelihood=math.log(sup_likelihood),
         subtract_baseline=subtract_baseline,
     )
     score_weights = config.compute_score_weights(log_likelihoods=likelihoods.log())
@@ -155,7 +155,7 @@ def test_single_rollout_returns_normalized_likelihoods() -> None:
     sup_likelihood = 2.5
     config = MaxRLEstimatorConfig.initialize(
         degree=1,
-        sup_likelihood=sup_likelihood,
+        log_sup_likelihood=math.log(sup_likelihood),
         subtract_baseline=False,
     )
 
@@ -179,7 +179,7 @@ def test_rollout_permutation_only_permutes_the_outputs() -> None:
     )
     permutation = torch.tensor([3, 0, 4, 1, 2])
     config = MaxRLEstimatorConfig.initialize(
-        degree=5, sup_likelihood=1.0, subtract_baseline=False
+        degree=5, log_sup_likelihood=0.0, subtract_baseline=False
     )
 
     original = config.compute_score_weights(log_likelihoods=likelihoods.log())
@@ -231,7 +231,7 @@ def test_score_weights_are_detached_from_autograd() -> None:
         requires_grad=True,
     )
     config = MaxRLEstimatorConfig.initialize(
-        degree=4, sup_likelihood=1.0, subtract_baseline=False
+        degree=4, log_sup_likelihood=0.0, subtract_baseline=False
     )
 
     score_weights = config.compute_score_weights(log_likelihoods=likelihoods.log())
@@ -250,7 +250,7 @@ def test_private_core_handles_zero_and_one_complements() -> None:
     )
     degree = 4
     config = MaxRLEstimatorConfig.initialize(
-        degree=degree, sup_likelihood=1.0, subtract_baseline=False
+        degree=degree, log_sup_likelihood=0.0, subtract_baseline=False
     )
 
     got = config._log_leave_one_out_weight(complement_nl=complements).exp()
@@ -273,7 +273,7 @@ def test_leave_one_out_dp_stays_finite_for_tiny_likelihoods() -> None:
     num_rollouts = 1024
     degree = 1024
     config = MaxRLEstimatorConfig.initialize(
-        degree=degree, sup_likelihood=1.0, subtract_baseline=False
+        degree=degree, log_sup_likelihood=0.0, subtract_baseline=False
     )
     # sigma_j = exp(-1000) => complement a_j = 1 - sigma_j ~= 1; log a_j ~= 0.
     log_likelihoods = torch.full((1, num_rollouts), -1000.0, dtype=torch.float64)
@@ -358,7 +358,7 @@ def test_baseline_requires_multiple_rollouts() -> None:
     import pytest
 
     config = MaxRLEstimatorConfig.initialize(
-        degree=1, sup_likelihood=1.0, subtract_baseline=True
+        degree=1, log_sup_likelihood=0.0, subtract_baseline=True
     )
     log_likelihoods = torch.tensor([[-0.5]], dtype=torch.float64)
 

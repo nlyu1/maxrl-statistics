@@ -24,7 +24,7 @@ class CorpusRegressionMaxRLConfig(CorpusRegressionStudyBaseConfig):
     so rollouts are joint-Gaussian samples around the deterministic prediction.
     MaxRL weights use the joint Gaussian likelihood of the noisy target under
     each rollout as l(y, z); the sup density is the joint mode at z = y,
-    L = (2 pi)^(-D/2) * sigma^(-D), and `sup_likelihood` must reflect that.
+    L = (2 pi)^(-D/2) * sigma^(-D), and `log_sup_likelihood` is log L.
     """
 
     num_rollouts_per_sample: int
@@ -40,10 +40,10 @@ class CorpusRegressionMaxRLConfig(CorpusRegressionStudyBaseConfig):
         sigma = self.gaussian_stdev
         D = self.data.embedding_dim
         assert sigma > 0.0
-        sup_likelihood = (math.sqrt(2.0 * math.pi) * sigma) ** (-D)
+        log_sup_likelihood = -D * math.log(math.sqrt(2.0 * math.pi) * sigma)
         return MaxRLEstimatorConfig.initialize(
             degree=self.degree,
-            sup_likelihood=sup_likelihood,
+            log_sup_likelihood=log_sup_likelihood,
             subtract_baseline=self.subtract_baseline,
         )
 
@@ -94,11 +94,11 @@ class CorpusRegressionMaxRLState(CorpusRegressionStudyBaseState):
             rollouts_f = rollouts.float()
             target_f = target.float()
             # Joint isotropic Gaussian log-likelihood: sum over D coords of
-            # per-coord log density. Add log(sup_likelihood) so the normalizer
+            # per-coord log density. Add log_sup_likelihood so the normalizer
             # in `compute_score_weights` (subtracts log L) cancels correctly.
             log_target_likelihoods: Float[Tensor, "batch rollout"] = -0.5 * (
                 (target_f.unsqueeze(1) - rollouts_f) / sigma
-            ).pow(2).sum(-1) + math.log(self.estimator_config.sup_likelihood)
+            ).pow(2).sum(-1) + self.estimator_config.log_sup_likelihood
         return self.estimator_config.compute_score_weights(
             log_likelihoods=log_target_likelihoods,
         )
