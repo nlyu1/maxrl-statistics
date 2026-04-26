@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Self
 
 import polars as pl
 import torch
+from pydantic import ValidationError
 
 from src.config.base import BaseConfig
 from src.data.corpus_regression import (
@@ -139,7 +140,9 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
 
     def save_config_json(self) -> None:
         """Create the study folder and persist `config.json`. If the file
-        already exists, verify it matches `self` and warn on mismatch."""
+        already exists, verify it matches `self` and warn on mismatch. If
+        the saved JSON fails validation under the current schema (e.g. a
+        new required field was added), warn and overwrite."""
         self.study_folder.mkdir(parents=True, exist_ok=True)
         config_path = self.study_folder / "config.json"
         config_json = self.model_dump_json(indent=2)
@@ -147,7 +150,15 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             config_path.write_text(config_json)
             return
 
-        saved = type(self).model_validate_json(config_path.read_text())
+        try:
+            saved = type(self).model_validate_json(config_path.read_text())
+        except ValidationError as e:
+            warnings.warn(
+                f"{config_path} fails validation under the current schema; "
+                f"overwriting.\n{e}"
+            )
+            config_path.write_text(config_json)
+            return
         if saved != self:
             warnings.warn(
                 f"{config_path} already exists with different config contents"

@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from typing import Self
 
 import torch
+from einops import rearrange, repeat
 from jaxtyping import Float, Int
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
@@ -19,20 +20,21 @@ from src.maxrl_estimator import MaxRLEstimatorConfig
 class CorpusRegressionMaxRLConfig(CorpusRegressionStudyBaseConfig):
     """Zero-step rollout, fully on-policy MaxRL config.
 
-    The policy is an isotropic Gaussian on the D-dim output,
-        m_theta(z | x) = N(f_theta(x), sigma^2 I_D),
-    so rollouts are joint-Gaussian samples around the deterministic prediction.
-    MaxRL weights use the joint Gaussian likelihood of the noisy target under
-    each rollout as l(y, z); the sup density is the joint mode at z = y,
-    L = (2 pi)^(-D/2) * sigma^(-D), and `log_sup_likelihood` is log L.
+    Policy: isotropic Gaussian m_theta(z | x) = N(f_theta(x), sigma^2 I_D).
+
+    use_factorized_likelihoods=True (canonical): per-coordinate scoring.
+    Each output dim d is treated as an independent 1-D regression with
+    likelihood l_d(y_d, z_d) = N(y_d; z_d, sigma^2). sigma_theta_d is
+    bounded above by 1/sqrt(2) regardless of D.
+
+    use_factorized_likelihoods=False: joint scoring with l(y, z) =
+    N(y; z, sigma^2 I_D). sigma_theta <= 2^(-D/2), exponentially small in D.
     """
 
     num_rollouts_per_sample: int
     degree: int
-    # Implied stdev of the Gaussian policy m_theta, NOT the data's noise.
     gaussian_stdev: float
     subtract_baseline: bool
-    # Important parameter: decouple coordinates
     use_factorized_likelihoods: bool
 
     def get_state_cls(self) -> type["CorpusRegressionMaxRLState"]:
@@ -40,9 +42,12 @@ class CorpusRegressionMaxRLConfig(CorpusRegressionStudyBaseConfig):
 
     def _build_estimator_config(self) -> MaxRLEstimatorConfig:
         sigma = self.gaussian_stdev
-        D = self.data.embedding_dim
+        d = self.data.embedding_dim
         assert sigma > 0.0
-        log_sup_likelihood = -D * math.log(math.sqrt(2.0 * math.pi) * sigma)
+        log_sup_one_dim = -math.log(math.sqrt(2.0 * math.pi) * sigma)
+        log_sup_likelihood = (
+            log_sup_one_dim if self.use_factorized_likelihoods else d * log_sup_one_dim
+        )
         return MaxRLEstimatorConfig.initialize(
             degree=self.degree,
             log_sup_likelihood=log_sup_likelihood,
@@ -59,6 +64,7 @@ class CorpusRegressionMaxRLConfig(CorpusRegressionStudyBaseConfig):
         num_rollouts_per_sample: int,
         gaussian_stdev: float,
         subtract_baseline: bool,
+        use_factorized_likelihoods: bool,
         **kwargs: object,
     ) -> Self:
         assert num_rollouts_per_sample >= 1
@@ -69,6 +75,7 @@ class CorpusRegressionMaxRLConfig(CorpusRegressionStudyBaseConfig):
             degree=num_rollouts_per_sample,
             gaussian_stdev=gaussian_stdev,
             subtract_baseline=subtract_baseline,
+            use_factorized_likelihoods=use_factorized_likelihoods,
         )
         config.save_config_json()
         return config
@@ -90,20 +97,30 @@ class CorpusRegressionMaxRLState(CorpusRegressionStudyBaseState):
         *,
         rollouts: Float[Tensor, "batch rollout D"],
         target: Float[Tensor, "batch D"],
-    ) -> Float[Tensor, "batch rollout"]:
+    ) -> Float[Tensor, "batch rollout D"]:
+        """Per-dim score coefficients. In joint mode the same scalar is broadcast
+        across the D dimension so the caller can multiply per-dim log-policy uniformly.
+        """
         sigma = self.config.gaussian_stdev
+        log_L = self.estimator_config.log_sup_likelihood
         with torch.no_grad():
             rollouts_f = rollouts.float()
             target_f = target.float()
-            # Joint isotropic Gaussian log-likelihood: sum over D coords of
-            # per-coord log density. Add log_sup_likelihood so the normalizer
-            # in `compute_score_weights` (subtracts log L) cancels correctly.
-            log_target_likelihoods: Float[Tensor, "batch rollout"] = -0.5 * (
+            sq: Float[Tensor, "batch rollout D"] = (
                 (target_f.unsqueeze(1) - rollouts_f) / sigma
-            ).pow(2).sum(-1) + self.estimator_config.log_sup_likelihood
-        return self.estimator_config.compute_score_weights(
-            log_likelihoods=log_target_likelihoods,
-        )
+            ).pow(2)
+            d = sq.shape[-1]
+            if self.config.use_factorized_likelihoods:
+                log_lik: Float[Tensor, "batch rollout D"] = -0.5 * sq + log_L
+                sw_flat = self.estimator_config.compute_score_weights(
+                    log_likelihoods=rearrange(log_lik, "b r d -> (b d) r"),
+                )
+                return rearrange(sw_flat, "(b d) r -> b r d", d=d)
+            log_lik_joint: Float[Tensor, "batch rollout"] = -0.5 * sq.sum(-1) + log_L
+            sw_joint = self.estimator_config.compute_score_weights(
+                log_likelihoods=log_lik_joint,
+            )
+            return repeat(sw_joint, "b r -> b r d", d=d)
 
     def train_step(
         self,
@@ -153,17 +170,13 @@ class CorpusRegressionMaxRLState(CorpusRegressionStudyBaseState):
                     prediction.unsqueeze(1) + sigma * noise
                 )
 
-            # Joint logp of each rollout under m_theta; sum over D coords gives
-            # log of product of per-coord Gaussian densities.
-            logp_rollouts: Float[Tensor, "batch rollout"] = -0.5 * (
+            logp_per_dim: Float[Tensor, "batch rollout D"] = -0.5 * (
                 (rollouts - prediction.unsqueeze(1)) / sigma
-            ).pow(2).sum(-1)
-            score_weights = self._compute_score_weights(
-                rollouts=rollouts,
-                target=target,
+            ).pow(2)
+            score_weights: Float[Tensor, "batch rollout D"] = (
+                self._compute_score_weights(rollouts=rollouts, target=target)
             )
-
-            loss = -(logp_rollouts * score_weights.detach()).mean()
+            loss = -(logp_per_dim * score_weights.detach()).sum(-1).mean()
 
             with torch.no_grad():
                 self.train_target_counter.tick(
