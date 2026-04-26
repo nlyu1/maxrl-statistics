@@ -105,14 +105,10 @@ class CorpusRegressionDatasetConfig(BaseConfig):
 
         total = len(prefix_list)
 
-        # Labels: element-wise product of Rademacher vectors over the lookforward window.
-        # Product of ±1 values is still ±1, so each label coordinate is in {-1, +1}.
-        labels: Int[Tensor, "total embedding_dim"] = torch.ones(
-            total, self.embedding_dim, dtype=torch.int8
-        )
-        for i, lf_ids in enumerate(lookforward_list):
-            for tid in lf_ids:
-                labels[i] *= rademacher[tid]
+        # Labels: Rademacher vectors for each lookforward token, flattened.
+        # Shape: (total, num_lookfoward_tokens * embedding_dim), values in {-1, +1}.
+        lf_tensor = torch.tensor(lookforward_list, dtype=torch.long)  # (total, num_look)
+        labels: Float[Tensor, "total label_dim"] = rademacher[lf_tensor].flatten(1).float()
 
         shuffle_rng = torch.Generator()
         shuffle_rng.manual_seed(_SEED)
@@ -121,7 +117,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         all_tokens: Int[Tensor, "total prefix_length"] = torch.tensor(
             prefix_list, dtype=torch.int32
         )[perm]
-        all_labels: Float[Tensor, "total embedding_dim"] = labels.float()[perm]
+        all_labels: Float[Tensor, "total label_dim"] = labels[perm]
 
         return CorpusRegressionDataset(
             config=self,
