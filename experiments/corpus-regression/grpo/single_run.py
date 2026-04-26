@@ -15,17 +15,17 @@ import sys
 import click
 import torch
 
-from src import chdir_repo_base, get_repo_base
+from src import chdir_repo_base
 
 chdir_repo_base()
-repo_root = get_repo_base()
 
+from src.experiments.corpus_regression.config import (  # noqa: E402
+    artifacts_dir,
+    data_dir,
+)
 from src.experiments.corpus_regression.grpo import CorpusRegressionGRPOConfig  # noqa: E402
 from src.experiments.utils import cleanup_cuda, set_seeds  # noqa: E402
 
-PROJECT_ROOT = repo_root / "artifacts" / "corpus-regression"
-DATA_BASE = PROJECT_ROOT
-ARTIFACTS_BASE = PROJECT_ROOT / "artifacts"
 METHOD = "grpo"
 GAUSSIAN_STDEV = 1.0
 
@@ -46,12 +46,12 @@ def main(
     set_seeds(seed)
 
     study_base = (
-        ARTIFACTS_BASE / METHOD / f"seed-{seed}" / f"rollouts-{num_rollouts}"
+        artifacts_dir() / METHOD / f"seed-{seed}" / f"rollouts-{num_rollouts}"
     )
     torch_device = torch.device(device)
 
     config = CorpusRegressionGRPOConfig.get_canonical(
-        dataset_base_folder=DATA_BASE,
+        dataset_base_folder=data_dir(),
         study_base_folder=study_base,
         num_lookforward_tokens=num_lookforward_tokens,
         train_epochs=train_epochs,

@@ -11,6 +11,7 @@ import polars as pl
 import torch
 from pydantic import ValidationError
 
+from src import get_repo_base
 from src.config.base import BaseConfig
 from src.data.corpus_regression import (
     CorpusRegressionDataloadingConfig,
@@ -223,3 +224,17 @@ def baseline_mode_folder(*, subtract_baseline: bool) -> str:
 
 def likelihood_mode_folder(*, use_factorized_likelihoods: bool) -> str:
     return "factorized" if use_factorized_likelihoods else "joint"
+
+
+def project_dir() -> Path:
+    return get_repo_base() / "artifacts" / "corpus-regression"
+
+
+def data_dir() -> Path:
+    """Canonical dataset cache: <repo>/artifacts/corpus-regression/data/."""
+    return project_dir() / "data"
+
+
+def artifacts_dir() -> Path:
+    """Canonical sweep-output root: <repo>/artifacts/corpus-regression/artifacts/."""
+    return project_dir() / "artifacts"

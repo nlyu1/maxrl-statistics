@@ -7,7 +7,7 @@ Usage:
         --subtract-baseline True --use-factorized-likelihoods True
 
 Artifacts ->
-    artifacts/corpus-regression-maxrl-sweep/seed-{S}/rollouts-{N}/
+    artifacts/corpus-regression/artifacts/maxrl/seed-{S}/rollouts-{N}/
     {baseline_mode}/{likelihood_mode}/{dataset_name}/
 where {dataset_name} encodes num_lookforward_tokens (e.g. ..._look4_dim32).
 """
@@ -17,27 +17,21 @@ import sys
 import click
 import torch
 
-from src import chdir_repo_base, get_repo_base
+from src import chdir_repo_base
 
 chdir_repo_base()
-repo_root = get_repo_base()
 
+from src.experiments.corpus_regression.config import (  # noqa: E402
+    artifacts_dir,
+    baseline_mode_folder,
+    data_dir,
+    likelihood_mode_folder,
+)
 from src.experiments.corpus_regression.maxrl import CorpusRegressionMaxRLConfig  # noqa: E402
-from src.experiments.utils import cleanup_cuda, set_seeds, sweep_root_name  # noqa: E402
+from src.experiments.utils import cleanup_cuda, set_seeds  # noqa: E402
 
-ARTIFACTS_ROOT = repo_root / "artifacts"
-DATA_BASE = ARTIFACTS_ROOT / "corpus-regression"
-PROJECT = "corpus-regression"
 METHOD = "maxrl"
 GAUSSIAN_STDEV = 1.0
-
-
-def _baseline_folder(*, subtract_baseline: bool) -> str:
-    return "subtract-baseline" if subtract_baseline else "no-subtract-baseline"
-
-
-def _likelihood_folder(*, use_factorized_likelihoods: bool) -> str:
-    return "factorized" if use_factorized_likelihoods else "joint"
 
 
 @click.command()
@@ -59,13 +53,13 @@ def main(
 ) -> None:
     set_seeds(seed)
 
-    baseline_mode = _baseline_folder(subtract_baseline=subtract_baseline)
-    likelihood_mode = _likelihood_folder(
+    baseline_mode = baseline_mode_folder(subtract_baseline=subtract_baseline)
+    likelihood_mode = likelihood_mode_folder(
         use_factorized_likelihoods=use_factorized_likelihoods,
     )
     study_base = (
-        ARTIFACTS_ROOT
-        / sweep_root_name(project=PROJECT, method=METHOD)
+        artifacts_dir()
+        / METHOD
         / f"seed-{seed}"
         / f"rollouts-{num_rollouts}"
         / baseline_mode
@@ -74,7 +68,7 @@ def main(
     torch_device = torch.device(device)
 
     config = CorpusRegressionMaxRLConfig.get_canonical(
-        dataset_base_folder=DATA_BASE,
+        dataset_base_folder=data_dir(),
         study_base_folder=study_base,
         num_lookforward_tokens=num_lookforward_tokens,
         train_epochs=train_epochs,

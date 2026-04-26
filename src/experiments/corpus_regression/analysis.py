@@ -16,31 +16,22 @@ from src.data.corpus_regression import (
     candidate_rollout_steps,
     candidate_seeds,
 )
+from src.experiments.corpus_regression.config import (
+    baseline_mode_folder,
+    likelihood_mode_folder,
+)
 
 _ROLLOUTS_RE = re.compile(r" r=(\d+)")
-_SWEEP_ROOT_BY_METHOD: dict[str, str] = {
-    "sl": "cr-sl-sweep",
-    "grpo": "cr-grpo-sweep",
-    "maxrl": "cr-maxrl-sweep",
-}
 
 
 def _seed_folder_name(seed: int) -> str:
     return f"seed-{seed}"
 
 
-def baseline_mode_folder(*, subtract_baseline: bool) -> str:
-    return "subtract-baseline" if subtract_baseline else "no-subtract-baseline"
-
-
-def sweep_root_name(*, method: str) -> str:
-    return _SWEEP_ROOT_BY_METHOD[method]
-
-
 def canonical_dataset_folder_name(*, num_lookforward_tokens: int) -> str:
-    """Single source of truth for the per-lookforward dataset slug. Reuses
-    `CorpusRegressionDatasetConfig.get_canonical_folder` so the name stays in
-    sync with run-time artifacts."""
+    """Slug used by single_run scripts as the leaf study folder. Computed from
+    `CorpusRegressionDatasetConfig.get_canonical_folder` so it stays in sync
+    with run-time artifacts."""
     cfg = CorpusRegressionDatasetConfig(
         **{
             **CorpusRegressionDatasetConfig.canonical_kwargs(),
@@ -51,9 +42,9 @@ def canonical_dataset_folder_name(*, num_lookforward_tokens: int) -> str:
 
 
 def _decode_dim_averaged(df: pl.DataFrame) -> pl.DataFrame:
-    """Append scalar `{split}_corr` and `{split}_mse` columns. Sufficient stats
-    are stored as length-D list-columns; per-dim metrics are averaged across D
-    output dimensions (same recipe as `utils.dim_averaged_metrics_from_parquet`)."""
+    """Append scalar `{split}_corr` and `{split}_mse` columns by averaging
+    per-dim metrics across the D output dimensions of the list-column
+    sufficient stats."""
     out = df
     for split in ("train", "val"):
         xx = np.asarray(df[f"{split}_target_xx"].to_list(), dtype=np.float64)
@@ -70,13 +61,9 @@ def _decode_dim_averaged(df: pl.DataFrame) -> pl.DataFrame:
 
 
 class CorpusRegressionAnalysisConfig(BaseConfig):
-    """
-    Grouped view over completed/started study folders. Each `studies` key is a
-    group name (e.g. `"look=4"` for SL, `"look=4 r=128"` for GRPO/MaxRL); the
-    value is the list of per-seed study folders backing it. Construct via the
-    `from_*_sweep` factories, which consume the canonical grids in
-    `src.data.corpus_regression`.
-    """
+    """Grouped view over completed/started study folders. Each `studies` key
+    is a group name (`"look=4"` for SL, `"look=4 r=128"` for GRPO/MaxRL); the
+    value is the list of per-seed study folders backing it."""
 
     studies: dict[str, list[Path]]
     study_seeds: dict[str, list[int]]
@@ -84,9 +71,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
     @classmethod
     def from_grouped(cls, grouped: dict[str, list[tuple[int, Path]]]) -> Self | None:
-        """Build from group-name -> [(seed, path), ...]. Drops paths missing
-        `metrics.parquet`/`config.json`; drops empty groups. Returns None if
-        nothing survives so notebook loops can skip cleanly."""
+        """Drop paths missing `metrics.parquet`/`config.json`; drop empty
+        groups; return None if nothing survives."""
         studies: dict[str, list[Path]] = {}
         study_seeds: dict[str, list[int]] = {}
         study_lookforwards: dict[str, int] = {}
@@ -116,15 +102,13 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
     @classmethod
     def from_sl_sweep(cls, *, artifacts_root: Path) -> Self | None:
-        """Discover SL runs under
-        `<artifacts_root>/cr-sl-sweep/seed-{S}/{dataset_folder}/`."""
-        study_base = artifacts_root / sweep_root_name(method="sl")
+        """`<artifacts_root>/sl/seed-{S}/{dataset_folder}/`."""
+        study_base = artifacts_root / "sl"
         if not study_base.exists():
             return None
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
-            name = f"look={n}"
-            grouped[name] = [
+            grouped[f"look={n}"] = [
                 (
                     s,
                     study_base
@@ -137,16 +121,14 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
     @classmethod
     def from_grpo_sweep(cls, *, artifacts_root: Path) -> Self | None:
-        """Discover GRPO runs under
-        `<artifacts_root>/cr-grpo-sweep/seed-{S}/rollouts-{N}/{dataset_folder}/`."""
-        study_base = artifacts_root / sweep_root_name(method="grpo")
+        """`<artifacts_root>/grpo/seed-{S}/rollouts-{N}/{dataset_folder}/`."""
+        study_base = artifacts_root / "grpo"
         if not study_base.exists():
             return None
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
-                name = f"look={n} r={r}"
-                grouped[name] = [
+                grouped[f"look={n} r={r}"] = [
                     (
                         s,
                         study_base
@@ -164,26 +146,28 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         *,
         artifacts_root: Path,
         subtract_baseline: bool,
+        use_factorized_likelihoods: bool,
     ) -> Self | None:
-        """Discover MaxRL runs under
-        `<artifacts_root>/cr-maxrl-sweep/seed-{S}/rollouts-{N}/{baseline_mode}/{dataset_folder}/`.
-        The baseline mode is fixed per factory call; surface it in the figure
-        title rather than the group key."""
-        study_base = artifacts_root / sweep_root_name(method="maxrl")
+        """`<artifacts_root>/maxrl/seed-{S}/rollouts-{N}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
+        Both flags are fixed per call — surface them in the figure title."""
+        study_base = artifacts_root / "maxrl"
         if not study_base.exists():
             return None
-        baseline_folder = baseline_mode_folder(subtract_baseline=subtract_baseline)
+        baseline = baseline_mode_folder(subtract_baseline=subtract_baseline)
+        likelihood = likelihood_mode_folder(
+            use_factorized_likelihoods=use_factorized_likelihoods,
+        )
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
-                name = f"look={n} r={r}"
-                grouped[name] = [
+                grouped[f"look={n} r={r}"] = [
                     (
                         s,
                         study_base
                         / _seed_folder_name(s)
                         / f"rollouts-{r}"
-                        / baseline_folder
+                        / baseline
+                        / likelihood
                         / canonical_dataset_folder_name(num_lookforward_tokens=n),
                     )
                     for s in candidate_seeds
@@ -191,7 +175,6 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         return cls.from_grouped(grouped)
 
     def describe(self, label: str) -> None:
-        """One-line summary: run count, group count, max seeds/group."""
         n_runs = sum(len(v) for v in self.studies.values())
         n_groups = len(self.studies)
         max_seeds = max(len(v) for v in self.studies.values())
@@ -201,8 +184,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         )
 
     def get_metric_dataframe(self) -> pl.DataFrame:
-        """Vertical concat of per-(study, seed) metrics.parquet files, with
-        scalar `{split}_corr` and `{split}_mse` columns appended."""
+        """Concat per-(study, seed) metrics.parquet, then append scalar
+        `{split}_corr` / `{split}_mse` columns."""
         frames: list[pl.DataFrame] = []
         for name, paths in self.studies.items():
             seeds = self.study_seeds[name]
@@ -216,8 +199,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         return _decode_dim_averaged(pl.concat(frames))
 
     def _rollouts_groups(self) -> dict[int, list[str]] | None:
-        """Split studies by ` r=(\\d+)` suffix. Returns None if any study lacks
-        the suffix (i.e. SL sweeps)."""
+        """Split studies by ` r=(\\d+)` suffix; None if any study lacks it
+        (i.e. SL sweeps)."""
         groups: dict[int, list[str]] = {}
         for name in self.studies:
             m = _ROLLOUTS_RE.search(name)
@@ -227,7 +210,6 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         return dict(sorted(groups.items()))
 
     def _aggregate_by_epoch(self, *, df: pl.DataFrame, y_name: str) -> pl.DataFrame:
-        """Collapse across seed: (study, epoch) -> mean_y, min_y, max_y, n_seeds."""
         return (
             df
             .group_by(["study", "epoch"])
@@ -255,13 +237,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             )
         )
 
-    # Default-visible rollouts on first render of rollout sweeps. Intersected
-    # with the max-lookforward default group, this gives a small but
-    # representative initial view.
     _DEFAULT_VISIBLE_ROLLOUTS: frozenset[int] = frozenset({4, 128, 1024})
 
     @staticmethod
     def _apply_compact_layout(fig: go.Figure, *, has_title: bool) -> None:
+        # Right margin is explicit so the legend doesn't get clipped when the
+        # figure is first rendered hidden inside a collapsed callout.
         fig.update_layout(
             height=320,
             margin=dict(l=50, r=105, t=40 if has_title else 15, b=40),
@@ -291,19 +272,11 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         )
 
     def _study_styling(self) -> tuple[
-        dict[str, str],
-        dict[str, str],
-        dict[str, str],
-        bool,
-        str | None,
+        dict[str, str], dict[str, str], dict[str, str], bool, str | None,
     ]:
-        """Resolve per-study color, legendgroup, legend display name, whether
-        to show legend group titles, and the default-visible group key.
-
-        For SL-shaped sweeps (no `r=` suffix), each study gets its own color
-        and is visible by default. For rollout-shaped sweeps, color comes from
-        rollouts, legendgroup from `look=<N>`, and the default-visible group is
-        the maximum lookforward."""
+        """For SL: each study gets a unique color, no group title. For rollout
+        sweeps: color by rollouts, legend-group by lookforward, default-visible
+        is the max-look group."""
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
         if rollouts is None:
@@ -341,14 +314,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         show_seed_bar: bool = False,
         save_path: Path | None = None,
     ) -> go.Figure:
-        """Per-epoch traces, two panels (train left, val right) of
-        `{train,val}_{metric}`. One line per study (seed-mean).
-
-        For rollout sweeps (study names carry ` r=<N>`), traces are colored by
-        rollouts and legend-grouped by lookforward; only the max-lookforward
-        group with rollouts in `_DEFAULT_VISIBLE_ROLLOUTS` is visible at first
-        render. For SL sweeps, every study is colored uniquely and visible by
-        default."""
+        """Two panels (train left, val right) of `{train,val}_{metric}` per
+        epoch, one line per study (seed-mean). Rollout sweeps default-show
+        the max-look group with rollouts in `_DEFAULT_VISIBLE_ROLLOUTS`."""
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         (
@@ -367,9 +335,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             r = int(_ROLLOUTS_RE.search(study).group(1))
             return r in self._DEFAULT_VISIBLE_ROLLOUTS
 
-        splits = ("train", "val")
         fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
-        for col, split in enumerate(splits, start=1):
+        for col, split in enumerate(("train", "val"), start=1):
             y_name = f"{split}_{metric}"
             agg_df = self._aggregate_by_epoch(df=df, y_name=y_name)
             for study in self.studies:
@@ -440,14 +407,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         show_seed_bar: bool = False,
         save_path: Path | None = None,
     ) -> go.Figure:
-        """Best-epoch (argmax seed-averaged value) of `train_corr` / `val_corr`
-        vs `num_lookforward_tokens`. Two panels (train left, val right).
-
-        For rollout sweeps, one curve per rollouts value — only those in
-        `_DEFAULT_VISIBLE_ROLLOUTS` start visible. For SL, a single curve.
-        `x_scale="log"` plots on the real lookforward axis; `x_scale="uniform"`
-        ranks values within `candidate_lookforward_tokens` for equal spacing
-        and labels ticks with the real values."""
+        """Best-epoch (argmax seed-mean) `train_corr` / `val_corr` vs
+        `num_lookforward_tokens`, two panels. Rollout sweeps draw one curve
+        per rollouts value; only `_DEFAULT_VISIBLE_ROLLOUTS` start visible."""
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
@@ -458,9 +420,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         else:
             curve_groups = [(f"r={r}", r, names) for r, names in rollouts.items()]
 
-        splits = ("train", "val")
         fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
-        for col, split in enumerate(splits, start=1):
+        for col, split in enumerate(("train", "val"), start=1):
             y_name = f"{split}_corr"
             agg_df = self._aggregate_by_epoch(df=df, y_name=y_name)
             for i, (curve_name, r_value, names) in enumerate(curve_groups):
@@ -473,29 +434,17 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     )
                     else {}
                 )
-                rows: list[tuple[int, float, float, float, int, int, str]] = []
-                for study in names:
-                    sub = agg_df.filter(pl.col("study") == study)
-                    if sub.is_empty():
-                        continue
-                    best = sub.sort("mean_y", descending=True).head(1)
-                    rows.append((
-                        self.study_lookforwards[study],
-                        best["mean_y"].item(),
-                        best["min_y"].item(),
-                        best["max_y"].item(),
-                        best["epoch"].item(),
-                        best["n_seeds"].item(),
-                        study,
-                    ))
+                rows = _best_epoch_rows_for_studies(
+                    cfg=self, agg_df=agg_df, studies=names,
+                )
                 if not rows:
                     continue
-                rows.sort(key=lambda r: r[0])
                 looks = [r[0] for r in rows]
-                if x_scale == "uniform":
-                    xs = [candidate_lookforward_tokens.index(v) for v in looks]
-                else:
-                    xs = looks
+                xs = (
+                    [candidate_lookforward_tokens.index(v) for v in looks]
+                    if x_scale == "uniform"
+                    else looks
+                )
                 ys = [r[1] for r in rows]
                 mins = [r[2] for r in rows]
                 maxs = [r[3] for r in rows]
@@ -547,3 +496,160 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         if save_path is not None:
             self._save_html(fig, save_path)
         return fig
+
+
+# Cross-method comparison helpers.
+
+_METHOD_DASH: dict[str, str] = {"sl": "solid", "grpo": "dash", "maxrl": "dot"}
+
+
+def _best_epoch_rows_for_studies(
+    *,
+    cfg: CorpusRegressionAnalysisConfig,
+    agg_df: pl.DataFrame,
+    studies: list[str],
+) -> list[tuple[int, float, float, float, int, int, str]]:
+    """Per-study best-epoch (argmax seed-mean) row, sorted by lookforward.
+    Skips studies with no rows so partial sweeps render cleanly."""
+    out: list[tuple[int, float, float, float, int, int, str]] = []
+    for study in studies:
+        sub = agg_df.filter(pl.col("study") == study)
+        if sub.is_empty():
+            continue
+        best = sub.sort("mean_y", descending=True).head(1)
+        out.append((
+            cfg.study_lookforwards[study],
+            best["mean_y"].item(),
+            best["min_y"].item(),
+            best["max_y"].item(),
+            best["epoch"].item(),
+            best["n_seeds"].item(),
+            study,
+        ))
+    out.sort(key=lambda r: r[0])
+    return out
+
+
+def plot_methods_vs_lookforward(
+    *,
+    sl: CorpusRegressionAnalysisConfig | None = None,
+    grpo: CorpusRegressionAnalysisConfig | None = None,
+    maxrl: CorpusRegressionAnalysisConfig | None = None,
+    title: str | None = None,
+    x_scale: Literal["log", "uniform"] = "uniform",
+    save_path: Path | None = None,
+) -> go.Figure:
+    """Cross-method best-epoch corr vs `num_lookforward_tokens`. Two panels
+    (train, val); one curve per (method, rollouts) — SL contributes a single
+    'baseline' curve. Color = rollouts (consistent across methods); dash =
+    method. Default-visible: highest-rollouts curve per RL method, plus SL."""
+    methods: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
+        (name, cfg)
+        for name, cfg in (("sl", sl), ("grpo", grpo), ("maxrl", maxrl))
+        if cfg is not None
+    ]
+    if not methods:
+        raise ValueError("at least one of sl/grpo/maxrl must be provided")
+
+    palette = qualitative.Plotly
+    rollouts_seen: list[int] = []
+    for _, cfg in methods:
+        rg = cfg._rollouts_groups()
+        if rg is None:
+            continue
+        for r in rg:
+            if r not in rollouts_seen:
+                rollouts_seen.append(r)
+    rollouts_seen.sort()
+    color_by_rollouts = {
+        r: palette[i % len(palette)] for i, r in enumerate(rollouts_seen)
+    }
+    sl_color = palette[len(rollouts_seen) % len(palette)]
+    max_rollouts = rollouts_seen[-1] if rollouts_seen else None
+
+    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
+    for col, split in enumerate(("train", "val"), start=1):
+        y_name = f"{split}_corr"
+        for method_name, cfg in methods:
+            df = cfg.get_metric_dataframe()
+            agg_df = cfg._aggregate_by_epoch(df=df, y_name=y_name)
+            rg = cfg._rollouts_groups()
+            curves: list[tuple[str, list[str], str, bool]]
+            if rg is None:
+                curves = [("baseline", list(cfg.studies.keys()), sl_color, True)]
+            else:
+                curves = [
+                    (f"r={r}", names, color_by_rollouts[r], r == max_rollouts)
+                    for r, names in rg.items()
+                ]
+            for curve_label, names, color, visible_default in curves:
+                rows = _best_epoch_rows_for_studies(
+                    cfg=cfg, agg_df=agg_df, studies=names,
+                )
+                if not rows:
+                    continue
+                looks = [r[0] for r in rows]
+                xs = (
+                    [candidate_lookforward_tokens.index(v) for v in looks]
+                    if x_scale == "uniform"
+                    else looks
+                )
+                ys = [r[1] for r in rows]
+                mins = [r[2] for r in rows]
+                maxs = [r[3] for r in rows]
+                customdata = [(r[0], r[4], r[5], r[6]) for r in rows]
+                error_kwargs = (
+                    CorpusRegressionAnalysisConfig._seed_bar_error_kwargs(
+                        ys=ys, mins=mins, maxs=maxs,
+                    )
+                )
+                visible_kwargs = (
+                    {} if visible_default else dict(visible="legendonly")
+                )
+                trace_name = f"{method_name} · {curve_label}"
+                fig.add_trace(
+                    go.Scatter(
+                        x=xs,
+                        y=ys,
+                        mode="lines+markers",
+                        name=trace_name,
+                        legendgroup=method_name,
+                        legendgrouptitle_text=method_name,
+                        showlegend=(col == 1),
+                        line=dict(color=color, dash=_METHOD_DASH[method_name]),
+                        marker=dict(color=color),
+                        customdata=customdata,
+                        hovertemplate=(
+                            "num_lookforward_tokens: %{customdata[0]}<br>"
+                            f"{y_name}: %{{y}}<br>"
+                            "epoch: %{customdata[1]}<br>"
+                            "n_seeds: %{customdata[2]}"
+                            f"<extra>{trace_name} %{{customdata[3]}}</extra>"
+                        ),
+                        **visible_kwargs,
+                        **error_kwargs,
+                    ),
+                    row=1,
+                    col=col,
+                )
+        fig.update_xaxes(title_text="num_lookforward_tokens", row=1, col=col)
+        fig.update_yaxes(title_text=y_name, row=1, col=col)
+        if x_scale == "log":
+            fig.update_xaxes(type="log", row=1, col=col)
+        else:
+            fig.update_xaxes(
+                tickmode="array",
+                tickvals=list(range(len(candidate_lookforward_tokens))),
+                ticktext=[str(v) for v in candidate_lookforward_tokens],
+                row=1,
+                col=col,
+            )
+    fig.update_layout(legend=dict(groupclick="togglegroup"))
+    if title is not None:
+        fig.update_layout(title=title)
+    CorpusRegressionAnalysisConfig._apply_compact_layout(
+        fig, has_title=title is not None
+    )
+    if save_path is not None:
+        CorpusRegressionAnalysisConfig._save_html(fig, save_path)
+    return fig
