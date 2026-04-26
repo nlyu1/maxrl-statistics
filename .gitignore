@@ -21,3 +21,4 @@ __pycache__/
 artifacts/
 AGENTS.md
 CLAUDE.md
+.claude/
