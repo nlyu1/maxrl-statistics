@@ -31,12 +31,13 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     Initializes `HuggingFaceFW/fineweb-edu`.
     Extracts `num_samples * 2` samples of length >=
         `prefix_length + num_lookfoward_tokens`.
-    Each sample consists of `prefix_length` tokens and
-        `embedding_dim` ±1 Rademacher labels.
-
-    Labels: element-wise product of per-token ±1 Rademacher vectors
-    over the lookforward window. With num_lookfoward_tokens=1 this is
-    the single next-token's Rademacher vector.
+    Input: the first `prefix_length` tokens of each sample.
+    Label: the `embedding_dim`-dim ±1 Rademacher vector of the
+        final lookforward token (i.e. the token at index
+        `prefix_length + num_lookfoward_tokens - 1`).
+    With `num_lookfoward_tokens > 1` the intermediate tokens are
+        not exposed to the model and do not contribute to the label —
+        this is a skip-ahead target, not next-token prediction.
     """
 
     prefix_length: int
@@ -59,6 +60,17 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     @classmethod
     def get_canonical(cls) -> Self:
         return cls(**cls.canonical_kwargs())
+
+    def get_canonical_folder_name(self) -> str:
+        """Stable slug encoding the fields that affect dataset bytes."""
+        tokenizer_slug = (
+            self.pretrained_tokenizer_model_name.split("/")[-1].lower().replace("-", "_")
+        )
+        return (
+            f"fineweb_edu_{tokenizer_slug}"
+            f"_{self.num_samples}x{self.prefix_length}"
+            f"_look{self.num_lookfoward_tokens}_dim{self.embedding_dim}"
+        )
 
     def build(self) -> "CorpusRegressionDataset":
         """
@@ -83,9 +95,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             _DATASET, name=_DATASET_CONFIG, split="train", streaming=True
         ).shuffle(seed=_SEED, buffer_size=10_000)
 
-        prefix_list: list[list[int]] = []
-        lookforward_list: list[list[int]] = []
-
+        collected: list[list[int]] = []
         bar = tqdm(total=target_total, desc="collecting samples")
         for ex in ds_stream:
             text = ex["text"].strip()
@@ -94,37 +104,31 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             ids = tok.encode(text, add_special_tokens=False)
             if len(ids) < min_length:
                 continue
-            prefix_list.append(ids[: self.prefix_length])
-            lookforward_list.append(
-                ids[self.prefix_length : self.prefix_length + self.num_lookfoward_tokens]
-            )
+            collected.append(ids[:min_length])
             bar.update(1)
-            if len(prefix_list) >= target_total:
+            if len(collected) >= target_total:
                 break
         bar.close()
 
-        total = len(prefix_list)
+        total = len(collected)
+        full: Int[Tensor, "total min_length"] = torch.tensor(collected, dtype=torch.long)
 
-        # Labels: Rademacher vectors for each lookforward token, flattened.
-        # Shape: (total, num_lookfoward_tokens * embedding_dim), values in {-1, +1}.
-        lf_tensor = torch.tensor(lookforward_list, dtype=torch.long)  # (total, num_look)
-        labels: Float[Tensor, "total label_dim"] = rademacher[lf_tensor].flatten(1).float()
+        # Input is the prefix; label is the Rademacher vector of the final lookforward token.
+        prefix_tokens: Int[Tensor, "total prefix_length"] = full[:, : self.prefix_length].to(torch.int32)
+        labels: Float[Tensor, "total embedding_dim"] = rademacher[full[:, -1]].float()
 
         shuffle_rng = torch.Generator()
         shuffle_rng.manual_seed(_SEED)
         perm = torch.randperm(total, generator=shuffle_rng)
-
-        all_tokens: Int[Tensor, "total prefix_length"] = torch.tensor(
-            prefix_list, dtype=torch.int32
-        )[perm]
-        all_labels: Float[Tensor, "total label_dim"] = labels[perm]
+        all_tokens: Int[Tensor, "total prefix_length"] = prefix_tokens[perm]
+        all_labels: Float[Tensor, "total embedding_dim"] = labels[perm]
 
         return CorpusRegressionDataset(
             config=self,
-            train_tokens=all_tokens[: self.num_samples],
-            train_labels=all_labels[: self.num_samples],
-            val_tokens=all_tokens[self.num_samples :],
-            val_labels=all_labels[self.num_samples :],
+            train_tokens=all_tokens[:self.num_samples],
+            train_labels=all_labels[:self.num_samples],
+            val_tokens=all_tokens[self.num_samples:],
+            val_labels=all_labels[self.num_samples:],
         )
 
     def build_or_load(self, folder: Path) -> "CorpusRegressionDataset":
