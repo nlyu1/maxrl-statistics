@@ -278,13 +278,14 @@ _NEG_COLOR = "#d62728"
 
 
 def _sample_body_html(*, tokenizer: Any, sample: dict[str, Any]) -> str:
+    final_id = sample["final_id"]
     prefix = _html.escape(tokenizer.decode(sample["prefix_ids"]))
     middle = (
         _html.escape(tokenizer.decode(sample["middle_ids"]))
         if sample["middle_ids"]
         else ""
     )
-    final = _html.escape(tokenizer.decode([sample["final_id"]]))
+    final = _html.escape(tokenizer.decode([final_id]))
     tail = (
         _html.escape(tokenizer.decode(sample["tail_ids"]))
         if sample.get("tail_ids")
@@ -297,7 +298,7 @@ def _sample_body_html(*, tokenizer: Any, sample: dict[str, Any]) -> str:
     return (
         f"<span style='color:{_PREFIX_COLOR}'>{prefix}</span>"
         f"<span style='color:{_LOOKAHEAD_COLOR}'>{middle}</span>"
-        f"<span style='{final_box}' title='token id {sample[\"final_id\"]}'>{final}</span>"
+        f"<span style='{final_box}' title='token id {final_id}'>{final}</span>"
         f"<span style='color:#888'>{tail} …</span>"
     )
 
