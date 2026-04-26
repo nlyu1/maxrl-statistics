@@ -33,14 +33,18 @@ def _stream_token_prefixes(
     min_length: int,
     target_count: int,
     desc: str,
+    overshoot: int = 0,
 ) -> list[list[int]]:
-    """Stream fineweb-edu, return up to `target_count` token-id sequences truncated
-    to `min_length`. Empty/short docs are skipped. Single source of truth for the
-    streaming + filter pipeline used by both `build` and `demonstrate`."""
+    """Stream fineweb-edu, return up to `target_count` token-id sequences. Each
+    sequence is truncated to `min_length + overshoot` tokens (or the doc's full
+    length if shorter than that). Docs with fewer than `min_length` tokens are
+    skipped. Single source of truth for streaming used by `build` (overshoot=0)
+    and `demonstrate` (overshoot>0 to show trailing context past the label token)."""
     stream = load_dataset(
         _DATASET, name=_DATASET_CONFIG, split="train", streaming=True
     ).shuffle(seed=_SEED, buffer_size=10_000)
 
+    take = min_length + overshoot
     out: list[list[int]] = []
     bar = tqdm(total=target_count, desc=desc)
     for ex in stream:
@@ -50,7 +54,7 @@ def _stream_token_prefixes(
         ids = tokenizer.encode(text, add_special_tokens=False)
         if len(ids) < min_length:
             continue
-        out.append(ids[:min_length])
+        out.append(ids[:take])
         bar.update(1)
         if len(out) >= target_count:
             break
@@ -163,6 +167,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             min_length=min_length,
             target_count=num_samples,
             desc="streaming demo samples",
+            overshoot=16,
         )
         last = self.prefix_length + self.num_lookfoward_tokens - 1
         samples = [
@@ -170,6 +175,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
                 "prefix_ids": ids[: self.prefix_length],
                 "middle_ids": ids[self.prefix_length : last],
                 "final_id": ids[last],
+                "tail_ids": ids[last + 1 :],
                 "label": rademacher[ids[last]].tolist(),
             }
             for ids in collected
@@ -279,11 +285,20 @@ def _sample_body_html(*, tokenizer: Any, sample: dict[str, Any]) -> str:
         else ""
     )
     final = _html.escape(tokenizer.decode([sample["final_id"]]))
+    tail = (
+        _html.escape(tokenizer.decode(sample["tail_ids"]))
+        if sample.get("tail_ids")
+        else ""
+    )
+    final_box = (
+        f"color:#fff;background:{_LOOKAHEAD_COLOR};font-weight:bold;"
+        "padding:0 3px;border-radius:3px;white-space:pre;"
+    )
     return (
         f"<span style='color:{_PREFIX_COLOR}'>{prefix}</span>"
         f"<span style='color:{_LOOKAHEAD_COLOR}'>{middle}</span>"
-        f"<span style='color:{_LOOKAHEAD_COLOR};font-weight:bold'>{final}</span>"
-        f"<span style='color:#888'> …</span>"
+        f"<span style='{final_box}' title='token id {sample[\"final_id\"]}'>{final}</span>"
+        f"<span style='color:#888'>{tail} …</span>"
     )
 
 
@@ -292,7 +307,7 @@ def _label_vector_html(label: list[int]) -> str:
         f"<span style='color:{_POS_COLOR if v > 0 else _NEG_COLOR}'>{int(v):+d}</span>"
         for v in label
     )
-    return f"<b>label ({len(label)}-d ±1):</b> {cells}"
+    return f"<b>label ({len(label)}d):</b> {cells}"
 
 
 def _inspect_corpus_samples(*, tokenizer: Any, samples: list[dict[str, Any]]):
@@ -305,22 +320,28 @@ def _inspect_corpus_samples(*, tokenizer: Any, samples: list[dict[str, Any]]):
         n = len(samples)
         sample = samples[idx]
 
-        with solara.Column(gap="10px", style={"max-width": "920px"}):
-            with solara.Row(gap="6px", style={"align-items": "center"}):
+        button_style = (
+            "min-width:24px;width:24px;height:24px;padding:0;"
+            "font-size:14px;line-height:1;"
+        )
+        with solara.Column(gap="8px", style={"max-width": "920px"}):
+            with solara.Row(gap="4px", style={"align-items": "center"}):
                 solara.Button(
                     "−",
                     on_click=lambda: set_idx(max(0, idx - 1)),
                     disabled=(idx == 0),
+                    style=button_style,
                 )
                 solara.Button(
                     "+",
                     on_click=lambda: set_idx(min(n - 1, idx + 1)),
                     disabled=(idx == n - 1),
+                    style=button_style,
                 )
                 solara.HTML(
                     tag="span",
                     unsafe_innerHTML=f"sample <b>{idx + 1}</b> / {n}",
-                    style="font-family:monospace;font-size:13px;",
+                    style="font-family:monospace;font-size:13px;margin-left:4px;",
                 )
             solara.HTML(
                 tag="div",
@@ -329,6 +350,11 @@ def _inspect_corpus_samples(*, tokenizer: Any, samples: list[dict[str, Any]]):
                     "font-family:Georgia,serif;font-size:14px;line-height:1.5;"
                     "white-space:pre-wrap;"
                 ),
+            )
+            solara.HTML(
+                tag="hr",
+                unsafe_innerHTML="",
+                style="border:none;border-top:1px solid #ddd;margin:4px 0;",
             )
             solara.HTML(
                 tag="div",
