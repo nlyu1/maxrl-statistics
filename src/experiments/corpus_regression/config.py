@@ -16,6 +16,7 @@ from src.data.corpus_regression import (
     CorpusRegressionDataset,
     CorpusRegressionDatasetConfig,
 )
+from src.metrics import RegressionStatCounter
 from src.model.minimal import CausalLMConfig
 from src.model.optimizer import CausalLMWithLinearHeadOptimizerConfig
 
@@ -187,6 +188,9 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             train_dl=train_dl,
             val_dl=val_dl,
             device=device,
+            train_target_counter=RegressionStatCounter.initialize(
+                dim=self.data.embedding_dim,
+            ),
         )
 
     def _extra_state_kwargs(self) -> dict:

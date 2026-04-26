@@ -72,9 +72,9 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "MaxRL gradient estimator details",
+    "title": "MaxRL Statistics",
     "section": "",
-    "text": "Continuously updated research progress on the rollout-likelihood generalization of maximum likelihood reinforcement learning.\nTheory:\nExperiments:\nThe bag-of-words (BoW) setup isolates noise-robustness of SL, GRPO, and MaxRL in a zero-step rollout setting: the model sees a single prompt and predicts a scalar target with no sequential reasoning. There are three versions of the dataset:"
+    "text": "Continuously updated research progress on the rollout-likelihood generalization of maximum likelihood reinforcement learning.\nTheory:\n\nTheory — MaxRL as a compute-indexed truncation of log-likelihood, per-rollout reweighting, and the generalized leave-one-out estimator.\nGradient Estimator — numerically stable \\(O(BRD)\\) computation of the leave-one-out weights via prefix-suffix scans of elementary symmetric polynomials.\n\nExperiments:\n\nRegression: bag of words — noise-robustness in the zero-step sampling setting. WIP.\nRegression: corpus regression — same zero-step setting on natural-language prefixes. WIP.\nRegression: DAG-reasoning — reasoning advantage and rollout efficiency. Not started."
   },
   {
     "objectID": "corpus-regression.html",
