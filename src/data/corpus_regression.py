@@ -7,6 +7,7 @@ due to minor semantic changes. It's a design choice to keep
 them slightly separate.
 """
 
+import html as _html
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
@@ -24,6 +25,37 @@ from src.config.base import BaseConfig
 _DATASET = "HuggingFaceFW/fineweb-edu"
 _DATASET_CONFIG = "sample-10BT"
 _SEED = 42
+
+
+def _stream_token_prefixes(
+    *,
+    tokenizer: Any,
+    min_length: int,
+    target_count: int,
+    desc: str,
+) -> list[list[int]]:
+    """Stream fineweb-edu, return up to `target_count` token-id sequences truncated
+    to `min_length`. Empty/short docs are skipped. Single source of truth for the
+    streaming + filter pipeline used by both `build` and `demonstrate`."""
+    stream = load_dataset(
+        _DATASET, name=_DATASET_CONFIG, split="train", streaming=True
+    ).shuffle(seed=_SEED, buffer_size=10_000)
+
+    out: list[list[int]] = []
+    bar = tqdm(total=target_count, desc=desc)
+    for ex in stream:
+        text = ex["text"].strip()
+        if not text:
+            continue
+        ids = tokenizer.encode(text, add_special_tokens=False)
+        if len(ids) < min_length:
+            continue
+        out.append(ids[:min_length])
+        bar.update(1)
+        if len(out) >= target_count:
+            break
+    bar.close()
+    return out
 
 
 class CorpusRegressionDatasetConfig(BaseConfig):
@@ -61,54 +93,41 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     def get_canonical(cls) -> Self:
         return cls(**cls.canonical_kwargs())
 
-    def get_canonical_folder_name(self) -> str:
-        """Stable slug encoding the fields that affect dataset bytes."""
+    def get_canonical_folder(self, base_path: Path) -> Path:
+        """Resolve `base_path / <slug>` where the slug encodes every field that
+        affects dataset bytes. Single source of truth for cache directory."""
         tokenizer_slug = (
             self.pretrained_tokenizer_model_name.split("/")[-1].lower().replace("-", "_")
         )
-        return (
+        slug = (
             f"fineweb_edu_{tokenizer_slug}"
             f"_{self.num_samples}x{self.prefix_length}"
             f"_look{self.num_lookfoward_tokens}_dim{self.embedding_dim}"
         )
+        return base_path / slug
 
-    def build(self) -> "CorpusRegressionDataset":
-        """
-        Streams fineweb-edu, tokenizes, computes Rademacher labels,
-        shuffles, and returns a train/val split.
-        """
-        min_length = self.prefix_length + self.num_lookfoward_tokens
-        target_total = 2 * self.num_samples
-
-        tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
-        vocab_size = len(tok)
-
-        # Deterministic ±1 embedding: row i is the Rademacher vector for token i.
-        # Seeded at 0 so labels are reproducible regardless of dataset shuffle seed.
-        rad_rng = torch.Generator()
-        rad_rng.manual_seed(0)
-        rademacher: Int[Tensor, "vocab embedding_dim"] = (
-            torch.randint(0, 2, (vocab_size, self.embedding_dim), generator=rad_rng) * 2 - 1
+    def _rademacher_matrix(self, vocab_size: int) -> Int[Tensor, "vocab embedding_dim"]:
+        """Deterministic ±1 token embedding (seed=0). Row i is the Rademacher
+        vector assigned to token i; reproducible across runs and configs."""
+        rng = torch.Generator()
+        rng.manual_seed(0)
+        return (
+            torch.randint(0, 2, (vocab_size, self.embedding_dim), generator=rng) * 2 - 1
         ).to(torch.int8)
 
-        ds_stream = load_dataset(
-            _DATASET, name=_DATASET_CONFIG, split="train", streaming=True
-        ).shuffle(seed=_SEED, buffer_size=10_000)
+    def build(self) -> "CorpusRegressionDataset":
+        """Stream fineweb-edu, tokenize, compute Rademacher labels, shuffle,
+        and return a train/val split."""
+        min_length = self.prefix_length + self.num_lookfoward_tokens
+        tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
+        rademacher = self._rademacher_matrix(len(tok))
 
-        collected: list[list[int]] = []
-        bar = tqdm(total=target_total, desc="collecting samples")
-        for ex in ds_stream:
-            text = ex["text"].strip()
-            if not text:
-                continue
-            ids = tok.encode(text, add_special_tokens=False)
-            if len(ids) < min_length:
-                continue
-            collected.append(ids[:min_length])
-            bar.update(1)
-            if len(collected) >= target_total:
-                break
-        bar.close()
+        collected = _stream_token_prefixes(
+            tokenizer=tok,
+            min_length=min_length,
+            target_count=2 * self.num_samples,
+            desc="collecting samples",
+        )
 
         total = len(collected)
         full: Int[Tensor, "total min_length"] = torch.tensor(collected, dtype=torch.long)
@@ -125,25 +144,61 @@ class CorpusRegressionDatasetConfig(BaseConfig):
 
         return CorpusRegressionDataset(
             config=self,
-            train_tokens=all_tokens[:self.num_samples],
-            train_labels=all_labels[:self.num_samples],
-            val_tokens=all_tokens[self.num_samples:],
-            val_labels=all_labels[self.num_samples:],
+            train_tokens=all_tokens[: self.num_samples],
+            train_labels=all_labels[: self.num_samples],
+            val_tokens=all_tokens[self.num_samples :],
+            val_labels=all_labels[self.num_samples :],
         )
 
-    def build_or_load(self, folder: Path) -> "CorpusRegressionDataset":
-        """Loads from `folder` if config matches; otherwise builds and saves."""
+    def demonstrate(self, num_samples: int = 50):
+        """Stream `num_samples` fresh docs and return a Solara browser for visual
+        inspection: prefix (black) + lookahead window (blue) + final predicted token
+        (bold blue) + the Rademacher label vector. Independent of any cached dataset."""
+        min_length = self.prefix_length + self.num_lookfoward_tokens
+        tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
+        rademacher = self._rademacher_matrix(len(tok))
+
+        collected = _stream_token_prefixes(
+            tokenizer=tok,
+            min_length=min_length,
+            target_count=num_samples,
+            desc="streaming demo samples",
+        )
+        last = self.prefix_length + self.num_lookfoward_tokens - 1
+        samples = [
+            {
+                "prefix_ids": ids[: self.prefix_length],
+                "middle_ids": ids[self.prefix_length : last],
+                "final_id": ids[last],
+                "label": rademacher[ids[last]].tolist(),
+            }
+            for ids in collected
+        ]
+        return _inspect_corpus_samples(tokenizer=tok, samples=samples)
+
+    @classmethod
+    def init_or_load_from(cls, *, folder: Path, **init_kwargs) -> Self:
+        """Reuse the cached dataset at `folder` if its config matches, else (re)generate.
+        kwargs forward to `cls(**init_kwargs)`. Tensors land on disk; materialize them
+        with `CorpusRegressionDataset.load_from(folder)`."""
+        config = cls(**init_kwargs)
         config_path = folder / "config.json"
+        required_paths = (
+            folder / "train_tokens.pt",
+            folder / "train_labels.pt",
+            folder / "val_tokens.pt",
+            folder / "val_labels.pt",
+        )
         if config_path.exists():
-            saved = CorpusRegressionDatasetConfig.model_validate_json(
-                config_path.read_text()
-            )
-            if saved == self:
-                return CorpusRegressionDataset.load_from(folder)
-            print("Cached config mismatch — re-building dataset.")
-        ds = self.build()
-        ds.write_to(folder)
-        return ds
+            saved = cls.model_validate_json(config_path.read_text())
+            if saved == config and all(path.exists() for path in required_paths):
+                return saved
+            if saved != config:
+                print("Cached config mismatch — re-building dataset.")
+            else:
+                print("Cached dataset files missing — re-building dataset.")
+        config.build().write_to(folder)
+        return config
 
 
 @dataclass(kw_only=True)
@@ -203,3 +258,84 @@ class CorpusRegressionDataloadingConfig(BaseConfig):
             drop_last=self.drop_last,
             pin_memory=True,
         )
+
+
+##### Dataset visualization ####
+# Pure UI for `CorpusRegressionDatasetConfig.demonstrate`. Knows nothing about
+# fineweb-edu or Rademacher embeddings — just renders a tokenizer + pre-collected
+# samples (`prefix_ids`, `middle_ids`, `final_id`, `label`).
+
+_PREFIX_COLOR = "#111"
+_LOOKAHEAD_COLOR = "#1f77b4"
+_POS_COLOR = "#1f77b4"
+_NEG_COLOR = "#d62728"
+
+
+def _sample_body_html(*, tokenizer: Any, sample: dict[str, Any]) -> str:
+    prefix = _html.escape(tokenizer.decode(sample["prefix_ids"]))
+    middle = (
+        _html.escape(tokenizer.decode(sample["middle_ids"]))
+        if sample["middle_ids"]
+        else ""
+    )
+    final = _html.escape(tokenizer.decode([sample["final_id"]]))
+    return (
+        f"<span style='color:{_PREFIX_COLOR}'>{prefix}</span>"
+        f"<span style='color:{_LOOKAHEAD_COLOR}'>{middle}</span>"
+        f"<span style='color:{_LOOKAHEAD_COLOR};font-weight:bold'>{final}</span>"
+        f"<span style='color:#888'> …</span>"
+    )
+
+
+def _label_vector_html(label: list[int]) -> str:
+    cells = " ".join(
+        f"<span style='color:{_POS_COLOR if v > 0 else _NEG_COLOR}'>{int(v):+d}</span>"
+        for v in label
+    )
+    return f"<b>label ({len(label)}-d ±1):</b> {cells}"
+
+
+def _inspect_corpus_samples(*, tokenizer: Any, samples: list[dict[str, Any]]):
+    """+/- index Solara browser over pre-collected samples."""
+    import solara
+
+    @solara.component
+    def _panel():
+        idx, set_idx = solara.use_state(0)
+        n = len(samples)
+        sample = samples[idx]
+
+        with solara.Column(gap="10px", style={"max-width": "920px"}):
+            with solara.Row(gap="6px", style={"align-items": "center"}):
+                solara.Button(
+                    "−",
+                    on_click=lambda: set_idx(max(0, idx - 1)),
+                    disabled=(idx == 0),
+                )
+                solara.Button(
+                    "+",
+                    on_click=lambda: set_idx(min(n - 1, idx + 1)),
+                    disabled=(idx == n - 1),
+                )
+                solara.HTML(
+                    tag="span",
+                    unsafe_innerHTML=f"sample <b>{idx + 1}</b> / {n}",
+                    style="font-family:monospace;font-size:13px;",
+                )
+            solara.HTML(
+                tag="div",
+                unsafe_innerHTML=_sample_body_html(tokenizer=tokenizer, sample=sample),
+                style=(
+                    "font-family:Georgia,serif;font-size:14px;line-height:1.5;"
+                    "white-space:pre-wrap;"
+                ),
+            )
+            solara.HTML(
+                tag="div",
+                unsafe_innerHTML=_label_vector_html(sample["label"]),
+                style="font-family:monospace;font-size:12px;",
+            )
+
+    container, render_context = solara.render(_panel())
+    setattr(container, "_solara_render_context", render_context)
+    return container
