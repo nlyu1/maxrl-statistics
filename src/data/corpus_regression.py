@@ -5,6 +5,8 @@ This aims to be a more standalone module.
 There are some duplication with bag-of-words library code
 due to minor semantic changes. It's a design choice to keep
 them slightly separate.
+
+Also imported by `writeup/code/`; check usage there on updates.
 """
 
 import html as _html

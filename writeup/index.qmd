@@ -15,4 +15,5 @@ Theory:
 Experiments:
 
 - [Regression: bag of words](bag-of-words.qmd) — noise-robustness in the zero-step sampling setting. WIP.
+- [Regression: corpus regression](corpus-regression.qmd) — same zero-step setting on natural-language prefixes. WIP.
 - [Regression: DAG-reasoning](dag-reasoning.qmd) — reasoning advantage and rollout efficiency. Not started.

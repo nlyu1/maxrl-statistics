@@ -134,6 +134,10 @@ window.Quarto = {
 <span class="menu-text">Bag of Words (WIP)</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="./corpus-regression.html"> 
+<span class="menu-text">Corpus Regression (WIP)</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./dag-reasoning.html"> 
 <span class="menu-text">DAG Reasoning (Empty)</span></a>
   </li>  
@@ -157,7 +161,6 @@ window.Quarto = {
   <li><a href="#dataset" id="toc-dataset" class="nav-link" data-scroll-target="#dataset">Dataset</a>
   <ul>
   <li><a href="#homogeneous-baseline" id="toc-homogeneous-baseline" class="nav-link" data-scroll-target="#homogeneous-baseline">Homogeneous baseline</a></li>
-  <li><a href="#row-level-heteroskedasticity-unlearnable" id="toc-row-level-heteroskedasticity-unlearnable" class="nav-link" data-scroll-target="#row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</a></li>
   <li><a href="#word-level-heteroskedasticity-learnable" id="toc-word-level-heteroskedasticity-learnable" class="nav-link" data-scroll-target="#word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</a></li>
   </ul></li>
   <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a>
@@ -198,14 +201,7 @@ window.Quarto = {
 </ol>
 <section id="tl-dr" class="level3">
 <h3 class="anchored" data-anchor-id="tl-dr">TL; DR</h3>
-<ol type="1">
-<li>We didn’t find SL and GRPO (by corollary, MaxRL) different on the bag-of-words baseline.</li>
-<li>The next step is to sharpen the hypothesis that SL (maximum-likelihood) is better on harder-tasks.</li>
-</ol>
-<p>New hypothesis: SL and GRPO differentiates only when there is <strong>variation</strong> in task difficulty.</p>
-<ul>
-<li>Does random per-row difficulty suffice, or do we need semantic, learnable variation in difficulty?</li>
-</ul>
+<p>No advantage of SL / MaxRL over GRPO in the BoW setup, in either homogeneous or heterogeneous settings.</p>
 </section>
 <section id="dataset" class="level2">
 <h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
@@ -276,38 +272,38 @@ window.Quarto = {
 </div>
 </div>
 </div>
-</section>
-<section id="row-level-heteroskedasticity-unlearnable" class="level3">
-<h3 class="anchored" data-anchor-id="row-level-heteroskedasticity-unlearnable">Row-level heteroskedasticity (unlearnable)</h3>
-<p>The row-level heteroskedastic variant has unlearnable per-sample hardness. We parameterize the label as follows: fixing a global signal-to-target correlation budget <span class="math inline">\(\rho \in [0, 1]\)</span>, we parameterize <span class="math display">\[
+<!--
+### Row-level heteroskedasticity (unlearnable)
+
+The row-level heteroskedastic variant has unlearnable per-sample hardness. We parameterize the label as follows: fixing a global signal-to-target correlation budget $\rho \in [0, 1]$, we parameterize
+$$
 \text{target}_i = \text{signal}_i + \sqrt{1-\rho^2}\, a_i\, \varepsilon_i
-\]</span> So long as we choose <span class="math inline">\(\mathbb E[a_j^2] = 1\)</span>, we can satisfy the global correlation budget while varying the by-sample correlation (hardness).</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>Details on per-sample noise v. signal distribution
-</div>
-<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
-</div>
-<div id="callout-2" class="callout-2-contents callout-collapse collapse">
-<div class="callout-body-container callout-body">
-<p>The per-sample local correlation is <span class="math display">\[
+$$
+So long as we choose $\mathbb E[a_j^2] = 1$, we can satisfy the global correlation budget while varying the by-sample correlation (hardness).
+
+::: {.callout-note collapse="true"}
+## Details on per-sample noise v. signal distribution
+
+The per-sample local correlation is
+$$
   \rho_j = \dfrac{\rho}{\sqrt{\rho^2 + (1-\rho^2) a_j^2}} \in [0, 1] \iff
   a_j^2 = \dfrac{\rho^2}{1-\rho^2}\Big(\dfrac{1}{\rho_j^2} - 1\Big)
-\]</span> The budget <span class="math inline">\(\mathbb E[a_j^2] = 1\)</span> becomes the harmonic-mean constraint <span class="math inline">\(\mathbb E[1/\rho_j^2] = 1/\rho^2\)</span>.</p>
-<p>Because <span class="math inline">\(\rho_j\)</span> is bounded, a natural candidate is to draw the variance <span class="math inline">\(\rho_j^2 \sim \mathrm{Beta}(\alpha, \beta)\)</span>; this reads <span class="math inline">\((\alpha + \beta - 1)/(\alpha - 1) = 1/\rho^2\)</span>, pinning <span class="math inline">\(\beta\)</span> from <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\rho\)</span>. Writing <span class="math inline">\(\eta = \alpha - 1 =\)</span> <code>row_hardness_eta</code>, <span class="math display">\[
+$$
+The budget $\mathbb E[a_j^2] = 1$ becomes the harmonic-mean constraint $\mathbb E[1/\rho_j^2] = 1/\rho^2$.
+
+Because $\rho_j$ is bounded, a natural candidate is to draw the variance $\rho_j^2 \sim \mathrm{Beta}(\alpha, \beta)$; this reads $(\alpha + \beta - 1)/(\alpha - 1) = 1/\rho^2$, pinning $\beta$ from $\alpha$ and $\rho$. Writing $\eta = \alpha - 1 =$ `row_hardness_eta`,
+$$
   \alpha = 1 + \eta, \qquad \beta = \eta\,(1 - \rho^2)\,/\,\rho^2,
-\]</span> leaves one concentration knob. Substituting into the stock Beta variance gives <span class="math display">\[
+$$
+leaves one concentration knob. Substituting into the stock Beta variance gives
+$$
   \mathrm{Var}(\rho_j^2) \;=\; \dfrac{\alpha\,\beta}{(\alpha + \beta)^2\,(\alpha + \beta + 1)}
   \;=\; \dfrac{(1+\eta)\,\eta\,(1-\rho^2)\,\rho^4}{(\rho^2 + \eta)^2\,(2\rho^2 + \eta)}
   \;\xrightarrow{\eta \to \infty}\; \dfrac{(1-\rho^2)\,\rho^4}{\eta}.
-\]</span> We require <span class="math inline">\(\eta &gt; 1\)</span> so that the inverted <span class="math inline">\(a_j^2\)</span> has finite population variance.</p>
-</div>
-</div>
-</div>
+$$
+We require $\eta > 1$ so that the inverted $a_j^2$ has finite population variance.
+:::
+-->
 <script>
 window.fitScaledIframeContainer = function(frame) {
   const iframe = frame.querySelector("iframe");
@@ -352,15 +348,19 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
+<!--
 <div class="scaled-plotly-frame" data-source-width="900" data-source-height="620">
-  <iframe src="assets/bow/row_heteroskedasticity.html" width="900" height="620" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/bow/row_heteroskedasticity.html"
+          width="900" height="620" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
+-->
 </section>
 <section id="word-level-heteroskedasticity-learnable" class="level3">
 <h3 class="anchored" data-anchor-id="word-level-heteroskedasticity-learnable">Word-level heteroskedasticity (learnable)</h3>
 <p>We propose another heteroskedastic variation where hardness is tied to <strong>word content</strong>, so it is in principle recoverable from the prompt. Semantic words are ranked by <span class="math inline">\(|v(w)|\)</span> and assigned a quantile <span class="math inline">\(q(w) \in (0, 1)\)</span>; auxiliary words carry zero hardness. The dataset is parameterized by global signal-to-target correlation <span class="math inline">\(\rho\)</span>, and a difficulty skew <code>snr_halflife_in_word_quantile</code></p>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -369,7 +369,7 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div id="callout-2" class="callout-2-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <p>The raw per-word multiplier is <span class="math display">\[
 \tilde a(w) \;=\; \begin{cases} 2^{(q(w) - 1/2)\,/\,h_{\text{word}}} &amp; w \text{ semantic},\\ 0 &amp; w \text{ auxiliary}, \end{cases}
@@ -391,7 +391,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 <section id="experiments" class="level2">
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -400,7 +400,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-4" class="callout-4-contents callout-collapse collapse">
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/bow/README.md"><code>experiments/bow/README.md</code></a> for sweep and single-run instructions.</p>
 </div>
@@ -429,7 +429,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 <li>The dataset has desired properties – we observe overfitting as well as general fitting difficulty as noise increases.</li>
 </ol>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -438,7 +438,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-5" class="callout-5-contents callout-collapse collapse">
+<div id="callout-4" class="callout-4-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/bow/sl_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
@@ -450,7 +450,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-6-contents" aria-controls="callout-6" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -459,7 +459,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-6" class="callout-6-contents callout-collapse collapse">
+<div id="callout-5" class="callout-5-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/bow/grpo_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
@@ -471,7 +471,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-7-contents" aria-controls="callout-7" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-6-contents" aria-controls="callout-6" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -480,7 +480,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-7" class="callout-7-contents callout-collapse collapse">
+<div id="callout-6" class="callout-6-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <p>See <a href="maxrl-estimator.qmd">MaxRL estimator: leave-one-out derivation</a> for the estimator math used here.</p>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
@@ -495,6 +495,10 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </section>
 <section id="word-level-heterogeneous-bag-of-words" class="level3">
 <h3 class="anchored" data-anchor-id="word-level-heterogeneous-bag-of-words">Word-level heterogeneous bag-of-words</h3>
+<p><u>Null finding</u>: <strong>no discernable difference in the heterogeneous setup</strong>.</p>
+<blockquote class="blockquote">
+<p>The updated hypothesis is that heterogeneity via irreducible noise, along the purely statistical axis, is insufficient to differentiate the ML objective. The next step is to introduce true, semantic variability.</p>
+</blockquote>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/bow/sl_word_het_vs_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -505,7 +509,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
   <iframe src="assets/bow/maxrl_sub_word_het_vs_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-8-contents" aria-controls="callout-8" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-7-contents" aria-controls="callout-7" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -514,7 +518,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-8" class="callout-8-contents callout-collapse collapse">
+<div id="callout-7" class="callout-7-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/bow/sl_word_het_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
@@ -526,7 +530,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-9-contents" aria-controls="callout-9" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-8-contents" aria-controls="callout-8" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -535,7 +539,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-9" class="callout-9-contents callout-collapse collapse">
+<div id="callout-8" class="callout-8-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/bow/grpo_word_het_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
@@ -547,7 +551,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-10-contents" aria-controls="callout-10" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-9-contents" aria-controls="callout-9" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -556,7 +560,7 @@ a(x) = \tilde a(x) \,/\, \sqrt{\mathbb{E}_{w \sim p}[\tilde a(w)^2]},
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-10" class="callout-10-contents callout-collapse collapse">
+<div id="callout-9" class="callout-9-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/bow/maxrl_sub_word_het_per_epoch_rsq.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>

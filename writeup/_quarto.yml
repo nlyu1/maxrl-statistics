@@ -14,6 +14,8 @@ website:
         text: Gradient Estimator
       - href: bag-of-words.qmd
         text: Bag of Words (WIP)
+      - href: corpus-regression.qmd
+        text: Corpus Regression (WIP)
       - href: dag-reasoning.qmd
         text: DAG Reasoning (Empty)
 

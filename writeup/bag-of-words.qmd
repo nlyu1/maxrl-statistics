@@ -10,12 +10,7 @@ The bag-of-words (BoW) setup isolates noise-robustness of SL, GRPO, and MaxRL in
 
 ### TL; DR
 
-1. We didn't find SL and GRPO (by corollary, MaxRL) different on the bag-of-words baseline.
-2. The next step is to sharpen the hypothesis that SL (maximum-likelihood) is better on harder-tasks.
-
-New hypothesis: SL and GRPO differentiates only when there is **variation** in task difficulty.
-
-- Does random per-row difficulty suffice, or do we need semantic, learnable variation in difficulty?
+No advantage of SL / MaxRL over GRPO in the BoW setup, in either homogeneous or heterogeneous settings.
 
 ## Dataset
 
@@ -62,6 +57,7 @@ $\sum v_i = -6$, signal $= 0.0031 \times (-6) = -0.019$, target $= -2.54$
 $\sum v_i = +7$, signal $= 0.277 \times 7 = 1.94$, target $= 1.78$
 :::
 
+<!--
 ### Row-level heteroskedasticity (unlearnable)
 
 The row-level heteroskedastic variant has unlearnable per-sample hardness. We parameterize the label as follows: fixing a global signal-to-target correlation budget $\rho \in [0, 1]$, we parameterize
@@ -92,6 +88,7 @@ $$
 $$
 We require $\eta > 1$ so that the inverted $a_j^2$ has finite population variance.
 :::
+-->
 
 ```{=html}
 <script>
@@ -138,11 +135,13 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
+<!--
 <div class="scaled-plotly-frame" data-source-width="900" data-source-height="620">
   <iframe src="assets/bow/row_heteroskedasticity.html"
           width="900" height="620" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
+-->
 ```
 
 ### Word-level heteroskedasticity (learnable)
@@ -265,6 +264,12 @@ See [MaxRL estimator: leave-one-out derivation](maxrl-estimator.qmd) for the est
 :::
 
 ### Word-level heterogeneous bag-of-words
+
+<u>Null finding</u>: **no discernable difference in the heterogeneous setup**.
+
+> The updated hypothesis is that heterogeneity via irreducible noise, along the purely
+  statistical axis, is insufficient to differentiate the ML objective. The next step
+  is to introduce true, semantic variability.
 
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
