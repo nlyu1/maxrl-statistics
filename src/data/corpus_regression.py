@@ -29,6 +29,18 @@ _DATASET_CONFIG = "sample-10BT"
 _SEED = 42
 
 
+# Canonical sweep grid for the corpus-regression experiments. 16 lookforward
+# horizons spanning short (next-token) to long (32-token skip-ahead).
+candidate_lookforward_tokens: list[int] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32,
+]
+
+# Rollout counts for RL sweeps.
+candidate_rollout_steps: list[int] = [4, 16, 128, 1024]
+
+candidate_seeds: list[int] = [51, 61, 121, 153, 228]
+
+
 def _stream_token_prefixes(
     *,
     tokenizer: Any,

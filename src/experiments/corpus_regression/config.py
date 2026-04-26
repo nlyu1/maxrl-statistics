@@ -215,3 +215,11 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
     ) -> CorpusRegressionStudyBaseState:
         common = self._build_common_state_kwargs(device=device)
         return self.get_state_cls()(**common, **self._extra_state_kwargs())
+
+
+def baseline_mode_folder(*, subtract_baseline: bool) -> str:
+    return "subtract-baseline" if subtract_baseline else "no-subtract-baseline"
+
+
+def likelihood_mode_folder(*, use_factorized_likelihoods: bool) -> str:
+    return "factorized" if use_factorized_likelihoods else "joint"
