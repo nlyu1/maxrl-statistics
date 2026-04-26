@@ -19,46 +19,9 @@ Each sample is the first $L$ tokens of a fineweb-edu document. The label is a de
 The canonical configuration uses the SmolLM2-135M tokenizer, $L = 128$, $k = 1$, $D = 32$, and $50{,}000$ train / $50{,}000$ val samples.
 
 ```{=html}
-<script>
-window.fitScaledIframeContainer = window.fitScaledIframeContainer || function(frame) {
-  const iframe = frame.querySelector("iframe");
-  const sourceWidth = Number(frame.dataset.sourceWidth);
-  const sourceHeight = Number(frame.dataset.sourceHeight);
-  if (!iframe || !sourceWidth || !sourceHeight) return;
-  const displayWidth = frame.clientWidth;
-  if (!displayWidth) return;
-  const scale = Math.min(1, displayWidth / sourceWidth);
-  frame.style.maxWidth = "100%";
-  frame.style.overflow = "hidden";
-  frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
-  iframe.style.width = `${sourceWidth}px`;
-  iframe.style.height = `${sourceHeight}px`;
-  iframe.style.display = "block";
-  iframe.style.border = "0";
-  iframe.style.transformOrigin = "top left";
-  iframe.style.transform = `scale(${scale})`;
-};
-window.addEventListener("DOMContentLoaded", () => {
-  const frames = document.querySelectorAll(".scaled-plotly-frame");
-  frames.forEach(window.fitScaledIframeContainer);
-  if ("ResizeObserver" in window) {
-    const obs = new ResizeObserver((es) =>
-      es.forEach((e) => window.fitScaledIframeContainer(e.target))
-    );
-    frames.forEach((f) => obs.observe(f));
-  } else {
-    window.addEventListener("resize", () =>
-      frames.forEach(window.fitScaledIframeContainer)
-    );
-  }
-});
-</script>
-
-<div class="scaled-plotly-frame" data-source-width="920" data-source-height="360">
-  <iframe src="assets/corpus-regression/demonstrate.html"
-          width="920" height="360" scrolling="no"
-          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
-</div>
+<iframe src="assets/corpus-regression/demonstrate.html"
+        style="width:100%; height:220px; border:0; display:block;"
+        scrolling="auto"></iframe>
 ```
 ## Experiments
 

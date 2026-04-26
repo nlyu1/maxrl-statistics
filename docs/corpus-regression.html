@@ -207,44 +207,7 @@ Note
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/corpus_regression.py"><code>src/data/corpus_regression.py</code></a>.</p>
 <p>Each sample is the first <span class="math inline">\(L\)</span> tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D\)</span>-dimensional Rademacher (<span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookfoward_tokens</code>. With <span class="math inline">\(k = 1\)</span> this is one-step prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have <span class="math inline">\(\mathbb{E}[\text{label}] = 0\)</span>, <span class="math inline">\(\text{Var}(\text{label}_d) = 1\)</span> per coordinate.</p>
 <p>The canonical configuration uses the SmolLM2-135M tokenizer, <span class="math inline">\(L = 128\)</span>, <span class="math inline">\(k = 1\)</span>, <span class="math inline">\(D = 32\)</span>, and <span class="math inline">\(50{,}000\)</span> train / <span class="math inline">\(50{,}000\)</span> val samples.</p>
-<script>
-window.fitScaledIframeContainer = window.fitScaledIframeContainer || function(frame) {
-  const iframe = frame.querySelector("iframe");
-  const sourceWidth = Number(frame.dataset.sourceWidth);
-  const sourceHeight = Number(frame.dataset.sourceHeight);
-  if (!iframe || !sourceWidth || !sourceHeight) return;
-  const displayWidth = frame.clientWidth;
-  if (!displayWidth) return;
-  const scale = Math.min(1, displayWidth / sourceWidth);
-  frame.style.maxWidth = "100%";
-  frame.style.overflow = "hidden";
-  frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
-  iframe.style.width = `${sourceWidth}px`;
-  iframe.style.height = `${sourceHeight}px`;
-  iframe.style.display = "block";
-  iframe.style.border = "0";
-  iframe.style.transformOrigin = "top left";
-  iframe.style.transform = `scale(${scale})`;
-};
-window.addEventListener("DOMContentLoaded", () => {
-  const frames = document.querySelectorAll(".scaled-plotly-frame");
-  frames.forEach(window.fitScaledIframeContainer);
-  if ("ResizeObserver" in window) {
-    const obs = new ResizeObserver((es) =>
-      es.forEach((e) => window.fitScaledIframeContainer(e.target))
-    );
-    frames.forEach((f) => obs.observe(f));
-  } else {
-    window.addEventListener("resize", () =>
-      frames.forEach(window.fitScaledIframeContainer)
-    );
-  }
-});
-</script>
-
-<div class="scaled-plotly-frame" data-source-width="920" data-source-height="360">
-  <iframe src="assets/corpus-regression/demonstrate.html" width="920" height="360" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
-</div>
+<iframe src="assets/corpus-regression/demonstrate.html" style="width:100%; height:220px; border:0; display:block;" scrolling="auto"></iframe>
 </section>
 <section id="experiments" class="level2">
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
