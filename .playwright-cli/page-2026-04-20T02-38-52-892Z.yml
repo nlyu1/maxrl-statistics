@@ -213,16 +213,16 @@
               - generic [ref=e241]:
                 - generic [ref=e243]: "1"
                 - generic [ref=e245]: −
-                - generic [ref=e247]: α
+                - generic [ref=e247]: alpha
               - math [ref=e249]:
                 - generic [ref=e250]: "1"
                 - generic [ref=e251]: −
-                - generic [ref=e252]: α
+                - generic [ref=e252]: alpha
             - text: (where
             - generic [ref=e254]:
-              - generic [ref=e257]: α
+              - generic [ref=e257]: alpha
               - math [ref=e259]:
-                - generic [ref=e260]: α
+                - generic [ref=e260]: alpha
             - text: =
             - code [ref=e261]: aux_words_ratio
             - text: "), shaped by a power-law centered on the neutral word “fair”:"
@@ -271,18 +271,18 @@
                     - generic [ref=e321]: γ
             - text: . Auxiliary words uniformly split mass
             - generic [ref=e323]:
-              - generic [ref=e326]: α
+              - generic [ref=e326]: alpha
               - math [ref=e328]:
-                - generic [ref=e329]: α
+                - generic [ref=e329]: alpha
             - text: .
-          - 'figure "Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency: α = 0.5 , γ = 1.0" [ref=e331]':
+          - 'figure "Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency: alpha = 0.5 , γ = 1.0" [ref=e331]':
             - paragraph [ref=e332]:
               - img [ref=e333]
             - generic [ref=e334]:
               - text: "Semantic word probabilities at canonical configuration when half of the words are semantic, with linearly decaying frequency:"
               - generic [ref=e336]:
                 - generic [ref=e337]:
-                  - generic [ref=e339]: α
+                  - generic [ref=e339]: alpha
                   - generic [ref=e341]: =
                   - generic [ref=e342]:
                     - generic [ref=e343]: "0"
@@ -296,7 +296,7 @@
                     - generic [ref=e354]: .
                     - generic [ref=e355]: "0"
                 - math [ref=e357]:
-                  - generic [ref=e358]: α
+                  - generic [ref=e358]: alpha
                   - generic [ref=e359]: =
                   - generic [ref=e360]: "0.5"
                   - generic [ref=e361]: ","
@@ -588,7 +588,7 @@
               - generic [ref=e752]:
                 - generic [ref=e753]: Note
                 - text: Details on per-sample noise v. signal distribution
-            - text: ρ j = ρ √ ρ 2 + ( 1 − ρ 2 ) a 2 j ∈ [ 0 , 1 ] ⟺ a 2 j = ρ 2 1 − ρ 2 ( 1 ρ 2 j − 1 ) E [ a 2 j ] = 1 E [ 1 / ρ 2 j ] = 1 / ρ 2 ρ j ρ 2 j ∼ B e t a ( α , β ) ( α + β − 1 ) / ( α − 1 ) = 1 / ρ 2 β α ρ η = α − 1 = α = 1 + η , β = η ( 1 − ρ 2 ) / ρ 2 , V a r ( ρ 2 j ) = α β ( α + β ) 2 ( α + β + 1 ) = ( 1 + η ) η ( 1 − ρ 2 ) ρ 4 ( ρ 2 + η ) 2 ( 2 ρ 2 + η ) η → ∞ − → ( 1 − ρ 2 ) ρ 4 η . η > 1 a 2 j
+            - text: ρ j = ρ √ ρ 2 + ( 1 − ρ 2 ) a 2 j ∈ [ 0 , 1 ] ⟺ a 2 j = ρ 2 1 − ρ 2 ( 1 ρ 2 j − 1 ) E [ a 2 j ] = 1 E [ 1 / ρ 2 j ] = 1 / ρ 2 ρ j ρ 2 j ∼ B e t a ( alpha , beta ) ( alpha + beta − 1 ) / ( alpha − 1 ) = 1 / ρ 2 beta alpha ρ η = alpha − 1 = alpha = 1 + η , beta = η ( 1 − ρ 2 ) / ρ 2 , V a r ( ρ 2 j ) = alpha beta ( alpha + beta ) 2 ( alpha + beta + 1 ) = ( 1 + η ) η ( 1 − ρ 2 ) ρ 4 ( ρ 2 + η ) 2 ( 2 ρ 2 + η ) η → ∞ − → ( 1 − ρ 2 ) ρ 4 η . η > 1 a 2 j
           - iframe [ref=e757]:
             - generic [active] [ref=f1e1]:
               - generic [ref=f1e5]:

@@ -14,9 +14,9 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
 
     This variant injects **row-level heteroskedastic noise** via the harmonic-beta
     law on the local squared correlation q_i = rho_i²:
-        α = 1 + row_hardness_eta
-        β = row_hardness_eta · (1 - corr²) / corr²
-        q_i ~ Beta(α, β)
+        alpha = 1 + row_hardness_eta
+        beta = row_hardness_eta · (1 - corr²) / corr²
+        q_i ~ Beta(alpha, beta)
         a_i² = corr² / (1 - corr²) · (1 / q_i - 1)
     By construction E[a_i²] = 1, so the target model
         target_i = signal_i + sqrt(1 - corr²) · a_i · ε_i
@@ -86,12 +86,14 @@ class RowHeterogeneousBagOfWordsDatasetConfig(BagOfWordsDatasetConfig):
         )
 
         # Harmonic-beta schedule with theoretical E[a²] = 1.
-        a = np.sqrt(type(self).sample_noise_variance_multiplier(
-            corr=self.corr,
-            row_hardness_eta=self.row_hardness_eta,
-            rng=rng,
-            n=n,
-        ))
+        a = np.sqrt(
+            type(self).sample_noise_variance_multiplier(
+                corr=self.corr,
+                row_hardness_eta=self.row_hardness_eta,
+                rng=rng,
+                n=n,
+            )
+        )
 
         noise_std_global = (1 - self.corr**2) ** 0.5
         targets = signal + noise_std_global * a * rng.standard_normal(n)
