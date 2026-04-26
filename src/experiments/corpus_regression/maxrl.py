@@ -32,6 +32,8 @@ class CorpusRegressionMaxRLConfig(CorpusRegressionStudyBaseConfig):
     # Implied stdev of the Gaussian policy m_theta, NOT the data's noise.
     gaussian_stdev: float
     subtract_baseline: bool
+    # Important parameter: decouple coordinates
+    use_factorized_likelihoods: bool
 
     def get_state_cls(self) -> type["CorpusRegressionMaxRLState"]:
         return CorpusRegressionMaxRLState
