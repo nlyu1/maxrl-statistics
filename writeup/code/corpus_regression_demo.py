@@ -116,7 +116,7 @@ def build_html(*, config: CorpusRegressionDatasetConfig, num_samples: int) -> st
     tok = AutoTokenizer.from_pretrained(config.pretrained_tokenizer_model_name)
     rademacher = config._rademacher_matrix(len(tok))
 
-    min_length = config.prefix_length + config.num_lookfoward_tokens
+    min_length = config.prefix_length + config.num_lookforward_tokens
     collected = _stream_token_prefixes(
         tokenizer=tok,
         min_length=min_length,
@@ -124,7 +124,7 @@ def build_html(*, config: CorpusRegressionDatasetConfig, num_samples: int) -> st
         desc="streaming demo samples",
         overshoot=16,
     )
-    last = config.prefix_length + config.num_lookfoward_tokens - 1
+    last = config.prefix_length + config.num_lookforward_tokens - 1
     payload = []
     for ids in collected:
         sample = {

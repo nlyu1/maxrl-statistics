@@ -68,12 +68,12 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     """
     Initializes `HuggingFaceFW/fineweb-edu`.
     Extracts `num_samples * 2` samples of length >=
-        `prefix_length + num_lookfoward_tokens`.
+        `prefix_length + num_lookforward_tokens`.
     Input: the first `prefix_length` tokens of each sample.
     Label: the `embedding_dim`-dim ±1 Rademacher vector of the
         final lookforward token (i.e. the token at index
-        `prefix_length + num_lookfoward_tokens - 1`).
-    With `num_lookfoward_tokens > 1` the intermediate tokens are
+        `prefix_length + num_lookforward_tokens - 1`).
+    With `num_lookforward_tokens > 1` the intermediate tokens are
         not exposed to the model and do not contribute to the label —
         this is a skip-ahead target, not next-token prediction.
     """
@@ -82,7 +82,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     num_samples: int
     pretrained_tokenizer_model_name: str
 
-    num_lookfoward_tokens: int  # >= 1
+    num_lookforward_tokens: int  # >= 1
     embedding_dim: int  # dimensions of rademacher embedding
 
     @classmethod
@@ -91,7 +91,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             "prefix_length": 128,
             "num_samples": 50_000,
             "pretrained_tokenizer_model_name": "HuggingFaceTB/SmolLM2-135M",
-            "num_lookfoward_tokens": 1,
+            "num_lookforward_tokens": 1,
             "embedding_dim": 32,
         }
 
@@ -108,7 +108,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         slug = (
             f"fineweb_edu_{tokenizer_slug}"
             f"_{self.num_samples}x{self.prefix_length}"
-            f"_look{self.num_lookfoward_tokens}_dim{self.embedding_dim}"
+            f"_look{self.num_lookforward_tokens}_dim{self.embedding_dim}"
         )
         return base_path / slug
 
@@ -124,7 +124,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     def build(self) -> "CorpusRegressionDataset":
         """Stream fineweb-edu, tokenize, compute Rademacher labels, shuffle,
         and return a train/val split."""
-        min_length = self.prefix_length + self.num_lookfoward_tokens
+        min_length = self.prefix_length + self.num_lookforward_tokens
         tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
         rademacher = self._rademacher_matrix(len(tok))
 
@@ -160,7 +160,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         """Stream `num_samples` fresh docs and return a Solara browser for visual
         inspection: prefix (black) + lookahead window (blue) + final predicted token
         (bold blue) + the Rademacher label vector. Independent of any cached dataset."""
-        min_length = self.prefix_length + self.num_lookfoward_tokens
+        min_length = self.prefix_length + self.num_lookforward_tokens
         tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
         rademacher = self._rademacher_matrix(len(tok))
 
@@ -171,7 +171,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             desc="streaming demo samples",
             overshoot=16,
         )
-        last = self.prefix_length + self.num_lookfoward_tokens - 1
+        last = self.prefix_length + self.num_lookforward_tokens - 1
         samples = [
             {
                 "prefix_ids": ids[: self.prefix_length],

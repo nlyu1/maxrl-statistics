@@ -43,7 +43,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         *,
         dataset_base_folder: Path,
         study_base_folder: Path,
-        num_lookfoward_tokens: int,
+        num_lookforward_tokens: int,
         embedding_dim: int = 32,
         prefix_length: int = 128,
         num_samples: int = 50_000,
@@ -62,7 +62,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             prefix_length=prefix_length,
             num_samples=num_samples,
             pretrained_tokenizer_model_name=model_name,
-            num_lookfoward_tokens=num_lookfoward_tokens,
+            num_lookforward_tokens=num_lookforward_tokens,
             embedding_dim=embedding_dim,
         )
         dataset_folder = data_config.get_canonical_folder(dataset_base_folder)

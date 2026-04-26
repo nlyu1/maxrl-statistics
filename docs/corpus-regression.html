@@ -131,7 +131,7 @@ window.Quarto = {
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="./bag-of-words.html"> 
-<span class="menu-text">Bag of Words (WIP)</span></a>
+<span class="menu-text">Bag of Words</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link active" href="./corpus-regression.html" aria-current="page"> 
@@ -205,7 +205,7 @@ Note
 <section id="dataset" class="level2">
 <h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/corpus_regression.py"><code>src/data/corpus_regression.py</code></a>.</p>
-<p>Each sample is the first <span class="math inline">\(L\)</span> tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D\)</span>-dimensional Rademacher (<span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookfoward_tokens</code>. With <span class="math inline">\(k = 1\)</span> this is one-step prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have <span class="math inline">\(\mathbb{E}[\text{label}] = 0\)</span>, <span class="math inline">\(\text{Var}(\text{label}_d) = 1\)</span> per coordinate.</p>
+<p>Each sample is the first <span class="math inline">\(L\)</span> tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D\)</span>-dimensional Rademacher (<span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookforward_tokens</code>. With <span class="math inline">\(k = 1\)</span> this is one-step prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have <span class="math inline">\(\mathbb{E}[\text{label}] = 0\)</span>, <span class="math inline">\(\text{Var}(\text{label}_d) = 1\)</span> per coordinate.</p>
 <p>The canonical configuration uses the SmolLM2-135M tokenizer, <span class="math inline">\(L = 128\)</span>, <span class="math inline">\(k = 1\)</span>, <span class="math inline">\(D = 32\)</span>, and <span class="math inline">\(50{,}000\)</span> train / <span class="math inline">\(50{,}000\)</span> val samples.</p>
 <iframe src="assets/corpus-regression/demonstrate.html" style="width:100%; height:220px; border:0; display:block;" scrolling="auto"></iframe>
 </section>

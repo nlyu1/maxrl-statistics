@@ -74,7 +74,7 @@
     "href": "index.html",
     "title": "MaxRL Statistics",
     "section": "",
-    "text": "Continuously updated research progress on the rollout-likelihood generalization of maximum likelihood reinforcement learning.\nTheory:\n\nTheory — MaxRL as a compute-indexed truncation of log-likelihood, per-rollout reweighting, and the generalized leave-one-out estimator.\nGradient Estimator — numerically stable \\(O(BRD)\\) computation of the leave-one-out weights via prefix-suffix scans of elementary symmetric polynomials.\n\nExperiments:\n\nRegression: bag of words — noise-robustness in the zero-step sampling setting. WIP.\nRegression: corpus regression — same zero-step setting on natural-language prefixes. WIP.\nRegression: DAG-reasoning — reasoning advantage and rollout efficiency. Not started."
+    "text": "Continuously updated research progress on the rollout-likelihood generalization of maximum likelihood reinforcement learning.\nTheory:\n\nTheory — MaxRL as a compute-indexed truncation of log-likelihood, per-rollout reweighting, and the generalized leave-one-out estimator.\nGradient Estimator — numerically stable \\(O(BRD)\\) computation of the leave-one-out weights via prefix-suffix scans of elementary symmetric polynomials.\n\nExperiments:\n\nRegression: bag of words — noise-robustness in the zero-step sampling setting.\nRegression: corpus regression — same zero-step setting on natural-language prefixes. WIP.\nRegression: DAG-reasoning — reasoning advantage and rollout efficiency. Not started."
   },
   {
     "objectID": "corpus-regression.html",
@@ -88,7 +88,7 @@
     "href": "corpus-regression.html#dataset",
     "title": "Regression: corpus regression",
     "section": "Dataset",
-    "text": "Dataset\nSee src/data/corpus_regression.py.\nEach sample is the first \\(L\\) tokens of a fineweb-edu document. The label is a deterministic \\(D\\)-dimensional Rademacher (\\(\\pm 1\\)) embedding of the token at position \\(L + k - 1\\), where \\(k \\ge 1\\) is num_lookfoward_tokens. With \\(k = 1\\) this is one-step prediction; with \\(k &gt; 1\\) the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have \\(\\mathbb{E}[\\text{label}] = 0\\), \\(\\text{Var}(\\text{label}_d) = 1\\) per coordinate.\nThe canonical configuration uses the SmolLM2-135M tokenizer, \\(L = 128\\), \\(k = 1\\), \\(D = 32\\), and \\(50{,}000\\) train / \\(50{,}000\\) val samples."
+    "text": "Dataset\nSee src/data/corpus_regression.py.\nEach sample is the first \\(L\\) tokens of a fineweb-edu document. The label is a deterministic \\(D\\)-dimensional Rademacher (\\(\\pm 1\\)) embedding of the token at position \\(L + k - 1\\), where \\(k \\ge 1\\) is num_lookforward_tokens. With \\(k = 1\\) this is one-step prediction; with \\(k &gt; 1\\) the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have \\(\\mathbb{E}[\\text{label}] = 0\\), \\(\\text{Var}(\\text{label}_d) = 1\\) per coordinate.\nThe canonical configuration uses the SmolLM2-135M tokenizer, \\(L = 128\\), \\(k = 1\\), \\(D = 32\\), and \\(50{,}000\\) train / \\(50{,}000\\) val samples."
   },
   {
     "objectID": "corpus-regression.html#experiments",
