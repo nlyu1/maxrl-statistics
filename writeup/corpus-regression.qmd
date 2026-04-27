@@ -7,24 +7,163 @@ The corpus-regression task performs next-token regression on natural-language pr
 ### TL; DR
 
 ::: {.callout-note}
-Placeholder — experiments pending.
+Placeholder. Sweep pending completion. We do see weak advantage of MaxRL.
 :::
 
 ## Dataset
 
 See [`src/data/corpus_regression.py`]({{< var repo_url >}}/src/data/corpus_regression.py).
 
-Each sample is the first ($L=128$) tokens of a fineweb-edu document. The label is a deterministic $D=32$-dimensional Rademacher ($\pm 1$) embedding of the token at position $L + k - 1$, where $k \ge 1$ is `num_lookforward_tokens`. With $k = 1$ this is one-step prediction; with $k > 1$ the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have $\mathbb{E}[\text{label}] = 0$, $\text{Var}(\text{label}_d) = 1$ per coordinate.
+Each sample is the first ($L=128$) tokens of a fineweb-edu document. The label is a deterministic $D=32$-dimensional Rademacher (random $\pm 1$) embedding of the token at position $L + k - 1$, where $k \ge 1$ is `num_lookforward_tokens`.
 
-The canonical configuration uses the SmolLM2-135M tokenizer, $L = 128$, $k = 1$, $D = 32$, and $50{,}000$ train / $50{,}000$ val samples.
+With $k = 1$ this is next-token prediction; with $k > 1$ the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding. The random embedding is keyed by token id with a fixed seed for reproducibility.
+
+The canonical configuration uses $L = 128$ prefix length and $D = 32$ embedding, and 100k train / 100k val samples.
 
 ```{=html}
 <iframe src="assets/corpus-regression/demonstrate.html"
         style="width:100%; height:220px; border:0; display:block;"
         scrolling="auto"></iframe>
 ```
+```{=html}
+<script>
+window.fitScaledIframeContainer = function(frame) {
+  const iframe = frame.querySelector("iframe");
+  const sourceWidth = Number(frame.dataset.sourceWidth);
+  const sourceHeight = Number(frame.dataset.sourceHeight);
+  if (!iframe || !sourceWidth || !sourceHeight) return;
+
+  const displayWidth = frame.clientWidth;
+  if (!displayWidth) return;
+
+  const scale = Math.min(1, displayWidth / sourceWidth);
+  frame.style.maxWidth = "100%";
+  frame.style.overflow = "hidden";
+  frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
+  iframe.style.width = `${sourceWidth}px`;
+  iframe.style.height = `${sourceHeight}px`;
+  iframe.style.display = "block";
+  iframe.style.border = "0";
+  iframe.style.transformOrigin = "top left";
+  iframe.style.transform = `scale(${scale})`;
+};
+window.addEventListener("DOMContentLoaded", () => {
+  const frames = document.querySelectorAll(".scaled-plotly-frame");
+  frames.forEach(window.fitScaledIframeContainer);
+  if ("ResizeObserver" in window) {
+    const obs = new ResizeObserver((es) =>
+      es.forEach((e) => window.fitScaledIframeContainer(e.target))
+    );
+    frames.forEach((f) => obs.observe(f));
+  } else {
+    window.addEventListener("resize", () =>
+      frames.forEach(window.fitScaledIframeContainer)
+    );
+  }
+  document.addEventListener("shown.bs.collapse", (event) => {
+    event.target
+      .querySelectorAll(".scaled-plotly-frame")
+      .forEach((frame) => {
+        requestAnimationFrame(() => window.fitScaledIframeContainer(frame));
+      });
+  });
+});
+</script>
+```
+
 ## Experiments
 
-::: {.callout-note}
-Placeholder — sweeps in progress.
+::: {.callout-note collapse="true"}
+## Code instructions
+See [`experiments/corpus-regression/README.md`]({{< var repo_url >}}/experiments/corpus-regression/README.md) for sweep and single-run instructions.
+:::
+
+#### Cross-method comparison
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/methods_vs_lookforward.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+#### Supervised learning
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/sl_vs_lookforward.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+::: {.callout-note collapse="true"}
+## (Graphics): SL training corr and mse
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/sl_per_epoch_corr.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/sl_per_epoch_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+:::
+
+#### GRPO
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/grpo_vs_lookforward.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+::: {.callout-note collapse="true"}
+## (Graphics): GRPO training corr and mse
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/grpo_per_epoch_corr.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/grpo_per_epoch_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+:::
+
+#### MaxRL (subtract-baseline + factorized)
+
+See [MaxRL estimator: leave-one-out derivation](maxrl-estimator.qmd) for the estimator math used here.
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/maxrl_sub_fact_vs_lookforward.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+::: {.callout-note collapse="true"}
+## (Graphics): MaxRL training corr and mse
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_corr.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
 :::

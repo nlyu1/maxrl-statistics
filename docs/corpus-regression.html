@@ -159,7 +159,13 @@ window.Quarto = {
   <ul>
   <li><a href="#tl-dr" id="toc-tl-dr" class="nav-link active" data-scroll-target="#tl-dr">TL; DR</a></li>
   <li><a href="#dataset" id="toc-dataset" class="nav-link" data-scroll-target="#dataset">Dataset</a></li>
-  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a></li>
+  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a>
+  <ul>
+  <li><a href="#cross-method-comparison" id="toc-cross-method-comparison" class="nav-link" data-scroll-target="#cross-method-comparison">Cross-method comparison</a></li>
+  <li><a href="#supervised-learning" id="toc-supervised-learning" class="nav-link" data-scroll-target="#supervised-learning">Supervised learning</a></li>
+  <li><a href="#grpo" id="toc-grpo" class="nav-link" data-scroll-target="#grpo">GRPO</a></li>
+  <li><a href="#maxrl-subtract-baseline-factorized" id="toc-maxrl-subtract-baseline-factorized" class="nav-link" data-scroll-target="#maxrl-subtract-baseline-factorized">MaxRL (subtract-baseline + factorized)</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -198,34 +204,169 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Placeholder — experiments pending.</p>
+<p>Placeholder. Sweep pending completion. We do see weak advantage of MaxRL.</p>
 </div>
 </div>
 </section>
 <section id="dataset" class="level2">
 <h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/corpus_regression.py"><code>src/data/corpus_regression.py</code></a>.</p>
-<p>Each sample is the first (<span class="math inline">\(L=128\)</span>) tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D=32\)</span>-dimensional Rademacher (<span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookforward_tokens</code>. With <span class="math inline">\(k = 1\)</span> this is one-step prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have <span class="math inline">\(\mathbb{E}[\text{label}] = 0\)</span>, <span class="math inline">\(\text{Var}(\text{label}_d) = 1\)</span> per coordinate.</p>
-<p>The canonical configuration uses the SmolLM2-135M tokenizer, <span class="math inline">\(L = 128\)</span>, <span class="math inline">\(k = 1\)</span>, <span class="math inline">\(D = 32\)</span>, and <span class="math inline">\(50{,}000\)</span> train / <span class="math inline">\(50{,}000\)</span> val samples.</p>
+<p>Each sample is the first (<span class="math inline">\(L=128\)</span>) tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D=32\)</span>-dimensional Rademacher (random <span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookforward_tokens</code>.</p>
+<p>With <span class="math inline">\(k = 1\)</span> this is next-token prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding. The random embedding is keyed by token id with a fixed seed for reproducibility.</p>
+<p>The canonical configuration uses <span class="math inline">\(L = 128\)</span> prefix length and <span class="math inline">\(D = 32\)</span> embedding, and 100k train / 100k val samples.</p>
 <iframe src="assets/corpus-regression/demonstrate.html" style="width:100%; height:220px; border:0; display:block;" scrolling="auto"></iframe>
+<script>
+window.fitScaledIframeContainer = function(frame) {
+  const iframe = frame.querySelector("iframe");
+  const sourceWidth = Number(frame.dataset.sourceWidth);
+  const sourceHeight = Number(frame.dataset.sourceHeight);
+  if (!iframe || !sourceWidth || !sourceHeight) return;
+
+  const displayWidth = frame.clientWidth;
+  if (!displayWidth) return;
+
+  const scale = Math.min(1, displayWidth / sourceWidth);
+  frame.style.maxWidth = "100%";
+  frame.style.overflow = "hidden";
+  frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
+  iframe.style.width = `${sourceWidth}px`;
+  iframe.style.height = `${sourceHeight}px`;
+  iframe.style.display = "block";
+  iframe.style.border = "0";
+  iframe.style.transformOrigin = "top left";
+  iframe.style.transform = `scale(${scale})`;
+};
+window.addEventListener("DOMContentLoaded", () => {
+  const frames = document.querySelectorAll(".scaled-plotly-frame");
+  frames.forEach(window.fitScaledIframeContainer);
+  if ("ResizeObserver" in window) {
+    const obs = new ResizeObserver((es) =>
+      es.forEach((e) => window.fitScaledIframeContainer(e.target))
+    );
+    frames.forEach((f) => obs.observe(f));
+  } else {
+    window.addEventListener("resize", () =>
+      frames.forEach(window.fitScaledIframeContainer)
+    );
+  }
+  document.addEventListener("shown.bs.collapse", (event) => {
+    event.target
+      .querySelectorAll(".scaled-plotly-frame")
+      .forEach((frame) => {
+        requestAnimationFrame(() => window.fitScaledIframeContainer(frame));
+      });
+  });
+});
+</script>
 </section>
 <section id="experiments" class="level2">
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Note
+<span class="screen-reader-only">Note</span>Code instructions
 </div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
+<div id="callout-2" class="callout-2-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
-<p>Placeholder — sweeps in progress.</p>
+<p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/corpus-regression/README.md"><code>experiments/corpus-regression/README.md</code></a> for sweep and single-run instructions.</p>
+</div>
+</div>
+</div>
+<section id="cross-method-comparison" class="level4">
+<h4 class="anchored" data-anchor-id="cross-method-comparison">Cross-method comparison</h4>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/methods_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+</section>
+<section id="supervised-learning" class="level4">
+<h4 class="anchored" data-anchor-id="supervised-learning">Supervised learning</h4>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/sl_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>(Graphics): SL training corr and mse
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/sl_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/sl_per_epoch_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="grpo" class="level4">
+<h4 class="anchored" data-anchor-id="grpo">GRPO</h4>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/grpo_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>(Graphics): GRPO training corr and mse
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-4" class="callout-4-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/grpo_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/grpo_per_epoch_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="maxrl-subtract-baseline-factorized" class="level4">
+<h4 class="anchored" data-anchor-id="maxrl-subtract-baseline-factorized">MaxRL (subtract-baseline + factorized)</h4>
+<p>See <a href="maxrl-estimator.qmd">MaxRL estimator: leave-one-out derivation</a> for the estimator math used here.</p>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/maxrl_sub_fact_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>(Graphics): MaxRL training corr and mse
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-5" class="callout-5-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+</div>
 </div>
 </div>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

@@ -88,14 +88,14 @@
     "href": "corpus-regression.html#dataset",
     "title": "Regression: corpus regression",
     "section": "Dataset",
-    "text": "Dataset\nSee src/data/corpus_regression.py.\nEach sample is the first (\\(L=128\\)) tokens of a fineweb-edu document. The label is a deterministic \\(D=32\\)-dimensional Rademacher (\\(\\pm 1\\)) embedding of the token at position \\(L + k - 1\\), where \\(k \\ge 1\\) is num_lookforward_tokens. With \\(k = 1\\) this is one-step prediction; with \\(k &gt; 1\\) the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have \\(\\mathbb{E}[\\text{label}] = 0\\), \\(\\text{Var}(\\text{label}_d) = 1\\) per coordinate.\nThe canonical configuration uses the SmolLM2-135M tokenizer, \\(L = 128\\), \\(k = 1\\), \\(D = 32\\), and \\(50{,}000\\) train / \\(50{,}000\\) val samples."
+    "text": "Dataset\nSee src/data/corpus_regression.py.\nEach sample is the first (\\(L=128\\)) tokens of a fineweb-edu document. The label is a deterministic \\(D=32\\)-dimensional Rademacher (random \\(\\pm 1\\)) embedding of the token at position \\(L + k - 1\\), where \\(k \\ge 1\\) is num_lookforward_tokens.\nWith \\(k = 1\\) this is next-token prediction; with \\(k &gt; 1\\) the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding. The random embedding is keyed by token id with a fixed seed for reproducibility.\nThe canonical configuration uses \\(L = 128\\) prefix length and \\(D = 32\\) embedding, and 100k train / 100k val samples."
   },
   {
     "objectID": "corpus-regression.html#experiments",
     "href": "corpus-regression.html#experiments",
     "title": "Regression: corpus regression",
     "section": "Experiments",
-    "text": "Experiments\n\n\n\n\n\n\nNote\n\n\n\nPlaceholder — sweeps in progress."
+    "text": "Experiments\n\n\n\n\n\n\nNoteCode instructions\n\n\n\n\n\nSee experiments/corpus-regression/README.md for sweep and single-run instructions.\n\n\n\n\nCross-method comparison\n\n  \n\n\n\nSupervised learning\n\n  \n\n\n\n\n\n\n\nNote(Graphics): SL training corr and mse\n\n\n\n\n\n\n  \n\n\n  \n\n\n\n\n\n\nGRPO\n\n  \n\n\n\n\n\n\n\nNote(Graphics): GRPO training corr and mse\n\n\n\n\n\n\n  \n\n\n  \n\n\n\n\n\n\nMaxRL (subtract-baseline + factorized)\nSee MaxRL estimator: leave-one-out derivation for the estimator math used here.\n\n  \n\n\n\n\n\n\n\nNote(Graphics): MaxRL training corr and mse"
   },
   {
     "objectID": "index.html#dataset",
