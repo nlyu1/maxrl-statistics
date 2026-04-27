@@ -204,16 +204,15 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Placeholder. Sweep pending completion. We do see weak advantage of MaxRL.</p>
+<p>Placeholder — experiments pending.</p>
 </div>
 </div>
 </section>
 <section id="dataset" class="level2">
 <h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/corpus_regression.py"><code>src/data/corpus_regression.py</code></a>.</p>
-<p>Each sample is the first (<span class="math inline">\(L=128\)</span>) tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D=32\)</span>-dimensional Rademacher (random <span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookforward_tokens</code>.</p>
-<p>With <span class="math inline">\(k = 1\)</span> this is next-token prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding. The random embedding is keyed by token id with a fixed seed for reproducibility.</p>
-<p>The canonical configuration uses <span class="math inline">\(L = 128\)</span> prefix length and <span class="math inline">\(D = 32\)</span> embedding, and 100k train / 100k val samples.</p>
+<p>Each sample is the first (<span class="math inline">\(L=128\)</span>) tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D=32\)</span>-dimensional Rademacher (<span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookforward_tokens</code>. With <span class="math inline">\(k = 1\)</span> this is one-step prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have <span class="math inline">\(\mathbb{E}[\text{label}] = 0\)</span>, <span class="math inline">\(\text{Var}(\text{label}_d) = 1\)</span> per coordinate.</p>
+<p>The canonical configuration uses the SmolLM2-135M tokenizer, <span class="math inline">\(L = 128\)</span>, <span class="math inline">\(k = 1\)</span>, <span class="math inline">\(D = 32\)</span>, and <span class="math inline">\(50{,}000\)</span> train / <span class="math inline">\(50{,}000\)</span> val samples.</p>
 <iframe src="assets/corpus-regression/demonstrate.html" style="width:100%; height:220px; border:0; display:block;" scrolling="auto"></iframe>
 <script>
 window.fitScaledIframeContainer = function(frame) {
@@ -277,14 +276,14 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 </div>
 </div>
-<section id="cross-method-comparison" class="level4">
-<h4 class="anchored" data-anchor-id="cross-method-comparison">Cross-method comparison</h4>
+<section id="cross-method-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="cross-method-comparison">Cross-method comparison</h3>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/corpus-regression/methods_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 </section>
-<section id="supervised-learning" class="level4">
-<h4 class="anchored" data-anchor-id="supervised-learning">Supervised learning</h4>
+<section id="supervised-learning" class="level3">
+<h3 class="anchored" data-anchor-id="supervised-learning">Supervised learning</h3>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/corpus-regression/sl_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -310,8 +309,8 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 </div>
 </section>
-<section id="grpo" class="level4">
-<h4 class="anchored" data-anchor-id="grpo">GRPO</h4>
+<section id="grpo" class="level3">
+<h3 class="anchored" data-anchor-id="grpo">GRPO</h3>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/corpus-regression/grpo_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -337,8 +336,8 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 </div>
 </section>
-<section id="maxrl-subtract-baseline-factorized" class="level4">
-<h4 class="anchored" data-anchor-id="maxrl-subtract-baseline-factorized">MaxRL (subtract-baseline + factorized)</h4>
+<section id="maxrl-subtract-baseline-factorized" class="level3">
+<h3 class="anchored" data-anchor-id="maxrl-subtract-baseline-factorized">MaxRL (subtract-baseline + factorized)</h3>
 <p>See <a href="maxrl-estimator.qmd">MaxRL estimator: leave-one-out derivation</a> for the estimator math used here.</p>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
   <iframe src="assets/corpus-regression/maxrl_sub_fact_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
