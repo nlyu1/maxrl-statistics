@@ -14,7 +14,7 @@ Placeholder — experiments pending.
 
 See [`src/data/corpus_regression.py`]({{< var repo_url >}}/src/data/corpus_regression.py).
 
-Each sample is the first $L$ tokens of a fineweb-edu document. The label is a deterministic $D$-dimensional Rademacher ($\pm 1$) embedding of the token at position $L + k - 1$, where $k \ge 1$ is `num_lookforward_tokens`. With $k = 1$ this is one-step prediction; with $k > 1$ the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have $\mathbb{E}[\text{label}] = 0$, $\text{Var}(\text{label}_d) = 1$ per coordinate.
+Each sample is the first ($L=128$) tokens of a fineweb-edu document. The label is a deterministic $D=32$-dimensional Rademacher ($\pm 1$) embedding of the token at position $L + k - 1$, where $k \ge 1$ is `num_lookforward_tokens`. With $k = 1$ this is one-step prediction; with $k > 1$ the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have $\mathbb{E}[\text{label}] = 0$, $\text{Var}(\text{label}_d) = 1$ per coordinate.
 
 The canonical configuration uses the SmolLM2-135M tokenizer, $L = 128$, $k = 1$, $D = 32$, and $50{,}000$ train / $50{,}000$ val samples.
 

@@ -541,20 +541,22 @@ def plot_methods_vs_lookforward(
     save_path: Path | None = None,
 ) -> go.Figure:
     """Cross-method best-epoch corr vs `num_lookforward_tokens`. Two panels
-    (train, val); one curve per (method, rollouts) — SL contributes a single
-    'baseline' curve. Color = rollouts (consistent across methods); dash =
-    method. Default-visible: highest-rollouts curve per RL method, plus SL."""
-    methods: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
+    (train, val). SL (when present) is a single standalone curve; GRPO and
+    MaxRL traces are grouped by rollouts — one legend group per `r=N`,
+    containing one curve per RL method that ran that rollouts value. Color =
+    rollouts; dash = method. Default-visible: SL plus the highest-rollouts
+    group."""
+    methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
         (name, cfg)
-        for name, cfg in (("sl", sl), ("grpo", grpo), ("maxrl", maxrl))
+        for name, cfg in (("grpo", grpo), ("maxrl", maxrl))
         if cfg is not None
     ]
-    if not methods:
+    if sl is None and not methods_rl:
         raise ValueError("at least one of sl/grpo/maxrl must be provided")
 
     palette = qualitative.Plotly
     rollouts_seen: list[int] = []
-    for _, cfg in methods:
+    for _, cfg in methods_rl:
         rg = cfg._rollouts_groups()
         if rg is None:
             continue
@@ -568,71 +570,69 @@ def plot_methods_vs_lookforward(
     sl_color = palette[len(rollouts_seen) % len(palette)]
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
+    sl_df = sl.get_metric_dataframe() if sl is not None else None
+    rl_dfs: dict[str, pl.DataFrame] = {
+        name: cfg.get_metric_dataframe() for name, cfg in methods_rl
+    }
+    rl_groups: dict[str, dict[int, list[str]]] = {
+        name: cfg._rollouts_groups() or {} for name, cfg in methods_rl
+    }
+    rl_cfgs: dict[str, CorpusRegressionAnalysisConfig] = dict(methods_rl)
+
     fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
     for col, split in enumerate(("train", "val"), start=1):
         y_name = f"{split}_corr"
-        for method_name, cfg in methods:
-            df = cfg.get_metric_dataframe()
-            agg_df = cfg._aggregate_by_epoch(df=df, y_name=y_name)
-            rg = cfg._rollouts_groups()
-            curves: list[tuple[str, list[str], str, bool]]
-            if rg is None:
-                curves = [("baseline", list(cfg.studies.keys()), sl_color, True)]
-            else:
-                curves = [
-                    (f"r={r}", names, color_by_rollouts[r], r == max_rollouts)
-                    for r, names in rg.items()
-                ]
-            for curve_label, names, color, visible_default in curves:
+
+        if sl is not None:
+            sl_agg = sl._aggregate_by_epoch(df=sl_df, y_name=y_name)
+            sl_rows = _best_epoch_rows_for_studies(
+                cfg=sl, agg_df=sl_agg, studies=list(sl.studies.keys()),
+            )
+            if sl_rows:
+                _add_methods_curve(
+                    fig=fig,
+                    rows=sl_rows,
+                    col=col,
+                    trace_name="sl",
+                    legendgroup="sl",
+                    legendgrouptitle_text=None,
+                    color=sl_color,
+                    dash=_METHOD_DASH["sl"],
+                    y_name=y_name,
+                    x_scale=x_scale,
+                    show_legend=(col == 1),
+                    visible_default=True,
+                )
+
+        for r in rollouts_seen:
+            for method_name, _ in methods_rl:
+                names_for_r = rl_groups[method_name].get(r, [])
+                if not names_for_r:
+                    continue
+                cfg = rl_cfgs[method_name]
+                agg_df = cfg._aggregate_by_epoch(
+                    df=rl_dfs[method_name], y_name=y_name,
+                )
                 rows = _best_epoch_rows_for_studies(
-                    cfg=cfg, agg_df=agg_df, studies=names,
+                    cfg=cfg, agg_df=agg_df, studies=names_for_r,
                 )
                 if not rows:
                     continue
-                looks = [r[0] for r in rows]
-                xs = (
-                    [candidate_lookforward_tokens.index(v) for v in looks]
-                    if x_scale == "uniform"
-                    else looks
-                )
-                ys = [r[1] for r in rows]
-                mins = [r[2] for r in rows]
-                maxs = [r[3] for r in rows]
-                customdata = [(r[0], r[4], r[5], r[6]) for r in rows]
-                error_kwargs = (
-                    CorpusRegressionAnalysisConfig._seed_bar_error_kwargs(
-                        ys=ys, mins=mins, maxs=maxs,
-                    )
-                )
-                visible_kwargs = (
-                    {} if visible_default else dict(visible="legendonly")
-                )
-                trace_name = f"{method_name} · {curve_label}"
-                fig.add_trace(
-                    go.Scatter(
-                        x=xs,
-                        y=ys,
-                        mode="lines+markers",
-                        name=trace_name,
-                        legendgroup=method_name,
-                        legendgrouptitle_text=method_name,
-                        showlegend=(col == 1),
-                        line=dict(color=color, dash=_METHOD_DASH[method_name]),
-                        marker=dict(color=color),
-                        customdata=customdata,
-                        hovertemplate=(
-                            "num_lookforward_tokens: %{customdata[0]}<br>"
-                            f"{y_name}: %{{y}}<br>"
-                            "epoch: %{customdata[1]}<br>"
-                            "n_seeds: %{customdata[2]}"
-                            f"<extra>{trace_name} %{{customdata[3]}}</extra>"
-                        ),
-                        **visible_kwargs,
-                        **error_kwargs,
-                    ),
-                    row=1,
+                _add_methods_curve(
+                    fig=fig,
+                    rows=rows,
                     col=col,
+                    trace_name=method_name,
+                    legendgroup=f"r={r}",
+                    legendgrouptitle_text=f"r={r}",
+                    color=color_by_rollouts[r],
+                    dash=_METHOD_DASH[method_name],
+                    y_name=y_name,
+                    x_scale=x_scale,
+                    show_legend=(col == 1),
+                    visible_default=(r == max_rollouts),
                 )
+
         fig.update_xaxes(title_text="num_lookforward_tokens", row=1, col=col)
         fig.update_yaxes(title_text=y_name, row=1, col=col)
         if x_scale == "log":
@@ -654,3 +654,64 @@ def plot_methods_vs_lookforward(
     if save_path is not None:
         CorpusRegressionAnalysisConfig._save_html(fig, save_path)
     return fig
+
+
+def _add_methods_curve(
+    *,
+    fig: go.Figure,
+    rows: list[tuple[int, float, float, float, int, int, str]],
+    col: int,
+    trace_name: str,
+    legendgroup: str,
+    legendgrouptitle_text: str | None,
+    color: str,
+    dash: str,
+    y_name: str,
+    x_scale: Literal["log", "uniform"],
+    show_legend: bool,
+    visible_default: bool,
+) -> None:
+    looks = [r[0] for r in rows]
+    xs = (
+        [candidate_lookforward_tokens.index(v) for v in looks]
+        if x_scale == "uniform"
+        else looks
+    )
+    ys = [r[1] for r in rows]
+    mins = [r[2] for r in rows]
+    maxs = [r[3] for r in rows]
+    customdata = [(r[0], r[4], r[5], r[6]) for r in rows]
+    error_kwargs = CorpusRegressionAnalysisConfig._seed_bar_error_kwargs(
+        ys=ys, mins=mins, maxs=maxs,
+    )
+    group_title_kwargs = (
+        dict(legendgrouptitle_text=legendgrouptitle_text)
+        if legendgrouptitle_text is not None
+        else {}
+    )
+    visible_kwargs = {} if visible_default else dict(visible="legendonly")
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="lines+markers",
+            name=trace_name,
+            legendgroup=legendgroup,
+            **group_title_kwargs,
+            showlegend=show_legend,
+            line=dict(color=color, dash=dash),
+            marker=dict(color=color),
+            customdata=customdata,
+            hovertemplate=(
+                "num_lookforward_tokens: %{customdata[0]}<br>"
+                f"{y_name}: %{{y}}<br>"
+                "epoch: %{customdata[1]}<br>"
+                "n_seeds: %{customdata[2]}"
+                f"<extra>{trace_name} %{{customdata[3]}}</extra>"
+            ),
+            **visible_kwargs,
+            **error_kwargs,
+        ),
+        row=1,
+        col=col,
+    )
