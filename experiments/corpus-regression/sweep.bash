@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-SEEDS=(51 61 121 153 228)
+SEEDS=(51 61 121 153 228 19 143 151 181 210)
 
 for seed in "${SEEDS[@]}"; do
     uv run python experiments/corpus-regression/maxrl/orchestrate.py \
