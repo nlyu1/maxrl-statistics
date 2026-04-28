@@ -23,5 +23,7 @@ Prefer explicit failure over permissive branching or broad `try/except`. Prefer 
 
 Use polars, not pandas.
 
+Before adding code for new functionality, especially if we're bootstrapping from similar code of implemented functionalities, if we're adding things to the shared library, make sure to check for duplicates and code which can be reused.
+
 ## Testing Guidelines
 This is a research repo, so snippet validation is the default. Use focused `uv run python -c ...` checks to validate imports, shapes, and control flow. If you add tests, place them in `tests/` and name files `test_<feature>.py`.

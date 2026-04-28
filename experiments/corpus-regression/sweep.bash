@@ -15,4 +15,7 @@ for seed in "${SEEDS[@]}"; do
         --seed "${seed}"
     uv run python experiments/corpus-regression/grpo/orchestrate.py \
         --seed "${seed}"
+    uv run python experiments/corpus-regression/rloo/orchestrate.py \
+        --seed "${seed}" \
+        --factorized True
 done

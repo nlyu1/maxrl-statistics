@@ -18,6 +18,7 @@ from src.data.corpus_regression import (
 )
 from src.experiments.corpus_regression.config import (
     baseline_mode_folder,
+    factorized_mode_folder,
     likelihood_mode_folder,
 )
 
@@ -134,6 +135,35 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         study_base
                         / _seed_folder_name(s)
                         / f"rollouts-{r}"
+                        / canonical_dataset_folder_name(num_lookforward_tokens=n),
+                    )
+                    for s in candidate_seeds
+                ]
+        return cls.from_grouped(grouped)
+
+    @classmethod
+    def from_rloo_sweep(
+        cls,
+        *,
+        artifacts_root: Path,
+        factorized: bool,
+    ) -> Self | None:
+        """`<artifacts_root>/rloo/seed-{S}/rollouts-{N}/{factorized_mode}/{dataset_folder}/`.
+        `factorized` is fixed per call — surface it in the figure title."""
+        study_base = artifacts_root / "rloo"
+        if not study_base.exists():
+            return None
+        factorized_mode = factorized_mode_folder(factorized=factorized)
+        grouped: dict[str, list[tuple[int, Path]]] = {}
+        for n in candidate_lookforward_tokens:
+            for r in candidate_rollout_steps:
+                grouped[f"look={n} r={r}"] = [
+                    (
+                        s,
+                        study_base
+                        / _seed_folder_name(s)
+                        / f"rollouts-{r}"
+                        / factorized_mode
                         / canonical_dataset_folder_name(num_lookforward_tokens=n),
                     )
                     for s in candidate_seeds
@@ -501,7 +531,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
 # Cross-method comparison helpers.
 
-_METHOD_DASH: dict[str, str] = {"sl": "solid", "grpo": "dash", "maxrl": "dot"}
+_METHOD_DASH: dict[str, str] = {
+    "sl": "solid",
+    "grpo": "dash",
+    "maxrl": "dot",
+    "rloo": "longdash",
+}
 
 
 def _best_epoch_rows_for_studies(
@@ -536,23 +571,24 @@ def plot_methods_vs_lookforward(
     sl: CorpusRegressionAnalysisConfig | None = None,
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
+    rloo: CorpusRegressionAnalysisConfig | None = None,
     title: str | None = None,
     x_scale: Literal["log", "uniform"] = "uniform",
     save_path: Path | None = None,
 ) -> go.Figure:
     """Cross-method best-epoch corr vs `num_lookforward_tokens`. Two panels
-    (train, val). SL (when present) is a single standalone curve; GRPO and
-    MaxRL traces are grouped by rollouts — one legend group per `r=N`,
+    (train, val). SL (when present) is a single standalone curve; GRPO, MaxRL
+    and RLOO traces are grouped by rollouts — one legend group per `r=N`,
     containing one curve per RL method that ran that rollouts value. Color =
     rollouts; dash = method. Default-visible: SL plus the highest-rollouts
     group."""
     methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
         (name, cfg)
-        for name, cfg in (("grpo", grpo), ("maxrl", maxrl))
+        for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
         if cfg is not None
     ]
     if sl is None and not methods_rl:
-        raise ValueError("at least one of sl/grpo/maxrl must be provided")
+        raise ValueError("at least one of sl/grpo/maxrl/rloo must be provided")
 
     palette = qualitative.Plotly
     rollouts_seen: list[int] = []

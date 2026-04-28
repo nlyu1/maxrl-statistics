@@ -226,6 +226,10 @@ def likelihood_mode_folder(*, use_factorized_likelihoods: bool) -> str:
     return "factorized" if use_factorized_likelihoods else "joint"
 
 
+def factorized_mode_folder(*, factorized: bool) -> str:
+    return "factorized" if factorized else "joint"
+
+
 def project_dir() -> Path:
     return get_repo_base() / "artifacts" / "corpus-regression"
 
