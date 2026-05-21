@@ -40,6 +40,7 @@ GAUSSIAN_STDEV = 1.0
 @click.option("--device", type=str, required=True)
 @click.option("--factorized", type=bool, required=True)
 @click.option("--train-epochs", type=int, default=5, show_default=True)
+@click.option("--num-samples", type=int, default=100_000, show_default=True)
 def main(
     num_lookforward_tokens: int,
     num_rollouts: int,
@@ -47,6 +48,7 @@ def main(
     device: str,
     factorized: bool,
     train_epochs: int,
+    num_samples: int,
 ) -> None:
     set_seeds(seed)
 
@@ -68,6 +70,7 @@ def main(
         num_rollouts_per_sample=num_rollouts,
         gaussian_stdev=GAUSSIAN_STDEV,
         factorized=factorized,
+        num_samples=num_samples,
     )
     tag = (
         f"seed={seed} look={num_lookforward_tokens} rollouts={num_rollouts} "

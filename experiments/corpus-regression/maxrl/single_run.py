@@ -42,6 +42,7 @@ GAUSSIAN_STDEV = 1.0
 @click.option("--subtract-baseline", type=bool, required=True)
 @click.option("--use-factorized-likelihoods", type=bool, required=True)
 @click.option("--train-epochs", type=int, default=5, show_default=True)
+@click.option("--num-samples", type=int, default=100_000, show_default=True)
 def main(
     num_lookforward_tokens: int,
     num_rollouts: int,
@@ -50,6 +51,7 @@ def main(
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
     train_epochs: int,
+    num_samples: int,
 ) -> None:
     set_seeds(seed)
 
@@ -76,6 +78,7 @@ def main(
         gaussian_stdev=GAUSSIAN_STDEV,
         subtract_baseline=subtract_baseline,
         use_factorized_likelihoods=use_factorized_likelihoods,
+        num_samples=num_samples,
     )
     tag = (
         f"seed={seed} look={num_lookforward_tokens} rollouts={num_rollouts} "

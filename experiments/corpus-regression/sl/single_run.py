@@ -33,11 +33,13 @@ METHOD = "sl"
 @click.option("--seed", type=int, required=True)
 @click.option("--device", type=str, required=True)
 @click.option("--train-epochs", type=int, default=5, show_default=True)
+@click.option("--num-samples", type=int, default=100_000, show_default=True)
 def main(
     num_lookforward_tokens: int,
     seed: int,
     device: str,
     train_epochs: int,
+    num_samples: int,
 ) -> None:
     set_seeds(seed)
 
@@ -49,6 +51,7 @@ def main(
         study_base_folder=study_base,
         num_lookforward_tokens=num_lookforward_tokens,
         train_epochs=train_epochs,
+        num_samples=num_samples,
     )
     tag = f"seed={seed} look={num_lookforward_tokens}"
     study_folder = config.study_folder

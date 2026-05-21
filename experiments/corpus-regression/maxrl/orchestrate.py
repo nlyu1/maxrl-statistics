@@ -1,3 +1,9 @@
+# DEPRECATED — use `experiments/corpus-regression/orchestrate.py` instead.
+# This file is kept as a reference for the original static 2-GPU partitioning logic.
+
+# DEPRECATED — use `experiments/corpus-regression/orchestrate.py` instead.
+# This file is kept as a reference for the original static 2-GPU partitioning logic.
+
 """
 Orchestrator for one MaxRL corpus-regression sweep (single seed).
 

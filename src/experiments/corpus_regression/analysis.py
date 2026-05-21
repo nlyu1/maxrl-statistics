@@ -29,7 +29,9 @@ def _seed_folder_name(seed: int) -> str:
     return f"seed-{seed}"
 
 
-def canonical_dataset_folder_name(*, num_lookforward_tokens: int) -> str:
+def canonical_dataset_folder_name(
+    *, num_lookforward_tokens: int, num_samples: int = 100_000
+) -> str:
     """Slug used by single_run scripts as the leaf study folder. Computed from
     `CorpusRegressionDatasetConfig.get_canonical_folder` so it stays in sync
     with run-time artifacts."""
@@ -37,6 +39,7 @@ def canonical_dataset_folder_name(*, num_lookforward_tokens: int) -> str:
         **{
             **CorpusRegressionDatasetConfig.canonical_kwargs(),
             "num_lookforward_tokens": num_lookforward_tokens,
+            "num_samples": num_samples,
         }
     )
     return cfg.get_canonical_folder(Path("/")).name
@@ -102,7 +105,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         )
 
     @classmethod
-    def from_sl_sweep(cls, *, artifacts_root: Path) -> Self | None:
+    def from_sl_sweep(
+        cls, *, artifacts_root: Path, num_samples: int = 100_000
+    ) -> Self | None:
         """`<artifacts_root>/sl/seed-{S}/{dataset_folder}/`."""
         study_base = artifacts_root / "sl"
         if not study_base.exists():
@@ -114,14 +119,18 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     s,
                     study_base
                     / _seed_folder_name(s)
-                    / canonical_dataset_folder_name(num_lookforward_tokens=n),
+                    / canonical_dataset_folder_name(
+                        num_lookforward_tokens=n, num_samples=num_samples
+                    ),
                 )
                 for s in candidate_seeds
             ]
         return cls.from_grouped(grouped)
 
     @classmethod
-    def from_grpo_sweep(cls, *, artifacts_root: Path) -> Self | None:
+    def from_grpo_sweep(
+        cls, *, artifacts_root: Path, num_samples: int = 100_000
+    ) -> Self | None:
         """`<artifacts_root>/grpo/seed-{S}/rollouts-{N}/{dataset_folder}/`."""
         study_base = artifacts_root / "grpo"
         if not study_base.exists():
@@ -135,7 +144,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         study_base
                         / _seed_folder_name(s)
                         / f"rollouts-{r}"
-                        / canonical_dataset_folder_name(num_lookforward_tokens=n),
+                        / canonical_dataset_folder_name(
+                            num_lookforward_tokens=n, num_samples=num_samples
+                        ),
                     )
                     for s in candidate_seeds
                 ]
@@ -147,6 +158,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         *,
         artifacts_root: Path,
         factorized: bool,
+        num_samples: int = 100_000,
     ) -> Self | None:
         """`<artifacts_root>/rloo/seed-{S}/rollouts-{N}/{factorized_mode}/{dataset_folder}/`.
         `factorized` is fixed per call — surface it in the figure title."""
@@ -164,7 +176,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / _seed_folder_name(s)
                         / f"rollouts-{r}"
                         / factorized_mode
-                        / canonical_dataset_folder_name(num_lookforward_tokens=n),
+                        / canonical_dataset_folder_name(
+                            num_lookforward_tokens=n, num_samples=num_samples
+                        ),
                     )
                     for s in candidate_seeds
                 ]
@@ -177,6 +191,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         artifacts_root: Path,
         subtract_baseline: bool,
         use_factorized_likelihoods: bool,
+        num_samples: int = 100_000,
     ) -> Self | None:
         """`<artifacts_root>/maxrl/seed-{S}/rollouts-{N}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
         Both flags are fixed per call — surface them in the figure title."""
@@ -198,7 +213,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / f"rollouts-{r}"
                         / baseline
                         / likelihood
-                        / canonical_dataset_folder_name(num_lookforward_tokens=n),
+                        / canonical_dataset_folder_name(
+                            num_lookforward_tokens=n, num_samples=num_samples
+                        ),
                     )
                     for s in candidate_seeds
                 ]
