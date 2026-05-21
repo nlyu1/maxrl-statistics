@@ -20,6 +20,7 @@ from src.experiments.corpus_regression.config import (
     baseline_mode_folder,
     factorized_mode_folder,
     likelihood_mode_folder,
+    sigma_folder,
 )
 
 _ROLLOUTS_RE = re.compile(r" r=(\d+)")
@@ -129,12 +130,13 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
     @classmethod
     def from_grpo_sweep(
-        cls, *, artifacts_root: Path, num_samples: int = 100_000
+        cls, *, artifacts_root: Path, num_samples: int = 100_000, gaussian_stdev: float = 1.0
     ) -> Self | None:
-        """`<artifacts_root>/grpo/seed-{S}/rollouts-{N}/{dataset_folder}/`."""
+        """`<artifacts_root>/grpo/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/`."""
         study_base = artifacts_root / "grpo"
         if not study_base.exists():
             return None
+        sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
@@ -144,6 +146,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         study_base
                         / _seed_folder_name(s)
                         / f"rollouts-{r}"
+                        / sigma
                         / canonical_dataset_folder_name(
                             num_lookforward_tokens=n, num_samples=num_samples
                         ),
@@ -159,13 +162,15 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         artifacts_root: Path,
         factorized: bool,
         num_samples: int = 100_000,
+        gaussian_stdev: float = 1.0,
     ) -> Self | None:
-        """`<artifacts_root>/rloo/seed-{S}/rollouts-{N}/{factorized_mode}/{dataset_folder}/`.
+        """`<artifacts_root>/rloo/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/`.
         `factorized` is fixed per call — surface it in the figure title."""
         study_base = artifacts_root / "rloo"
         if not study_base.exists():
             return None
         factorized_mode = factorized_mode_folder(factorized=factorized)
+        sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
@@ -175,6 +180,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         study_base
                         / _seed_folder_name(s)
                         / f"rollouts-{r}"
+                        / sigma
                         / factorized_mode
                         / canonical_dataset_folder_name(
                             num_lookforward_tokens=n, num_samples=num_samples
@@ -192,8 +198,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         subtract_baseline: bool,
         use_factorized_likelihoods: bool,
         num_samples: int = 100_000,
+        gaussian_stdev: float = 1.0,
     ) -> Self | None:
-        """`<artifacts_root>/maxrl/seed-{S}/rollouts-{N}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
+        """`<artifacts_root>/maxrl/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
         Both flags are fixed per call — surface them in the figure title."""
         study_base = artifacts_root / "maxrl"
         if not study_base.exists():
@@ -202,6 +209,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         likelihood = likelihood_mode_folder(
             use_factorized_likelihoods=use_factorized_likelihoods,
         )
+        sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
@@ -211,6 +219,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         study_base
                         / _seed_folder_name(s)
                         / f"rollouts-{r}"
+                        / sigma
                         / baseline
                         / likelihood
                         / canonical_dataset_folder_name(

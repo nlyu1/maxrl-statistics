@@ -230,6 +230,10 @@ def factorized_mode_folder(*, factorized: bool) -> str:
     return "factorized" if factorized else "joint"
 
 
+def sigma_folder(*, gaussian_stdev: float) -> str:
+    return f"sigma-{gaussian_stdev}"
+
+
 def project_dir() -> Path:
     return get_repo_base() / "artifacts" / "corpus-regression"
 

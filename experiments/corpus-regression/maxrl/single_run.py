@@ -26,12 +26,12 @@ from src.experiments.corpus_regression.config import (  # noqa: E402
     baseline_mode_folder,
     data_dir,
     likelihood_mode_folder,
+    sigma_folder,
 )
 from src.experiments.corpus_regression.maxrl import CorpusRegressionMaxRLConfig  # noqa: E402
 from src.experiments.utils import cleanup_cuda, set_seeds  # noqa: E402
 
 METHOD = "maxrl"
-GAUSSIAN_STDEV = 1.0
 
 
 @click.command()
@@ -43,6 +43,7 @@ GAUSSIAN_STDEV = 1.0
 @click.option("--use-factorized-likelihoods", type=bool, required=True)
 @click.option("--train-epochs", type=int, default=5, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
+@click.option("--gaussian-stdev", type=float, default=1.0, show_default=True)
 def main(
     num_lookforward_tokens: int,
     num_rollouts: int,
@@ -52,6 +53,7 @@ def main(
     use_factorized_likelihoods: bool,
     train_epochs: int,
     num_samples: int,
+    gaussian_stdev: float,
 ) -> None:
     set_seeds(seed)
 
@@ -64,6 +66,7 @@ def main(
         / METHOD
         / f"seed-{seed}"
         / f"rollouts-{num_rollouts}"
+        / sigma_folder(gaussian_stdev=gaussian_stdev)
         / baseline_mode
         / likelihood_mode
     )
@@ -75,7 +78,7 @@ def main(
         num_lookforward_tokens=num_lookforward_tokens,
         train_epochs=train_epochs,
         num_rollouts_per_sample=num_rollouts,
-        gaussian_stdev=GAUSSIAN_STDEV,
+        gaussian_stdev=gaussian_stdev,
         subtract_baseline=subtract_baseline,
         use_factorized_likelihoods=use_factorized_likelihoods,
         num_samples=num_samples,
