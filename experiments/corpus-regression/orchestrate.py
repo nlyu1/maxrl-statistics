@@ -128,7 +128,6 @@ def _build_sl_jobs(
             "--device", "{device}",
             "--train-epochs", str(train_epochs),
             "--num-samples", str(num_samples),
-            "--gaussian-stdev", str(gaussian_stdev),
         ]
         jobs.append(Job(
             cmd_template=cmd,
