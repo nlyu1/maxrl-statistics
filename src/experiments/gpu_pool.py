@@ -5,13 +5,14 @@ executing them as subprocesses. Jobs specify a `{device}` placeholder in their
 command template; the pool substitutes the assigned device string at dispatch time.
 
 Thread-based (not process-based) because workers spend their time in
-`subprocess.run()` — no GIL contention, no CUDA fork-safety concerns, no
+`subprocess.Popen()` — no GIL contention, no CUDA fork-safety concerns, no
 pickling overhead.
 """
 
 from __future__ import annotations
 
 import queue
+import signal
 import subprocess
 import threading
 from collections.abc import Sequence
@@ -32,6 +33,7 @@ class Job:
     cmd_template: list[str]
     label: str = ""
     env: dict[str, str] = field(default_factory=dict)
+    log_path: Path | None = None
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -101,15 +103,33 @@ class GPUPool:
         if log_dir is not None:
             log_dir.mkdir(parents=True, exist_ok=True)
 
-        work_queue: queue.Queue[Job | None] = queue.Queue()
-        for job in jobs:
-            work_queue.put(job)
+        total_jobs = len(jobs)
+        work_queue: queue.Queue[tuple[int, Job] | None] = queue.Queue()
+        for idx, job in enumerate(jobs, start=1):
+            work_queue.put((idx, job))
 
         results: list[JobResult] = []
         results_lock = threading.Lock()
         abort_event = threading.Event()
 
+        # Track active subprocesses so the SIGINT handler can kill them.
+        active_procs: dict[int, subprocess.Popen] = {}  # thread ident -> Popen
+        active_procs_lock = threading.Lock()
+
+        # Install SIGINT handler for immediate Ctrl+C termination.
+        original_sigint = signal.getsignal(signal.SIGINT)
+
+        def _sigint_handler(signum: int, frame: object) -> None:
+            abort_event.set()
+            with active_procs_lock:
+                for proc in active_procs.values():
+                    proc.terminate()
+            raise SystemExit(130)
+
+        signal.signal(signal.SIGINT, _sigint_handler)
+
         def _worker(device: str) -> None:
+            tid = threading.current_thread().ident
             while not abort_event.is_set():
                 try:
                     item = work_queue.get_nowait()
@@ -118,29 +138,46 @@ class GPUPool:
                 if item is None:
                     return
 
-                cmd = [tok.replace("{device}", device) for tok in item.cmd_template]
+                idx, job = item
+                cmd = [tok.replace("{device}", device) for tok in job.cmd_template]
 
                 log_fh = None
-                if log_dir is not None:
+                if job.log_path is not None:
+                    job.log_path.parent.mkdir(parents=True, exist_ok=True)
+                    log_fh = job.log_path.open("w")
+                elif log_dir is not None:
                     safe_label = (
-                        item.label.replace(" ", "_")
+                        job.label.replace(" ", "_")
                         .replace("/", "-")
                         .replace("=", "-")
                         or "unnamed"
                     )
-                    log_fh = (log_dir / f"{safe_label}.log").open("a")
+                    log_fh = (log_dir / f"{safe_label}.log").open("w")
 
-                proc = subprocess.run(
+                print(
+                    f"[{idx:>{len(str(total_jobs))}}/{total_jobs}] [{device}] "
+                    f"Starting: {job.label}",
+                    flush=True,
+                )
+
+                proc = subprocess.Popen(
                     cmd,
                     stdout=log_fh if log_fh else subprocess.DEVNULL,
                     stderr=subprocess.STDOUT if log_fh else subprocess.DEVNULL,
                 )
+                with active_procs_lock:
+                    active_procs[tid] = proc
+
+                proc.wait()
+
+                with active_procs_lock:
+                    active_procs.pop(tid, None)
 
                 if log_fh is not None:
                     log_fh.close()
 
                 result = JobResult(
-                    job=item,
+                    job=job,
                     device=device,
                     returncode=proc.returncode,
                 )
@@ -149,11 +186,15 @@ class GPUPool:
                     results.append(result)
 
                 status = "done" if proc.returncode == 0 else f"FAILED rc={proc.returncode}"
-                print(f"[{device}] {item.label} — {status}", flush=True)
+                print(
+                    f"[{idx:>{len(str(total_jobs))}}/{total_jobs}] [{device}] "
+                    f"{job.label} — {status}",
+                    flush=True,
+                )
 
                 if proc.returncode != 0 and fail_fast:
                     abort_event.set()
-                    # Drain the queue to unblock other workers
+                    # Drain the queue to unblock other workers.
                     while not work_queue.empty():
                         try:
                             work_queue.get_nowait()
@@ -169,5 +210,8 @@ class GPUPool:
             t.start()
         for t in threads:
             t.join()
+
+        # Restore original signal handler.
+        signal.signal(signal.SIGINT, original_sigint)
 
         return results

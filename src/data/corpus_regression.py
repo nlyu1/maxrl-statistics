@@ -9,6 +9,7 @@ them slightly separate.
 Also imported by `writeup/code/`; check usage there on updates.
 """
 
+import fcntl
 import html as _html
 from dataclasses import dataclass
 from pathlib import Path
@@ -200,8 +201,15 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     def init_or_load_from(cls, *, folder: Path, **init_kwargs) -> Self:
         """Reuse the cached dataset at `folder` if its config matches, else (re)generate.
         kwargs forward to `cls(**init_kwargs)`. Tensors land on disk; materialize them
-        with `CorpusRegressionDataset.load_from(folder)`."""
+        with `CorpusRegressionDataset.load_from(folder)`.
+
+        Uses a file lock to prevent concurrent processes from building the same
+        dataset simultaneously (race on first cold-start when multiple GPU workers
+        share the same dataset config).
+        """
         config = cls(**init_kwargs)
+        folder.mkdir(parents=True, exist_ok=True)
+        lock_path = folder / ".build.lock"
         config_path = folder / "config.json"
         required_paths = (
             folder / "train_tokens.pt",
@@ -209,15 +217,22 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             folder / "val_tokens.pt",
             folder / "val_labels.pt",
         )
-        if config_path.exists():
-            saved = cls.model_validate_json(config_path.read_text())
-            if saved == config and all(path.exists() for path in required_paths):
-                return saved
-            if saved != config:
-                print("Cached config mismatch — re-building dataset.")
-            else:
-                print("Cached dataset files missing — re-building dataset.")
-        config.build().write_to(folder)
+
+        with lock_path.open("w") as lock_fh:
+            fcntl.flock(lock_fh, fcntl.LOCK_EX)
+            try:
+                # Re-check under lock — another process may have built while we waited.
+                if config_path.exists():
+                    saved = cls.model_validate_json(config_path.read_text())
+                    if saved == config and all(path.exists() for path in required_paths):
+                        return saved
+                    if saved != config:
+                        print("Cached config mismatch — re-building dataset.")
+                    else:
+                        print("Cached dataset files missing — re-building dataset.")
+                config.build().write_to(folder)
+            finally:
+                fcntl.flock(lock_fh, fcntl.LOCK_UN)
         return config
 
 
