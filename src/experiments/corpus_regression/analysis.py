@@ -570,15 +570,17 @@ def _best_epoch_rows_for_studies(
     cfg: CorpusRegressionAnalysisConfig,
     agg_df: pl.DataFrame,
     studies: list[str],
+    higher_is_better: bool = True,
 ) -> list[tuple[int, float, float, float, int, int, str]]:
-    """Per-study best-epoch (argmax seed-mean) row, sorted by lookforward.
+    """Per-study best-epoch row, sorted by lookforward. Uses argmax when
+    `higher_is_better=True` (corr) and argmin when False (mse).
     Skips studies with no rows so partial sweeps render cleanly."""
     out: list[tuple[int, float, float, float, int, int, str]] = []
     for study in studies:
         sub = agg_df.filter(pl.col("study") == study)
         if sub.is_empty():
             continue
-        best = sub.sort("mean_y", descending=True).head(1)
+        best = sub.sort("mean_y", descending=higher_is_better).head(1)
         out.append((
             cfg.study_lookforwards[study],
             best["mean_y"].item(),
@@ -598,11 +600,12 @@ def plot_methods_vs_lookforward(
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
     rloo: CorpusRegressionAnalysisConfig | None = None,
+    metric: Literal["corr", "mse"] = "corr",
     title: str | None = None,
     x_scale: Literal["log", "uniform"] = "uniform",
     save_path: Path | None = None,
 ) -> go.Figure:
-    """Cross-method best-epoch corr vs `num_lookforward_tokens`. Two panels
+    """Cross-method best-epoch metric vs `num_lookforward_tokens`. Two panels
     (train, val). SL (when present) is a single standalone curve; GRPO, MaxRL
     and RLOO traces are grouped by rollouts — one legend group per `r=N`,
     containing one curve per RL method that ran that rollouts value. Color =
@@ -641,14 +644,17 @@ def plot_methods_vs_lookforward(
     }
     rl_cfgs: dict[str, CorpusRegressionAnalysisConfig] = dict(methods_rl)
 
+    higher_is_better = metric == "corr"
+
     fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
     for col, split in enumerate(("train", "val"), start=1):
-        y_name = f"{split}_corr"
+        y_name = f"{split}_{metric}"
 
         if sl is not None:
             sl_agg = sl._aggregate_by_epoch(df=sl_df, y_name=y_name)
             sl_rows = _best_epoch_rows_for_studies(
                 cfg=sl, agg_df=sl_agg, studies=list(sl.studies.keys()),
+                higher_is_better=higher_is_better,
             )
             if sl_rows:
                 _add_methods_curve(
@@ -677,6 +683,7 @@ def plot_methods_vs_lookforward(
                 )
                 rows = _best_epoch_rows_for_studies(
                     cfg=cfg, agg_df=agg_df, studies=names_for_r,
+                    higher_is_better=higher_is_better,
                 )
                 if not rows:
                     continue
