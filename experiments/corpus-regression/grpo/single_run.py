@@ -38,6 +38,7 @@ METHOD = "grpo"
 @click.option("--train-epochs", type=int, default=5, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
 @click.option("--gaussian-stdev", type=float, default=1.0, show_default=True)
+@click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
 def main(
     num_lookforward_tokens: int,
     num_rollouts: int,
@@ -46,6 +47,7 @@ def main(
     train_epochs: int,
     num_samples: int,
     gaussian_stdev: float,
+    label_type: str,
 ) -> None:
     set_seeds(seed)
 
@@ -66,6 +68,7 @@ def main(
         num_rollouts_per_sample=num_rollouts,
         gaussian_stdev=gaussian_stdev,
         num_samples=num_samples,
+        label_type=label_type,
     )
     tag = f"seed={seed} look={num_lookforward_tokens} rollouts={num_rollouts}"
     study_folder = config.study_folder

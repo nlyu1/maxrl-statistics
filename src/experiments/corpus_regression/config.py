@@ -5,7 +5,7 @@ import shutil
 import warnings
 from contextlib import nullcontext
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 import polars as pl
 import torch
@@ -47,6 +47,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         study_base_folder: Path,
         num_lookforward_tokens: int,
         embedding_dim: int = 32,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
         prefix_length: int = 128,
         num_samples: int = 100_000,
         model_name: str = "HuggingFaceTB/SmolLM2-135M",
@@ -66,6 +67,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             pretrained_tokenizer_model_name=model_name,
             num_lookforward_tokens=num_lookforward_tokens,
             embedding_dim=embedding_dim,
+            label_type=label_type,
         )
         dataset_folder = data_config.get_canonical_folder(dataset_base_folder)
         # Build (or reuse) the on-disk dataset.
@@ -77,6 +79,8 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             drop_last=True,
         )
 
+        # Use post-validation embedding_dim (forced to 1 for token_id).
+        effective_dim = data_config.embedding_dim
         head_lr = lr_per_token * batch_size * prefix_length
         return dict(
             data=data_config,
@@ -84,7 +88,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             dataloading=dataloading,
             model=CausalLMConfig(
                 pretrained_model=model_name,
-                initial_output_norms=[head_init_norm] * embedding_dim,
+                initial_output_norms=[head_init_norm] * effective_dim,
             ),
             optimizer=CausalLMWithLinearHeadOptimizerConfig(
                 lr=head_lr / backbone_lr_divisor,

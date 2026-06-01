@@ -124,16 +124,19 @@ def _build_sl_jobs(
     lookforward_tokens: tuple[int, ...],
     num_samples_values: tuple[int, ...],
     train_epochs: int,
+    label_type: str,
 ) -> list[Job]:
     script = str(_script_path("sl"))
     jobs: list[Job] = []
     for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
-        label = f"sl_seed-{seed}_look-{lft}_ns-{ns}"
+        label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lbl-{label_type}"
         log_path = (
             artifacts_dir() / "sl" / "logs"
             / f"seed-{seed}"
             / f"look-{lft}_ns-{ns}.log"
         )
+        if label_type != "rademacher":
+            log_path = log_path.parent / label_type / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -141,6 +144,7 @@ def _build_sl_jobs(
             "--device", "{device}",
             "--train-epochs", str(train_epochs),
             "--num-samples", str(ns),
+            "--label-type", label_type,
         ]
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
@@ -154,13 +158,14 @@ def _build_grpo_jobs(
     num_samples_values: tuple[int, ...],
     train_epochs: int,
     gaussian_stdev_values: tuple[float, ...],
+    label_type: str,
 ) -> list[Job]:
     script = str(_script_path("grpo"))
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
-        label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}"
+        label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}_lbl-{label_type}"
         log_path = (
             artifacts_dir() / "grpo" / "logs"
             / f"seed-{seed}"
@@ -168,6 +173,8 @@ def _build_grpo_jobs(
             / sigma_folder(gaussian_stdev=stdev)
             / f"look-{lft}_ns-{ns}.log"
         )
+        if label_type != "rademacher":
+            log_path = log_path.parent / label_type / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -177,6 +184,7 @@ def _build_grpo_jobs(
             "--train-epochs", str(train_epochs),
             "--num-samples", str(ns),
             "--gaussian-stdev", str(stdev),
+            "--label-type", label_type,
         ]
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
@@ -191,6 +199,7 @@ def _build_rloo_jobs(
     train_epochs: int,
     factorized: bool,
     gaussian_stdev_values: tuple[float, ...],
+    label_type: str,
 ) -> list[Job]:
     script = str(_script_path("rloo"))
     jobs: list[Job] = []
@@ -199,7 +208,7 @@ def _build_rloo_jobs(
     ):
         label = (
             f"rloo_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_fact-{factorized}_sigma-{stdev}"
+            f"_ns-{ns}_fact-{factorized}_sigma-{stdev}_lbl-{label_type}"
         )
         log_path = (
             artifacts_dir() / "rloo" / "logs"
@@ -209,6 +218,8 @@ def _build_rloo_jobs(
             / factorized_mode_folder(factorized=factorized)
             / f"look-{lft}_ns-{ns}.log"
         )
+        if label_type != "rademacher":
+            log_path = log_path.parent / label_type / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -219,6 +230,7 @@ def _build_rloo_jobs(
             "--num-samples", str(ns),
             "--factorized", str(factorized),
             "--gaussian-stdev", str(stdev),
+            "--label-type", label_type,
         ]
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
@@ -234,6 +246,7 @@ def _build_maxrl_jobs(
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
     gaussian_stdev_values: tuple[float, ...],
+    label_type: str,
 ) -> list[Job]:
     script = str(_script_path("maxrl"))
     jobs: list[Job] = []
@@ -242,7 +255,7 @@ def _build_maxrl_jobs(
     ):
         label = (
             f"maxrl_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}"
+            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}_lbl-{label_type}"
         )
         log_path = (
             artifacts_dir() / "maxrl" / "logs"
@@ -253,6 +266,8 @@ def _build_maxrl_jobs(
             / likelihood_mode_folder(use_factorized_likelihoods=use_factorized_likelihoods)
             / f"look-{lft}_ns-{ns}.log"
         )
+        if label_type != "rademacher":
+            log_path = log_path.parent / label_type / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -264,6 +279,7 @@ def _build_maxrl_jobs(
             "--subtract-baseline", str(subtract_baseline),
             "--use-factorized-likelihoods", str(use_factorized_likelihoods),
             "--gaussian-stdev", str(stdev),
+            "--label-type", label_type,
         ]
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
@@ -346,6 +362,13 @@ def _build_maxrl_jobs(
     help="RLOO: use per-coordinate factorized advantages.",
 )
 @click.option(
+    "--label-type",
+    type=click.Choice(["rademacher", "token_id"]),
+    default="rademacher",
+    show_default=True,
+    help="Label type for the regression target.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Print the job list and exit without running.",
@@ -367,6 +390,7 @@ def main(
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
     factorized: bool,
+    label_type: str,
     dry_run: bool,
     fail_fast: bool,
 ) -> None:
@@ -390,6 +414,7 @@ def main(
                 lookforward_tokens=lookforward_tokens,
                 num_samples_values=num_samples,
                 train_epochs=train_epochs,
+                label_type=label_type,
             )
         elif m == "grpo":
             jobs_by_method[m] = _build_grpo_jobs(
@@ -399,6 +424,7 @@ def main(
                 num_samples_values=num_samples,
                 train_epochs=train_epochs,
                 gaussian_stdev_values=gaussian_stdev,
+                label_type=label_type,
             )
         elif m == "rloo":
             jobs_by_method[m] = _build_rloo_jobs(
@@ -409,6 +435,7 @@ def main(
                 train_epochs=train_epochs,
                 factorized=factorized,
                 gaussian_stdev_values=gaussian_stdev,
+                label_type=label_type,
             )
         elif m == "maxrl":
             jobs_by_method[m] = _build_maxrl_jobs(
@@ -420,6 +447,7 @@ def main(
                 subtract_baseline=subtract_baseline,
                 use_factorized_likelihoods=use_factorized_likelihoods,
                 gaussian_stdev_values=gaussian_stdev,
+                label_type=label_type,
             )
         else:
             raise click.BadParameter(f"Unknown method: {m}")

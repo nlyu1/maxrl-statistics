@@ -13,11 +13,12 @@ import fcntl
 import html as _html
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 import torch
 from datasets import load_dataset
 from jaxtyping import Float, Int
+from pydantic import model_validator
 from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm.auto import tqdm
@@ -97,15 +98,25 @@ class CorpusRegressionDatasetConfig(BaseConfig):
 
     num_lookforward_tokens: int  # >= 1
     embedding_dim: int  # dimensions of rademacher embedding
+    label_type: Literal["rademacher", "token_id"] = "rademacher"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _enforce_token_id_dim(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """When label_type='token_id', force embedding_dim=1."""
+        if data.get("label_type") == "token_id":
+            data["embedding_dim"] = 1
+        return data
 
     @classmethod
-    def canonical_kwargs(cls) -> dict[str, Any]:
+    def canonical_kwargs(cls, *, label_type: Literal["rademacher", "token_id"] = "rademacher") -> dict[str, Any]:
         return {
             "prefix_length": 128,
             "num_samples": 100_000,
             "pretrained_tokenizer_model_name": "HuggingFaceTB/SmolLM2-135M",
             "num_lookforward_tokens": 1,
             "embedding_dim": 32,
+            "label_type": label_type,
         }
 
     @classmethod
@@ -123,6 +134,10 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             f"_{self.num_samples}x{self.prefix_length}"
             f"_look{self.num_lookforward_tokens}_dim{self.embedding_dim}"
         )
+        # Only append label_type suffix for non-default values (backward-compatible
+        # slug for existing Rademacher caches).
+        if self.label_type != "rademacher":
+            slug += f"_{self.label_type}"
         return base_path / slug
 
     def _rademacher_matrix(self, vocab_size: int) -> Int[Tensor, "vocab embedding_dim"]:
@@ -135,11 +150,10 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         ).to(torch.int8)
 
     def build(self) -> "CorpusRegressionDataset":
-        """Stream fineweb-edu, tokenize, compute Rademacher labels, shuffle,
+        """Stream fineweb-edu, tokenize, compute labels, shuffle,
         and return a train/val split."""
         min_length = self.prefix_length + self.num_lookforward_tokens
         tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
-        rademacher = self._rademacher_matrix(len(tok))
 
         collected = _stream_token_prefixes(
             tokenizer=tok,
@@ -151,9 +165,16 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         total = len(collected)
         full: Int[Tensor, "total min_length"] = torch.tensor(collected, dtype=torch.long)
 
-        # Input is the prefix; label is the Rademacher vector of the final lookforward token.
+        # Input is the prefix; label is derived from the final lookforward token.
         prefix_tokens: Int[Tensor, "total prefix_length"] = full[:, : self.prefix_length].to(torch.int32)
-        labels: Float[Tensor, "total embedding_dim"] = rademacher[full[:, -1]].float()
+
+        if self.label_type == "rademacher":
+            rademacher = self._rademacher_matrix(len(tok))
+            labels: Float[Tensor, "total embedding_dim"] = rademacher[full[:, -1]].float()
+        elif self.label_type == "token_id":
+            labels: Float[Tensor, "total 1"] = full[:, -1].float().unsqueeze(1)
+        else:
+            raise ValueError(f"Unknown label_type: {self.label_type!r}")
 
         shuffle_rng = torch.Generator()
         shuffle_rng.manual_seed(_SEED)
@@ -172,10 +193,9 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     def demonstrate(self, num_samples: int = 50):
         """Stream `num_samples` fresh docs and return a Solara browser for visual
         inspection: prefix (black) + lookahead window (blue) + final predicted token
-        (bold blue) + the Rademacher label vector. Independent of any cached dataset."""
+        (bold blue) + the label. Independent of any cached dataset."""
         min_length = self.prefix_length + self.num_lookforward_tokens
         tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
-        rademacher = self._rademacher_matrix(len(tok))
 
         collected = _stream_token_prefixes(
             tokenizer=tok,
@@ -185,16 +205,33 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             overshoot=16,
         )
         last = self.prefix_length + self.num_lookforward_tokens - 1
-        samples = [
-            {
-                "prefix_ids": ids[: self.prefix_length],
-                "middle_ids": ids[self.prefix_length : last],
-                "final_id": ids[last],
-                "tail_ids": ids[last + 1 :],
-                "label": rademacher[ids[last]].tolist(),
-            }
-            for ids in collected
-        ]
+
+        if self.label_type == "rademacher":
+            rademacher = self._rademacher_matrix(len(tok))
+            samples = [
+                {
+                    "prefix_ids": ids[: self.prefix_length],
+                    "middle_ids": ids[self.prefix_length : last],
+                    "final_id": ids[last],
+                    "tail_ids": ids[last + 1 :],
+                    "label": rademacher[ids[last]].tolist(),
+                }
+                for ids in collected
+            ]
+        elif self.label_type == "token_id":
+            samples = [
+                {
+                    "prefix_ids": ids[: self.prefix_length],
+                    "middle_ids": ids[self.prefix_length : last],
+                    "final_id": ids[last],
+                    "tail_ids": ids[last + 1 :],
+                    "label": [ids[last]],
+                }
+                for ids in collected
+            ]
+        else:
+            raise ValueError(f"Unknown label_type: {self.label_type!r}")
+
         return _inspect_corpus_samples(tokenizer=tok, samples=samples)
 
     @classmethod

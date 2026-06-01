@@ -31,14 +31,17 @@ def _seed_folder_name(seed: int) -> str:
 
 
 def canonical_dataset_folder_name(
-    *, num_lookforward_tokens: int, num_samples: int = 100_000
+    *,
+    num_lookforward_tokens: int,
+    num_samples: int = 100_000,
+    label_type: Literal["rademacher", "token_id"] = "rademacher",
 ) -> str:
     """Slug used by single_run scripts as the leaf study folder. Computed from
     `CorpusRegressionDatasetConfig.get_canonical_folder` so it stays in sync
     with run-time artifacts."""
     cfg = CorpusRegressionDatasetConfig(
         **{
-            **CorpusRegressionDatasetConfig.canonical_kwargs(),
+            **CorpusRegressionDatasetConfig.canonical_kwargs(label_type=label_type),
             "num_lookforward_tokens": num_lookforward_tokens,
             "num_samples": num_samples,
         }
@@ -106,8 +109,41 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         )
 
     @classmethod
+    def from_ntp_baseline(
+        cls,
+        *,
+        artifacts_root: Path,
+        num_lookforward_tokens: int = 1,
+        num_samples: int = 100_000,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
+    ) -> Self | None:
+        """`<artifacts_root>/ntp_baseline/{dataset_folder}/`.
+
+        NTP baseline has no seeds (deterministic given dataset). We wrap
+        the single result as seed=0 for compatibility with the grouped API.
+        """
+        study_base = artifacts_root / "ntp_baseline"
+        if not study_base.exists():
+            return None
+        folder_name = canonical_dataset_folder_name(
+            num_lookforward_tokens=num_lookforward_tokens,
+            num_samples=num_samples,
+            label_type=label_type,
+        )
+        grouped: dict[str, list[tuple[int, Path]]] = {
+            f"look={num_lookforward_tokens}": [
+                (0, study_base / folder_name),
+            ]
+        }
+        return cls.from_grouped(grouped)
+
+    @classmethod
     def from_sl_sweep(
-        cls, *, artifacts_root: Path, num_samples: int = 100_000
+        cls,
+        *,
+        artifacts_root: Path,
+        num_samples: int = 100_000,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
     ) -> Self | None:
         """`<artifacts_root>/sl/seed-{S}/{dataset_folder}/`."""
         study_base = artifacts_root / "sl"
@@ -121,7 +157,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     study_base
                     / _seed_folder_name(s)
                     / canonical_dataset_folder_name(
-                        num_lookforward_tokens=n, num_samples=num_samples
+                        num_lookforward_tokens=n, num_samples=num_samples,
+                        label_type=label_type,
                     ),
                 )
                 for s in candidate_seeds
@@ -130,7 +167,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
     @classmethod
     def from_grpo_sweep(
-        cls, *, artifacts_root: Path, num_samples: int = 100_000, gaussian_stdev: float = 1.0
+        cls,
+        *,
+        artifacts_root: Path,
+        num_samples: int = 100_000,
+        gaussian_stdev: float = 1.0,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
     ) -> Self | None:
         """`<artifacts_root>/grpo/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/`."""
         study_base = artifacts_root / "grpo"
@@ -148,7 +190,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / f"rollouts-{r}"
                         / sigma
                         / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples
+                            num_lookforward_tokens=n, num_samples=num_samples,
+                            label_type=label_type,
                         ),
                     )
                     for s in candidate_seeds
@@ -163,6 +206,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         factorized: bool,
         num_samples: int = 100_000,
         gaussian_stdev: float = 1.0,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
     ) -> Self | None:
         """`<artifacts_root>/rloo/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/`.
         `factorized` is fixed per call — surface it in the figure title."""
@@ -183,7 +227,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / sigma
                         / factorized_mode
                         / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples
+                            num_lookforward_tokens=n, num_samples=num_samples,
+                            label_type=label_type,
                         ),
                     )
                     for s in candidate_seeds
@@ -199,6 +244,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         use_factorized_likelihoods: bool,
         num_samples: int = 100_000,
         gaussian_stdev: float = 1.0,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
     ) -> Self | None:
         """`<artifacts_root>/maxrl/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
         Both flags are fixed per call — surface them in the figure title."""
@@ -223,7 +269,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / baseline
                         / likelihood
                         / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples
+                            num_lookforward_tokens=n, num_samples=num_samples,
+                            label_type=label_type,
                         ),
                     )
                     for s in candidate_seeds
@@ -562,6 +609,7 @@ _METHOD_DASH: dict[str, str] = {
     "grpo": "dash",
     "maxrl": "dot",
     "rloo": "longdash",
+    "ntp_baseline": "dashdot",
 }
 
 
@@ -600,6 +648,7 @@ def plot_methods_vs_lookforward(
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
     rloo: CorpusRegressionAnalysisConfig | None = None,
+    ntp_baseline: CorpusRegressionAnalysisConfig | None = None,
     metric: Literal["corr", "mse"] = "corr",
     title: str | None = None,
     x_scale: Literal["log", "uniform"] = "uniform",
@@ -610,14 +659,17 @@ def plot_methods_vs_lookforward(
     and RLOO traces are grouped by rollouts — one legend group per `r=N`,
     containing one curve per RL method that ran that rollouts value. Color =
     rollouts; dash = method. Default-visible: SL plus the highest-rollouts
-    group."""
+    group.
+
+    `ntp_baseline` (when present) is drawn as a standalone curve representing
+    the intrinsic variance floor."""
     methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
         (name, cfg)
         for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
         if cfg is not None
     ]
-    if sl is None and not methods_rl:
-        raise ValueError("at least one of sl/grpo/maxrl/rloo must be provided")
+    if sl is None and not methods_rl and ntp_baseline is None:
+        raise ValueError("at least one of sl/grpo/maxrl/rloo/ntp_baseline must be provided")
 
     palette = qualitative.Plotly
     rollouts_seen: list[int] = []
@@ -633,9 +685,11 @@ def plot_methods_vs_lookforward(
         r: palette[i % len(palette)] for i, r in enumerate(rollouts_seen)
     }
     sl_color = palette[len(rollouts_seen) % len(palette)]
+    ntp_color = palette[(len(rollouts_seen) + 1) % len(palette)]
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
     sl_df = sl.get_metric_dataframe() if sl is not None else None
+    ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
     rl_dfs: dict[str, pl.DataFrame] = {
         name: cfg.get_metric_dataframe() for name, cfg in methods_rl
     }
@@ -666,6 +720,28 @@ def plot_methods_vs_lookforward(
                     legendgrouptitle_text=None,
                     color=sl_color,
                     dash=_METHOD_DASH["sl"],
+                    y_name=y_name,
+                    x_scale=x_scale,
+                    show_legend=(col == 1),
+                    visible_default=True,
+                )
+
+        if ntp_baseline is not None:
+            ntp_agg = ntp_baseline._aggregate_by_epoch(df=ntp_df, y_name=y_name)
+            ntp_rows = _best_epoch_rows_for_studies(
+                cfg=ntp_baseline, agg_df=ntp_agg, studies=list(ntp_baseline.studies.keys()),
+                higher_is_better=higher_is_better,
+            )
+            if ntp_rows:
+                _add_methods_curve(
+                    fig=fig,
+                    rows=ntp_rows,
+                    col=col,
+                    trace_name="ntp_baseline",
+                    legendgroup="ntp_baseline",
+                    legendgrouptitle_text=None,
+                    color=ntp_color,
+                    dash=_METHOD_DASH["ntp_baseline"],
                     y_name=y_name,
                     x_scale=x_scale,
                     show_legend=(col == 1),
@@ -784,3 +860,204 @@ def _add_methods_curve(
         row=1,
         col=col,
     )
+
+
+def _add_epoch_curve(
+    *,
+    fig: go.Figure,
+    agg_df: pl.DataFrame,
+    col: int,
+    trace_name: str,
+    legendgroup: str,
+    legendgrouptitle_text: str | None,
+    color: str,
+    dash: str,
+    y_name: str,
+    show_legend: bool,
+    visible_default: bool,
+    show_seed_bar: bool,
+) -> None:
+    """Add a single per-epoch Scatter trace to `fig`. `agg_df` must already be
+    filtered to one study and sorted by epoch."""
+    epochs = agg_df["epoch"].to_list()
+    ys = agg_df["mean_y"].to_list()
+    mins = agg_df["min_y"].to_list()
+    maxs = agg_df["max_y"].to_list()
+    n_seeds = agg_df["n_seeds"].to_list()
+    error_kwargs = (
+        CorpusRegressionAnalysisConfig._seed_bar_error_kwargs(
+            ys=ys, mins=mins, maxs=maxs
+        )
+        if show_seed_bar
+        else {}
+    )
+    group_title_kwargs = (
+        dict(legendgrouptitle_text=legendgrouptitle_text)
+        if legendgrouptitle_text is not None
+        else {}
+    )
+    visible_kwargs = {} if visible_default else dict(visible="legendonly")
+    fig.add_trace(
+        go.Scatter(
+            x=epochs,
+            y=ys,
+            mode="lines+markers",
+            name=trace_name,
+            legendgroup=legendgroup,
+            **group_title_kwargs,
+            showlegend=show_legend,
+            line=dict(color=color, dash=dash),
+            marker=dict(color=color),
+            customdata=[[n] for n in n_seeds],
+            hovertemplate=(
+                "epoch: %{x}<br>"
+                f"{y_name}: %{{y}}<br>"
+                "n_seeds: %{customdata[0]}"
+                f"<extra>{trace_name}</extra>"
+            ),
+            **visible_kwargs,
+            **error_kwargs,
+        ),
+        row=1,
+        col=col,
+    )
+
+
+def plot_methods_vs_epoch(
+    *,
+    sl: CorpusRegressionAnalysisConfig | None = None,
+    grpo: CorpusRegressionAnalysisConfig | None = None,
+    maxrl: CorpusRegressionAnalysisConfig | None = None,
+    rloo: CorpusRegressionAnalysisConfig | None = None,
+    ntp_baseline: CorpusRegressionAnalysisConfig | None = None,
+    num_lookforward_tokens: int = 1,
+    metric: Literal["corr", "mse"] = "corr",
+    show_seed_bar: bool = False,
+    title: str | None = None,
+    save_path: Path | None = None,
+) -> go.Figure:
+    """Cross-method per-epoch metric curves for a single `num_lookforward_tokens`
+    value. Two panels (train, val). Color = rollouts; dash = method."""
+    methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
+        (name, cfg)
+        for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
+        if cfg is not None
+    ]
+    if sl is None and not methods_rl and ntp_baseline is None:
+        raise ValueError("at least one of sl/grpo/maxrl/rloo/ntp_baseline must be provided")
+
+    palette = qualitative.Plotly
+
+    # Collect rollout values across RL methods.
+    rollouts_seen: list[int] = []
+    for _, cfg in methods_rl:
+        rg = cfg._rollouts_groups()
+        if rg is None:
+            continue
+        for r in rg:
+            if r not in rollouts_seen:
+                rollouts_seen.append(r)
+    rollouts_seen.sort()
+    color_by_rollouts = {
+        r: palette[i % len(palette)] for i, r in enumerate(rollouts_seen)
+    }
+    sl_color = palette[len(rollouts_seen) % len(palette)]
+    ntp_color = palette[(len(rollouts_seen) + 1) % len(palette)]
+    max_rollouts = rollouts_seen[-1] if rollouts_seen else None
+
+    # Pre-load metric DataFrames.
+    sl_df = sl.get_metric_dataframe() if sl is not None else None
+    ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
+    rl_dfs: dict[str, pl.DataFrame] = {
+        name: cfg.get_metric_dataframe() for name, cfg in methods_rl
+    }
+
+    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
+    for col, split in enumerate(("train", "val"), start=1):
+        y_name = f"{split}_{metric}"
+
+        # SL (no rollouts): single study "look=N".
+        if sl is not None and sl_df is not None:
+            study_name = f"look={num_lookforward_tokens}"
+            if study_name in sl.studies:
+                agg = sl._aggregate_by_epoch(
+                    df=sl_df.filter(pl.col("study") == study_name), y_name=y_name
+                )
+                if not agg.is_empty():
+                    _add_epoch_curve(
+                        fig=fig,
+                        agg_df=agg,
+                        col=col,
+                        trace_name="sl",
+                        legendgroup="sl",
+                        legendgrouptitle_text=None,
+                        color=sl_color,
+                        dash=_METHOD_DASH["sl"],
+                        y_name=y_name,
+                        show_legend=(col == 1),
+                        visible_default=True,
+                        show_seed_bar=show_seed_bar,
+                    )
+
+        # NTP baseline: single study "look=N".
+        if ntp_baseline is not None and ntp_df is not None:
+            study_name = f"look={num_lookforward_tokens}"
+            if study_name in ntp_baseline.studies:
+                agg = ntp_baseline._aggregate_by_epoch(
+                    df=ntp_df.filter(pl.col("study") == study_name), y_name=y_name
+                )
+                if not agg.is_empty():
+                    _add_epoch_curve(
+                        fig=fig,
+                        agg_df=agg,
+                        col=col,
+                        trace_name="ntp_baseline",
+                        legendgroup="ntp_baseline",
+                        legendgrouptitle_text=None,
+                        color=ntp_color,
+                        dash=_METHOD_DASH["ntp_baseline"],
+                        y_name=y_name,
+                        show_legend=(col == 1),
+                        visible_default=True,
+                        show_seed_bar=show_seed_bar,
+                    )
+
+        # RL methods: one trace per (rollouts, method) pair.
+        for r in rollouts_seen:
+            for method_name, cfg in methods_rl:
+                study_name = f"look={num_lookforward_tokens} r={r}"
+                if study_name not in cfg.studies:
+                    continue
+                agg = cfg._aggregate_by_epoch(
+                    df=rl_dfs[method_name].filter(pl.col("study") == study_name),
+                    y_name=y_name,
+                )
+                if agg.is_empty():
+                    continue
+                _add_epoch_curve(
+                    fig=fig,
+                    agg_df=agg,
+                    col=col,
+                    trace_name=method_name,
+                    legendgroup=f"r={r}",
+                    legendgrouptitle_text=f"r={r}",
+                    color=color_by_rollouts[r],
+                    dash=_METHOD_DASH[method_name],
+                    y_name=y_name,
+                    show_legend=(col == 1),
+                    visible_default=(r == max_rollouts),
+                    show_seed_bar=show_seed_bar,
+                )
+
+        fig.update_xaxes(title_text="epoch", row=1, col=col)
+        fig.update_yaxes(title_text=y_name, row=1, col=col)
+
+    fig.update_layout(legend=dict(groupclick="togglegroup"))
+    if title is not None:
+        fig.update_layout(title=title)
+    CorpusRegressionAnalysisConfig._apply_compact_layout(
+        fig, has_title=title is not None
+    )
+    if save_path is not None:
+        CorpusRegressionAnalysisConfig._save_html(fig, save_path)
+    return fig
