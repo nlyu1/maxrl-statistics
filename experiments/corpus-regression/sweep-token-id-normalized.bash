@@ -20,7 +20,7 @@ uv run python "${ORCHESTRATE}" \
     --label-range 0.0 1.0 \
     --lookforward-tokens 1 \
     --rollout-steps 1024 \
-    --gaussian-stdev 1.0,0.5,0.1,0.01 \
-    --num-samples 50000,100000 \
+    --gaussian-stdev 1.0,0.5 \
+    --num-samples 500000 \
     --subtract-baseline \
     --use-factorized-likelihoods
