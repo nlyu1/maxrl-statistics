@@ -32,7 +32,8 @@ METHOD = "sl"
 @click.option("--num-lookforward-tokens", type=int, required=True)
 @click.option("--seed", type=int, required=True)
 @click.option("--device", type=str, required=True)
-@click.option("--train-epochs", type=int, default=5, show_default=True)
+@click.option("--train-steps", type=int, default=10_000, show_default=True)
+@click.option("--val-every-n-steps", type=int, default=2000, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
 @click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
 @click.option("--normalize-labels", is_flag=True, default=False, show_default=True)
@@ -41,7 +42,8 @@ def main(
     num_lookforward_tokens: int,
     seed: int,
     device: str,
-    train_epochs: int,
+    train_steps: int,
+    val_every_n_steps: int,
     num_samples: int,
     label_type: str,
     normalize_labels: bool,
@@ -56,7 +58,8 @@ def main(
         dataset_base_folder=data_dir(),
         study_base_folder=study_base,
         num_lookforward_tokens=num_lookforward_tokens,
-        train_epochs=train_epochs,
+        train_steps=train_steps,
+        val_every_n_steps=val_every_n_steps,
         num_samples=num_samples,
         label_type=label_type,
         normalize_labels=normalize_labels,

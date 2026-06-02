@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -17,6 +18,20 @@ from tqdm.autonotebook import tqdm
 from src.data.corpus_regression import CorpusRegressionDataset
 from src.experiments.corpus_regression.config import CorpusRegressionStudyBaseConfig
 from src.metrics import RegressionStatCounter
+
+
+@dataclass(kw_only=True)
+class TrainStepOutput:
+    """Per-step metrics returned by each algorithm's train_step."""
+
+    loss: float  # algorithm-native loss (MSE for SL, policy-gradient for RL)
+    mse: float  # MSE(f_theta(x), target) dim-averaged — deterministic mean, no rollout noise
+
+
+def _cycle_dataloader(dl: DataLoader) -> Iterator:
+    """Re-iterates the dataloader indefinitely (re-shuffles each pass)."""
+    while True:
+        yield from dl
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
@@ -66,15 +81,19 @@ class CorpusRegressionStudyBaseState(ABC):
     val_dl: DataLoader
     device: torch.device
 
-    train_target_counter: RegressionStatCounter
-    current_epoch: int = 0
-
     @abstractmethod
     def compute_last_step_projections(
         self,
         *,
         context: Int[Tensor, "batch seq"],
     ) -> Float[Tensor, "batch D"]: ...
+
+    @abstractmethod
+    def train_step(
+        self,
+        *,
+        batch: tuple[Int[Tensor, "batch seq"], Float[Tensor, "batch D"]],
+    ) -> TrainStepOutput: ...
 
     def compute_validation(self) -> CorpusRegressionValidationOutput:
         model_was_training = self.model.training
@@ -94,7 +113,7 @@ class CorpusRegressionStudyBaseState(ABC):
         ):
             for tokens, target in tqdm(
                 self.val_dl,
-                desc=f"validation epoch {self.current_epoch}",
+                desc="validation",
             ):
                 tokens: Int[Tensor, "batch seq"] = tokens.to(
                     device=self.device,
@@ -116,35 +135,66 @@ class CorpusRegressionStudyBaseState(ABC):
             target=torch.cat(targets),
         )
 
-    def serialize_at_end_of_epoch(
+    def _flush_train_metrics(self, buffer: list[dict[str, float]]) -> None:
+        """Append buffered per-step train metrics to train_metrics.parquet."""
+        if not buffer:
+            return
+        new_rows = pl.DataFrame(buffer, schema={"step": pl.Int64, "loss": pl.Float64, "mse": pl.Float64})
+        metrics_path = self.config.study_folder / "train_metrics.parquet"
+        if metrics_path.exists():
+            existing = pl.read_parquet(metrics_path)
+            min_new_step = new_rows["step"].min()
+            existing = existing.filter(pl.col("step") < min_new_step)
+            new_rows = pl.concat([existing, new_rows]).sort("step")
+        new_rows.write_parquet(metrics_path)
+
+    def _serialize_val(
         self,
         *,
+        step: int,
         validation: CorpusRegressionValidationOutput,
     ) -> None:
-        """Per-epoch sufficient stats per output dimension, written as polars
-        list-columns. Downstream analysis derives per-dim corr / R² / MSE and
-        averages across dims via `.list.mean()`. If this schema changes, update
-        analysis.py."""
-        validation.save_to(self.config.study_folder / str(self.current_epoch))
+        """Append one validation row to val_metrics.parquet and save predictions."""
+        validation.save_to(self.config.study_folder / f"val-step-{step}")
 
         val_counter = validation.compute_counter()
         sufficient_stats: dict[str, object] = {}
-        sufficient_stats.update(
-            _per_dim_stats(self.train_target_counter, prefix="train_target")
-        )
         sufficient_stats.update(_per_dim_stats(val_counter, prefix="val_target"))
 
-        metrics_path = self.config.study_folder / "metrics.parquet"
+        metrics_path = self.config.study_folder / "val_metrics.parquet"
         new_row = pl.DataFrame({
-            "epoch": [self.current_epoch],
+            "step": [step],
             **{key: [value] for key, value in sufficient_stats.items()},
         })
         if metrics_path.exists():
-            metrics = pl.read_parquet(metrics_path)
-            if metrics.columns == new_row.columns:
-                metrics = metrics.filter(pl.col("epoch") != self.current_epoch)
-                new_row = pl.concat([metrics, new_row]).sort("epoch")
+            existing = pl.read_parquet(metrics_path)
+            if existing.columns == new_row.columns:
+                existing = existing.filter(pl.col("step") != step)
+                new_row = pl.concat([existing, new_row]).sort("step")
         new_row.write_parquet(metrics_path)
+
+    def run_training(self) -> None:
+        """Flat step-based training loop. Validates every val_every_n_steps."""
+        self.model.train()
+        batch_iter = _cycle_dataloader(self.train_dl)
+        train_buffer: list[dict[str, float]] = []
+
+        pbar = tqdm(range(self.config.train_steps), desc="training")
+        for step in pbar:
+            output = self.train_step(batch=next(batch_iter))
+            train_buffer.append({"step": step, "loss": output.loss, "mse": output.mse})
+            pbar.set_postfix(loss=f"{output.loss:.4f}", mse=f"{output.mse:.4f}")
+
+            is_val_step = (
+                (step + 1) % self.config.val_every_n_steps == 0
+                or step == self.config.train_steps - 1
+            )
+            if is_val_step:
+                validation = self.compute_validation()
+                self._flush_train_metrics(train_buffer)
+                self._serialize_val(step=step, validation=validation)
+                train_buffer = []
+                self.model.train()
 
     def step_and_zero_grad(self) -> None:
         clip_grad_norm_(

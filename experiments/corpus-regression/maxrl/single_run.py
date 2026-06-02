@@ -41,7 +41,8 @@ METHOD = "maxrl"
 @click.option("--device", type=str, required=True)
 @click.option("--subtract-baseline", type=bool, required=True)
 @click.option("--use-factorized-likelihoods", type=bool, required=True)
-@click.option("--train-epochs", type=int, default=5, show_default=True)
+@click.option("--train-steps", type=int, default=10_000, show_default=True)
+@click.option("--val-every-n-steps", type=int, default=2000, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
 @click.option("--gaussian-stdev", type=float, default=1.0, show_default=True)
 @click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
@@ -54,7 +55,8 @@ def main(
     device: str,
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
-    train_epochs: int,
+    train_steps: int,
+    val_every_n_steps: int,
     num_samples: int,
     gaussian_stdev: float,
     label_type: str,
@@ -82,7 +84,8 @@ def main(
         dataset_base_folder=data_dir(),
         study_base_folder=study_base,
         num_lookforward_tokens=num_lookforward_tokens,
-        train_epochs=train_epochs,
+        train_steps=train_steps,
+        val_every_n_steps=val_every_n_steps,
         num_rollouts_per_sample=num_rollouts,
         gaussian_stdev=gaussian_stdev,
         subtract_baseline=subtract_baseline,

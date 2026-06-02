@@ -6,14 +6,14 @@ that supports configurable sweep grids and dynamic GPU scheduling.
 
 Usage:
     uv run python experiments/corpus-regression/orchestrate.py \
-        --method sl --seeds 51,61 --train-epochs 5
+        --method sl --seeds 51,61 --train-steps 5
 
     uv run python experiments/corpus-regression/orchestrate.py \
         --method maxrl --seeds 51 \
         --lookforward-tokens 1,4,8 \
         --rollout-steps 16,1024 \
         --num-samples 50000,100000 \
-        --train-epochs 5 \
+        --train-steps 5 \
         --subtract-baseline --use-factorized-likelihoods
 
     uv run python experiments/corpus-regression/orchestrate.py \
@@ -52,7 +52,8 @@ Method = Literal["sl", "grpo", "rloo", "maxrl", "ntp_baseline"]
 DEFAULT_LOOKFORWARD_TOKENS = (1, 2, 3, 4, 5, 6, 7, 8)
 DEFAULT_ROLLOUT_STEPS = (4, 16, 128, 1024)
 DEFAULT_NUM_SAMPLES = 100_000
-DEFAULT_TRAIN_EPOCHS = 5
+DEFAULT_TRAIN_STEPS = 10_000
+DEFAULT_VAL_EVERY_N_STEPS = 2000
 DEFAULT_GAUSSIAN_STDEV = 1.0
 
 
@@ -123,7 +124,8 @@ def _build_sl_jobs(
     seeds: tuple[int, ...],
     lookforward_tokens: tuple[int, ...],
     num_samples_values: tuple[int, ...],
-    train_epochs: int,
+    train_steps: int,
+    val_every_n_steps: int,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -146,7 +148,8 @@ def _build_sl_jobs(
             "--num-lookforward-tokens", str(lft),
             "--seed", str(seed),
             "--device", "{device}",
-            "--train-epochs", str(train_epochs),
+            "--train-steps", str(train_steps),
+            "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
             "--label-type", label_type,
         ]
@@ -163,7 +166,8 @@ def _build_grpo_jobs(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples_values: tuple[int, ...],
-    train_epochs: int,
+    train_steps: int,
+    val_every_n_steps: int,
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
     normalize_labels: bool,
@@ -192,7 +196,8 @@ def _build_grpo_jobs(
             "--num-rollouts", str(rollouts),
             "--seed", str(seed),
             "--device", "{device}",
-            "--train-epochs", str(train_epochs),
+            "--train-steps", str(train_steps),
+            "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
             "--gaussian-stdev", str(stdev),
             "--label-type", label_type,
@@ -210,7 +215,8 @@ def _build_rloo_jobs(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples_values: tuple[int, ...],
-    train_epochs: int,
+    train_steps: int,
+    val_every_n_steps: int,
     factorized: bool,
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
@@ -244,7 +250,8 @@ def _build_rloo_jobs(
             "--num-rollouts", str(rollouts),
             "--seed", str(seed),
             "--device", "{device}",
-            "--train-epochs", str(train_epochs),
+            "--train-steps", str(train_steps),
+            "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
             "--factorized", str(factorized),
             "--gaussian-stdev", str(stdev),
@@ -263,7 +270,8 @@ def _build_maxrl_jobs(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples_values: tuple[int, ...],
-    train_epochs: int,
+    train_steps: int,
+    val_every_n_steps: int,
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
     gaussian_stdev_values: tuple[float, ...],
@@ -299,7 +307,8 @@ def _build_maxrl_jobs(
             "--num-rollouts", str(rollouts),
             "--seed", str(seed),
             "--device", "{device}",
-            "--train-epochs", str(train_epochs),
+            "--train-steps", str(train_steps),
+            "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
             "--subtract-baseline", str(subtract_baseline),
             "--use-factorized-likelihoods", str(use_factorized_likelihoods),
@@ -322,7 +331,7 @@ def _build_ntp_jobs(
     label_range: tuple[float, float],
 ) -> list[Job]:
     """NTP baseline is inference-only and deterministic — no seeds, rollouts,
-    stdev, train_epochs, baseline, or factorized flags. The cross-product is
+    stdev, train_steps, baseline, or factorized flags. The cross-product is
     only over (lookforward_tokens × num_samples_values)."""
     script = str(_script_path("ntp_baseline"))
     jobs: list[Job] = []
@@ -392,11 +401,18 @@ def _build_ntp_jobs(
     help="Comma-separated training sample counts to sweep.",
 )
 @click.option(
-    "--train-epochs",
+    "--train-steps",
     type=int,
-    default=DEFAULT_TRAIN_EPOCHS,
+    default=DEFAULT_TRAIN_STEPS,
     show_default=True,
-    help="Number of training epochs per run.",
+    help="Total number of gradient steps per run.",
+)
+@click.option(
+    "--val-every-n-steps",
+    type=int,
+    default=DEFAULT_VAL_EVERY_N_STEPS,
+    show_default=True,
+    help="Validate every N gradient steps.",
 )
 @click.option(
     "--gaussian-stdev",
@@ -466,7 +482,8 @@ def main(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples: tuple[int, ...],
-    train_epochs: int,
+    train_steps: int,
+    val_every_n_steps: int,
     gaussian_stdev: tuple[float, ...],
     gpu_ids: tuple[int, ...] | None,
     subtract_baseline: bool,
@@ -506,7 +523,8 @@ def main(
                 seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 num_samples_values=num_samples,
-                train_epochs=train_epochs,
+                train_steps=train_steps,
+                val_every_n_steps=val_every_n_steps,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -517,7 +535,8 @@ def main(
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
-                train_epochs=train_epochs,
+                train_steps=train_steps,
+                val_every_n_steps=val_every_n_steps,
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
@@ -529,7 +548,8 @@ def main(
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
-                train_epochs=train_epochs,
+                train_steps=train_steps,
+                val_every_n_steps=val_every_n_steps,
                 factorized=factorized,
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
@@ -542,7 +562,8 @@ def main(
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
-                train_epochs=train_epochs,
+                train_steps=train_steps,
+                val_every_n_steps=val_every_n_steps,
                 subtract_baseline=subtract_baseline,
                 use_factorized_likelihoods=use_factorized_likelihoods,
                 gaussian_stdev_values=gaussian_stdev,
@@ -571,7 +592,7 @@ def main(
         click.echo(f"rollout_steps={rollout_steps}")
     click.echo(
         f"num_samples={num_samples}  gaussian_stdev={gaussian_stdev}  "
-        f"train_epochs={train_epochs}  gpus={pool.num_devices}  total_jobs={len(all_jobs)}"
+        f"train_steps={train_steps}  gpus={pool.num_devices}  total_jobs={len(all_jobs)}"
     )
 
     if dry_run:

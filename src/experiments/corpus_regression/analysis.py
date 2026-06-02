@@ -1,5 +1,6 @@
 import json
 import re
+import warnings
 from pathlib import Path
 from typing import Literal, Self
 
@@ -58,9 +59,13 @@ def canonical_dataset_folder_name(
 def _decode_dim_averaged(df: pl.DataFrame) -> pl.DataFrame:
     """Append scalar `{split}_corr` and `{split}_mse` columns by averaging
     per-dim metrics across the D output dimensions of the list-column
-    sufficient stats."""
+    sufficient stats. Handles both old format (train+val) and new format
+    (val-only)."""
     out = df
     for split in ("train", "val"):
+        xx_col = f"{split}_target_xx"
+        if xx_col not in df.columns:
+            continue
         xx = np.asarray(df[f"{split}_target_xx"].to_list(), dtype=np.float64)
         xy = np.asarray(df[f"{split}_target_xy"].to_list(), dtype=np.float64)
         yy = np.asarray(df[f"{split}_target_yy"].to_list(), dtype=np.float64)
@@ -74,6 +79,16 @@ def _decode_dim_averaged(df: pl.DataFrame) -> pl.DataFrame:
     return out
 
 
+def _has_study_metrics(path: Path) -> bool:
+    """True if the study folder contains metrics in either new or old format."""
+    return (path / "val_metrics.parquet").exists() or (path / "metrics.parquet").exists()
+
+
+def _is_new_format(path: Path) -> bool:
+    """True if the study folder uses the new step-based format."""
+    return (path / "val_metrics.parquet").exists()
+
+
 class CorpusRegressionAnalysisConfig(BaseConfig):
     """Grouped view over completed/started study folders. Each `studies` key
     is a group name (`"look=4"` for SL, `"look=4 r=128"` for GRPO/MaxRL); the
@@ -85,8 +100,11 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
     @classmethod
     def from_grouped(cls, grouped: dict[str, list[tuple[int, Path]]]) -> Self | None:
-        """Drop paths missing `metrics.parquet`/`config.json`; drop empty
-        groups; return None if nothing survives."""
+        """Drop paths missing metrics files or config.json; drop empty
+        groups; return None if nothing survives.
+
+        Supports both new-format (val_metrics.parquet) and old-format
+        (metrics.parquet) study folders."""
         studies: dict[str, list[Path]] = {}
         study_seeds: dict[str, list[int]] = {}
         study_lookforwards: dict[str, int] = {}
@@ -94,7 +112,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             kept = [
                 (s, p)
                 for (s, p) in pairs
-                if (p / "metrics.parquet").exists() and (p / "config.json").exists()
+                if _has_study_metrics(p) and (p / "config.json").exists()
             ]
             if not kept:
                 continue
@@ -353,19 +371,57 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         return pl.DataFrame(rows).sort(["num_lookforward", "study"])
 
     def get_metric_dataframe(self) -> pl.DataFrame:
-        """Concat per-(study, seed) metrics.parquet, then append scalar
-        `{split}_corr` / `{split}_mse` columns."""
+        """Concat per-(study, seed) val metrics, then append scalar
+        `val_corr` / `val_mse` columns.
+
+        Supports both new-format (val_metrics.parquet with `step` column)
+        and old-format (metrics.parquet with `epoch` column). The returned
+        frame always has a `step` column (for old format, `epoch` is renamed
+        to `step` for uniform downstream handling)."""
         frames: list[pl.DataFrame] = []
         for name, paths in self.studies.items():
             seeds = self.study_seeds[name]
             for seed, path in zip(seeds, paths, strict=True):
+                if _is_new_format(path):
+                    df = pl.read_parquet(path / "val_metrics.parquet")
+                else:
+                    df = pl.read_parquet(path / "metrics.parquet")
+                    if "epoch" in df.columns and "step" not in df.columns:
+                        df = df.rename({"epoch": "step"})
                 frames.append(
-                    pl.read_parquet(path / "metrics.parquet").with_columns(
+                    df.with_columns(
                         pl.lit(name).alias("study"),
                         pl.lit(seed).alias("seed"),
                     )
                 )
         return _decode_dim_averaged(pl.concat(frames))
+
+    def get_train_dataframe(self) -> pl.DataFrame:
+        """Concat per-(study, seed) train_metrics.parquet files.
+
+        Returns frame with columns: study, seed, step, loss, mse.
+        Only works with new-format study folders; old-format folders are
+        skipped with a warning."""
+        frames: list[pl.DataFrame] = []
+        for name, paths in self.studies.items():
+            seeds = self.study_seeds[name]
+            for seed, path in zip(seeds, paths, strict=True):
+                train_path = path / "train_metrics.parquet"
+                if not train_path.exists():
+                    continue
+                frames.append(
+                    pl.read_parquet(train_path).with_columns(
+                        pl.lit(name).alias("study"),
+                        pl.lit(seed).alias("seed"),
+                    )
+                )
+        if not frames:
+            warnings.warn(
+                "No train_metrics.parquet found; all studies use old epoch format",
+                stacklevel=2,
+            )
+            return pl.DataFrame(schema={"study": pl.Utf8, "seed": pl.Int64, "step": pl.Int64, "loss": pl.Float64, "mse": pl.Float64})
+        return pl.concat(frames)
 
     def _rollouts_groups(self) -> dict[int, list[str]] | None:
         """Split studies by ` r=(\\d+)` suffix; None if any study lacks it
@@ -379,16 +435,20 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         return dict(sorted(groups.items()))
 
     def _aggregate_by_epoch(self, *, df: pl.DataFrame, y_name: str) -> pl.DataFrame:
+        """Aggregate across seeds by (study, step). Works with both old `epoch`
+        and new `step` column names — `get_metric_dataframe()` normalizes to `step`."""
+        x_col = "step" if "step" in df.columns else "epoch"
         return (
             df
-            .group_by(["study", "epoch"])
+            .group_by(["study", x_col])
             .agg(
                 pl.col(y_name).mean().alias("mean_y"),
                 pl.col(y_name).min().alias("min_y"),
                 pl.col(y_name).max().alias("max_y"),
                 pl.len().alias("n_seeds"),
             )
-            .sort(["study", "epoch"])
+            .sort(["study", x_col])
+            .rename({x_col: "epoch"})
         )
 
     @staticmethod
@@ -560,6 +620,105 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 )
             fig.update_xaxes(title_text="epoch", row=1, col=col)
             fig.update_yaxes(title_text=y_name, row=1, col=col)
+        if rollouts is not None:
+            fig.update_layout(legend=dict(groupclick="togglegroup"))
+        if title is not None:
+            fig.update_layout(title=title)
+        self._apply_compact_layout(fig, has_title=title is not None)
+        if save_path is not None:
+            self._save_html(fig, save_path)
+        return fig
+
+    def plot_vs_step(
+        self,
+        metric: Literal["loss", "mse"],
+        *,
+        title: str | None = None,
+        show_seed_bar: bool = False,
+        save_path: Path | None = None,
+    ) -> go.Figure:
+        """Per-step train metrics (loss or mse) as continuous lines, one per
+        study (seed-mean). Requires new-format study folders with
+        train_metrics.parquet."""
+        df = self.get_train_dataframe()
+        if df.is_empty():
+            raise ValueError("No train_metrics.parquet found; cannot plot_vs_step")
+        rollouts = self._rollouts_groups()
+        (
+            study_colors,
+            study_legendgroups,
+            study_legend_names,
+            show_group_title,
+            default_visible_group,
+        ) = self._study_styling()
+
+        def is_default_visible(study: str) -> bool:
+            if default_visible_group is None:
+                return True
+            if study_legendgroups[study] != default_visible_group:
+                return False
+            r = int(_ROLLOUTS_RE.search(study).group(1))
+            return r in self._DEFAULT_VISIBLE_ROLLOUTS
+
+        fig = go.Figure()
+        agg_df = (
+            df
+            .group_by(["study", "step"])
+            .agg(
+                pl.col(metric).mean().alias("mean_y"),
+                pl.col(metric).min().alias("min_y"),
+                pl.col(metric).max().alias("max_y"),
+                pl.len().alias("n_seeds"),
+            )
+            .sort(["study", "step"])
+        )
+        for study in self.studies:
+            sub = agg_df.filter(pl.col("study") == study).sort("step")
+            if sub.is_empty():
+                continue
+            look = self.study_lookforwards[study]
+            steps = sub["step"].to_list()
+            ys = sub["mean_y"].to_list()
+            mins = sub["min_y"].to_list()
+            maxs = sub["max_y"].to_list()
+            n_seeds = sub["n_seeds"].to_list()
+            customdata = [[look, n] for n in n_seeds]
+            error_kwargs = (
+                self._seed_bar_error_kwargs(ys=ys, mins=mins, maxs=maxs)
+                if show_seed_bar
+                else {}
+            )
+            group_title_kwargs = (
+                dict(legendgrouptitle_text=study_legendgroups[study])
+                if show_group_title
+                else {}
+            )
+            visible_kwargs = (
+                {} if is_default_visible(study) else dict(visible="legendonly")
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=steps,
+                    y=ys,
+                    mode="lines",
+                    name=study_legend_names[study],
+                    legendgroup=study_legendgroups[study],
+                    **group_title_kwargs,
+                    **visible_kwargs,
+                    line=dict(color=study_colors[study]),
+                    customdata=customdata,
+                    hovertemplate=(
+                        "step: %{x}<br>"
+                        f"{metric}: %{{y}}<br>"
+                        "num_lookforward_tokens: %{customdata[0]}<br>"
+                        "n_seeds: %{customdata[1]}"
+                        f"<extra>{study}</extra>"
+                    ),
+                    **error_kwargs,
+                ),
+            )
+        fig.update_xaxes(title_text="step")
+        fig.update_yaxes(title_text=metric)
         if rollouts is not None:
             fig.update_layout(legend=dict(groupclick="togglegroup"))
         if title is not None:

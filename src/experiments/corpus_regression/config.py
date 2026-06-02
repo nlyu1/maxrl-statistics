@@ -18,7 +18,6 @@ from src.data.corpus_regression import (
     CorpusRegressionDataset,
     CorpusRegressionDatasetConfig,
 )
-from src.metrics import RegressionStatCounter
 from src.model.minimal import CausalLMConfig
 from src.model.optimizer import CausalLMWithLinearHeadOptimizerConfig
 
@@ -34,7 +33,8 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
     model: CausalLMConfig
     optimizer: CausalLMWithLinearHeadOptimizerConfig
 
-    train_epochs: int
+    train_steps: int
+    val_every_n_steps: int
     study_folder: Path
     compile_model: bool = True
     compile_mode: str = "reduce-overhead"
@@ -58,7 +58,8 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         weight_decay: float = 0.0,
         lr_per_token: float = 1e-6,
         backbone_lr_divisor: float = 6.66,
-        train_epochs: int = 5,
+        train_steps: int = 10_000,
+        val_every_n_steps: int = 2000,
         clip_grad_norm: float = 1.0,
         compile_model: bool = True,
         head_init_norm: float = 1.0,
@@ -100,7 +101,8 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
                 weight_decay=weight_decay,
                 clip_grad_norm=clip_grad_norm,
             ),
-            train_epochs=train_epochs,
+            train_steps=train_steps,
+            val_every_n_steps=val_every_n_steps,
             study_folder=study_base_folder / dataset_folder.name,
             compile_model=compile_model,
         )
@@ -113,25 +115,25 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
 
     @classmethod
     def has_study_started(cls, study_folder: Path) -> bool:
-        return (study_folder / "metrics.parquet").exists() and (
+        return (study_folder / "train_metrics.parquet").exists() and (
             study_folder / "config.json"
         ).exists()
 
     @classmethod
     def is_study_complete(cls, study_folder: Path) -> bool:
-        """True iff the study at *study_folder* has completed all its training epochs."""
+        """True iff the study at *study_folder* has completed all its training steps."""
         if not cls.has_study_started(study_folder):
             return False
-        train_epochs = json.loads((study_folder / "config.json").read_text())[
-            "train_epochs"
+        train_steps = json.loads((study_folder / "config.json").read_text())[
+            "train_steps"
         ]
-        max_epoch = (
+        max_step = (
             pl
-            .read_parquet(study_folder / "metrics.parquet")
-            .select(pl.col("epoch").max())
+            .read_parquet(study_folder / "train_metrics.parquet")
+            .select(pl.col("step").max())
             .item()
         )
-        return max_epoch >= train_epochs - 1
+        return max_step >= train_steps - 1
 
     @classmethod
     def prepare_study_folder(cls, *, study_folder: Path, tag: str) -> bool:
@@ -208,9 +210,6 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             train_dl=train_dl,
             val_dl=val_dl,
             device=device,
-            train_target_counter=RegressionStatCounter.initialize(
-                dim=self.data.embedding_dim,
-            ),
         )
 
     def _extra_state_kwargs(self) -> dict:
