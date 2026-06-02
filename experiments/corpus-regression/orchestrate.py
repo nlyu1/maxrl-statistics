@@ -47,7 +47,7 @@ from src.experiments.corpus_regression.config import (  # noqa: E402
 )
 from src.experiments.gpu_pool import GPUPool, Job  # noqa: E402
 
-Method = Literal["sl", "grpo", "rloo", "maxrl"]
+Method = Literal["sl", "grpo", "rloo", "maxrl", "ntp_baseline"]
 
 DEFAULT_LOOKFORWARD_TOKENS = (1, 2, 3, 4, 5, 6, 7, 8)
 DEFAULT_ROLLOUT_STEPS = (4, 16, 128, 1024)
@@ -125,6 +125,7 @@ def _build_sl_jobs(
     num_samples_values: tuple[int, ...],
     train_epochs: int,
     label_type: str,
+    normalize_labels: bool,
 ) -> list[Job]:
     script = str(_script_path("sl"))
     jobs: list[Job] = []
@@ -146,6 +147,8 @@ def _build_sl_jobs(
             "--num-samples", str(ns),
             "--label-type", label_type,
         ]
+        if normalize_labels:
+            cmd.append("--normalize-labels")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -159,6 +162,7 @@ def _build_grpo_jobs(
     train_epochs: int,
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
+    normalize_labels: bool,
 ) -> list[Job]:
     script = str(_script_path("grpo"))
     jobs: list[Job] = []
@@ -186,6 +190,8 @@ def _build_grpo_jobs(
             "--gaussian-stdev", str(stdev),
             "--label-type", label_type,
         ]
+        if normalize_labels:
+            cmd.append("--normalize-labels")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -200,6 +206,7 @@ def _build_rloo_jobs(
     factorized: bool,
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
+    normalize_labels: bool,
 ) -> list[Job]:
     script = str(_script_path("rloo"))
     jobs: list[Job] = []
@@ -232,6 +239,8 @@ def _build_rloo_jobs(
             "--gaussian-stdev", str(stdev),
             "--label-type", label_type,
         ]
+        if normalize_labels:
+            cmd.append("--normalize-labels")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -247,6 +256,7 @@ def _build_maxrl_jobs(
     use_factorized_likelihoods: bool,
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
+    normalize_labels: bool,
 ) -> list[Job]:
     script = str(_script_path("maxrl"))
     jobs: list[Job] = []
@@ -281,6 +291,41 @@ def _build_maxrl_jobs(
             "--gaussian-stdev", str(stdev),
             "--label-type", label_type,
         ]
+        if normalize_labels:
+            cmd.append("--normalize-labels")
+        jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
+    return jobs
+
+
+def _build_ntp_jobs(
+    *,
+    lookforward_tokens: tuple[int, ...],
+    num_samples_values: tuple[int, ...],
+    label_type: str,
+    normalize_labels: bool,
+) -> list[Job]:
+    """NTP baseline is inference-only and deterministic — no seeds, rollouts,
+    stdev, train_epochs, baseline, or factorized flags. The cross-product is
+    only over (lookforward_tokens × num_samples_values)."""
+    script = str(_script_path("ntp_baseline"))
+    jobs: list[Job] = []
+    for lft, ns in itertools.product(lookforward_tokens, num_samples_values):
+        label = f"ntp_baseline_look-{lft}_ns-{ns}_lbl-{label_type}"
+        log_path = (
+            artifacts_dir() / "ntp_baseline" / "logs"
+            / f"look-{lft}_ns-{ns}.log"
+        )
+        if label_type != "rademacher":
+            log_path = log_path.parent / label_type / log_path.name
+        cmd = [
+            sys.executable, script,
+            "--num-lookforward-tokens", str(lft),
+            "--num-samples", str(ns),
+            "--label-type", label_type,
+            "--device", "{device}",
+        ]
+        if normalize_labels:
+            cmd.append("--normalize-labels")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -291,7 +336,7 @@ def _build_maxrl_jobs(
 @click.command()
 @click.option(
     "--method",
-    type=click.Choice(["sl", "grpo", "rloo", "maxrl"]),
+    type=click.Choice(["sl", "grpo", "rloo", "maxrl", "ntp_baseline"]),
     multiple=True,
     required=True,
     help="Training method(s) to run. Repeat for cross-algorithm batching.",
@@ -299,8 +344,11 @@ def _build_maxrl_jobs(
 @click.option(
     "--seeds",
     type=INT_LIST,
-    required=True,
-    help="Comma-separated random seeds (e.g. '51,61,121').",
+    default=None,
+    help=(
+        "Comma-separated random seeds (e.g. '51,61,121'). "
+        "Required when any non-NTP method is selected; ignored by ntp_baseline."
+    ),
 )
 @click.option(
     "--lookforward-tokens",
@@ -369,6 +417,13 @@ def _build_maxrl_jobs(
     help="Label type for the regression target.",
 )
 @click.option(
+    "--normalize-labels",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Normalize labels before training.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Print the job list and exit without running.",
@@ -380,7 +435,7 @@ def _build_maxrl_jobs(
 )
 def main(
     method: tuple[str, ...],
-    seeds: tuple[int, ...],
+    seeds: tuple[int, ...] | None,
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples: tuple[int, ...],
@@ -391,6 +446,7 @@ def main(
     use_factorized_likelihoods: bool,
     factorized: bool,
     label_type: str,
+    normalize_labels: bool,
     dry_run: bool,
     fail_fast: bool,
 ) -> None:
@@ -405,30 +461,41 @@ def main(
     # Deduplicate methods, preserving order.
     methods = list(dict.fromkeys(method))
 
+    # NTP baseline is deterministic and ignores --seeds. Other methods require it.
+    non_ntp_methods = [m for m in methods if m != "ntp_baseline"]
+    if non_ntp_methods and not seeds:
+        raise click.BadParameter(
+            f"--seeds is required when any non-NTP method is selected (got methods={methods})",
+            param_hint="--seeds",
+        )
+    seeds_tuple: tuple[int, ...] = seeds if seeds is not None else ()
+
     # Build job list per method.
     jobs_by_method: dict[str, list[Job]] = {}
     for m in methods:
         if m == "sl":
             jobs_by_method[m] = _build_sl_jobs(
-                seeds=seeds,
+                seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 num_samples_values=num_samples,
                 train_epochs=train_epochs,
                 label_type=label_type,
+                normalize_labels=normalize_labels,
             )
         elif m == "grpo":
             jobs_by_method[m] = _build_grpo_jobs(
-                seeds=seeds,
+                seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
                 train_epochs=train_epochs,
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
+                normalize_labels=normalize_labels,
             )
         elif m == "rloo":
             jobs_by_method[m] = _build_rloo_jobs(
-                seeds=seeds,
+                seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
@@ -436,10 +503,11 @@ def main(
                 factorized=factorized,
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
+                normalize_labels=normalize_labels,
             )
         elif m == "maxrl":
             jobs_by_method[m] = _build_maxrl_jobs(
-                seeds=seeds,
+                seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
@@ -448,6 +516,14 @@ def main(
                 use_factorized_likelihoods=use_factorized_likelihoods,
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
+                normalize_labels=normalize_labels,
+            )
+        elif m == "ntp_baseline":
+            jobs_by_method[m] = _build_ntp_jobs(
+                lookforward_tokens=lookforward_tokens,
+                num_samples_values=num_samples,
+                label_type=label_type,
+                normalize_labels=normalize_labels,
             )
         else:
             raise click.BadParameter(f"Unknown method: {m}")
@@ -456,8 +532,8 @@ def main(
 
     # Summary.
     pool = GPUPool(device_ids=list(gpu_ids) if gpu_ids else None)
-    click.echo(f"methods={methods}  seeds={seeds}  lookforward_tokens={lookforward_tokens}")
-    has_rollouts = any(m != "sl" for m in methods)
+    click.echo(f"methods={methods}  seeds={seeds_tuple}  lookforward_tokens={lookforward_tokens}")
+    has_rollouts = any(m not in ("sl", "ntp_baseline") for m in methods)
     if has_rollouts:
         click.echo(f"rollout_steps={rollout_steps}")
     click.echo(

@@ -35,6 +35,7 @@ METHOD = "sl"
 @click.option("--train-epochs", type=int, default=5, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
 @click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
+@click.option("--normalize-labels", is_flag=True, default=False, show_default=True)
 def main(
     num_lookforward_tokens: int,
     seed: int,
@@ -42,6 +43,7 @@ def main(
     train_epochs: int,
     num_samples: int,
     label_type: str,
+    normalize_labels: bool,
 ) -> None:
     set_seeds(seed)
 
@@ -55,6 +57,7 @@ def main(
         train_epochs=train_epochs,
         num_samples=num_samples,
         label_type=label_type,
+        normalize_labels=normalize_labels,
     )
     tag = f"seed={seed} look={num_lookforward_tokens}"
     study_folder = config.study_folder

@@ -48,6 +48,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         num_lookforward_tokens: int,
         embedding_dim: int = 32,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
         prefix_length: int = 128,
         num_samples: int = 100_000,
         model_name: str = "HuggingFaceTB/SmolLM2-135M",
@@ -68,6 +69,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             num_lookforward_tokens=num_lookforward_tokens,
             embedding_dim=embedding_dim,
             label_type=label_type,
+            normalize_labels=normalize_labels,
         )
         dataset_folder = data_config.get_canonical_folder(dataset_base_folder)
         # Build (or reuse) the on-disk dataset.

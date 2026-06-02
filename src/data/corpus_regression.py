@@ -99,6 +99,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     num_lookforward_tokens: int  # >= 1
     embedding_dim: int  # dimensions of rademacher embedding
     label_type: Literal["rademacher", "token_id"] = "rademacher"
+    normalize_labels: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -109,7 +110,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         return data
 
     @classmethod
-    def canonical_kwargs(cls, *, label_type: Literal["rademacher", "token_id"] = "rademacher") -> dict[str, Any]:
+    def canonical_kwargs(cls, *, label_type: Literal["rademacher", "token_id"] = "rademacher", normalize_labels: bool = False) -> dict[str, Any]:
         return {
             "prefix_length": 128,
             "num_samples": 100_000,
@@ -117,6 +118,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             "num_lookforward_tokens": 1,
             "embedding_dim": 32,
             "label_type": label_type,
+            "normalize_labels": normalize_labels,
         }
 
     @classmethod
