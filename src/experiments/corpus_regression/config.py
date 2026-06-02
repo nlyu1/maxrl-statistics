@@ -49,6 +49,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         embedding_dim: int = 32,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
         prefix_length: int = 128,
         num_samples: int = 100_000,
         model_name: str = "HuggingFaceTB/SmolLM2-135M",
@@ -70,6 +71,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             embedding_dim=embedding_dim,
             label_type=label_type,
             normalize_labels=normalize_labels,
+            label_range=label_range,
         )
         dataset_folder = data_config.get_canonical_folder(dataset_base_folder)
         # Build (or reuse) the on-disk dataset.

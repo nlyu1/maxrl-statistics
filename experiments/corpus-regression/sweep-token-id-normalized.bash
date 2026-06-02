@@ -7,7 +7,7 @@ cd "${REPO_ROOT}"
 SEEDS="51,61,121"
 ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 
-# SL sweep (token_id)
+# Same sweep as sweep-token-id.bash but with labels normalized to [0, 1].
 uv run python "${ORCHESTRATE}" \
     --method sl \
     --method grpo \
@@ -16,9 +16,11 @@ uv run python "${ORCHESTRATE}" \
     --method ntp_baseline \
     --seeds "${SEEDS}" \
     --label-type token_id \
+    --normalize-labels \
+    --label-range 0.0 1.0 \
     --lookforward-tokens 1 \
     --rollout-steps 1024 \
-    --gaussian-stdev 1.0,9.0,100.0,900.0,10000.0 \
-    --num-samples 50000,100000,500000 \
+    --gaussian-stdev 1.0,0.5,0.1,0.01 \
+    --num-samples 50000,100000 \
     --subtract-baseline \
     --use-factorized-likelihoods

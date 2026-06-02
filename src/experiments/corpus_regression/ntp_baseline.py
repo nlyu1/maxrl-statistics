@@ -61,6 +61,7 @@ class NTPBaselineConfig(BaseConfig):
         embedding_dim: int = 32,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
         prefix_length: int = 128,
         num_samples: int = 100_000,
         model_name: str = "HuggingFaceTB/SmolLM2-135M",
@@ -74,6 +75,7 @@ class NTPBaselineConfig(BaseConfig):
             embedding_dim=embedding_dim,
             label_type=label_type,
             normalize_labels=normalize_labels,
+            label_range=label_range,
         )
         dataset_folder = data_config.get_canonical_folder(dataset_base_folder)
         # Ensure dataset exists on disk.
@@ -142,6 +144,9 @@ def run_ntp_baseline(
         label_projector: Float[Tensor, "vocab 1"] = (
             torch.arange(vocab_size, device=device, dtype=torch.float32).unsqueeze(1)
         )
+        if config.data.normalize_labels:
+            lo, hi = config.data.label_range
+            label_projector = lo + (hi - lo) * (label_projector / vocab_size)
     else:
         raise ValueError(f"Unknown label_type: {config.data.label_type!r}")
 

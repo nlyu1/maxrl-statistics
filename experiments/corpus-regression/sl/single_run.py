@@ -36,6 +36,7 @@ METHOD = "sl"
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
 @click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
 @click.option("--normalize-labels", is_flag=True, default=False, show_default=True)
+@click.option("--label-range", type=(float, float), default=(0.0, 1.0), show_default=True, help="Target (lo, hi) range for label normalization.")
 def main(
     num_lookforward_tokens: int,
     seed: int,
@@ -44,6 +45,7 @@ def main(
     num_samples: int,
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
 ) -> None:
     set_seeds(seed)
 
@@ -58,6 +60,7 @@ def main(
         num_samples=num_samples,
         label_type=label_type,
         normalize_labels=normalize_labels,
+        label_range=label_range,
     )
     tag = f"seed={seed} look={num_lookforward_tokens}"
     study_folder = config.study_folder

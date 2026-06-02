@@ -100,6 +100,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
     embedding_dim: int  # dimensions of rademacher embedding
     label_type: Literal["rademacher", "token_id"] = "rademacher"
     normalize_labels: bool = False
+    label_range: tuple[float, float] = (0.0, 1.0)
 
     @model_validator(mode="before")
     @classmethod
@@ -110,7 +111,13 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         return data
 
     @classmethod
-    def canonical_kwargs(cls, *, label_type: Literal["rademacher", "token_id"] = "rademacher", normalize_labels: bool = False) -> dict[str, Any]:
+    def canonical_kwargs(
+        cls,
+        *,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
+    ) -> dict[str, Any]:
         return {
             "prefix_length": 128,
             "num_samples": 100_000,
@@ -119,6 +126,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             "embedding_dim": 32,
             "label_type": label_type,
             "normalize_labels": normalize_labels,
+            "label_range": label_range,
         }
 
     @classmethod
@@ -140,6 +148,9 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         # slug for existing Rademacher caches).
         if self.label_type != "rademacher":
             slug += f"_{self.label_type}"
+        if self.normalize_labels:
+            lo, hi = self.label_range
+            slug += f"_norm{lo:.2g}_{hi:.2g}"
         return base_path / slug
 
     def _rademacher_matrix(self, vocab_size: int) -> Int[Tensor, "vocab embedding_dim"]:
@@ -175,6 +186,10 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             labels: Float[Tensor, "total embedding_dim"] = rademacher[full[:, -1]].float()
         elif self.label_type == "token_id":
             labels: Float[Tensor, "total 1"] = full[:, -1].float().unsqueeze(1)
+            if self.normalize_labels:
+                vocab_size = len(tok)
+                lo, hi = self.label_range
+                labels = lo + (hi - lo) * (labels / vocab_size)
         else:
             raise ValueError(f"Unknown label_type: {self.label_type!r}")
 

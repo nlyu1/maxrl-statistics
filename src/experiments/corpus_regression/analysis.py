@@ -35,13 +35,19 @@ def canonical_dataset_folder_name(
     num_lookforward_tokens: int,
     num_samples: int = 100_000,
     label_type: Literal["rademacher", "token_id"] = "rademacher",
+    normalize_labels: bool = False,
+    label_range: tuple[float, float] = (0.0, 1.0),
 ) -> str:
     """Slug used by single_run scripts as the leaf study folder. Computed from
     `CorpusRegressionDatasetConfig.get_canonical_folder` so it stays in sync
     with run-time artifacts."""
     cfg = CorpusRegressionDatasetConfig(
         **{
-            **CorpusRegressionDatasetConfig.canonical_kwargs(label_type=label_type),
+            **CorpusRegressionDatasetConfig.canonical_kwargs(
+                label_type=label_type,
+                normalize_labels=normalize_labels,
+                label_range=label_range,
+            ),
             "num_lookforward_tokens": num_lookforward_tokens,
             "num_samples": num_samples,
         }
@@ -116,6 +122,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         num_lookforward_tokens: int = 1,
         num_samples: int = 100_000,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
     ) -> Self | None:
         """`<artifacts_root>/ntp_baseline/{dataset_folder}/`.
 
@@ -129,6 +137,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             num_lookforward_tokens=num_lookforward_tokens,
             num_samples=num_samples,
             label_type=label_type,
+            normalize_labels=normalize_labels,
+            label_range=label_range,
         )
         grouped: dict[str, list[tuple[int, Path]]] = {
             f"look={num_lookforward_tokens}": [
@@ -144,6 +154,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         artifacts_root: Path,
         num_samples: int = 100_000,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
     ) -> Self | None:
         """`<artifacts_root>/sl/seed-{S}/{dataset_folder}/`."""
         study_base = artifacts_root / "sl"
@@ -159,6 +171,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     / canonical_dataset_folder_name(
                         num_lookforward_tokens=n, num_samples=num_samples,
                         label_type=label_type,
+                        normalize_labels=normalize_labels,
+                        label_range=label_range,
                     ),
                 )
                 for s in candidate_seeds
@@ -173,6 +187,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         num_samples: int = 100_000,
         gaussian_stdev: float = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
     ) -> Self | None:
         """`<artifacts_root>/grpo/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/`."""
         study_base = artifacts_root / "grpo"
@@ -192,6 +208,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / canonical_dataset_folder_name(
                             num_lookforward_tokens=n, num_samples=num_samples,
                             label_type=label_type,
+                            normalize_labels=normalize_labels,
+                            label_range=label_range,
                         ),
                     )
                     for s in candidate_seeds
@@ -207,6 +225,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         num_samples: int = 100_000,
         gaussian_stdev: float = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
     ) -> Self | None:
         """`<artifacts_root>/rloo/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/`.
         `factorized` is fixed per call — surface it in the figure title."""
@@ -229,6 +249,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / canonical_dataset_folder_name(
                             num_lookforward_tokens=n, num_samples=num_samples,
                             label_type=label_type,
+                            normalize_labels=normalize_labels,
+                            label_range=label_range,
                         ),
                     )
                     for s in candidate_seeds
@@ -245,6 +267,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         num_samples: int = 100_000,
         gaussian_stdev: float = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
     ) -> Self | None:
         """`<artifacts_root>/maxrl/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
         Both flags are fixed per call — surface them in the figure title."""
@@ -271,6 +295,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         / canonical_dataset_folder_name(
                             num_lookforward_tokens=n, num_samples=num_samples,
                             label_type=label_type,
+                            normalize_labels=normalize_labels,
+                            label_range=label_range,
                         ),
                     )
                     for s in candidate_seeds
@@ -285,6 +311,46 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             f"{label:<32s}  {n_runs:>4d} runs   {n_groups:>3d} groups   "
             f"up to {max_seeds} seeds/group"
         )
+
+    def summarize(self, *, metric: Literal["corr", "mse"]) -> pl.DataFrame:
+        """Per-study best-epoch summary across seeds, sorted by lookforward.
+
+        "Best" is picked by `val_{metric}` (argmax for corr, argmin for mse) —
+        same convention as `plot_vs_lookforward(metric=...)`. Train statistics
+        are reported at that same best-by-val epoch (not separately optimized),
+        so train and val rows describe the same model checkpoint. NTP baseline
+        has only one epoch (=0); rows then trivially correspond to that epoch."""
+        df = self.get_metric_dataframe()
+        higher_is_better = metric == "corr"
+        val_y = f"val_{metric}"
+        train_y = f"train_{metric}"
+        val_agg = self._aggregate_by_epoch(df=df, y_name=val_y)
+        train_agg = self._aggregate_by_epoch(df=df, y_name=train_y)
+
+        rows: list[dict] = []
+        for study in self.studies:
+            v = val_agg.filter(pl.col("study") == study)
+            if v.is_empty():
+                continue
+            best = v.sort("mean_y", descending=higher_is_better).head(1)
+            best_epoch = int(best["epoch"].item())
+            t = train_agg.filter(
+                (pl.col("study") == study) & (pl.col("epoch") == best_epoch)
+            )
+            if t.is_empty():
+                raise ValueError(
+                    f"train aggregation missing for study {study!r} epoch={best_epoch}; "
+                    "metrics.parquet is internally inconsistent"
+                )
+            rows.append({
+                "study": study,
+                "num_lookforward": self.study_lookforwards[study],
+                "best_epoch": best_epoch,
+                "n_seeds": int(best["n_seeds"].item()),
+                f"train_{metric}_mean": float(t["mean_y"].item()),
+                f"val_{metric}_mean": float(best["mean_y"].item()),
+            })
+        return pl.DataFrame(rows).sort(["num_lookforward", "study"])
 
     def get_metric_dataframe(self) -> pl.DataFrame:
         """Concat per-(study, seed) metrics.parquet, then append scalar
@@ -506,17 +572,21 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     def plot_vs_lookforward(
         self,
         *,
+        metric: Literal["corr", "mse"] = "corr",
         title: str | None = None,
         x_scale: Literal["log", "uniform"] = "uniform",
         show_seed_bar: bool = False,
         save_path: Path | None = None,
     ) -> go.Figure:
-        """Best-epoch (argmax seed-mean) `train_corr` / `val_corr` vs
-        `num_lookforward_tokens`, two panels. Rollout sweeps draw one curve
-        per rollouts value; only `_DEFAULT_VISIBLE_ROLLOUTS` start visible."""
+        """Best-epoch `train_{metric}` / `val_{metric}` vs
+        `num_lookforward_tokens`, two panels. "Best" is argmax over seed-mean
+        for `metric="corr"` and argmin for `metric="mse"`. Rollout sweeps draw
+        one curve per rollouts value; only `_DEFAULT_VISIBLE_ROLLOUTS` start
+        visible."""
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
+        higher_is_better = metric == "corr"
         if rollouts is None:
             curve_groups: list[tuple[str, int | None, list[str]]] = [
                 ("all", None, list(self.studies.keys()))
@@ -526,7 +596,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
         fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
         for col, split in enumerate(("train", "val"), start=1):
-            y_name = f"{split}_corr"
+            y_name = f"{split}_{metric}"
             agg_df = self._aggregate_by_epoch(df=df, y_name=y_name)
             for i, (curve_name, r_value, names) in enumerate(curve_groups):
                 color = palette[i % len(palette)]
@@ -540,6 +610,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 )
                 rows = _best_epoch_rows_for_studies(
                     cfg=self, agg_df=agg_df, studies=names,
+                    higher_is_better=higher_is_better,
                 )
                 if not rows:
                     continue

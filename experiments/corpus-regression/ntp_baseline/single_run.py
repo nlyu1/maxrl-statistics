@@ -38,6 +38,7 @@ METHOD = "ntp_baseline"
 @click.option("--eval-batch-size", type=int, default=128, show_default=True)
 @click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
 @click.option("--normalize-labels", is_flag=True, default=False, show_default=True)
+@click.option("--label-range", type=(float, float), default=(0.0, 1.0), show_default=True, help="Target (lo, hi) range for label normalization.")
 def main(
     num_lookforward_tokens: int,
     device: str,
@@ -45,6 +46,7 @@ def main(
     eval_batch_size: int,
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
 ) -> None:
     torch_device = torch.device(device)
     study_base = artifacts_dir() / METHOD
@@ -57,6 +59,7 @@ def main(
         eval_batch_size=eval_batch_size,
         label_type=label_type,
         normalize_labels=normalize_labels,
+        label_range=label_range,
     )
 
     tag = f"ntp_baseline look={num_lookforward_tokens}"

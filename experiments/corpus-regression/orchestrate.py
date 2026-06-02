@@ -126,6 +126,7 @@ def _build_sl_jobs(
     train_epochs: int,
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
 ) -> list[Job]:
     script = str(_script_path("sl"))
     jobs: list[Job] = []
@@ -138,6 +139,8 @@ def _build_sl_jobs(
         )
         if label_type != "rademacher":
             log_path = log_path.parent / label_type / log_path.name
+        if normalize_labels:
+            log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -149,6 +152,7 @@ def _build_sl_jobs(
         ]
         if normalize_labels:
             cmd.append("--normalize-labels")
+            cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -163,6 +167,7 @@ def _build_grpo_jobs(
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
 ) -> list[Job]:
     script = str(_script_path("grpo"))
     jobs: list[Job] = []
@@ -179,6 +184,8 @@ def _build_grpo_jobs(
         )
         if label_type != "rademacher":
             log_path = log_path.parent / label_type / log_path.name
+        if normalize_labels:
+            log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -192,6 +199,7 @@ def _build_grpo_jobs(
         ]
         if normalize_labels:
             cmd.append("--normalize-labels")
+            cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -207,6 +215,7 @@ def _build_rloo_jobs(
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
 ) -> list[Job]:
     script = str(_script_path("rloo"))
     jobs: list[Job] = []
@@ -227,6 +236,8 @@ def _build_rloo_jobs(
         )
         if label_type != "rademacher":
             log_path = log_path.parent / label_type / log_path.name
+        if normalize_labels:
+            log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -241,6 +252,7 @@ def _build_rloo_jobs(
         ]
         if normalize_labels:
             cmd.append("--normalize-labels")
+            cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -257,6 +269,7 @@ def _build_maxrl_jobs(
     gaussian_stdev_values: tuple[float, ...],
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
 ) -> list[Job]:
     script = str(_script_path("maxrl"))
     jobs: list[Job] = []
@@ -278,6 +291,8 @@ def _build_maxrl_jobs(
         )
         if label_type != "rademacher":
             log_path = log_path.parent / label_type / log_path.name
+        if normalize_labels:
+            log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -293,6 +308,7 @@ def _build_maxrl_jobs(
         ]
         if normalize_labels:
             cmd.append("--normalize-labels")
+            cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -303,6 +319,7 @@ def _build_ntp_jobs(
     num_samples_values: tuple[int, ...],
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
 ) -> list[Job]:
     """NTP baseline is inference-only and deterministic — no seeds, rollouts,
     stdev, train_epochs, baseline, or factorized flags. The cross-product is
@@ -317,6 +334,8 @@ def _build_ntp_jobs(
         )
         if label_type != "rademacher":
             log_path = log_path.parent / label_type / log_path.name
+        if normalize_labels:
+            log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -326,6 +345,7 @@ def _build_ntp_jobs(
         ]
         if normalize_labels:
             cmd.append("--normalize-labels")
+            cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -424,6 +444,13 @@ def _build_ntp_jobs(
     help="Normalize labels before training.",
 )
 @click.option(
+    "--label-range",
+    type=(float, float),
+    default=(0.0, 1.0),
+    show_default=True,
+    help="Target (lo, hi) range for label normalization (only effective with --normalize-labels).",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Print the job list and exit without running.",
@@ -447,6 +474,7 @@ def main(
     factorized: bool,
     label_type: str,
     normalize_labels: bool,
+    label_range: tuple[float, float],
     dry_run: bool,
     fail_fast: bool,
 ) -> None:
@@ -481,6 +509,7 @@ def main(
                 train_epochs=train_epochs,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
+                label_range=label_range,
             )
         elif m == "grpo":
             jobs_by_method[m] = _build_grpo_jobs(
@@ -492,6 +521,7 @@ def main(
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
+                label_range=label_range,
             )
         elif m == "rloo":
             jobs_by_method[m] = _build_rloo_jobs(
@@ -504,6 +534,7 @@ def main(
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
+                label_range=label_range,
             )
         elif m == "maxrl":
             jobs_by_method[m] = _build_maxrl_jobs(
@@ -517,6 +548,7 @@ def main(
                 gaussian_stdev_values=gaussian_stdev,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
+                label_range=label_range,
             )
         elif m == "ntp_baseline":
             jobs_by_method[m] = _build_ntp_jobs(
@@ -524,6 +556,7 @@ def main(
                 num_samples_values=num_samples,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
+                label_range=label_range,
             )
         else:
             raise click.BadParameter(f"Unknown method: {m}")
