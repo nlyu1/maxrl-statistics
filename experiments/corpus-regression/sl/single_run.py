@@ -38,6 +38,7 @@ METHOD = "sl"
 @click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
 @click.option("--normalize-labels", is_flag=True, default=False, show_default=True)
 @click.option("--label-range", type=(float, float), default=(0.0, 1.0), show_default=True, help="Target (lo, hi) range for label normalization.")
+@click.option("--train-from-scratch", is_flag=True, default=False, show_default=True, help="Random-init the backbone instead of loading pretrained weights.")
 def main(
     num_lookforward_tokens: int,
     seed: int,
@@ -48,10 +49,12 @@ def main(
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
+    train_from_scratch: bool,
 ) -> None:
     set_seeds(seed)
 
-    study_base = artifacts_dir() / METHOD / f"seed-{seed}"
+    method_dir = METHOD + ("_scratch" if train_from_scratch else "")
+    study_base = artifacts_dir() / method_dir / f"seed-{seed}"
     torch_device = torch.device(device)
 
     config = CorpusRegressionSLConfig.get_canonical(
@@ -64,6 +67,7 @@ def main(
         label_type=label_type,
         normalize_labels=normalize_labels,
         label_range=label_range,
+        train_from_scratch=train_from_scratch,
     )
     tag = f"seed={seed} look={num_lookforward_tokens}"
     study_folder = config.study_folder

@@ -119,6 +119,12 @@ def _script_path(method: str) -> Path:
     )
 
 
+def _method_dir(method: str, *, train_from_scratch: bool) -> str:
+    """Method-level artifact subfolder. From-scratch sweeps land in a parallel
+    `<method>_scratch` tree alongside the pretrained-weight `<method>` tree."""
+    return f"{method}_scratch" if train_from_scratch else method
+
+
 def _build_sl_jobs(
     *,
     seeds: tuple[int, ...],
@@ -129,13 +135,15 @@ def _build_sl_jobs(
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
+    train_from_scratch: bool,
 ) -> list[Job]:
     script = str(_script_path("sl"))
+    method_dir = _method_dir("sl", train_from_scratch=train_from_scratch)
     jobs: list[Job] = []
     for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
         label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lbl-{label_type}"
         log_path = (
-            artifacts_dir() / "sl" / "logs"
+            artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / f"look-{lft}_ns-{ns}.log"
         )
@@ -156,6 +164,8 @@ def _build_sl_jobs(
         if normalize_labels:
             cmd.append("--normalize-labels")
             cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
+        if train_from_scratch:
+            cmd.append("--train-from-scratch")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -172,15 +182,17 @@ def _build_grpo_jobs(
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
+    train_from_scratch: bool,
 ) -> list[Job]:
     script = str(_script_path("grpo"))
+    method_dir = _method_dir("grpo", train_from_scratch=train_from_scratch)
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
         label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}_lbl-{label_type}"
         log_path = (
-            artifacts_dir() / "grpo" / "logs"
+            artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
@@ -205,6 +217,8 @@ def _build_grpo_jobs(
         if normalize_labels:
             cmd.append("--normalize-labels")
             cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
+        if train_from_scratch:
+            cmd.append("--train-from-scratch")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -222,8 +236,10 @@ def _build_rloo_jobs(
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
+    train_from_scratch: bool,
 ) -> list[Job]:
     script = str(_script_path("rloo"))
+    method_dir = _method_dir("rloo", train_from_scratch=train_from_scratch)
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
@@ -233,7 +249,7 @@ def _build_rloo_jobs(
             f"_ns-{ns}_fact-{factorized}_sigma-{stdev}_lbl-{label_type}"
         )
         log_path = (
-            artifacts_dir() / "rloo" / "logs"
+            artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
@@ -260,6 +276,8 @@ def _build_rloo_jobs(
         if normalize_labels:
             cmd.append("--normalize-labels")
             cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
+        if train_from_scratch:
+            cmd.append("--train-from-scratch")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -278,8 +296,10 @@ def _build_maxrl_jobs(
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
+    train_from_scratch: bool,
 ) -> list[Job]:
     script = str(_script_path("maxrl"))
+    method_dir = _method_dir("maxrl", train_from_scratch=train_from_scratch)
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
@@ -289,7 +309,7 @@ def _build_maxrl_jobs(
             f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}_lbl-{label_type}"
         )
         log_path = (
-            artifacts_dir() / "maxrl" / "logs"
+            artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
@@ -318,6 +338,8 @@ def _build_maxrl_jobs(
         if normalize_labels:
             cmd.append("--normalize-labels")
             cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
+        if train_from_scratch:
+            cmd.append("--train-from-scratch")
         jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
     return jobs
 
@@ -467,6 +489,16 @@ def _build_ntp_jobs(
     help="Target (lo, hi) range for label normalization (only effective with --normalize-labels).",
 )
 @click.option(
+    "--train-from-scratch/--no-train-from-scratch",
+    default=False,
+    show_default=True,
+    help=(
+        "Random-init the backbone instead of loading pretrained weights. "
+        "Routes artifacts to <method>_scratch/ subtrees. Incompatible with "
+        "ntp_baseline (inference-only)."
+    ),
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Print the job list and exit without running.",
@@ -492,6 +524,7 @@ def main(
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
+    train_from_scratch: bool,
     dry_run: bool,
     fail_fast: bool,
 ) -> None:
@@ -505,6 +538,15 @@ def main(
 
     # Deduplicate methods, preserving order.
     methods = list(dict.fromkeys(method))
+
+    # NTP baseline is inference-only on the pretrained model — there's no
+    # meaningful "from scratch" version of an intrinsic-variance baseline.
+    if train_from_scratch and "ntp_baseline" in methods:
+        raise click.BadParameter(
+            "ntp_baseline cannot be combined with --train-from-scratch "
+            "(NTP baseline is inference-only on pretrained weights).",
+            param_hint="--train-from-scratch",
+        )
 
     # NTP baseline is deterministic and ignores --seeds. Other methods require it.
     non_ntp_methods = [m for m in methods if m != "ntp_baseline"]
@@ -528,6 +570,7 @@ def main(
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
+                train_from_scratch=train_from_scratch,
             )
         elif m == "grpo":
             jobs_by_method[m] = _build_grpo_jobs(
@@ -541,6 +584,7 @@ def main(
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
+                train_from_scratch=train_from_scratch,
             )
         elif m == "rloo":
             jobs_by_method[m] = _build_rloo_jobs(
@@ -555,6 +599,7 @@ def main(
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
+                train_from_scratch=train_from_scratch,
             )
         elif m == "maxrl":
             jobs_by_method[m] = _build_maxrl_jobs(
@@ -570,6 +615,7 @@ def main(
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
+                train_from_scratch=train_from_scratch,
             )
         elif m == "ntp_baseline":
             jobs_by_method[m] = _build_ntp_jobs(
@@ -592,7 +638,8 @@ def main(
         click.echo(f"rollout_steps={rollout_steps}")
     click.echo(
         f"num_samples={num_samples}  gaussian_stdev={gaussian_stdev}  "
-        f"train_steps={train_steps}  gpus={pool.num_devices}  total_jobs={len(all_jobs)}"
+        f"train_steps={train_steps}  gpus={pool.num_devices}  "
+        f"train_from_scratch={train_from_scratch}  total_jobs={len(all_jobs)}"
     )
 
     if dry_run:

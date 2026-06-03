@@ -31,6 +31,12 @@ def _seed_folder_name(seed: int) -> str:
     return f"seed-{seed}"
 
 
+def _method_dir(method: str, *, train_from_scratch: bool) -> str:
+    """Method-level artifact subfolder. From-scratch sweeps land in a parallel
+    `<method>_scratch` tree alongside the pretrained-weight `<method>` tree."""
+    return f"{method}_scratch" if train_from_scratch else method
+
+
 def canonical_dataset_folder_name(
     *,
     num_lookforward_tokens: int,
@@ -174,9 +180,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/sl/seed-{S}/{dataset_folder}/`."""
-        study_base = artifacts_root / "sl"
+        """`<artifacts_root>/sl[_scratch]/seed-{S}/{dataset_folder}/`."""
+        study_base = artifacts_root / _method_dir(
+            "sl", train_from_scratch=train_from_scratch,
+        )
         if not study_base.exists():
             return None
         grouped: dict[str, list[tuple[int, Path]]] = {}
@@ -207,9 +216,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/grpo/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/`."""
-        study_base = artifacts_root / "grpo"
+        """`<artifacts_root>/grpo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/`."""
+        study_base = artifacts_root / _method_dir(
+            "grpo", train_from_scratch=train_from_scratch,
+        )
         if not study_base.exists():
             return None
         sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
@@ -245,10 +257,13 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/rloo/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/`.
+        """`<artifacts_root>/rloo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/`.
         `factorized` is fixed per call — surface it in the figure title."""
-        study_base = artifacts_root / "rloo"
+        study_base = artifacts_root / _method_dir(
+            "rloo", train_from_scratch=train_from_scratch,
+        )
         if not study_base.exists():
             return None
         factorized_mode = factorized_mode_folder(factorized=factorized)
@@ -287,10 +302,13 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/maxrl/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
+        """`<artifacts_root>/maxrl[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
         Both flags are fixed per call — surface them in the figure title."""
-        study_base = artifacts_root / "maxrl"
+        study_base = artifacts_root / _method_dir(
+            "maxrl", train_from_scratch=train_from_scratch,
+        )
         if not study_base.exists():
             return None
         baseline = baseline_mode_folder(subtract_baseline=subtract_baseline)

@@ -63,6 +63,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         clip_grad_norm: float = 1.0,
         compile_model: bool = True,
         head_init_norm: float = 1.0,
+        train_from_scratch: bool = False,
     ) -> dict:
         data_config = CorpusRegressionDatasetConfig(
             prefix_length=prefix_length,
@@ -87,6 +88,12 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         # Use post-validation embedding_dim (forced to 1 for token_id).
         effective_dim = data_config.embedding_dim
         head_lr = lr_per_token * batch_size * prefix_length
+        # From-scratch training conventionally uses the same LR for backbone
+        # and head — there are no pretrained features to preserve, so the
+        # fine-tuning divisor is dropped.
+        effective_backbone_lr_divisor = (
+            1.0 if train_from_scratch else backbone_lr_divisor
+        )
         return dict(
             data=data_config,
             dataset_folder=dataset_folder,
@@ -94,9 +101,10 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             model=CausalLMConfig(
                 pretrained_model=model_name,
                 initial_output_norms=[head_init_norm] * effective_dim,
+                train_from_scratch=train_from_scratch,
             ),
             optimizer=CausalLMWithLinearHeadOptimizerConfig(
-                lr=head_lr / backbone_lr_divisor,
+                lr=head_lr / effective_backbone_lr_divisor,
                 head_lr=head_lr,
                 weight_decay=weight_decay,
                 clip_grad_norm=clip_grad_norm,

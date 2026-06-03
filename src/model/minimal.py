@@ -15,10 +15,19 @@ from src.config.base import BaseConfig
 class CausalLMConfig(BaseConfig):
     pretrained_model: str
     initial_output_norms: list[float]  # one norm per output dimension
-    def get_model(self) -> "CausalLMWithLinearHead":
-        from transformers import AutoModelForCausalLM
+    # When True, instantiate the architecture of `pretrained_model` with random
+    # weights instead of loading the pretrained checkpoint. Tokenizer choice
+    # is unchanged; only the backbone weights differ.
+    train_from_scratch: bool = False
 
-        backbone = AutoModelForCausalLM.from_pretrained(self.pretrained_model)
+    def get_model(self) -> "CausalLMWithLinearHead":
+        from transformers import AutoConfig, AutoModelForCausalLM
+
+        if self.train_from_scratch:
+            hf_config = AutoConfig.from_pretrained(self.pretrained_model)
+            backbone = AutoModelForCausalLM.from_config(hf_config)
+        else:
+            backbone = AutoModelForCausalLM.from_pretrained(self.pretrained_model)
         return CausalLMWithLinearHead(
             backbone=backbone,
             initial_output_norms=torch.tensor(self.initial_output_norms),

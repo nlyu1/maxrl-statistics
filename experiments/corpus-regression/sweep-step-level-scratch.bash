@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Production sweep using the new per-step logging regime.
-# Runs all methods (SL, GRPO, RLOO, MaxRL, NTP baseline) with canonical
-# step-level defaults: 10K train steps, validation every 2K steps.
+# From-scratch sweep using the new per-step logging regime.
+# Mirror of sweep-step-level.bash with two differences:
+#   - --train-from-scratch appended (random-init backbone, lr_divisor forced
+#     to 1.0, artifacts land under <method>_scratch/).
+#   - ntp_baseline excluded (inference-only on pretrained weights, has no
+#     meaningful from-scratch counterpart).
+# Trains SL, GRPO, RLOO, MaxRL with canonical step-level defaults.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
@@ -16,7 +20,6 @@ ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 #     --method grpo \
 #     --method rloo \
 #     --method maxrl \
-#     --method ntp_baseline \
 #     --seeds "${SEEDS}" \
 #     --train-steps 10000 \
 #     --val-every-n-steps 1000 \
@@ -26,14 +29,14 @@ ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 #     --num-samples 100000,500000 \
 #     --subtract-baseline \
 #     --use-factorized-likelihoods \
-#     --factorized
+#     --factorized \
+#     --train-from-scratch
 
 uv run python "${ORCHESTRATE}" \
     --method sl \
     --method grpo \
     --method rloo \
     --method maxrl \
-    --method ntp_baseline \
     --seeds "${SEEDS}" \
     --label-type token_id \
     --normalize-labels \
@@ -46,4 +49,5 @@ uv run python "${ORCHESTRATE}" \
     --num-samples 100000,500000 \
     --subtract-baseline \
     --use-factorized-likelihoods \
-    --factorized
+    --factorized \
+    --train-from-scratch
