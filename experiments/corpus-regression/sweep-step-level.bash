@@ -8,7 +8,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-SEEDS="51,61,121"
+SEEDS="51"
 ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 
 # uv run python "${ORCHESTRATE}" \

@@ -167,16 +167,18 @@ def run_ntp_baseline(
     )
     val_counter = val_output.compute_counter()
 
-    # Serialize results (epoch=0 for compatibility with analysis pipeline).
+    # Serialize results at step=0 (NTP baseline is inference-only, single
+    # pass — there is no real training step counter, but the analysis layer
+    # ingests `val_metrics.parquet` keyed by `step`, so we write step=0).
     val_output.save_to(config.study_folder / "0")
 
     sufficient_stats: dict[str, object] = {}
     sufficient_stats.update(_per_dim_stats(train_counter, prefix="train_target"))
     sufficient_stats.update(_per_dim_stats(val_counter, prefix="val_target"))
 
-    metrics_path = config.study_folder / "metrics.parquet"
+    metrics_path = config.study_folder / "val_metrics.parquet"
     pl.DataFrame({
-        "epoch": [0],
+        "step": [0],
         **{key: [value] for key, value in sufficient_stats.items()},
     }).write_parquet(metrics_path)
 

@@ -66,7 +66,7 @@ def main(
     study_folder = config.study_folder
 
     # Skip if already complete.
-    if (study_folder / "metrics.parquet").exists():
+    if (study_folder / "val_metrics.parquet").exists():
         print(f"!!! {tag} already complete, skipping ({study_folder})")
         sys.exit(0)
 
