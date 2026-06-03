@@ -180,6 +180,12 @@ class CorpusRegressionDatasetConfig(BaseConfig):
 
         # Input is the prefix; label is derived from the final lookforward token.
         prefix_tokens: Int[Tensor, "total prefix_length"] = full[:, : self.prefix_length].to(torch.int32)
+        # Raw lookahead token id (the K-th-ahead token), persisted alongside
+        # `labels` for downstream NTP cross-entropy training. For
+        # label_type='rademacher' this is the inverse of the embedding lookup;
+        # for label_type='token_id' it duplicates the label as int32 (without
+        # normalization) so CE training is independent of label normalization.
+        lookahead_token_ids: Int[Tensor, "total"] = full[:, -1].to(torch.int32)
 
         if self.label_type == "rademacher":
             rademacher = self._rademacher_matrix(len(tok))
@@ -198,13 +204,16 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         perm = torch.randperm(total, generator=shuffle_rng)
         all_tokens: Int[Tensor, "total prefix_length"] = prefix_tokens[perm]
         all_labels: Float[Tensor, "total embedding_dim"] = labels[perm]
+        all_lookahead_token_ids: Int[Tensor, "total"] = lookahead_token_ids[perm]
 
         return CorpusRegressionDataset(
             config=self,
             train_tokens=all_tokens[: self.num_samples],
             train_labels=all_labels[: self.num_samples],
+            train_lookahead_token_ids=all_lookahead_token_ids[: self.num_samples],
             val_tokens=all_tokens[self.num_samples :],
             val_labels=all_labels[self.num_samples :],
+            val_lookahead_token_ids=all_lookahead_token_ids[self.num_samples :],
         )
 
     def demonstrate(self, num_samples: int = 50):
@@ -268,8 +277,10 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         required_paths = (
             folder / "train_tokens.pt",
             folder / "train_labels.pt",
+            folder / "train_lookahead_token_ids.pt",
             folder / "val_tokens.pt",
             folder / "val_labels.pt",
+            folder / "val_lookahead_token_ids.pt",
         )
 
         with lock_path.open("w") as lock_fh:
@@ -296,9 +307,11 @@ class CorpusRegressionDataset:
 
     train_tokens: Int[Tensor, "batch seq_len"]
     train_labels: Float[Tensor, "batch dim"]
+    train_lookahead_token_ids: Int[Tensor, "batch"]
 
     val_tokens: Int[Tensor, "batch seq_len"]
     val_labels: Float[Tensor, "batch dim"]
+    val_lookahead_token_ids: Int[Tensor, "batch"]
 
     def write_to(self, folder: Path) -> None:
         """Pickles tensors to `folder`; writes config as json."""
@@ -306,8 +319,10 @@ class CorpusRegressionDataset:
         (folder / "config.json").write_text(self.config.model_dump_json())
         torch.save(self.train_tokens, folder / "train_tokens.pt")
         torch.save(self.train_labels, folder / "train_labels.pt")
+        torch.save(self.train_lookahead_token_ids, folder / "train_lookahead_token_ids.pt")
         torch.save(self.val_tokens, folder / "val_tokens.pt")
         torch.save(self.val_labels, folder / "val_labels.pt")
+        torch.save(self.val_lookahead_token_ids, folder / "val_lookahead_token_ids.pt")
 
     @classmethod
     def load_from(cls, folder: Path) -> "CorpusRegressionDataset":
@@ -318,8 +333,10 @@ class CorpusRegressionDataset:
             config=config,
             train_tokens=torch.load(folder / "train_tokens.pt"),
             train_labels=torch.load(folder / "train_labels.pt"),
+            train_lookahead_token_ids=torch.load(folder / "train_lookahead_token_ids.pt"),
             val_tokens=torch.load(folder / "val_tokens.pt"),
             val_labels=torch.load(folder / "val_labels.pt"),
+            val_lookahead_token_ids=torch.load(folder / "val_lookahead_token_ids.pt"),
         )
 
 
@@ -332,7 +349,7 @@ class CorpusRegressionDataloadingConfig(BaseConfig):
 
     def get_train_dataloader(self, ds: CorpusRegressionDataset) -> DataLoader:
         return DataLoader(
-            TensorDataset(ds.train_tokens, ds.train_labels),
+            TensorDataset(ds.train_tokens, ds.train_labels, ds.train_lookahead_token_ids),
             batch_size=self.train_batch_size,
             shuffle=True,
             drop_last=self.drop_last,
@@ -341,7 +358,7 @@ class CorpusRegressionDataloadingConfig(BaseConfig):
 
     def get_val_dataloader(self, ds: CorpusRegressionDataset) -> DataLoader:
         return DataLoader(
-            TensorDataset(ds.val_tokens, ds.val_labels),
+            TensorDataset(ds.val_tokens, ds.val_labels, ds.val_lookahead_token_ids),
             batch_size=self.eval_batch_size,
             shuffle=False,
             drop_last=self.drop_last,

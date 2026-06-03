@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import torch
 from muon import SingleDeviceMuonWithAuxAdam
+from torch import nn
 
 from src.config.base import BaseConfig
 from src.model.minimal import CausalLMWithLinearHead
@@ -63,3 +65,30 @@ class CausalLMWithLinearHeadOptimizerConfig(BaseConfig):
             ),
         ]
         return SingleDeviceMuonWithAuxAdam(param_groups)
+
+
+class CausalLMFullParamOptimizerConfig(BaseConfig):
+    """
+    Conventional AdamW fine-tuning config for an `AutoModelForCausalLM`.
+
+    Single AdamW group on `model.parameters()` — no Muon, no separate head LR.
+    Used by the `sl_ce` (NTP cross-entropy) trainer where the model is a vanilla
+    HuggingFace causal LM with the pretrained `lm_head` retained (no swapped-in
+    regression head). Betas (0.9, 0.95) match the AdamW group in
+    `CausalLMWithLinearHeadOptimizerConfig` so the two configs are comparable
+    when running side-by-side.
+    """
+
+    lr: float
+    weight_decay: float
+    clip_grad_norm: float
+
+    def get_optimizer(self, model: nn.Module) -> torch.optim.Optimizer:
+        return torch.optim.AdamW(
+            model.parameters(),
+            lr=self.lr,
+            betas=(0.9, 0.95),
+            eps=1e-10,
+            weight_decay=self.weight_decay,
+        )
+

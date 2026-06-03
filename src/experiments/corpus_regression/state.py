@@ -92,7 +92,11 @@ class CorpusRegressionStudyBaseState(ABC):
     def train_step(
         self,
         *,
-        batch: tuple[Int[Tensor, "batch seq"], Float[Tensor, "batch D"]],
+        batch: tuple[
+            Int[Tensor, "batch seq"],
+            Float[Tensor, "batch D"],
+            Int[Tensor, "batch"],
+        ],
     ) -> TrainStepOutput: ...
 
     def compute_validation(self) -> CorpusRegressionValidationOutput:
@@ -111,7 +115,7 @@ class CorpusRegressionStudyBaseState(ABC):
             device_context,
             torch.autocast(device_type=self.device.type, dtype=torch.bfloat16),
         ):
-            for tokens, target in tqdm(
+            for tokens, target, _lookahead_token_ids in tqdm(
                 self.val_dl,
                 desc="validation",
             ):

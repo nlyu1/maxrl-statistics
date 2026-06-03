@@ -207,6 +207,48 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         return cls.from_grouped(grouped)
 
     @classmethod
+    def from_sl_ce_sweep(
+        cls,
+        *,
+        artifacts_root: Path,
+        num_samples: int = 100_000,
+        label_type: Literal["rademacher", "token_id"] = "rademacher",
+        normalize_labels: bool = False,
+        label_range: tuple[float, float] = (0.0, 1.0),
+        train_from_scratch: bool = False,
+    ) -> Self | None:
+        """`<artifacts_root>/sl_ce[_scratch]/seed-{S}/{dataset_folder}/`.
+
+        Identical layout to the SL sweep — `sl_ce` produces the same
+        `train_metrics.parquet` / `val_metrics.parquet` schema and the same
+        per-seed-per-lookforward folder structure. Only K=1 is meaningful for
+        the NTP-CE objective, but we keep the lookforward sweep loop here so
+        partially-populated trees still render cleanly.
+        """
+        study_base = artifacts_root / _method_dir(
+            "sl_ce", train_from_scratch=train_from_scratch,
+        )
+        if not study_base.exists():
+            return None
+        grouped: dict[str, list[tuple[int, Path]]] = {}
+        for n in candidate_lookforward_tokens:
+            grouped[f"look={n}"] = [
+                (
+                    s,
+                    study_base
+                    / _seed_folder_name(s)
+                    / canonical_dataset_folder_name(
+                        num_lookforward_tokens=n, num_samples=num_samples,
+                        label_type=label_type,
+                        normalize_labels=normalize_labels,
+                        label_range=label_range,
+                    ),
+                )
+                for s in candidate_seeds
+            ]
+        return cls.from_grouped(grouped)
+
+    @classmethod
     def from_grpo_sweep(
         cls,
         *,
@@ -854,6 +896,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
 _METHOD_DASH: dict[str, str] = {
     "sl": "solid",
+    "sl_ce": "solid",
     "grpo": "dash",
     "maxrl": "dot",
     "rloo": "longdash",
@@ -866,6 +909,7 @@ _METHOD_COLORS: dict[str, str] = {
     "maxrl": qualitative.Plotly[2],
     "rloo": qualitative.Plotly[3],
     "ntp_baseline": qualitative.Plotly[4],
+    "sl_ce": qualitative.Plotly[5],
 }
 
 # Dash cycle ordered solid → most-broken so rising rollouts read as visually
@@ -908,6 +952,7 @@ def _best_epoch_rows_for_studies(
 def plot_methods_vs_lookforward(
     *,
     sl: CorpusRegressionAnalysisConfig | None = None,
+    sl_ce: CorpusRegressionAnalysisConfig | None = None,
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
     rloo: CorpusRegressionAnalysisConfig | None = None,
@@ -925,14 +970,22 @@ def plot_methods_vs_lookforward(
     group.
 
     `ntp_baseline` (when present) is drawn as a standalone curve representing
-    the intrinsic variance floor."""
+    the intrinsic variance floor. `sl_ce` (when present) is drawn as a
+    standalone curve representing the NTP cross-entropy supervised baseline."""
     methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
         (name, cfg)
         for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
         if cfg is not None
     ]
-    if sl is None and not methods_rl and ntp_baseline is None:
-        raise ValueError("at least one of sl/grpo/maxrl/rloo/ntp_baseline must be provided")
+    if (
+        sl is None
+        and sl_ce is None
+        and not methods_rl
+        and ntp_baseline is None
+    ):
+        raise ValueError(
+            "at least one of sl/sl_ce/grpo/maxrl/rloo/ntp_baseline must be provided"
+        )
 
     rollouts_seen: list[int] = []
     for _, cfg in methods_rl:
@@ -950,6 +1003,7 @@ def plot_methods_vs_lookforward(
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
     sl_df = sl.get_metric_dataframe() if sl is not None else None
+    sl_ce_df = sl_ce.get_metric_dataframe() if sl_ce is not None else None
     ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
     rl_dfs: dict[str, pl.DataFrame] = {
         name: cfg.get_metric_dataframe() for name, cfg in methods_rl
@@ -981,6 +1035,28 @@ def plot_methods_vs_lookforward(
                     legendgrouptitle_text=None,
                     color=_METHOD_COLORS["sl"],
                     dash="solid",
+                    y_name=y_name,
+                    x_scale=x_scale,
+                    show_legend=(col == 1),
+                    visible_default=True,
+                )
+
+        if sl_ce is not None:
+            sl_ce_agg = sl_ce._aggregate_by_epoch(df=sl_ce_df, y_name=y_name)
+            sl_ce_rows = _best_epoch_rows_for_studies(
+                cfg=sl_ce, agg_df=sl_ce_agg, studies=list(sl_ce.studies.keys()),
+                higher_is_better=higher_is_better,
+            )
+            if sl_ce_rows:
+                _add_methods_curve(
+                    fig=fig,
+                    rows=sl_ce_rows,
+                    col=col,
+                    trace_name="sl_ce",
+                    legendgroup="sl_ce",
+                    legendgrouptitle_text=None,
+                    color=_METHOD_COLORS["sl_ce"],
+                    dash=_METHOD_DASH["sl_ce"],
                     y_name=y_name,
                     x_scale=x_scale,
                     show_legend=(col == 1),
@@ -1187,6 +1263,7 @@ def _add_epoch_curve(
 def plot_methods_vs_epoch(
     *,
     sl: CorpusRegressionAnalysisConfig | None = None,
+    sl_ce: CorpusRegressionAnalysisConfig | None = None,
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
     rloo: CorpusRegressionAnalysisConfig | None = None,
@@ -1204,8 +1281,15 @@ def plot_methods_vs_epoch(
         for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
         if cfg is not None
     ]
-    if sl is None and not methods_rl and ntp_baseline is None:
-        raise ValueError("at least one of sl/grpo/maxrl/rloo/ntp_baseline must be provided")
+    if (
+        sl is None
+        and sl_ce is None
+        and not methods_rl
+        and ntp_baseline is None
+    ):
+        raise ValueError(
+            "at least one of sl/sl_ce/grpo/maxrl/rloo/ntp_baseline must be provided"
+        )
 
     # Collect rollout values across RL methods.
     rollouts_seen: list[int] = []
@@ -1225,6 +1309,7 @@ def plot_methods_vs_epoch(
 
     # Pre-load metric DataFrames.
     sl_df = sl.get_metric_dataframe() if sl is not None else None
+    sl_ce_df = sl_ce.get_metric_dataframe() if sl_ce is not None else None
     ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
     rl_dfs: dict[str, pl.DataFrame] = {
         name: cfg.get_metric_dataframe() for name, cfg in methods_rl
@@ -1251,6 +1336,30 @@ def plot_methods_vs_epoch(
                         legendgrouptitle_text=None,
                         color=_METHOD_COLORS["sl"],
                         dash="solid",
+                        y_name=y_name,
+                        show_legend=(col == 1),
+                        visible_default=True,
+                        show_seed_bar=show_seed_bar,
+                    )
+
+        # SL+NTP-CE (no rollouts): single study "look=N".
+        if sl_ce is not None and sl_ce_df is not None:
+            study_name = f"look={num_lookforward_tokens}"
+            if study_name in sl_ce.studies:
+                agg = sl_ce._aggregate_by_epoch(
+                    df=sl_ce_df.filter(pl.col("study") == study_name),
+                    y_name=y_name,
+                )
+                if not agg.is_empty():
+                    _add_epoch_curve(
+                        fig=fig,
+                        agg_df=agg,
+                        col=col,
+                        trace_name="sl_ce",
+                        legendgroup="sl_ce",
+                        legendgrouptitle_text=None,
+                        color=_METHOD_COLORS["sl_ce"],
+                        dash=_METHOD_DASH["sl_ce"],
                         y_name=y_name,
                         show_legend=(col == 1),
                         visible_default=True,

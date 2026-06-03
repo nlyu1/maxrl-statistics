@@ -47,7 +47,7 @@ from src.experiments.corpus_regression.config import (  # noqa: E402
 )
 from src.experiments.gpu_pool import GPUPool, Job  # noqa: E402
 
-Method = Literal["sl", "grpo", "rloo", "maxrl", "ntp_baseline"]
+Method = Literal["sl", "sl_ce", "grpo", "rloo", "maxrl", "ntp_baseline"]
 
 DEFAULT_LOOKFORWARD_TOKENS = (1, 2, 3, 4, 5, 6, 7, 8)
 DEFAULT_ROLLOUT_STEPS = (4, 16, 128, 1024)
@@ -142,6 +142,58 @@ def _build_sl_jobs(
     jobs: list[Job] = []
     for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
         label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lbl-{label_type}"
+        log_path = (
+            artifacts_dir() / method_dir / "logs"
+            / f"seed-{seed}"
+            / f"look-{lft}_ns-{ns}.log"
+        )
+        if label_type != "rademacher":
+            log_path = log_path.parent / label_type / log_path.name
+        if normalize_labels:
+            log_path = log_path.parent / "normalized" / log_path.name
+        cmd = [
+            sys.executable, script,
+            "--num-lookforward-tokens", str(lft),
+            "--seed", str(seed),
+            "--device", "{device}",
+            "--train-steps", str(train_steps),
+            "--val-every-n-steps", str(val_every_n_steps),
+            "--num-samples", str(ns),
+            "--label-type", label_type,
+        ]
+        if normalize_labels:
+            cmd.append("--normalize-labels")
+            cmd.extend(["--label-range", str(label_range[0]), str(label_range[1])])
+        if train_from_scratch:
+            cmd.append("--train-from-scratch")
+        jobs.append(Job(cmd_template=cmd, label=label, log_path=log_path))
+    return jobs
+
+
+def _build_sl_ce_jobs(
+    *,
+    seeds: tuple[int, ...],
+    lookforward_tokens: tuple[int, ...],
+    num_samples_values: tuple[int, ...],
+    train_steps: int,
+    val_every_n_steps: int,
+    label_type: str,
+    normalize_labels: bool,
+    label_range: tuple[float, float],
+    train_from_scratch: bool,
+) -> list[Job]:
+    """Mirror of `_build_sl_jobs` for the NTP-CE supervised variant.
+
+    `sl_ce` only supports K=1 — `single_run.py` rejects other values — but
+    we keep the same CLI surface as SL so the orchestrator's `--lookforward-
+    tokens` flag behaves predictably; non-1 values will surface as an error
+    inside the spawned process.
+    """
+    script = str(_script_path("sl_ce"))
+    method_dir = _method_dir("sl_ce", train_from_scratch=train_from_scratch)
+    jobs: list[Job] = []
+    for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
+        label = f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}_lbl-{label_type}"
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
@@ -387,7 +439,7 @@ def _build_ntp_jobs(
 @click.command()
 @click.option(
     "--method",
-    type=click.Choice(["sl", "grpo", "rloo", "maxrl", "ntp_baseline"]),
+    type=click.Choice(["sl", "sl_ce", "grpo", "rloo", "maxrl", "ntp_baseline"]),
     multiple=True,
     required=True,
     help="Training method(s) to run. Repeat for cross-algorithm batching.",
@@ -572,6 +624,18 @@ def main(
                 label_range=label_range,
                 train_from_scratch=train_from_scratch,
             )
+        elif m == "sl_ce":
+            jobs_by_method[m] = _build_sl_ce_jobs(
+                seeds=seeds_tuple,
+                lookforward_tokens=lookforward_tokens,
+                num_samples_values=num_samples,
+                train_steps=train_steps,
+                val_every_n_steps=val_every_n_steps,
+                label_type=label_type,
+                normalize_labels=normalize_labels,
+                label_range=label_range,
+                train_from_scratch=train_from_scratch,
+            )
         elif m == "grpo":
             jobs_by_method[m] = _build_grpo_jobs(
                 seeds=seeds_tuple,
@@ -633,7 +697,7 @@ def main(
     # Summary.
     pool = GPUPool(device_ids=list(gpu_ids) if gpu_ids else None)
     click.echo(f"methods={methods}  seeds={seeds_tuple}  lookforward_tokens={lookforward_tokens}")
-    has_rollouts = any(m not in ("sl", "ntp_baseline") for m in methods)
+    has_rollouts = any(m not in ("sl", "sl_ce", "ntp_baseline") for m in methods)
     if has_rollouts:
         click.echo(f"rollout_steps={rollout_steps}")
     click.echo(

@@ -107,9 +107,10 @@ class CorpusRegressionRLOOState(CorpusRegressionStudyBaseState):
         batch: tuple[
             Int[Tensor, "batch seq"],
             Float[Tensor, "batch D"],
+            Int[Tensor, "batch"],
         ],
     ) -> TrainStepOutput:
-        tokens, target = batch
+        tokens, target, _lookahead_token_ids = batch
         tokens = tokens.to(device=self.device, dtype=torch.long)
         target: Float[Tensor, "batch D"] = target.to(
             device=self.device, dtype=torch.bfloat16

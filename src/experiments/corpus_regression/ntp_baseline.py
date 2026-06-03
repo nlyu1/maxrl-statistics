@@ -211,7 +211,7 @@ def _evaluate_split(
     device_context = (
         torch.cuda.device(device) if device.type == "cuda" else nullcontext()
     )
-    for tokens, target in tqdm(dataloader, desc=desc):
+    for tokens, target, _lookahead_token_ids in tqdm(dataloader, desc=desc):
         tokens: Int[Tensor, "batch seq"] = tokens.to(device=device, dtype=torch.long)
         target: Float[Tensor, "batch D"] = target.float()
 
@@ -244,7 +244,7 @@ def _evaluate_split_full(
     device_context = (
         torch.cuda.device(device) if device.type == "cuda" else nullcontext()
     )
-    for tokens, target in tqdm(dataloader, desc=desc):
+    for tokens, target, _lookahead_token_ids in tqdm(dataloader, desc=desc):
         tokens: Int[Tensor, "batch seq"] = tokens.to(device=device, dtype=torch.long)
         target: Float[Tensor, "batch D"] = target.float()
 
