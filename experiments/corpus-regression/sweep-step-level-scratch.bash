@@ -15,38 +15,40 @@ cd "${REPO_ROOT}"
 SEEDS="51,61,121"
 ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 
-# uv run python "${ORCHESTRATE}" \
-#     --method sl \
-#     --method grpo \
-#     --method rloo \
-#     --method maxrl \
-#     --seeds "${SEEDS}" \
-#     --train-steps 10000 \
-#     --val-every-n-steps 1000 \
-#     --lookforward-tokens 1 \
-#     --rollout-steps 64,256,1024 \
-#     --gaussian-stdev 1.0,0.5,0.1 \
-#     --num-samples 100000,500000 \
-#     --subtract-baseline \
-#     --use-factorized-likelihoods \
-#     --factorized \
-#     --train-from-scratch
+uv run python "${ORCHESTRATE}" \
+    --method sl \
+    --method grpo \
+    --method rloo \
+    --method maxrl \
+    --method sl_ce \
+    --seeds "${SEEDS}" \
+    --train-steps 10000 \
+    --val-every-n-steps 500 \
+    --lookforward-tokens 1 \
+    --rollout-steps 16,64,256,1024 \
+    --gaussian-stdev 1.0,0.5,0.1 \
+    --num-samples 500000 \
+    --subtract-baseline \
+    --use-factorized-likelihoods \
+    --factorized \
+    --train-from-scratch
 
 uv run python "${ORCHESTRATE}" \
     --method sl \
     --method grpo \
     --method rloo \
     --method maxrl \
+    --method sl_ce \
     --seeds "${SEEDS}" \
     --label-type token_id \
     --normalize-labels \
     --label-range 0.0 1.0 \
     --train-steps 10000 \
-    --val-every-n-steps 1000 \
+    --val-every-n-steps 500 \
     --lookforward-tokens 1 \
-    --rollout-steps 1024 \
-    --gaussian-stdev 1.0,0.5 \
-    --num-samples 100000,500000 \
+    --rollout-steps 16,64,256,1024 \
+    --gaussian-stdev 1.0,0.5,0.1 \
+    --num-samples 500000 \
     --subtract-baseline \
     --use-factorized-likelihoods \
     --factorized \

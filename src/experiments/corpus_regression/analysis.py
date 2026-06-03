@@ -715,11 +715,21 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         *,
         title: str | None = None,
         show_seed_bar: bool = False,
+        y_clip_quantile: float | None = 0.99,
         save_path: Path | None = None,
     ) -> go.Figure:
         """Per-step train metrics (loss or mse) as continuous lines, one per
         study (seed-mean). Requires new-format study folders with
-        train_metrics.parquet."""
+        train_metrics.parquet.
+
+        Early-training spikes routinely blow up the y-axis. When
+        `y_clip_quantile` is not None (default 0.99), the y-axis autorange
+        is clipped on both sides via Plotly `autorangeoptions.clipmin`/
+        `clipmax`: the lower bound is capped at the `(1 - y_clip_quantile)`
+        quantile of the seed-mean ys pooled across all plotted studies and
+        the upper bound at the `y_clip_quantile` quantile, with 10%
+        headroom on each side scaled by the inter-quantile span. User
+        zoom and the autoscale button still work. Pass `None` to disable."""
         df = self.get_train_dataframe()
         if df.is_empty():
             raise ValueError("No train_metrics.parquet found; cannot plot_vs_step")
@@ -799,6 +809,18 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             )
         fig.update_xaxes(title_text="step")
         fig.update_yaxes(title_text=metric)
+        if y_clip_quantile is not None and not agg_df.is_empty():
+            means = agg_df["mean_y"]
+            q_hi = means.quantile(y_clip_quantile)
+            q_lo = means.quantile(1.0 - y_clip_quantile)
+            if q_hi is not None and q_lo is not None and q_hi > q_lo:
+                pad = 0.10 * (q_hi - q_lo)
+                fig.update_yaxes(
+                    autorangeoptions=dict(
+                        clipmin=q_lo - pad,
+                        clipmax=q_hi + pad,
+                    )
+                )
         if rollouts is not None:
             fig.update_layout(legend=dict(groupclick="togglegroup"))
         if title is not None:
