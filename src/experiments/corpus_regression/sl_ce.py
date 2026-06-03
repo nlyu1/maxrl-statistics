@@ -44,8 +44,12 @@ from src.data.corpus_regression import (
 from src.experiments.corpus_regression.state import (
     CorpusRegressionValidationOutput,
     TrainStepOutput,
+    _align_val_schema,
+    _batch_sufficient_stats,
     _cycle_dataloader,
     _per_dim_stats,
+    _per_dim_stats_from_tensors,
+    _scalar_corr_from_stats,
 )
 from src.model.optimizer import CausalLMFullParamOptimizerConfig
 
@@ -343,11 +347,14 @@ class CorpusRegressionSLCEState:
                 )
                 projected: Float[Tensor, "batch D"] = probs @ self.label_projector
                 mse = F.mse_loss(projected.float(), target.float()).item()
+                xx, xy, yy, n = _batch_sufficient_stats(
+                    prediction=projected, target=target,
+                )
 
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
         self.step_and_zero_grad()
-        return TrainStepOutput(loss=loss.item(), mse=mse)
+        return TrainStepOutput(loss=loss.item(), mse=mse, xx=xx, xy=xy, yy=yy, n=n)
 
     def compute_validation(self) -> CorpusRegressionValidationOutput:
         """Verbatim copy of `CorpusRegressionStudyBaseState.compute_validation`
@@ -393,14 +400,29 @@ class CorpusRegressionSLCEState:
         )
 
     def _flush_train_metrics(self, buffer: list[dict[str, float]]) -> None:
+        # Verbatim of state.CorpusRegressionStudyBaseState._flush_train_metrics —
+        # see the docstring there. Kept as a copy because sl_ce inherits from
+        # BaseConfig rather than the corpus-regression base state, so the
+        # plumbing has to live alongside its own train_step.
         if not buffer:
             return
         new_rows = pl.DataFrame(
-            buffer, schema={"step": pl.Int64, "loss": pl.Float64, "mse": pl.Float64}
+            buffer,
+            schema={
+                "step": pl.Int64,
+                "loss": pl.Float64,
+                "mse": pl.Float64,
+                "corr": pl.Float64,
+            },
         )
         metrics_path = self.config.study_folder / "train_metrics.parquet"
         if metrics_path.exists():
             existing = pl.read_parquet(metrics_path)
+            if "corr" not in existing.columns:
+                existing = existing.with_columns(
+                    pl.lit(None, dtype=pl.Float64).alias("corr")
+                )
+            existing = existing.select(["step", "loss", "mse", "corr"])
             min_new_step = new_rows["step"].min()
             existing = existing.filter(pl.col("step") < min_new_step)
             new_rows = pl.concat([existing, new_rows]).sort("step")
@@ -411,12 +433,28 @@ class CorpusRegressionSLCEState:
         *,
         step: int,
         validation: CorpusRegressionValidationOutput,
+        train_window_xx: Tensor,
+        train_window_xy: Tensor,
+        train_window_yy: Tensor,
+        train_window_n: int,
     ) -> None:
+        # Verbatim of state.CorpusRegressionStudyBaseState._serialize_val —
+        # see the docstring there for the window-aggregate semantics of
+        # `train_target_*`.
         validation.save_to(self.config.study_folder / f"val-step-{step}")
 
         val_counter = validation.compute_counter()
         sufficient_stats: dict[str, object] = {}
         sufficient_stats.update(_per_dim_stats(val_counter, prefix="val_target"))
+        sufficient_stats.update(
+            _per_dim_stats_from_tensors(
+                xx=train_window_xx,
+                xy=train_window_xy,
+                yy=train_window_yy,
+                n=train_window_n,
+                prefix="train_target",
+            )
+        )
 
         metrics_path = self.config.study_folder / "val_metrics.parquet"
         new_row = pl.DataFrame({
@@ -425,22 +463,49 @@ class CorpusRegressionSLCEState:
         })
         if metrics_path.exists():
             existing = pl.read_parquet(metrics_path)
-            if existing.columns == new_row.columns:
-                existing = existing.filter(pl.col("step") != step)
-                new_row = pl.concat([existing, new_row]).sort("step")
+            existing = _align_val_schema(existing, target_columns=new_row.columns)
+            existing = existing.filter(pl.col("step") != step)
+            new_row = pl.concat([existing, new_row]).sort("step")
         new_row.write_parquet(metrics_path)
 
     def run_training(self) -> None:
-        """Flat step-based training loop. Validates every val_every_n_steps."""
+        """Flat step-based training loop. Validates every val_every_n_steps.
+
+        Verbatim of `state.CorpusRegressionStudyBaseState.run_training`; see
+        that docstring for the buffering/aggregation semantics."""
         self.model.train()
         batch_iter = _cycle_dataloader(self.train_dl)
         train_buffer: list[dict[str, float]] = []
 
+        train_window_xx: Tensor | None = None
+        train_window_xy: Tensor | None = None
+        train_window_yy: Tensor | None = None
+        train_window_n: int = 0
+
         pbar = tqdm(range(self.config.train_steps), desc="training")
         for step in pbar:
             output = self.train_step(batch=next(batch_iter))
-            train_buffer.append({"step": step, "loss": output.loss, "mse": output.mse})
-            pbar.set_postfix(loss=f"{output.loss:.4f}", mse=f"{output.mse:.4f}")
+            corr = _scalar_corr_from_stats(xx=output.xx, xy=output.xy, yy=output.yy)
+            train_buffer.append({
+                "step": step,
+                "loss": output.loss,
+                "mse": output.mse,
+                "corr": corr,
+            })
+            pbar.set_postfix(
+                loss=f"{output.loss:.4f}",
+                mse=f"{output.mse:.4f}",
+                corr=f"{corr:.4f}",
+            )
+
+            if train_window_xx is None:
+                train_window_xx = torch.zeros_like(output.xx)
+                train_window_xy = torch.zeros_like(output.xy)
+                train_window_yy = torch.zeros_like(output.yy)
+            train_window_xx += output.xx
+            train_window_xy += output.xy
+            train_window_yy += output.yy
+            train_window_n += output.n
 
             is_val_step = (
                 (step + 1) % self.config.val_every_n_steps == 0
@@ -449,8 +514,20 @@ class CorpusRegressionSLCEState:
             if is_val_step:
                 validation = self.compute_validation()
                 self._flush_train_metrics(train_buffer)
-                self._serialize_val(step=step, validation=validation)
+                assert train_window_xx is not None
+                self._serialize_val(
+                    step=step,
+                    validation=validation,
+                    train_window_xx=train_window_xx,
+                    train_window_xy=train_window_xy,
+                    train_window_yy=train_window_yy,
+                    train_window_n=train_window_n,
+                )
                 train_buffer = []
+                train_window_xx.zero_()
+                train_window_xy.zero_()
+                train_window_yy.zero_()
+                train_window_n = 0
                 self.model.train()
 
     def step_and_zero_grad(self) -> None:

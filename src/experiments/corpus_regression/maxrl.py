@@ -16,6 +16,7 @@ from src.experiments.corpus_regression.config import CorpusRegressionStudyBaseCo
 from src.experiments.corpus_regression.state import (
     CorpusRegressionStudyBaseState,
     TrainStepOutput,
+    _batch_sufficient_stats,
 )
 from src.maxrl_estimator import MaxRLEstimatorConfig
 
@@ -184,8 +185,11 @@ class CorpusRegressionMaxRLState(CorpusRegressionStudyBaseState):
 
             with torch.no_grad():
                 mse = F.mse_loss(prediction.float(), target.float()).item()
+                xx, xy, yy, n = _batch_sufficient_stats(
+                    prediction=prediction, target=target,
+                )
 
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
         self.step_and_zero_grad()
-        return TrainStepOutput(loss=loss.item(), mse=mse)
+        return TrainStepOutput(loss=loss.item(), mse=mse, xx=xx, xy=xy, yy=yy, n=n)

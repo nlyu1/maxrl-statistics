@@ -397,13 +397,23 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         same convention as `plot_vs_lookforward(metric=...)`. Train statistics
         are reported at that same best-by-val epoch (not separately optimized),
         so train and val rows describe the same model checkpoint. NTP baseline
-        has only one epoch (=0); rows then trivially correspond to that epoch."""
+        has only one epoch (=0); rows then trivially correspond to that epoch.
+
+        Backward-compat: if the loaded DataFrame has no `train_{metric}` column
+        (new-format runs that predate the train-window aggregator added in
+        `state.py::_serialize_val`), the train column is omitted from the
+        output rather than raising. NTP-baseline old-format runs still have
+        both splits, so those continue to report a `train_{metric}_mean`."""
         df = self.get_metric_dataframe()
         higher_is_better = metric == "corr"
         val_y = f"val_{metric}"
         train_y = f"train_{metric}"
+        has_train = train_y in df.columns
+
         val_agg = self._aggregate_by_epoch(df=df, y_name=val_y)
-        train_agg = self._aggregate_by_epoch(df=df, y_name=train_y)
+        train_agg = (
+            self._aggregate_by_epoch(df=df, y_name=train_y) if has_train else None
+        )
 
         rows: list[dict] = []
         for study in self.studies:
@@ -412,22 +422,24 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 continue
             best = v.sort("mean_y", descending=higher_is_better).head(1)
             best_epoch = int(best["epoch"].item())
-            t = train_agg.filter(
-                (pl.col("study") == study) & (pl.col("epoch") == best_epoch)
-            )
-            if t.is_empty():
-                raise ValueError(
-                    f"train aggregation missing for study {study!r} epoch={best_epoch}; "
-                    "metrics.parquet is internally inconsistent"
-                )
-            rows.append({
+            row: dict = {
                 "study": study,
                 "num_lookforward": self.study_lookforwards[study],
                 "best_epoch": best_epoch,
                 "n_seeds": int(best["n_seeds"].item()),
-                f"train_{metric}_mean": float(t["mean_y"].item()),
-                f"val_{metric}_mean": float(best["mean_y"].item()),
-            })
+            }
+            if train_agg is not None:
+                t = train_agg.filter(
+                    (pl.col("study") == study) & (pl.col("epoch") == best_epoch)
+                )
+                if t.is_empty():
+                    raise ValueError(
+                        f"train aggregation missing for study {study!r} epoch={best_epoch}; "
+                        "metrics.parquet is internally inconsistent"
+                    )
+                row[f"train_{metric}_mean"] = float(t["mean_y"].item())
+            row[f"val_{metric}_mean"] = float(best["mean_y"].item())
+            rows.append(row)
         return pl.DataFrame(rows).sort(["num_lookforward", "study"])
 
     def get_metric_dataframe(self) -> pl.DataFrame:
@@ -459,9 +471,10 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     def get_train_dataframe(self) -> pl.DataFrame:
         """Concat per-(study, seed) train_metrics.parquet files.
 
-        Returns frame with columns: study, seed, step, loss, mse.
-        Only works with new-format study folders; old-format folders are
-        skipped with a warning."""
+        Returns frame with columns: study, seed, step, loss, mse, corr.
+        Old-format (epoch-based) runs are skipped with a warning. New-format
+        runs that predate the per-step `corr` column get the column synthesized
+        as null so concat schemas line up."""
         frames: list[pl.DataFrame] = []
         for name, paths in self.studies.items():
             seeds = self.study_seeds[name]
@@ -469,8 +482,13 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 train_path = path / "train_metrics.parquet"
                 if not train_path.exists():
                     continue
+                df = pl.read_parquet(train_path)
+                if "corr" not in df.columns:
+                    df = df.with_columns(
+                        pl.lit(None, dtype=pl.Float64).alias("corr")
+                    )
                 frames.append(
-                    pl.read_parquet(train_path).with_columns(
+                    df.with_columns(
                         pl.lit(name).alias("study"),
                         pl.lit(seed).alias("seed"),
                     )
@@ -480,7 +498,16 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 "No train_metrics.parquet found; all studies use old epoch format",
                 stacklevel=2,
             )
-            return pl.DataFrame(schema={"study": pl.Utf8, "seed": pl.Int64, "step": pl.Int64, "loss": pl.Float64, "mse": pl.Float64})
+            return pl.DataFrame(
+                schema={
+                    "study": pl.Utf8,
+                    "seed": pl.Int64,
+                    "step": pl.Int64,
+                    "loss": pl.Float64,
+                    "mse": pl.Float64,
+                    "corr": pl.Float64,
+                }
+            )
         return pl.concat(frames)
 
     def _rollouts_groups(self) -> dict[int, list[str]] | None:
@@ -606,7 +633,11 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     ) -> go.Figure:
         """Two panels (train left, val right) of `{train,val}_{metric}` per
         epoch, one line per study (seed-mean). Rollout sweeps default-show
-        the min-look group with rollouts in `_DEFAULT_VISIBLE_ROLLOUTS`."""
+        the min-look group with rollouts in `_DEFAULT_VISIBLE_ROLLOUTS`.
+
+        Backward-compat: when `train_{metric}` is missing from the loaded
+        DataFrame (new-format runs that predate the train-window aggregator),
+        the figure collapses to a single val panel."""
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         (
@@ -625,8 +656,11 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             r = int(_ROLLOUTS_RE.search(study).group(1))
             return r in self._DEFAULT_VISIBLE_ROLLOUTS
 
-        fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
-        for col, split in enumerate(("train", "val"), start=1):
+        splits: tuple[str, ...] = (
+            ("train", "val") if f"train_{metric}" in df.columns else ("val",)
+        )
+        fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
+        for col, split in enumerate(splits, start=1):
             y_name = f"{split}_{metric}"
             agg_df = self._aggregate_by_epoch(df=df, y_name=y_name)
             for study in self.studies:
@@ -801,7 +835,10 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         `num_lookforward_tokens`, two panels. "Best" is argmax over seed-mean
         for `metric="corr"` and argmin for `metric="mse"`. Rollout sweeps draw
         one curve per rollouts value; only `_DEFAULT_VISIBLE_ROLLOUTS` start
-        visible."""
+        visible.
+
+        Backward-compat: when `train_{metric}` is missing from the loaded
+        DataFrame the figure collapses to a single val panel."""
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
@@ -813,8 +850,11 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         else:
             curve_groups = [(f"r={r}", r, names) for r, names in rollouts.items()]
 
-        fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
-        for col, split in enumerate(("train", "val"), start=1):
+        splits: tuple[str, ...] = (
+            ("train", "val") if f"train_{metric}" in df.columns else ("val",)
+        )
+        fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
+        for col, split in enumerate(splits, start=1):
             y_name = f"{split}_{metric}"
             agg_df = self._aggregate_by_epoch(df=df, y_name=y_name)
             for i, (curve_name, r_value, names) in enumerate(curve_groups):
@@ -920,6 +960,15 @@ _ROLLOUTS_DASH_CYCLE: tuple[str, ...] = (
 )
 
 
+def _has_train_col(df: pl.DataFrame | None, metric: str) -> bool:
+    """True iff `df` contains the synthesized scalar `train_{metric}` column.
+    `_decode_dim_averaged` only emits it when `train_target_*` sufficient
+    stats were present in the underlying parquet — i.e. NTP-baseline
+    old-format runs and new-format runs that include the train-window
+    aggregate written by `state.py::_serialize_val`."""
+    return df is not None and f"train_{metric}" in df.columns
+
+
 def _best_epoch_rows_for_studies(
     *,
     cfg: CorpusRegressionAnalysisConfig,
@@ -1015,11 +1064,21 @@ def plot_methods_vs_lookforward(
 
     higher_is_better = metric == "corr"
 
-    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
-    for col, split in enumerate(("train", "val"), start=1):
+    # Per the call's mix of old- and new-format dataframes, decide whether
+    # the figure has a train panel at all, and which configs contribute on
+    # the train side. New-format runs without `train_target_*` are silently
+    # excluded from the train panel rather than raising.
+    any_has_train = any(
+        _has_train_col(d, metric)
+        for d in (sl_df, sl_ce_df, ntp_df, *rl_dfs.values())
+    )
+    splits: tuple[str, ...] = ("train", "val") if any_has_train else ("val",)
+
+    fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
+    for col, split in enumerate(splits, start=1):
         y_name = f"{split}_{metric}"
 
-        if sl is not None:
+        if sl is not None and (split == "val" or _has_train_col(sl_df, metric)):
             sl_agg = sl._aggregate_by_epoch(df=sl_df, y_name=y_name)
             sl_rows = _best_epoch_rows_for_studies(
                 cfg=sl, agg_df=sl_agg, studies=list(sl.studies.keys()),
@@ -1041,7 +1100,7 @@ def plot_methods_vs_lookforward(
                     visible_default=True,
                 )
 
-        if sl_ce is not None:
+        if sl_ce is not None and (split == "val" or _has_train_col(sl_ce_df, metric)):
             sl_ce_agg = sl_ce._aggregate_by_epoch(df=sl_ce_df, y_name=y_name)
             sl_ce_rows = _best_epoch_rows_for_studies(
                 cfg=sl_ce, agg_df=sl_ce_agg, studies=list(sl_ce.studies.keys()),
@@ -1063,7 +1122,9 @@ def plot_methods_vs_lookforward(
                     visible_default=True,
                 )
 
-        if ntp_baseline is not None:
+        if ntp_baseline is not None and (
+            split == "val" or _has_train_col(ntp_df, metric)
+        ):
             ntp_agg = ntp_baseline._aggregate_by_epoch(df=ntp_df, y_name=y_name)
             ntp_rows = _best_epoch_rows_for_studies(
                 cfg=ntp_baseline, agg_df=ntp_agg, studies=list(ntp_baseline.studies.keys()),
@@ -1087,6 +1148,10 @@ def plot_methods_vs_lookforward(
 
         for r in rollouts_seen:
             for method_name, _ in methods_rl:
+                if split == "train" and not _has_train_col(
+                    rl_dfs[method_name], metric
+                ):
+                    continue
                 names_for_r = rl_groups[method_name].get(r, [])
                 if not names_for_r:
                     continue
@@ -1315,12 +1380,21 @@ def plot_methods_vs_epoch(
         name: cfg.get_metric_dataframe() for name, cfg in methods_rl
     }
 
-    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.08)
-    for col, split in enumerate(("train", "val"), start=1):
+    any_has_train = any(
+        _has_train_col(d, metric)
+        for d in (sl_df, sl_ce_df, ntp_df, *rl_dfs.values())
+    )
+    splits: tuple[str, ...] = ("train", "val") if any_has_train else ("val",)
+    fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
+    for col, split in enumerate(splits, start=1):
         y_name = f"{split}_{metric}"
 
         # SL (no rollouts): single study "look=N".
-        if sl is not None and sl_df is not None:
+        if (
+            sl is not None
+            and sl_df is not None
+            and (split == "val" or _has_train_col(sl_df, metric))
+        ):
             study_name = f"look={num_lookforward_tokens}"
             if study_name in sl.studies:
                 agg = sl._aggregate_by_epoch(
@@ -1343,7 +1417,11 @@ def plot_methods_vs_epoch(
                     )
 
         # SL+NTP-CE (no rollouts): single study "look=N".
-        if sl_ce is not None and sl_ce_df is not None:
+        if (
+            sl_ce is not None
+            and sl_ce_df is not None
+            and (split == "val" or _has_train_col(sl_ce_df, metric))
+        ):
             study_name = f"look={num_lookforward_tokens}"
             if study_name in sl_ce.studies:
                 agg = sl_ce._aggregate_by_epoch(
@@ -1367,7 +1445,11 @@ def plot_methods_vs_epoch(
                     )
 
         # NTP baseline: single study "look=N".
-        if ntp_baseline is not None and ntp_df is not None:
+        if (
+            ntp_baseline is not None
+            and ntp_df is not None
+            and (split == "val" or _has_train_col(ntp_df, metric))
+        ):
             study_name = f"look={num_lookforward_tokens}"
             if study_name in ntp_baseline.studies:
                 agg = ntp_baseline._aggregate_by_epoch(
@@ -1392,6 +1474,10 @@ def plot_methods_vs_epoch(
         # RL methods: one trace per (rollouts, method) pair.
         for r in rollouts_seen:
             for method_name, cfg in methods_rl:
+                if split == "train" and not _has_train_col(
+                    rl_dfs[method_name], metric
+                ):
+                    continue
                 study_name = f"look={num_lookforward_tokens} r={r}"
                 if study_name not in cfg.studies:
                     continue

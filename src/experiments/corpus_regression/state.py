@@ -20,12 +20,25 @@ from src.experiments.corpus_regression.config import CorpusRegressionStudyBaseCo
 from src.metrics import RegressionStatCounter
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
 class TrainStepOutput:
-    """Per-step metrics returned by each algorithm's train_step."""
+    """Per-step metrics returned by each algorithm's train_step.
+
+    `xx`, `xy`, `yy`, `n` are per-batch sufficient stats over the deterministic
+    mean prediction f_theta(x) vs. target y, in float32 (matching the precision
+    used to compute `mse`). Downstream `run_training` (i) derives a scalar
+    per-step `corr` for `train_metrics.parquet`, and (ii) sums them across the
+    val window into `train_target_{xx,xy,yy,n}` written alongside `val_target_*`
+    in `val_metrics.parquet`. The latter is therefore a moving-window aggregate
+    over training batches drawn from changing model snapshots — *not* a
+    held-out train-set evaluation."""
 
     loss: float  # algorithm-native loss (MSE for SL, policy-gradient for RL)
     mse: float  # MSE(f_theta(x), target) dim-averaged — deterministic mean, no rollout noise
+    xx: Float[Tensor, "D"]  # sum_b f_theta(x_b) ** 2 (per-dim, float32)
+    xy: Float[Tensor, "D"]  # sum_b f_theta(x_b) * y_b
+    yy: Float[Tensor, "D"]  # sum_b y_b ** 2
+    n: int  # batch size B (number of (x, y) pairs summed)
 
 
 def _cycle_dataloader(dl: DataLoader) -> Iterator:
@@ -69,6 +82,78 @@ def _per_dim_stats(
         f"{prefix}_yy": counter.yy.float().cpu().tolist(),
         f"{prefix}_n": float(counter.n.cpu()),
     }
+
+
+@torch.no_grad()
+def _batch_sufficient_stats(
+    *,
+    prediction: Float[Tensor, "B D"],
+    target: Float[Tensor, "B D"],
+) -> tuple[Float[Tensor, "D"], Float[Tensor, "D"], Float[Tensor, "D"], int]:
+    """Per-dim sufficient stats for one training batch, in float32. Mirrors
+    `RegressionStatCounter.tick` but stays inline so we can return them via
+    `TrainStepOutput` without allocating a counter per step."""
+    x = prediction.float()
+    y = target.float()
+    xx = (x * x).sum(dim=0)
+    xy = (x * y).sum(dim=0)
+    yy = (y * y).sum(dim=0)
+    return xx, xy, yy, x.shape[0]
+
+
+def _scalar_corr_from_stats(
+    *,
+    xx: Float[Tensor, "D"],
+    xy: Float[Tensor, "D"],
+    yy: Float[Tensor, "D"],
+) -> float:
+    """Dim-averaged Pearson corr from sufficient stats. Same convention as
+    `analysis._decode_dim_averaged` (per-dim corr then mean over D)."""
+    eps = torch.finfo(xx.dtype).eps
+    per_dim_corr = xy / (xx * yy).sqrt().clamp_min(eps)
+    return float(per_dim_corr.mean().item())
+
+
+def _per_dim_stats_from_tensors(
+    *,
+    xx: Float[Tensor, "D"],
+    xy: Float[Tensor, "D"],
+    yy: Float[Tensor, "D"],
+    n: int,
+    prefix: str,
+) -> dict[str, object]:
+    """Same shape as `_per_dim_stats` but accepts raw aggregated tensors
+    instead of a `RegressionStatCounter`. Used for the train-window aggregate
+    written into `val_metrics.parquet` next to `val_target_*`."""
+    return {
+        f"{prefix}_xx": xx.float().cpu().tolist(),
+        f"{prefix}_xy": xy.float().cpu().tolist(),
+        f"{prefix}_yy": yy.float().cpu().tolist(),
+        f"{prefix}_n": float(n),
+    }
+
+
+def _align_val_schema(
+    existing: pl.DataFrame, *, target_columns: list[str],
+) -> pl.DataFrame:
+    """Backfill any missing columns from `target_columns` onto `existing`
+    with null values of the right dtype, then re-order to match. Used when a
+    resumed run encounters a `val_metrics.parquet` written before the
+    `train_target_*` columns were added."""
+    if existing.columns == target_columns:
+        return existing
+    # List dtype borrowed from val_target_xx so the polars cast doesn't trip
+    # on dtype mismatch when the file is later read.
+    list_dtype = existing.schema.get("val_target_xx", pl.List(pl.Float64))
+    additions: list[pl.Expr] = []
+    for col in target_columns:
+        if col in existing.columns:
+            continue
+        if col.endswith("_n"):
+            additions.append(pl.lit(None, dtype=pl.Float64).alias(col))
+        else:
+            additions.append(pl.lit(None, dtype=list_dtype).alias(col))
+    return existing.with_columns(additions).select(target_columns)
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
@@ -140,13 +225,30 @@ class CorpusRegressionStudyBaseState(ABC):
         )
 
     def _flush_train_metrics(self, buffer: list[dict[str, float]]) -> None:
-        """Append buffered per-step train metrics to train_metrics.parquet."""
+        """Append buffered per-step train metrics to train_metrics.parquet.
+
+        Buffer entries have keys `step, loss, mse, corr`. Resumed runs whose
+        existing parquet was written by an older code version (no `corr`
+        column) get backfilled with nulls so concat schemas line up."""
         if not buffer:
             return
-        new_rows = pl.DataFrame(buffer, schema={"step": pl.Int64, "loss": pl.Float64, "mse": pl.Float64})
+        new_rows = pl.DataFrame(
+            buffer,
+            schema={
+                "step": pl.Int64,
+                "loss": pl.Float64,
+                "mse": pl.Float64,
+                "corr": pl.Float64,
+            },
+        )
         metrics_path = self.config.study_folder / "train_metrics.parquet"
         if metrics_path.exists():
             existing = pl.read_parquet(metrics_path)
+            if "corr" not in existing.columns:
+                existing = existing.with_columns(
+                    pl.lit(None, dtype=pl.Float64).alias("corr")
+                )
+            existing = existing.select(["step", "loss", "mse", "corr"])
             min_new_step = new_rows["step"].min()
             existing = existing.filter(pl.col("step") < min_new_step)
             new_rows = pl.concat([existing, new_rows]).sort("step")
@@ -157,13 +259,38 @@ class CorpusRegressionStudyBaseState(ABC):
         *,
         step: int,
         validation: CorpusRegressionValidationOutput,
+        train_window_xx: Float[Tensor, "D"],
+        train_window_xy: Float[Tensor, "D"],
+        train_window_yy: Float[Tensor, "D"],
+        train_window_n: int,
     ) -> None:
-        """Append one validation row to val_metrics.parquet and save predictions."""
+        """Append one row to val_metrics.parquet (and save predictions).
+
+        Writes both the held-out validation sufficient stats (`val_target_*`)
+        and a *training-window aggregate* (`train_target_*`) summed over all
+        training batches since the last val step. The latter is **not** a
+        held-out train-set evaluation — it's a moving aggregate over batches
+        from changing model snapshots within the most recent val window. Used
+        downstream as a cheap proxy for train-set fit; expect noisier and
+        slightly more pessimistic numbers than a held-out pass would give.
+
+        Resumed runs whose existing parquet predates the new schema (no
+        `train_target_*` columns) get backfilled with nulls of the right
+        list dtype so concat schemas line up."""
         validation.save_to(self.config.study_folder / f"val-step-{step}")
 
         val_counter = validation.compute_counter()
         sufficient_stats: dict[str, object] = {}
         sufficient_stats.update(_per_dim_stats(val_counter, prefix="val_target"))
+        sufficient_stats.update(
+            _per_dim_stats_from_tensors(
+                xx=train_window_xx,
+                xy=train_window_xy,
+                yy=train_window_yy,
+                n=train_window_n,
+                prefix="train_target",
+            )
+        )
 
         metrics_path = self.config.study_folder / "val_metrics.parquet"
         new_row = pl.DataFrame({
@@ -172,22 +299,54 @@ class CorpusRegressionStudyBaseState(ABC):
         })
         if metrics_path.exists():
             existing = pl.read_parquet(metrics_path)
-            if existing.columns == new_row.columns:
-                existing = existing.filter(pl.col("step") != step)
-                new_row = pl.concat([existing, new_row]).sort("step")
+            existing = _align_val_schema(existing, target_columns=new_row.columns)
+            existing = existing.filter(pl.col("step") != step)
+            new_row = pl.concat([existing, new_row]).sort("step")
         new_row.write_parquet(metrics_path)
 
     def run_training(self) -> None:
-        """Flat step-based training loop. Validates every val_every_n_steps."""
+        """Flat step-based training loop. Validates every val_every_n_steps.
+
+        Per gradient step we record `(loss, mse, corr)` into `train_buffer`
+        for `train_metrics.parquet`, and add per-batch sufficient stats into
+        `train_window_*` for `val_metrics.parquet`. Both buffers are reset
+        after each val flush so each val row's `train_target_*` summarises
+        only the most recent val window."""
         self.model.train()
         batch_iter = _cycle_dataloader(self.train_dl)
         train_buffer: list[dict[str, float]] = []
 
+        # Initialised lazily on the first batch so we can match D from the
+        # actual prediction shape without poking the model config.
+        train_window_xx: Tensor | None = None
+        train_window_xy: Tensor | None = None
+        train_window_yy: Tensor | None = None
+        train_window_n: int = 0
+
         pbar = tqdm(range(self.config.train_steps), desc="training")
         for step in pbar:
             output = self.train_step(batch=next(batch_iter))
-            train_buffer.append({"step": step, "loss": output.loss, "mse": output.mse})
-            pbar.set_postfix(loss=f"{output.loss:.4f}", mse=f"{output.mse:.4f}")
+            corr = _scalar_corr_from_stats(xx=output.xx, xy=output.xy, yy=output.yy)
+            train_buffer.append({
+                "step": step,
+                "loss": output.loss,
+                "mse": output.mse,
+                "corr": corr,
+            })
+            pbar.set_postfix(
+                loss=f"{output.loss:.4f}",
+                mse=f"{output.mse:.4f}",
+                corr=f"{corr:.4f}",
+            )
+
+            if train_window_xx is None:
+                train_window_xx = torch.zeros_like(output.xx)
+                train_window_xy = torch.zeros_like(output.xy)
+                train_window_yy = torch.zeros_like(output.yy)
+            train_window_xx += output.xx
+            train_window_xy += output.xy
+            train_window_yy += output.yy
+            train_window_n += output.n
 
             is_val_step = (
                 (step + 1) % self.config.val_every_n_steps == 0
@@ -196,8 +355,20 @@ class CorpusRegressionStudyBaseState(ABC):
             if is_val_step:
                 validation = self.compute_validation()
                 self._flush_train_metrics(train_buffer)
-                self._serialize_val(step=step, validation=validation)
+                assert train_window_xx is not None
+                self._serialize_val(
+                    step=step,
+                    validation=validation,
+                    train_window_xx=train_window_xx,
+                    train_window_xy=train_window_xy,
+                    train_window_yy=train_window_yy,
+                    train_window_n=train_window_n,
+                )
                 train_buffer = []
+                train_window_xx.zero_()
+                train_window_xy.zero_()
+                train_window_yy.zero_()
+                train_window_n = 0
                 self.model.train()
 
     def step_and_zero_grad(self) -> None:
