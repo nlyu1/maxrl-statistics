@@ -860,6 +860,21 @@ _METHOD_DASH: dict[str, str] = {
     "ntp_baseline": "dashdot",
 }
 
+_METHOD_COLORS: dict[str, str] = {
+    "sl": qualitative.Plotly[0],
+    "grpo": qualitative.Plotly[1],
+    "maxrl": qualitative.Plotly[2],
+    "rloo": qualitative.Plotly[3],
+    "ntp_baseline": qualitative.Plotly[4],
+}
+
+# Dash cycle ordered solid → most-broken so rising rollouts read as visually
+# denser styles. Modular indexing handles the rare case of more than six
+# rollouts values appearing in a single sweep.
+_ROLLOUTS_DASH_CYCLE: tuple[str, ...] = (
+    "solid", "dot", "dash", "longdash", "dashdot", "longdashdot",
+)
+
 
 def _best_epoch_rows_for_studies(
     *,
@@ -906,7 +921,7 @@ def plot_methods_vs_lookforward(
     (train, val). SL (when present) is a single standalone curve; GRPO, MaxRL
     and RLOO traces are grouped by rollouts — one legend group per `r=N`,
     containing one curve per RL method that ran that rollouts value. Color =
-    rollouts; dash = method. Default-visible: SL plus the highest-rollouts
+    method; dash = rollouts. Default-visible: SL plus the highest-rollouts
     group.
 
     `ntp_baseline` (when present) is drawn as a standalone curve representing
@@ -919,7 +934,6 @@ def plot_methods_vs_lookforward(
     if sl is None and not methods_rl and ntp_baseline is None:
         raise ValueError("at least one of sl/grpo/maxrl/rloo/ntp_baseline must be provided")
 
-    palette = qualitative.Plotly
     rollouts_seen: list[int] = []
     for _, cfg in methods_rl:
         rg = cfg._rollouts_groups()
@@ -929,11 +943,10 @@ def plot_methods_vs_lookforward(
             if r not in rollouts_seen:
                 rollouts_seen.append(r)
     rollouts_seen.sort()
-    color_by_rollouts = {
-        r: palette[i % len(palette)] for i, r in enumerate(rollouts_seen)
+    dash_by_rollouts = {
+        r: _ROLLOUTS_DASH_CYCLE[i % len(_ROLLOUTS_DASH_CYCLE)]
+        for i, r in enumerate(rollouts_seen)
     }
-    sl_color = palette[len(rollouts_seen) % len(palette)]
-    ntp_color = palette[(len(rollouts_seen) + 1) % len(palette)]
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
     sl_df = sl.get_metric_dataframe() if sl is not None else None
@@ -966,8 +979,8 @@ def plot_methods_vs_lookforward(
                     trace_name="sl",
                     legendgroup="sl",
                     legendgrouptitle_text=None,
-                    color=sl_color,
-                    dash=_METHOD_DASH["sl"],
+                    color=_METHOD_COLORS["sl"],
+                    dash="solid",
                     y_name=y_name,
                     x_scale=x_scale,
                     show_legend=(col == 1),
@@ -988,8 +1001,8 @@ def plot_methods_vs_lookforward(
                     trace_name="ntp_baseline",
                     legendgroup="ntp_baseline",
                     legendgrouptitle_text=None,
-                    color=ntp_color,
-                    dash=_METHOD_DASH["ntp_baseline"],
+                    color=_METHOD_COLORS["ntp_baseline"],
+                    dash="solid",
                     y_name=y_name,
                     x_scale=x_scale,
                     show_legend=(col == 1),
@@ -1018,8 +1031,8 @@ def plot_methods_vs_lookforward(
                     trace_name=method_name,
                     legendgroup=f"r={r}",
                     legendgrouptitle_text=f"r={r}",
-                    color=color_by_rollouts[r],
-                    dash=_METHOD_DASH[method_name],
+                    color=_METHOD_COLORS[method_name],
+                    dash=dash_by_rollouts[r],
                     y_name=y_name,
                     x_scale=x_scale,
                     show_legend=(col == 1),
@@ -1185,7 +1198,7 @@ def plot_methods_vs_epoch(
     save_path: Path | None = None,
 ) -> go.Figure:
     """Cross-method per-epoch metric curves for a single `num_lookforward_tokens`
-    value. Two panels (train, val). Color = rollouts; dash = method."""
+    value. Two panels (train, val). Color = method; dash = rollouts."""
     methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
         (name, cfg)
         for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
@@ -1193,8 +1206,6 @@ def plot_methods_vs_epoch(
     ]
     if sl is None and not methods_rl and ntp_baseline is None:
         raise ValueError("at least one of sl/grpo/maxrl/rloo/ntp_baseline must be provided")
-
-    palette = qualitative.Plotly
 
     # Collect rollout values across RL methods.
     rollouts_seen: list[int] = []
@@ -1206,11 +1217,10 @@ def plot_methods_vs_epoch(
             if r not in rollouts_seen:
                 rollouts_seen.append(r)
     rollouts_seen.sort()
-    color_by_rollouts = {
-        r: palette[i % len(palette)] for i, r in enumerate(rollouts_seen)
+    dash_by_rollouts = {
+        r: _ROLLOUTS_DASH_CYCLE[i % len(_ROLLOUTS_DASH_CYCLE)]
+        for i, r in enumerate(rollouts_seen)
     }
-    sl_color = palette[len(rollouts_seen) % len(palette)]
-    ntp_color = palette[(len(rollouts_seen) + 1) % len(palette)]
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
     # Pre-load metric DataFrames.
@@ -1239,8 +1249,8 @@ def plot_methods_vs_epoch(
                         trace_name="sl",
                         legendgroup="sl",
                         legendgrouptitle_text=None,
-                        color=sl_color,
-                        dash=_METHOD_DASH["sl"],
+                        color=_METHOD_COLORS["sl"],
+                        dash="solid",
                         y_name=y_name,
                         show_legend=(col == 1),
                         visible_default=True,
@@ -1262,8 +1272,8 @@ def plot_methods_vs_epoch(
                         trace_name="ntp_baseline",
                         legendgroup="ntp_baseline",
                         legendgrouptitle_text=None,
-                        color=ntp_color,
-                        dash=_METHOD_DASH["ntp_baseline"],
+                        color=_METHOD_COLORS["ntp_baseline"],
+                        dash="solid",
                         y_name=y_name,
                         show_legend=(col == 1),
                         visible_default=True,
@@ -1289,8 +1299,8 @@ def plot_methods_vs_epoch(
                     trace_name=method_name,
                     legendgroup=f"r={r}",
                     legendgrouptitle_text=f"r={r}",
-                    color=color_by_rollouts[r],
-                    dash=_METHOD_DASH[method_name],
+                    color=_METHOD_COLORS[method_name],
+                    dash=dash_by_rollouts[r],
                     y_name=y_name,
                     show_legend=(col == 1),
                     visible_default=(r == max_rollouts),
