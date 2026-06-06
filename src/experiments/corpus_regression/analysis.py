@@ -63,11 +63,14 @@ def canonical_dataset_folder_name(
 
 
 def _decode_dim_averaged(df: pl.DataFrame) -> pl.DataFrame:
-    """Append scalar `{split}_corr` and `{split}_mse` columns by averaging
+    """Append scalar `{split}_corr`, `{split}_mse`, `{split}_pred_std`,
+    `{split}_target_std`, and `{split}_pred_std_ratio` columns by averaging
     per-dim metrics across the D output dimensions of the list-column
-    sufficient stats. Adds a `{split}_corr`/`{split}_mse` pair for whichever
-    sides have `{split}_target_*` populated — NTP baseline writes both train
-    and val sufficient stats, trained methods write val plus an optional
+    sufficient stats. The pred/target stds are computed from the new
+    `*_pred_sum` and `*_target_sum` columns when present (Var = E[X²] − E[X]²,
+    averaged across dims, then sqrt). Old parquets without those columns
+    silently get null pred/target stds rather than raising. NTP baseline writes
+    both train and val stats; trained methods write val plus an optional
     train-window aggregate."""
     out = df
     for split in ("train", "val"):
@@ -84,6 +87,59 @@ def _decode_dim_averaged(df: pl.DataFrame) -> pl.DataFrame:
             pl.Series(f"{split}_corr", per_dim_corr.mean(axis=1)),
             pl.Series(f"{split}_mse", per_dim_mse.mean(axis=1)),
         )
+
+        pred_sum_col = f"{split}_target_pred_sum"
+        target_sum_col = f"{split}_target_target_sum"
+        if (
+            pred_sum_col in df.columns
+            and target_sum_col in df.columns
+        ):
+            pred_sum_lst = df[pred_sum_col].to_list()
+            target_sum_lst = df[target_sum_col].to_list()
+            # `_align_val_schema` backfills missing rows with None; numpy can't
+            # build a 2-D array from a mixed [None, [...], ...] list, so we
+            # decode row-by-row and emit nulls where the list-column is null.
+            pred_var_rows: list[float | None] = []
+            target_var_rows: list[float | None] = []
+            ratio_rows: list[float | None] = []
+            for i, (pred_row, target_row) in enumerate(
+                zip(pred_sum_lst, target_sum_lst, strict=True)
+            ):
+                if pred_row is None or target_row is None or n[i] <= 0:
+                    pred_var_rows.append(None)
+                    target_var_rows.append(None)
+                    ratio_rows.append(None)
+                    continue
+                pred_arr = np.asarray(pred_row, dtype=np.float64)
+                target_arr = np.asarray(target_row, dtype=np.float64)
+                pred_mean = pred_arr / n[i]
+                target_mean = target_arr / n[i]
+                pred_var_per_dim = xx[i] / n[i] - pred_mean * pred_mean
+                target_var_per_dim = yy[i] / n[i] - target_mean * target_mean
+                pred_var = float(np.mean(pred_var_per_dim))
+                target_var = float(np.mean(target_var_per_dim))
+                pred_var_rows.append(pred_var)
+                target_var_rows.append(target_var)
+                pred_std = float(np.sqrt(max(pred_var, 0.0)))
+                target_std = float(np.sqrt(max(target_var, 0.0)))
+                ratio_rows.append(
+                    pred_std / target_std if target_std > 0.0 else None
+                )
+            pred_std_rows = [
+                float(np.sqrt(max(v, 0.0))) if v is not None else None
+                for v in pred_var_rows
+            ]
+            target_std_rows = [
+                float(np.sqrt(max(v, 0.0))) if v is not None else None
+                for v in target_var_rows
+            ]
+            out = out.with_columns(
+                pl.Series(f"{split}_pred_var", pred_var_rows, dtype=pl.Float64),
+                pl.Series(f"{split}_target_var", target_var_rows, dtype=pl.Float64),
+                pl.Series(f"{split}_pred_std", pred_std_rows, dtype=pl.Float64),
+                pl.Series(f"{split}_target_std", target_std_rows, dtype=pl.Float64),
+                pl.Series(f"{split}_pred_std_ratio", ratio_rows, dtype=pl.Float64),
+            )
     return out
 
 
@@ -175,14 +231,16 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        lr_per_sample: float = 1e-5,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/sl[_scratch]/seed-{S}/{dataset_folder}/`."""
+        """`<artifacts_root>/sl[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/`."""
         study_base = artifacts_root / _method_dir(
             "sl", train_from_scratch=train_from_scratch,
         )
         if not study_base.exists():
             return None
+        lr_seg = f"lr_{lr_per_sample:.2e}"
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             grouped[f"look={n}"] = [
@@ -195,7 +253,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         label_type=label_type,
                         normalize_labels=normalize_labels,
                         label_range=label_range,
-                    ),
+                    )
+                    / lr_seg,
                 )
                 for s in candidate_seeds
             ]
@@ -210,9 +269,10 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        lr_per_sample: float = 1e-5,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/sl_ce[_scratch]/seed-{S}/{dataset_folder}/`.
+        """`<artifacts_root>/sl_ce[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/`.
 
         Identical layout to the SL sweep — `sl_ce` produces the same
         `train_metrics.parquet` / `val_metrics.parquet` schema and the same
@@ -225,6 +285,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         )
         if not study_base.exists():
             return None
+        lr_seg = f"lr_{lr_per_sample:.2e}"
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             grouped[f"look={n}"] = [
@@ -237,7 +298,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                         label_type=label_type,
                         normalize_labels=normalize_labels,
                         label_range=label_range,
-                    ),
+                    )
+                    / lr_seg,
                 )
                 for s in candidate_seeds
             ]
@@ -253,15 +315,17 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        lr_per_sample: float = 1e-5,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/grpo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/`."""
+        """`<artifacts_root>/grpo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/lr_{lr}/`."""
         study_base = artifacts_root / _method_dir(
             "grpo", train_from_scratch=train_from_scratch,
         )
         if not study_base.exists():
             return None
         sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
+        lr_seg = f"lr_{lr_per_sample:.2e}"
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
@@ -277,7 +341,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                             label_type=label_type,
                             normalize_labels=normalize_labels,
                             label_range=label_range,
-                        ),
+                        )
+                        / lr_seg,
                     )
                     for s in candidate_seeds
                 ]
@@ -294,9 +359,10 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        lr_per_sample: float = 1e-5,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/rloo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/`.
+        """`<artifacts_root>/rloo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/lr_{lr}/`.
         `factorized` is fixed per call — surface it in the figure title."""
         study_base = artifacts_root / _method_dir(
             "rloo", train_from_scratch=train_from_scratch,
@@ -305,6 +371,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             return None
         factorized_mode = factorized_mode_folder(factorized=factorized)
         sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
+        lr_seg = f"lr_{lr_per_sample:.2e}"
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
@@ -321,7 +388,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                             label_type=label_type,
                             normalize_labels=normalize_labels,
                             label_range=label_range,
-                        ),
+                        )
+                        / lr_seg,
                     )
                     for s in candidate_seeds
                 ]
@@ -339,9 +407,10 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
+        lr_per_sample: float = 1e-5,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/maxrl[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/`.
+        """`<artifacts_root>/maxrl[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/lr_{lr}/`.
         Both flags are fixed per call — surface them in the figure title."""
         study_base = artifacts_root / _method_dir(
             "maxrl", train_from_scratch=train_from_scratch,
@@ -353,6 +422,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             use_factorized_likelihoods=use_factorized_likelihoods,
         )
         sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
+        lr_seg = f"lr_{lr_per_sample:.2e}"
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
@@ -370,7 +440,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                             label_type=label_type,
                             normalize_labels=normalize_labels,
                             label_range=label_range,
-                        ),
+                        )
+                        / lr_seg,
                     )
                     for s in candidate_seeds
                 ]
@@ -394,6 +465,14 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         so train and val rows describe the same model checkpoint. NTP baseline
         has only one step (=0); rows then trivially correspond to that step.
 
+        Per-study `pred_std`, `target_std`, and `pred_std_ratio` are reported
+        alongside the primary metric whenever the underlying parquet carries
+        the `*_pred_sum` / `*_target_sum` sufficient-stat columns. The ratio
+        is the regression-collapse signature: ratio → 0 means the model is
+        outputting a near-constant prediction (variance shrinking toward zero
+        relative to the target). Old parquets without those columns silently
+        omit the std/ratio fields rather than raising.
+
         If the loaded DataFrame has no `train_{metric}` column (trained methods
         whose `val_metrics.parquet` doesn't carry train-window sufficient
         stats), the train column is omitted from the output rather than
@@ -409,6 +488,16 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         train_agg = (
             self._aggregate_by_step(df=df, y_name=train_y) if has_train else None
         )
+
+        # Optional collapse-diagnostic columns. Each emits seed-mean per
+        # (study, step); we then look them up at the same best-by-val step
+        # the primary metric was selected at.
+        std_aggs: dict[str, pl.DataFrame] = {}
+        for split in ("train", "val"):
+            for suffix in ("pred_std", "target_std", "pred_std_ratio"):
+                col = f"{split}_{suffix}"
+                if col in df.columns:
+                    std_aggs[col] = self._aggregate_by_step(df=df, y_name=col)
 
         rows: list[dict] = []
         for study in self.studies:
@@ -434,6 +523,17 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     )
                 row[f"train_{metric}_mean"] = float(t["mean_y"].item())
             row[f"val_{metric}_mean"] = float(best["mean_y"].item())
+            for col, agg in std_aggs.items():
+                hit = agg.filter(
+                    (pl.col("study") == study) & (pl.col("step") == best_step)
+                )
+                if hit.is_empty():
+                    row[f"{col}_mean"] = None
+                else:
+                    val = hit["mean_y"].item()
+                    row[f"{col}_mean"] = (
+                        float(val) if val is not None else None
+                    )
             rows.append(row)
         return pl.DataFrame(rows).sort(["num_lookforward", "study"])
 
@@ -1486,6 +1586,201 @@ def plot_methods_vs_eval(
                 if split == "train" and not _has_train_col(
                     rl_dfs[method_name], metric
                 ):
+                    continue
+                study_name = f"look={num_lookforward_tokens} r={r}"
+                if study_name not in cfg.studies:
+                    continue
+                agg = cfg._aggregate_by_step(
+                    df=rl_dfs[method_name].filter(pl.col("study") == study_name),
+                    y_name=y_name,
+                )
+                if agg.is_empty():
+                    continue
+                _add_eval_curve(
+                    fig=fig,
+                    agg_df=agg,
+                    col=col,
+                    trace_name=method_name,
+                    legendgroup=f"r={r}",
+                    legendgrouptitle_text=f"r={r}",
+                    color=_METHOD_COLORS[method_name],
+                    dash=dash_by_rollouts[r],
+                    y_name=y_name,
+                    show_legend=(split == "val"),
+                    visible_default=(r == max_rollouts),
+                    show_seed_bar=show_seed_bar,
+                )
+
+        fig.update_xaxes(title_text="step", row=1, col=col)
+        fig.update_yaxes(title_text=y_name, row=1, col=col)
+
+    fig.update_layout(legend=dict(groupclick="togglegroup"))
+    if title is not None:
+        fig.update_layout(title=title)
+    CorpusRegressionAnalysisConfig._apply_compact_layout(
+        fig, has_title=title is not None
+    )
+    if save_path is not None:
+        CorpusRegressionAnalysisConfig._save_html(fig, save_path)
+    return fig
+
+
+def plot_methods_pred_std_vs_eval(
+    *,
+    sl: CorpusRegressionAnalysisConfig | None = None,
+    sl_ce: CorpusRegressionAnalysisConfig | None = None,
+    grpo: CorpusRegressionAnalysisConfig | None = None,
+    maxrl: CorpusRegressionAnalysisConfig | None = None,
+    rloo: CorpusRegressionAnalysisConfig | None = None,
+    ntp_baseline: CorpusRegressionAnalysisConfig | None = None,
+    num_lookforward_tokens: int = 1,
+    quantity: Literal["pred_std", "pred_std_ratio"] = "pred_std_ratio",
+    show_seed_bar: bool = False,
+    title: str | None = None,
+    save_path: Path | None = None,
+) -> go.Figure:
+    """Cross-method collapse diagnostic per eval step. Plots either
+    `pred_std` (raw prediction std) or `pred_std_ratio = pred_std/target_std`
+    (collapse signature: ratio → 0 means model output collapsing toward a
+    near-constant prediction).
+
+    Mirrors `plot_methods_vs_eval`'s layout and style — two panels (train,
+    val) with x-axis = training step, color = method, dash = rollouts. Old
+    parquets without the `*_pred_sum` / `*_target_sum` columns silently lack
+    the y-axis values and are excluded from the plot rather than raising.
+    """
+    methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
+        (name, cfg)
+        for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
+        if cfg is not None
+    ]
+    if (
+        sl is None
+        and sl_ce is None
+        and not methods_rl
+        and ntp_baseline is None
+    ):
+        raise ValueError(
+            "at least one of sl/sl_ce/grpo/maxrl/rloo/ntp_baseline must be provided"
+        )
+
+    rollouts_seen: list[int] = []
+    for _, cfg in methods_rl:
+        rg = cfg._rollouts_groups()
+        if rg is None:
+            continue
+        for r in rg:
+            if r not in rollouts_seen:
+                rollouts_seen.append(r)
+    rollouts_seen.sort()
+    dash_by_rollouts = {
+        r: _ROLLOUTS_DASH_CYCLE[i % len(_ROLLOUTS_DASH_CYCLE)]
+        for i, r in enumerate(rollouts_seen)
+    }
+    max_rollouts = rollouts_seen[-1] if rollouts_seen else None
+
+    sl_df = sl.get_metric_dataframe() if sl is not None else None
+    sl_ce_df = sl_ce.get_metric_dataframe() if sl_ce is not None else None
+    ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
+    rl_dfs: dict[str, pl.DataFrame] = {
+        name: cfg.get_metric_dataframe() for name, cfg in methods_rl
+    }
+
+    def has_quantity(df: pl.DataFrame | None, split: str) -> bool:
+        return df is not None and f"{split}_{quantity}" in df.columns
+
+    any_has_train = any(
+        has_quantity(d, "train")
+        for d in (sl_df, sl_ce_df, ntp_df, *rl_dfs.values())
+    )
+    splits: tuple[str, ...] = ("train", "val") if any_has_train else ("val",)
+    fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
+    for col, split in enumerate(splits, start=1):
+        y_name = f"{split}_{quantity}"
+
+        if (
+            sl is not None
+            and sl_df is not None
+            and has_quantity(sl_df, split)
+        ):
+            study_name = f"look={num_lookforward_tokens}"
+            if study_name in sl.studies:
+                agg = sl._aggregate_by_step(
+                    df=sl_df.filter(pl.col("study") == study_name), y_name=y_name
+                )
+                if not agg.is_empty():
+                    _add_eval_curve(
+                        fig=fig,
+                        agg_df=agg,
+                        col=col,
+                        trace_name="sl",
+                        legendgroup="sl",
+                        legendgrouptitle_text=None,
+                        color=_METHOD_COLORS["sl"],
+                        dash="solid",
+                        y_name=y_name,
+                        show_legend=(split == "val"),
+                        visible_default=True,
+                        show_seed_bar=show_seed_bar,
+                    )
+
+        if (
+            sl_ce is not None
+            and sl_ce_df is not None
+            and has_quantity(sl_ce_df, split)
+        ):
+            study_name = f"look={num_lookforward_tokens}"
+            if study_name in sl_ce.studies:
+                agg = sl_ce._aggregate_by_step(
+                    df=sl_ce_df.filter(pl.col("study") == study_name),
+                    y_name=y_name,
+                )
+                if not agg.is_empty():
+                    _add_eval_curve(
+                        fig=fig,
+                        agg_df=agg,
+                        col=col,
+                        trace_name="sl_ce",
+                        legendgroup="sl_ce",
+                        legendgrouptitle_text=None,
+                        color=_METHOD_COLORS["sl_ce"],
+                        dash=_METHOD_DASH["sl_ce"],
+                        y_name=y_name,
+                        show_legend=(split == "val"),
+                        visible_default=True,
+                        show_seed_bar=show_seed_bar,
+                    )
+
+        if (
+            ntp_baseline is not None
+            and ntp_df is not None
+            and has_quantity(ntp_df, split)
+        ):
+            study_name = f"look={num_lookforward_tokens}"
+            if study_name in ntp_baseline.studies:
+                agg = ntp_baseline._aggregate_by_step(
+                    df=ntp_df.filter(pl.col("study") == study_name),
+                    y_name=y_name,
+                )
+                if not agg.is_empty():
+                    _add_eval_curve(
+                        fig=fig,
+                        agg_df=agg,
+                        col=col,
+                        trace_name="ntp_baseline",
+                        legendgroup="ntp_baseline",
+                        legendgrouptitle_text=None,
+                        color=_METHOD_COLORS["ntp_baseline"],
+                        dash="solid",
+                        y_name=y_name,
+                        show_legend=(split == "val"),
+                        visible_default=True,
+                        show_seed_bar=show_seed_bar,
+                    )
+
+        for r in rollouts_seen:
+            for method_name, cfg in methods_rl:
+                if not has_quantity(rl_dfs[method_name], split):
                     continue
                 study_name = f"look={num_lookforward_tokens} r={r}"
                 if study_name not in cfg.studies:

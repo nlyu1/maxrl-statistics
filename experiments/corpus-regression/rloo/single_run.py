@@ -43,6 +43,7 @@ METHOD = "rloo"
 @click.option("--val-every-n-steps", type=int, default=2000, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
 @click.option("--gaussian-stdev", type=float, default=1.0, show_default=True)
+@click.option("--lr-per-sample", type=float, default=1e-5, show_default=True, help="Per-sample learning rate; final head_lr = lr_per_sample × batch_size.")
 @click.option("--label-type", type=click.Choice(["rademacher", "token_id"]), default="rademacher", show_default=True)
 @click.option("--normalize-labels", is_flag=True, default=False, show_default=True)
 @click.option("--label-range", type=(float, float), default=(0.0, 1.0), show_default=True, help="Target (lo, hi) range for label normalization.")
@@ -57,6 +58,7 @@ def main(
     val_every_n_steps: int,
     num_samples: int,
     gaussian_stdev: float,
+    lr_per_sample: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -86,6 +88,7 @@ def main(
         gaussian_stdev=gaussian_stdev,
         factorized=factorized,
         num_samples=num_samples,
+        lr_per_sample=lr_per_sample,
         label_type=label_type,
         normalize_labels=normalize_labels,
         label_range=label_range,

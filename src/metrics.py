@@ -13,6 +13,11 @@ class RegressionStatCounter:
     xx: Float[Tensor, "dim"]
     yy: Float[Tensor, "dim"]
     n: Float[Tensor, ""]
+    # First-moment accumulators are needed to recover Var[x] = xx/n − (Σx/n)²
+    # and Var[y] = yy/n − (Σy/n)² downstream (the existing xx/yy alone only
+    # give the non-centered second moments).
+    x_sum: Float[Tensor, "dim"]
+    y_sum: Float[Tensor, "dim"]
 
     @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
     class Statistics:
@@ -32,6 +37,8 @@ class RegressionStatCounter:
             xx=torch.zeros(dim, device=device),
             yy=torch.zeros(dim, device=device),
             n=torch.zeros((), device=device),
+            x_sum=torch.zeros(dim, device=device),
+            y_sum=torch.zeros(dim, device=device),
         )
 
     @torch.no_grad()
@@ -42,6 +49,8 @@ class RegressionStatCounter:
         self.xy += (x * y).sum(dim=0)
         self.xx += (x * x).sum(dim=0)
         self.yy += (y * y).sum(dim=0)
+        self.x_sum += x.sum(dim=0)
+        self.y_sum += y.sum(dim=0)
         self.n += x.shape[0]
 
     def get_stats(self) -> "RegressionStatCounter.Statistics":
@@ -56,4 +65,6 @@ class RegressionStatCounter:
         self.xy.zero_()
         self.xx.zero_()
         self.yy.zero_()
+        self.x_sum.zero_()
+        self.y_sum.zero_()
         self.n.zero_()

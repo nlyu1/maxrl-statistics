@@ -50,8 +50,9 @@ from src.experiments.corpus_regression.state import (
     _per_dim_stats,
     _per_dim_stats_from_tensors,
     _scalar_corr_from_stats,
+    _scalar_var_from_stats,
 )
-from src.model.optimizer import CausalLMFullParamOptimizerConfig
+from src.model.optimizer import CausalLMFullParamMuonOptimizerConfig
 
 
 class CorpusRegressionSLCEConfig(BaseConfig):
@@ -60,7 +61,8 @@ class CorpusRegressionSLCEConfig(BaseConfig):
     Mirrors `CorpusRegressionStudyBaseConfig` but with:
       - `pretrained_model: str` instead of `model: CausalLMConfig` (no
         swapped-in regression head — use the model's native LM head)
-      - `optimizer: CausalLMFullParamOptimizerConfig` (single AdamW group)
+      - `optimizer: CausalLMFullParamMuonOptimizerConfig` (Muon for backbone
+        2D matrices, AdamW for embed+lm_head+1D, both groups on a single LR)
     """
 
     data: CorpusRegressionDatasetConfig
@@ -68,7 +70,7 @@ class CorpusRegressionSLCEConfig(BaseConfig):
     dataloading: CorpusRegressionDataloadingConfig
 
     pretrained_model: str
-    optimizer: CausalLMFullParamOptimizerConfig
+    optimizer: CausalLMFullParamMuonOptimizerConfig
 
     train_steps: int
     val_every_n_steps: int
@@ -98,7 +100,7 @@ class CorpusRegressionSLCEConfig(BaseConfig):
         batch_size: int = 64,
         eval_batch_size_multiple: int = 2,
         weight_decay: float = 0.0,
-        lr_per_token: float = 1e-6,
+        lr_per_sample: float = 1e-5,
         backbone_lr_divisor: float = 6.66,
         train_steps: int = 10_000,
         val_every_n_steps: int = 2000,
@@ -126,11 +128,15 @@ class CorpusRegressionSLCEConfig(BaseConfig):
             drop_last=True,
         )
 
-        # Mirror SL's per-token learning-rate convention so SL and SL-CE
-        # respond identically to canonical knobs (batch size, prefix length).
-        # The "head_lr / divisor" path in SL becomes a single full-param lr
-        # here — no separate head/backbone group.
-        head_lr = lr_per_token * batch_size * prefix_length
+        # Mirror SL's per-sample learning-rate convention so SL and SL-CE
+        # respond identically to canonical knobs (batch size). Per-token
+        # scaling (× prefix_length) is dropped — CE here fires only at the
+        # last position, so per-token doesn't make sense. The "head_lr /
+        # divisor" path in SL becomes a single full-param lr here — both
+        # Muon and AdamW groups train on the same backbone LR; no separate
+        # head/backbone group, since `lm_head` is the native LM head rather
+        # than a freshly-init'd regression head.
+        head_lr = lr_per_sample * batch_size
         effective_backbone_lr_divisor = (
             1.0 if train_from_scratch else backbone_lr_divisor
         )
@@ -139,14 +145,18 @@ class CorpusRegressionSLCEConfig(BaseConfig):
             dataset_folder=dataset_folder,
             dataloading=dataloading,
             pretrained_model=model_name,
-            optimizer=CausalLMFullParamOptimizerConfig(
+            optimizer=CausalLMFullParamMuonOptimizerConfig(
                 lr=head_lr / effective_backbone_lr_divisor,
                 weight_decay=weight_decay,
                 clip_grad_norm=clip_grad_norm,
             ),
             train_steps=train_steps,
             val_every_n_steps=val_every_n_steps,
-            study_folder=study_base_folder / dataset_folder.name,
+            study_folder=(
+                study_base_folder
+                / dataset_folder.name
+                / f"lr_{lr_per_sample:.2e}"
+            ),
             compile_model=compile_model,
             train_from_scratch=train_from_scratch,
         )
@@ -347,14 +357,17 @@ class CorpusRegressionSLCEState:
                 )
                 projected: Float[Tensor, "batch D"] = probs @ self.label_projector
                 mse = F.mse_loss(projected.float(), target.float()).item()
-                xx, xy, yy, n = _batch_sufficient_stats(
+                xx, xy, yy, pred_sum, target_sum, n = _batch_sufficient_stats(
                     prediction=projected, target=target,
                 )
 
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
         self.step_and_zero_grad()
-        return TrainStepOutput(loss=loss.item(), mse=mse, xx=xx, xy=xy, yy=yy, n=n)
+        return TrainStepOutput(
+            loss=loss.item(), mse=mse, xx=xx, xy=xy, yy=yy,
+            pred_sum=pred_sum, target_sum=target_sum, n=n,
+        )
 
     def compute_validation(self) -> CorpusRegressionValidationOutput:
         """Verbatim copy of `CorpusRegressionStudyBaseState.compute_validation`
@@ -406,23 +419,24 @@ class CorpusRegressionSLCEState:
         # plumbing has to live alongside its own train_step.
         if not buffer:
             return
-        new_rows = pl.DataFrame(
-            buffer,
-            schema={
-                "step": pl.Int64,
-                "loss": pl.Float64,
-                "mse": pl.Float64,
-                "corr": pl.Float64,
-            },
-        )
+        target_schema = {
+            "step": pl.Int64,
+            "loss": pl.Float64,
+            "mse": pl.Float64,
+            "corr": pl.Float64,
+            "pred_var": pl.Float64,
+            "target_var": pl.Float64,
+        }
+        new_rows = pl.DataFrame(buffer, schema=target_schema)
         metrics_path = self.config.study_folder / "train_metrics.parquet"
         if metrics_path.exists():
             existing = pl.read_parquet(metrics_path)
-            if "corr" not in existing.columns:
-                existing = existing.with_columns(
-                    pl.lit(None, dtype=pl.Float64).alias("corr")
-                )
-            existing = existing.select(["step", "loss", "mse", "corr"])
+            for col, dtype in target_schema.items():
+                if col not in existing.columns:
+                    existing = existing.with_columns(
+                        pl.lit(None, dtype=dtype).alias(col)
+                    )
+            existing = existing.select(list(target_schema.keys()))
             min_new_step = new_rows["step"].min()
             existing = existing.filter(pl.col("step") < min_new_step)
             new_rows = pl.concat([existing, new_rows]).sort("step")
@@ -436,6 +450,8 @@ class CorpusRegressionSLCEState:
         train_window_xx: Tensor,
         train_window_xy: Tensor,
         train_window_yy: Tensor,
+        train_window_pred_sum: Tensor,
+        train_window_target_sum: Tensor,
         train_window_n: int,
     ) -> None:
         # Verbatim of state.CorpusRegressionStudyBaseState._serialize_val —
@@ -451,6 +467,8 @@ class CorpusRegressionSLCEState:
                 xx=train_window_xx,
                 xy=train_window_xy,
                 yy=train_window_yy,
+                pred_sum=train_window_pred_sum,
+                target_sum=train_window_target_sum,
                 n=train_window_n,
                 prefix="train_target",
             )
@@ -480,31 +498,46 @@ class CorpusRegressionSLCEState:
         train_window_xx: Tensor | None = None
         train_window_xy: Tensor | None = None
         train_window_yy: Tensor | None = None
+        train_window_pred_sum: Tensor | None = None
+        train_window_target_sum: Tensor | None = None
         train_window_n: int = 0
 
         pbar = tqdm(range(self.config.train_steps), desc="training")
         for step in pbar:
             output = self.train_step(batch=next(batch_iter))
             corr = _scalar_corr_from_stats(xx=output.xx, xy=output.xy, yy=output.yy)
+            pred_var = _scalar_var_from_stats(
+                sq_sum=output.xx, val_sum=output.pred_sum, n=output.n,
+            )
+            target_var = _scalar_var_from_stats(
+                sq_sum=output.yy, val_sum=output.target_sum, n=output.n,
+            )
             train_buffer.append({
                 "step": step,
                 "loss": output.loss,
                 "mse": output.mse,
                 "corr": corr,
+                "pred_var": pred_var,
+                "target_var": target_var,
             })
             pbar.set_postfix(
                 loss=f"{output.loss:.4f}",
                 mse=f"{output.mse:.4f}",
                 corr=f"{corr:.4f}",
+                pred_var=f"{pred_var:.4f}",
             )
 
             if train_window_xx is None:
                 train_window_xx = torch.zeros_like(output.xx)
                 train_window_xy = torch.zeros_like(output.xy)
                 train_window_yy = torch.zeros_like(output.yy)
+                train_window_pred_sum = torch.zeros_like(output.pred_sum)
+                train_window_target_sum = torch.zeros_like(output.target_sum)
             train_window_xx += output.xx
             train_window_xy += output.xy
             train_window_yy += output.yy
+            train_window_pred_sum += output.pred_sum
+            train_window_target_sum += output.target_sum
             train_window_n += output.n
 
             is_val_step = (
@@ -515,18 +548,24 @@ class CorpusRegressionSLCEState:
                 validation = self.compute_validation()
                 self._flush_train_metrics(train_buffer)
                 assert train_window_xx is not None
+                assert train_window_pred_sum is not None
+                assert train_window_target_sum is not None
                 self._serialize_val(
                     step=step,
                     validation=validation,
                     train_window_xx=train_window_xx,
                     train_window_xy=train_window_xy,
                     train_window_yy=train_window_yy,
+                    train_window_pred_sum=train_window_pred_sum,
+                    train_window_target_sum=train_window_target_sum,
                     train_window_n=train_window_n,
                 )
                 train_buffer = []
                 train_window_xx.zero_()
                 train_window_xy.zero_()
                 train_window_yy.zero_()
+                train_window_pred_sum.zero_()
+                train_window_target_sum.zero_()
                 train_window_n = 0
                 self.model.train()
 

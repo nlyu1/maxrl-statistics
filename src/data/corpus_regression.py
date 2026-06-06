@@ -38,7 +38,7 @@ candidate_lookforward_tokens: list[int] = [
 ]
 
 # Rollout counts for RL sweeps.
-candidate_rollout_steps: list[int] = [4, 16, 128, 1024]
+candidate_rollout_steps: list[int] = [ 2**k for k in range(0, 11) ]
 
 candidate_seeds: list[int] = [51, 61, 121, 153, 228]
 
@@ -144,10 +144,11 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             f"_{self.num_samples}x{self.prefix_length}"
             f"_look{self.num_lookforward_tokens}_dim{self.embedding_dim}"
         )
-        # Only append label_type suffix for non-default values (backward-compatible
-        # slug for existing Rademacher caches).
-        if self.label_type != "rademacher":
-            slug += f"_{self.label_type}"
+        # Always append the label_type so rademacher and token_id caches are
+        # at the same level of disambiguation. Breaking change: existing
+        # rademacher caches at `..._dim{D}` will be ignored and rebuilt under
+        # `..._dim{D}_rademacher`.
+        slug += f"_{self.label_type}"
         if self.normalize_labels:
             lo, hi = self.label_range
             slug += f"_norm{lo:.2g}_{hi:.2g}"

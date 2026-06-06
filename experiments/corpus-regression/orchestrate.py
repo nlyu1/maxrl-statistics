@@ -55,6 +55,14 @@ DEFAULT_NUM_SAMPLES = 100_000
 DEFAULT_TRAIN_STEPS = 10_000
 DEFAULT_VAL_EVERY_N_STEPS = 2000
 DEFAULT_GAUSSIAN_STDEV = 1.0
+DEFAULT_LR_PER_SAMPLE = 1e-5
+
+
+def _lr_log_segment(lr_per_sample: float) -> str:
+    """Path segment that disambiguates concurrent LR sweeps in
+    `<artifacts_dir>/<method>/logs/...`. Mirrors `lr_<value>` levels added by
+    each method's `study_folder` so logs and parquets stay aligned."""
+    return f"lr_{lr_per_sample:.2e}"
 
 
 # ─── Custom Click parameter types ─────────────────────────────────────────────
@@ -132,6 +140,7 @@ def _build_sl_jobs(
     num_samples_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
+    lr_per_sample: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -139,16 +148,17 @@ def _build_sl_jobs(
 ) -> list[Job]:
     script = str(_script_path("sl"))
     method_dir = _method_dir("sl", train_from_scratch=train_from_scratch)
+    lr_seg = _lr_log_segment(lr_per_sample)
     jobs: list[Job] = []
     for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
-        label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lbl-{label_type}"
+        label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}"
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
+            / lr_seg
+            / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
-        if label_type != "rademacher":
-            log_path = log_path.parent / label_type / log_path.name
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
@@ -159,6 +169,7 @@ def _build_sl_jobs(
             "--train-steps", str(train_steps),
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
+            "--lr-per-sample", str(lr_per_sample),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -177,6 +188,7 @@ def _build_sl_ce_jobs(
     num_samples_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
+    lr_per_sample: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -191,16 +203,17 @@ def _build_sl_ce_jobs(
     """
     script = str(_script_path("sl_ce"))
     method_dir = _method_dir("sl_ce", train_from_scratch=train_from_scratch)
+    lr_seg = _lr_log_segment(lr_per_sample)
     jobs: list[Job] = []
     for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
-        label = f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}_lbl-{label_type}"
+        label = f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}"
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
+            / lr_seg
+            / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
-        if label_type != "rademacher":
-            log_path = log_path.parent / label_type / log_path.name
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
@@ -211,6 +224,7 @@ def _build_sl_ce_jobs(
             "--train-steps", str(train_steps),
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
+            "--lr-per-sample", str(lr_per_sample),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -231,6 +245,7 @@ def _build_grpo_jobs(
     train_steps: int,
     val_every_n_steps: int,
     gaussian_stdev_values: tuple[float, ...],
+    lr_per_sample: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -238,20 +253,21 @@ def _build_grpo_jobs(
 ) -> list[Job]:
     script = str(_script_path("grpo"))
     method_dir = _method_dir("grpo", train_from_scratch=train_from_scratch)
+    lr_seg = _lr_log_segment(lr_per_sample)
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
-        label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}_lbl-{label_type}"
+        label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}"
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
+            / lr_seg
+            / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
-        if label_type != "rademacher":
-            log_path = log_path.parent / label_type / log_path.name
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
@@ -264,6 +280,7 @@ def _build_grpo_jobs(
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
             "--gaussian-stdev", str(stdev),
+            "--lr-per-sample", str(lr_per_sample),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -285,6 +302,7 @@ def _build_rloo_jobs(
     val_every_n_steps: int,
     factorized: bool,
     gaussian_stdev_values: tuple[float, ...],
+    lr_per_sample: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -292,13 +310,14 @@ def _build_rloo_jobs(
 ) -> list[Job]:
     script = str(_script_path("rloo"))
     method_dir = _method_dir("rloo", train_from_scratch=train_from_scratch)
+    lr_seg = _lr_log_segment(lr_per_sample)
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
         label = (
             f"rloo_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_fact-{factorized}_sigma-{stdev}_lbl-{label_type}"
+            f"_ns-{ns}_fact-{factorized}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}"
         )
         log_path = (
             artifacts_dir() / method_dir / "logs"
@@ -306,10 +325,10 @@ def _build_rloo_jobs(
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
             / factorized_mode_folder(factorized=factorized)
+            / lr_seg
+            / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
-        if label_type != "rademacher":
-            log_path = log_path.parent / label_type / log_path.name
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
@@ -323,6 +342,7 @@ def _build_rloo_jobs(
             "--num-samples", str(ns),
             "--factorized", str(factorized),
             "--gaussian-stdev", str(stdev),
+            "--lr-per-sample", str(lr_per_sample),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -345,6 +365,7 @@ def _build_maxrl_jobs(
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
     gaussian_stdev_values: tuple[float, ...],
+    lr_per_sample: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -352,13 +373,14 @@ def _build_maxrl_jobs(
 ) -> list[Job]:
     script = str(_script_path("maxrl"))
     method_dir = _method_dir("maxrl", train_from_scratch=train_from_scratch)
+    lr_seg = _lr_log_segment(lr_per_sample)
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
         label = (
             f"maxrl_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}_lbl-{label_type}"
+            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}"
         )
         log_path = (
             artifacts_dir() / method_dir / "logs"
@@ -367,10 +389,10 @@ def _build_maxrl_jobs(
             / sigma_folder(gaussian_stdev=stdev)
             / baseline_mode_folder(subtract_baseline=subtract_baseline)
             / likelihood_mode_folder(use_factorized_likelihoods=use_factorized_likelihoods)
+            / lr_seg
+            / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
-        if label_type != "rademacher":
-            log_path = log_path.parent / label_type / log_path.name
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
@@ -385,6 +407,7 @@ def _build_maxrl_jobs(
             "--subtract-baseline", str(subtract_baseline),
             "--use-factorized-likelihoods", str(use_factorized_likelihoods),
             "--gaussian-stdev", str(stdev),
+            "--lr-per-sample", str(lr_per_sample),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -412,11 +435,9 @@ def _build_ntp_jobs(
     for lft, ns in itertools.product(lookforward_tokens, num_samples_values):
         label = f"ntp_baseline_look-{lft}_ns-{ns}_lbl-{label_type}"
         log_path = (
-            artifacts_dir() / "ntp_baseline" / "logs"
+            artifacts_dir() / "ntp_baseline" / "logs" / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
-        if label_type != "rademacher":
-            log_path = log_path.parent / label_type / log_path.name
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
         cmd = [
@@ -496,6 +517,17 @@ def _build_ntp_jobs(
     help="Comma-separated stdevs for Gaussian policy rollouts (ignored for SL).",
 )
 @click.option(
+    "--lr-per-sample",
+    type=float,
+    default=DEFAULT_LR_PER_SAMPLE,
+    show_default=True,
+    help=(
+        "Per-sample learning rate. Final head_lr = lr_per_sample × batch_size; "
+        "backbone gets head_lr / divisor (divisor=6.66 for fine-tune, 1.0 for "
+        "from-scratch). Affects every method except ntp_baseline (inference-only)."
+    ),
+)
+@click.option(
     "--gpu-ids",
     type=INT_LIST,
     default=None,
@@ -569,6 +601,7 @@ def main(
     train_steps: int,
     val_every_n_steps: int,
     gaussian_stdev: tuple[float, ...],
+    lr_per_sample: float,
     gpu_ids: tuple[int, ...] | None,
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
@@ -587,6 +620,11 @@ def main(
                 f"gaussian_stdev must be positive, got {stdev}",
                 param_hint="--gaussian-stdev",
             )
+    if lr_per_sample <= 0.0:
+        raise click.BadParameter(
+            f"lr_per_sample must be positive, got {lr_per_sample}",
+            param_hint="--lr-per-sample",
+        )
 
     # Deduplicate methods, preserving order.
     methods = list(dict.fromkeys(method))
@@ -619,6 +657,7 @@ def main(
                 num_samples_values=num_samples,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
+                lr_per_sample=lr_per_sample,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -631,6 +670,7 @@ def main(
                 num_samples_values=num_samples,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
+                lr_per_sample=lr_per_sample,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -645,6 +685,7 @@ def main(
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 gaussian_stdev_values=gaussian_stdev,
+                lr_per_sample=lr_per_sample,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -660,6 +701,7 @@ def main(
                 val_every_n_steps=val_every_n_steps,
                 factorized=factorized,
                 gaussian_stdev_values=gaussian_stdev,
+                lr_per_sample=lr_per_sample,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -676,6 +718,7 @@ def main(
                 subtract_baseline=subtract_baseline,
                 use_factorized_likelihoods=use_factorized_likelihoods,
                 gaussian_stdev_values=gaussian_stdev,
+                lr_per_sample=lr_per_sample,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -702,6 +745,7 @@ def main(
         click.echo(f"rollout_steps={rollout_steps}")
     click.echo(
         f"num_samples={num_samples}  gaussian_stdev={gaussian_stdev}  "
+        f"lr_per_sample={lr_per_sample}  "
         f"train_steps={train_steps}  gpus={pool.num_devices}  "
         f"train_from_scratch={train_from_scratch}  total_jobs={len(all_jobs)}"
     )

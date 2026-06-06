@@ -56,7 +56,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         batch_size: int = 64,
         eval_batch_size_multiple: int = 2,
         weight_decay: float = 0.0,
-        lr_per_token: float = 1e-6,
+        lr_per_sample: float = 1e-5,
         backbone_lr_divisor: float = 6.66,
         train_steps: int = 10_000,
         val_every_n_steps: int = 2000,
@@ -87,7 +87,12 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
 
         # Use post-validation embedding_dim (forced to 1 for token_id).
         effective_dim = data_config.embedding_dim
-        head_lr = lr_per_token * batch_size * prefix_length
+        # Per-sample (linear-scaling-rule) LR formula. The previous per-token
+        # convention (× prefix_length) was unmotivated for the methods that
+        # produce one prediction per sample at the last position only. The
+        # × batch_size factor is retained so batch-size sweeps preserve the
+        # same gradient-noise scale.
+        head_lr = lr_per_sample * batch_size
         # From-scratch training conventionally uses the same LR for backbone
         # and head — there are no pretrained features to preserve, so the
         # fine-tuning divisor is dropped.
@@ -111,7 +116,11 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             ),
             train_steps=train_steps,
             val_every_n_steps=val_every_n_steps,
-            study_folder=study_base_folder / dataset_folder.name,
+            study_folder=(
+                study_base_folder
+                / dataset_folder.name
+                / f"lr_{lr_per_sample:.2e}"
+            ),
             compile_model=compile_model,
         )
 
