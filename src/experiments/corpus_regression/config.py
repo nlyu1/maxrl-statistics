@@ -19,7 +19,11 @@ from src.data.corpus_regression import (
     CorpusRegressionDatasetConfig,
 )
 from src.model.minimal import CausalLMConfig
-from src.model.optimizer import CausalLMWithLinearHeadOptimizerConfig
+from src.model.optimizer import (
+    CausalLMWithLinearHeadOptimizerConfig,
+    LRScheduleConfig,
+    build_lr_scheduler,
+)
 
 if TYPE_CHECKING:
     from src.experiments.corpus_regression.state import CorpusRegressionStudyBaseState
@@ -58,6 +62,9 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         weight_decay: float = 0.0,
         lr_per_sample: float = 1e-5,
         backbone_lr_divisor: float = 6.66,
+        lr_schedule: Literal["flat", "cosine"] = "flat",
+        warmup_ratio: float = 0.05,
+        lr_min_ratio: float = 0.1,
         train_steps: int = 10_000,
         val_every_n_steps: int = 2000,
         clip_grad_norm: float = 1.0,
@@ -99,6 +106,19 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         effective_backbone_lr_divisor = (
             1.0 if train_from_scratch else backbone_lr_divisor
         )
+        lr_schedule_config = LRScheduleConfig(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
+        sched_segment = lr_schedule_segment(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
+        study_folder = study_base_folder / dataset_folder.name / f"lr_{lr_per_sample:.2e}"
+        if sched_segment is not None:
+            study_folder = study_folder / sched_segment
         return dict(
             data=data_config,
             dataset_folder=dataset_folder,
@@ -113,14 +133,11 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
                 head_lr=head_lr,
                 weight_decay=weight_decay,
                 clip_grad_norm=clip_grad_norm,
+                lr_schedule=lr_schedule_config,
             ),
             train_steps=train_steps,
             val_every_n_steps=val_every_n_steps,
-            study_folder=(
-                study_base_folder
-                / dataset_folder.name
-                / f"lr_{lr_per_sample:.2e}"
-            ),
+            study_folder=study_folder,
             compile_model=compile_model,
         )
 
@@ -216,6 +233,11 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
         with device_context:
             model = self.model.get_model().to(device=device, dtype=torch.bfloat16)
             optimizer = self.optimizer.get_optimizer(model)
+            scheduler = build_lr_scheduler(
+                optimizer,
+                schedule_config=self.optimizer.lr_schedule,
+                train_steps=self.train_steps,
+            )
             if self.compile_model and device.type == "cuda":
                 model = torch.compile(model, mode=self.compile_mode)
 
@@ -223,6 +245,7 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             config=self,
             model=model,
             optimizer=optimizer,
+            scheduler=scheduler,
             dataset=dataset,
             train_dl=train_dl,
             val_dl=val_dl,
@@ -256,6 +279,35 @@ def factorized_mode_folder(*, factorized: bool) -> str:
 
 def sigma_folder(*, gaussian_stdev: float) -> str:
     return f"sigma-{gaussian_stdev}"
+
+
+def lr_schedule_segment(
+    *,
+    lr_schedule: Literal["flat", "cosine"],
+    warmup_ratio: float,
+    lr_min_ratio: float,
+) -> str | None:
+    """Optional path segment encoding the LR schedule, inserted **after** the
+    `lr_<value>` segment in study folders and orchestrator log paths.
+
+    Returns `None` for `"flat"` so the caller skips the segment entirely —
+    this preserves byte-for-byte backward compatibility with all existing
+    on-disk artifacts written under flat-LR training. Non-flat schedules are
+    encoded as ``sched-warmup-{warmup_ratio:.3f}-cosine-{lr_min_ratio:.2f}``,
+    e.g. ``sched-warmup-0.050-cosine-0.10``.
+
+    Both write-side (``config.py`` / ``sl_ce.py`` ``canonical_kwargs``) and
+    read-side (``analysis.py from_*_sweep`` loaders) **must** call this same
+    helper so they cannot drift apart.
+    """
+    if lr_schedule == "flat":
+        return None
+    if lr_schedule != "cosine":
+        raise ValueError(
+            f"Unsupported lr_schedule={lr_schedule!r}; "
+            "expected 'flat' or 'cosine'.",
+        )
+    return f"sched-warmup-{warmup_ratio:.3f}-cosine-{lr_min_ratio:.2f}"
 
 
 def project_dir() -> Path:

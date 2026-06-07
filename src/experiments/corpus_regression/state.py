@@ -12,6 +12,7 @@ from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
 from torch import Tensor, nn
 from torch.nn.utils import clip_grad_norm_
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader
 from tqdm.autonotebook import tqdm
 
@@ -202,6 +203,11 @@ class CorpusRegressionStudyBaseState(ABC):
     train_dl: DataLoader
     val_dl: DataLoader
     device: torch.device
+    # `None` for `lr_schedule == "flat"` — no scheduler is created and
+    # `step_and_zero_grad` skips the scheduler.step() call. Otherwise this
+    # is a `LambdaLR` driving the lockstep warmup+cosine factor across all
+    # optimizer param groups.
+    scheduler: LRScheduler | None = None
 
     @abstractmethod
     def compute_last_step_projections(
@@ -264,10 +270,13 @@ class CorpusRegressionStudyBaseState(ABC):
     def _flush_train_metrics(self, buffer: list[dict[str, float]]) -> None:
         """Append buffered per-step train metrics to train_metrics.parquet.
 
-        Buffer entries have keys `step, loss, mse, corr, pred_var, target_var`.
-        Resumed runs whose existing parquet was written by an older code
-        version (missing some columns) get backfilled with nulls so concat
-        schemas line up."""
+        Buffer entries have keys `step, loss, mse, corr, pred_var, target_var,
+        lr`. The `lr` column captures the realized backbone-Muon group LR at
+        the time of each step (param_groups[0]); under the lockstep schedule
+        every group's LR is `base_lr * f(t)` for the same `f(t)`, so a single
+        column suffices to verify schedule shape. Resumed runs whose existing
+        parquet was written by an older code version (missing some columns)
+        get backfilled with nulls so concat schemas line up."""
         if not buffer:
             return
         target_schema = {
@@ -277,6 +286,7 @@ class CorpusRegressionStudyBaseState(ABC):
             "corr": pl.Float64,
             "pred_var": pl.Float64,
             "target_var": pl.Float64,
+            "lr": pl.Float64,
         }
         new_rows = pl.DataFrame(buffer, schema=target_schema)
         metrics_path = self.config.study_folder / "train_metrics.parquet"
@@ -379,6 +389,9 @@ class CorpusRegressionStudyBaseState(ABC):
             target_var = _scalar_var_from_stats(
                 sq_sum=output.yy, val_sum=output.target_sum, n=output.n,
             )
+            # Realized backbone-Muon LR at the step we just took.
+            # Lockstep schedule ⇒ a single column captures schedule shape.
+            current_lr = float(self.optimizer.param_groups[0]["lr"])
             train_buffer.append({
                 "step": step,
                 "loss": output.loss,
@@ -386,12 +399,14 @@ class CorpusRegressionStudyBaseState(ABC):
                 "corr": corr,
                 "pred_var": pred_var,
                 "target_var": target_var,
+                "lr": current_lr,
             })
             pbar.set_postfix(
                 loss=f"{output.loss:.4f}",
                 mse=f"{output.mse:.4f}",
                 corr=f"{corr:.4f}",
                 pred_var=f"{pred_var:.4f}",
+                lr=f"{current_lr:.2e}",
             )
 
             if train_window_xx is None:
@@ -442,4 +457,10 @@ class CorpusRegressionStudyBaseState(ABC):
             max_norm=self.config.optimizer.clip_grad_norm,
         )
         self.optimizer.step()
+        # Scheduler advances after the optimizer step so the LR used by the
+        # step we just took matches `lr_lambda(last_epoch)` at the moment of
+        # the step. With `lr_schedule == "flat"` the scheduler is `None` and
+        # this is a no-op — preserves byte-for-byte today's behaviour.
+        if self.scheduler is not None:
+            self.scheduler.step()
         self.optimizer.zero_grad(set_to_none=True)

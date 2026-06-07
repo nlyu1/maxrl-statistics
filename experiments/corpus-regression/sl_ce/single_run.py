@@ -45,6 +45,31 @@ METHOD = "sl_ce"
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
 @click.option("--lr-per-sample", type=float, default=1e-5, show_default=True, help="Per-sample learning rate; final lr = lr_per_sample × batch_size / divisor.")
 @click.option(
+    "--lr-schedule",
+    type=click.Choice(["flat", "cosine"]),
+    default="flat",
+    show_default=True,
+    help=(
+        "LR schedule shape. 'flat' = no scheduler (today's behaviour). "
+        "'cosine' = linear warmup then half-cosine decay to "
+        "lr_min_ratio × peak."
+    ),
+)
+@click.option(
+    "--warmup-ratio",
+    type=float,
+    default=0.05,
+    show_default=True,
+    help="Warmup duration as a fraction of train_steps. Ignored when --lr-schedule flat.",
+)
+@click.option(
+    "--lr-min-ratio",
+    type=float,
+    default=0.1,
+    show_default=True,
+    help="Cosine end LR as a fraction of peak LR. Ignored when --lr-schedule flat.",
+)
+@click.option(
     "--label-type",
     type=click.Choice(["rademacher", "token_id"]),
     default="rademacher",
@@ -73,6 +98,9 @@ def main(
     val_every_n_steps: int,
     num_samples: int,
     lr_per_sample: float,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -103,6 +131,9 @@ def main(
         val_every_n_steps=val_every_n_steps,
         num_samples=num_samples,
         lr_per_sample=lr_per_sample,
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
         label_type=label_type,
         normalize_labels=normalize_labels,
         label_range=label_range,

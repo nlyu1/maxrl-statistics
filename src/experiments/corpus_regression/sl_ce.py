@@ -52,7 +52,11 @@ from src.experiments.corpus_regression.state import (
     _scalar_corr_from_stats,
     _scalar_var_from_stats,
 )
-from src.model.optimizer import CausalLMFullParamMuonOptimizerConfig
+from src.model.optimizer import (
+    CausalLMFullParamMuonOptimizerConfig,
+    LRScheduleConfig,
+    build_lr_scheduler,
+)
 
 
 class CorpusRegressionSLCEConfig(BaseConfig):
@@ -102,6 +106,9 @@ class CorpusRegressionSLCEConfig(BaseConfig):
         weight_decay: float = 0.0,
         lr_per_sample: float = 1e-5,
         backbone_lr_divisor: float = 6.66,
+        lr_schedule: Literal["flat", "cosine"] = "flat",
+        warmup_ratio: float = 0.05,
+        lr_min_ratio: float = 0.1,
         train_steps: int = 10_000,
         val_every_n_steps: int = 2000,
         clip_grad_norm: float = 1.0,
@@ -140,6 +147,22 @@ class CorpusRegressionSLCEConfig(BaseConfig):
         effective_backbone_lr_divisor = (
             1.0 if train_from_scratch else backbone_lr_divisor
         )
+        lr_schedule_config = LRScheduleConfig(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
+        # Local import to avoid a top-level circular import via config.py.
+        from src.experiments.corpus_regression.config import lr_schedule_segment
+
+        sched_segment = lr_schedule_segment(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
+        study_folder = study_base_folder / dataset_folder.name / f"lr_{lr_per_sample:.2e}"
+        if sched_segment is not None:
+            study_folder = study_folder / sched_segment
         return dict(
             data=data_config,
             dataset_folder=dataset_folder,
@@ -149,14 +172,11 @@ class CorpusRegressionSLCEConfig(BaseConfig):
                 lr=head_lr / effective_backbone_lr_divisor,
                 weight_decay=weight_decay,
                 clip_grad_norm=clip_grad_norm,
+                lr_schedule=lr_schedule_config,
             ),
             train_steps=train_steps,
             val_every_n_steps=val_every_n_steps,
-            study_folder=(
-                study_base_folder
-                / dataset_folder.name
-                / f"lr_{lr_per_sample:.2e}"
-            ),
+            study_folder=study_folder,
             compile_model=compile_model,
             train_from_scratch=train_from_scratch,
         )
@@ -265,6 +285,11 @@ class CorpusRegressionSLCEConfig(BaseConfig):
                     self.pretrained_model, torch_dtype=torch.bfloat16
                 ).to(device=device)
             optimizer = self.optimizer.get_optimizer(model)
+            scheduler = build_lr_scheduler(
+                optimizer,
+                schedule_config=self.optimizer.lr_schedule,
+                train_steps=self.train_steps,
+            )
             label_projector = self._build_label_projector(
                 vocab_size=model.config.vocab_size, device=device
             )
@@ -275,6 +300,7 @@ class CorpusRegressionSLCEConfig(BaseConfig):
             config=self,
             model=model,
             optimizer=optimizer,
+            scheduler=scheduler,
             dataset=dataset,
             train_dl=train_dl,
             val_dl=val_dl,
@@ -303,6 +329,9 @@ class CorpusRegressionSLCEState:
     val_dl: DataLoader
     device: torch.device
     label_projector: Float[Tensor, "vocab D"]
+    # `None` for `lr_schedule == "flat"` (no scheduler instantiated).
+    # See `CorpusRegressionStudyBaseState.scheduler` for semantics.
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
 
     def compute_last_step_projections(
         self,
@@ -426,6 +455,7 @@ class CorpusRegressionSLCEState:
             "corr": pl.Float64,
             "pred_var": pl.Float64,
             "target_var": pl.Float64,
+            "lr": pl.Float64,
         }
         new_rows = pl.DataFrame(buffer, schema=target_schema)
         metrics_path = self.config.study_folder / "train_metrics.parquet"
@@ -512,6 +542,7 @@ class CorpusRegressionSLCEState:
             target_var = _scalar_var_from_stats(
                 sq_sum=output.yy, val_sum=output.target_sum, n=output.n,
             )
+            current_lr = float(self.optimizer.param_groups[0]["lr"])
             train_buffer.append({
                 "step": step,
                 "loss": output.loss,
@@ -519,12 +550,14 @@ class CorpusRegressionSLCEState:
                 "corr": corr,
                 "pred_var": pred_var,
                 "target_var": target_var,
+                "lr": current_lr,
             })
             pbar.set_postfix(
                 loss=f"{output.loss:.4f}",
                 mse=f"{output.mse:.4f}",
                 corr=f"{corr:.4f}",
                 pred_var=f"{pred_var:.4f}",
+                lr=f"{current_lr:.2e}",
             )
 
             if train_window_xx is None:
@@ -575,4 +608,8 @@ class CorpusRegressionSLCEState:
             max_norm=self.config.optimizer.clip_grad_norm,
         )
         self.optimizer.step()
+        # Lockstep schedule across all param groups; no-op for `flat`.
+        # Mirrors `CorpusRegressionStudyBaseState.step_and_zero_grad`.
+        if self.scheduler is not None:
+            self.scheduler.step()
         self.optimizer.zero_grad(set_to_none=True)

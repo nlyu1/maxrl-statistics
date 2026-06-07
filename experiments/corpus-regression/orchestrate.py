@@ -43,11 +43,13 @@ from src.experiments.corpus_regression.config import (  # noqa: E402
     baseline_mode_folder,
     factorized_mode_folder,
     likelihood_mode_folder,
+    lr_schedule_segment,
     sigma_folder,
 )
 from src.experiments.gpu_pool import GPUPool, Job  # noqa: E402
 
 Method = Literal["sl", "sl_ce", "grpo", "rloo", "maxrl", "ntp_baseline"]
+LRSchedule = Literal["flat", "cosine"]
 
 DEFAULT_LOOKFORWARD_TOKENS = (1, 2, 3, 4, 5, 6, 7, 8)
 DEFAULT_ROLLOUT_STEPS = (4, 16, 128, 1024)
@@ -56,6 +58,9 @@ DEFAULT_TRAIN_STEPS = 10_000
 DEFAULT_VAL_EVERY_N_STEPS = 2000
 DEFAULT_GAUSSIAN_STDEV = 1.0
 DEFAULT_LR_PER_SAMPLE = 1e-5
+DEFAULT_LR_SCHEDULE: LRSchedule = "flat"
+DEFAULT_WARMUP_RATIO = 0.05
+DEFAULT_LR_MIN_RATIO = 0.1
 
 
 def _lr_log_segment(lr_per_sample: float) -> str:
@@ -63,6 +68,64 @@ def _lr_log_segment(lr_per_sample: float) -> str:
     `<artifacts_dir>/<method>/logs/...`. Mirrors `lr_<value>` levels added by
     each method's `study_folder` so logs and parquets stay aligned."""
     return f"lr_{lr_per_sample:.2e}"
+
+
+def _schedule_label_suffix(
+    *,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
+) -> str:
+    """Job-label suffix for non-flat schedules; empty string for flat. Mirrors
+    `lr_schedule_segment` but encoded for the inline label, not the path."""
+    if lr_schedule == "flat":
+        return ""
+    return (
+        f"_sched-{lr_schedule}_warm-{warmup_ratio:.3f}_min-{lr_min_ratio:.2f}"
+    )
+
+
+def _append_schedule_segment(
+    log_path: Path,
+    *,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
+) -> Path:
+    """Insert the optional schedule segment into a log path **between** the
+    `lr_<value>` directory and the `<label_type>/<filename>.log` tail.
+
+    The incoming `log_path` ends in
+    ``.../<lr_seg>/<label_type>/<look-{K}_ns-{N}.log>`` (or with a
+    ``normalized/`` prefix on the basename's parent). For non-flat schedules
+    we slot the schedule segment between `<lr_seg>` and `<label_type>` so
+    the log tree mirrors the corresponding study_folder layout under
+    `lr_schedule_segment`. For flat schedules this is a no-op.
+    """
+    sched = lr_schedule_segment(
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
+    )
+    if sched is None:
+        return log_path
+    # `log_path` is .../<lr_seg>/<...tail>` — peel off the tail (label_type
+    # subdir + filename, possibly with a `normalized/` parent), insert the
+    # schedule segment after lr_seg, and re-append the tail. We assert the
+    # `lr_` prefix matches so misuse is caught loudly.
+    ancestor_parts = log_path.parts
+    lr_idx: int | None = None
+    for idx in range(len(ancestor_parts) - 1, -1, -1):
+        if ancestor_parts[idx].startswith("lr_"):
+            lr_idx = idx
+            break
+    if lr_idx is None:
+        raise ValueError(
+            f"Expected log_path to contain an `lr_*` segment; got {log_path}",
+        )
+    head = Path(*ancestor_parts[: lr_idx + 1])
+    tail_parts = ancestor_parts[lr_idx + 1 :]
+    return head.joinpath(sched, *tail_parts)
 
 
 # ─── Custom Click parameter types ─────────────────────────────────────────────
@@ -141,6 +204,9 @@ def _build_sl_jobs(
     train_steps: int,
     val_every_n_steps: int,
     lr_per_sample: float,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -149,9 +215,14 @@ def _build_sl_jobs(
     script = str(_script_path("sl"))
     method_dir = _method_dir("sl", train_from_scratch=train_from_scratch)
     lr_seg = _lr_log_segment(lr_per_sample)
+    sched_suffix = _schedule_label_suffix(
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
+    )
     jobs: list[Job] = []
     for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
-        label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}"
+        label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
@@ -161,6 +232,12 @@ def _build_sl_jobs(
         )
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
+        log_path = _append_schedule_segment(
+            log_path,
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -170,6 +247,9 @@ def _build_sl_jobs(
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
             "--lr-per-sample", str(lr_per_sample),
+            "--lr-schedule", lr_schedule,
+            "--warmup-ratio", str(warmup_ratio),
+            "--lr-min-ratio", str(lr_min_ratio),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -189,6 +269,9 @@ def _build_sl_ce_jobs(
     train_steps: int,
     val_every_n_steps: int,
     lr_per_sample: float,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -204,9 +287,14 @@ def _build_sl_ce_jobs(
     script = str(_script_path("sl_ce"))
     method_dir = _method_dir("sl_ce", train_from_scratch=train_from_scratch)
     lr_seg = _lr_log_segment(lr_per_sample)
+    sched_suffix = _schedule_label_suffix(
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
+    )
     jobs: list[Job] = []
     for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
-        label = f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}"
+        label = f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
@@ -216,6 +304,12 @@ def _build_sl_ce_jobs(
         )
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
+        log_path = _append_schedule_segment(
+            log_path,
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -225,6 +319,9 @@ def _build_sl_ce_jobs(
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
             "--lr-per-sample", str(lr_per_sample),
+            "--lr-schedule", lr_schedule,
+            "--warmup-ratio", str(warmup_ratio),
+            "--lr-min-ratio", str(lr_min_ratio),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -246,6 +343,9 @@ def _build_grpo_jobs(
     val_every_n_steps: int,
     gaussian_stdev_values: tuple[float, ...],
     lr_per_sample: float,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -254,11 +354,16 @@ def _build_grpo_jobs(
     script = str(_script_path("grpo"))
     method_dir = _method_dir("grpo", train_from_scratch=train_from_scratch)
     lr_seg = _lr_log_segment(lr_per_sample)
+    sched_suffix = _schedule_label_suffix(
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
+    )
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
-        label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}"
+        label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
@@ -270,6 +375,12 @@ def _build_grpo_jobs(
         )
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
+        log_path = _append_schedule_segment(
+            log_path,
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -281,6 +392,9 @@ def _build_grpo_jobs(
             "--num-samples", str(ns),
             "--gaussian-stdev", str(stdev),
             "--lr-per-sample", str(lr_per_sample),
+            "--lr-schedule", lr_schedule,
+            "--warmup-ratio", str(warmup_ratio),
+            "--lr-min-ratio", str(lr_min_ratio),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -303,6 +417,9 @@ def _build_rloo_jobs(
     factorized: bool,
     gaussian_stdev_values: tuple[float, ...],
     lr_per_sample: float,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -311,13 +428,18 @@ def _build_rloo_jobs(
     script = str(_script_path("rloo"))
     method_dir = _method_dir("rloo", train_from_scratch=train_from_scratch)
     lr_seg = _lr_log_segment(lr_per_sample)
+    sched_suffix = _schedule_label_suffix(
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
+    )
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
         label = (
             f"rloo_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_fact-{factorized}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}"
+            f"_ns-{ns}_fact-{factorized}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
         )
         log_path = (
             artifacts_dir() / method_dir / "logs"
@@ -331,6 +453,12 @@ def _build_rloo_jobs(
         )
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
+        log_path = _append_schedule_segment(
+            log_path,
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -343,6 +471,9 @@ def _build_rloo_jobs(
             "--factorized", str(factorized),
             "--gaussian-stdev", str(stdev),
             "--lr-per-sample", str(lr_per_sample),
+            "--lr-schedule", lr_schedule,
+            "--warmup-ratio", str(warmup_ratio),
+            "--lr-min-ratio", str(lr_min_ratio),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -366,6 +497,9 @@ def _build_maxrl_jobs(
     use_factorized_likelihoods: bool,
     gaussian_stdev_values: tuple[float, ...],
     lr_per_sample: float,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
     label_type: str,
     normalize_labels: bool,
     label_range: tuple[float, float],
@@ -374,13 +508,18 @@ def _build_maxrl_jobs(
     script = str(_script_path("maxrl"))
     method_dir = _method_dir("maxrl", train_from_scratch=train_from_scratch)
     lr_seg = _lr_log_segment(lr_per_sample)
+    sched_suffix = _schedule_label_suffix(
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
+    )
     jobs: list[Job] = []
     for seed, lft, rollouts, ns, stdev in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
     ):
         label = (
             f"maxrl_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}"
+            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
         )
         log_path = (
             artifacts_dir() / method_dir / "logs"
@@ -395,6 +534,12 @@ def _build_maxrl_jobs(
         )
         if normalize_labels:
             log_path = log_path.parent / "normalized" / log_path.name
+        log_path = _append_schedule_segment(
+            log_path,
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         cmd = [
             sys.executable, script,
             "--num-lookforward-tokens", str(lft),
@@ -408,6 +553,9 @@ def _build_maxrl_jobs(
             "--use-factorized-likelihoods", str(use_factorized_likelihoods),
             "--gaussian-stdev", str(stdev),
             "--lr-per-sample", str(lr_per_sample),
+            "--lr-schedule", lr_schedule,
+            "--warmup-ratio", str(warmup_ratio),
+            "--lr-min-ratio", str(lr_min_ratio),
             "--label-type", label_type,
         ]
         if normalize_labels:
@@ -528,6 +676,33 @@ def _build_ntp_jobs(
     ),
 )
 @click.option(
+    "--lr-schedule",
+    type=click.Choice(["flat", "cosine"]),
+    default=DEFAULT_LR_SCHEDULE,
+    show_default=True,
+    help=(
+        "LR schedule shape. 'flat' = no scheduler, byte-for-byte today's "
+        "behaviour and today's artifact paths. 'cosine' = linear warmup to "
+        "peak LR, then half-cosine decay to lr_min_ratio × peak; runs are "
+        "routed to a `sched-warmup-X.XXX-cosine-X.XX` sibling subtree under "
+        "the existing `lr_*` segment."
+    ),
+)
+@click.option(
+    "--warmup-ratio",
+    type=float,
+    default=DEFAULT_WARMUP_RATIO,
+    show_default=True,
+    help="Warmup duration as a fraction of train_steps. Ignored when --lr-schedule flat.",
+)
+@click.option(
+    "--lr-min-ratio",
+    type=float,
+    default=DEFAULT_LR_MIN_RATIO,
+    show_default=True,
+    help="Cosine end LR as a fraction of peak LR. Ignored when --lr-schedule flat.",
+)
+@click.option(
     "--gpu-ids",
     type=INT_LIST,
     default=None,
@@ -602,6 +777,9 @@ def main(
     val_every_n_steps: int,
     gaussian_stdev: tuple[float, ...],
     lr_per_sample: float,
+    lr_schedule: str,
+    warmup_ratio: float,
+    lr_min_ratio: float,
     gpu_ids: tuple[int, ...] | None,
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
@@ -624,6 +802,24 @@ def main(
         raise click.BadParameter(
             f"lr_per_sample must be positive, got {lr_per_sample}",
             param_hint="--lr-per-sample",
+        )
+    # LR-schedule arg validation. Detailed range checks live in
+    # `build_lr_scheduler`; here we just catch obvious nonsense early so
+    # `--dry-run` surfaces the error before any subprocess is spawned.
+    if lr_schedule not in ("flat", "cosine"):
+        raise click.BadParameter(
+            f"lr_schedule must be one of {{flat, cosine}}, got {lr_schedule!r}",
+            param_hint="--lr-schedule",
+        )
+    if not 0.0 <= warmup_ratio < 1.0:
+        raise click.BadParameter(
+            f"warmup_ratio must be in [0.0, 1.0), got {warmup_ratio}",
+            param_hint="--warmup-ratio",
+        )
+    if not 0.0 <= lr_min_ratio <= 1.0:
+        raise click.BadParameter(
+            f"lr_min_ratio must be in [0.0, 1.0], got {lr_min_ratio}",
+            param_hint="--lr-min-ratio",
         )
 
     # Deduplicate methods, preserving order.
@@ -658,6 +854,9 @@ def main(
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 lr_per_sample=lr_per_sample,
+                lr_schedule=lr_schedule,
+                warmup_ratio=warmup_ratio,
+                lr_min_ratio=lr_min_ratio,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -671,6 +870,9 @@ def main(
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 lr_per_sample=lr_per_sample,
+                lr_schedule=lr_schedule,
+                warmup_ratio=warmup_ratio,
+                lr_min_ratio=lr_min_ratio,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -686,6 +888,9 @@ def main(
                 val_every_n_steps=val_every_n_steps,
                 gaussian_stdev_values=gaussian_stdev,
                 lr_per_sample=lr_per_sample,
+                lr_schedule=lr_schedule,
+                warmup_ratio=warmup_ratio,
+                lr_min_ratio=lr_min_ratio,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -702,6 +907,9 @@ def main(
                 factorized=factorized,
                 gaussian_stdev_values=gaussian_stdev,
                 lr_per_sample=lr_per_sample,
+                lr_schedule=lr_schedule,
+                warmup_ratio=warmup_ratio,
+                lr_min_ratio=lr_min_ratio,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -719,6 +927,9 @@ def main(
                 use_factorized_likelihoods=use_factorized_likelihoods,
                 gaussian_stdev_values=gaussian_stdev,
                 lr_per_sample=lr_per_sample,
+                lr_schedule=lr_schedule,
+                warmup_ratio=warmup_ratio,
+                lr_min_ratio=lr_min_ratio,
                 label_type=label_type,
                 normalize_labels=normalize_labels,
                 label_range=label_range,
@@ -746,6 +957,8 @@ def main(
     click.echo(
         f"num_samples={num_samples}  gaussian_stdev={gaussian_stdev}  "
         f"lr_per_sample={lr_per_sample}  "
+        f"lr_schedule={lr_schedule}  warmup_ratio={warmup_ratio}  "
+        f"lr_min_ratio={lr_min_ratio}  "
         f"train_steps={train_steps}  gpus={pool.num_devices}  "
         f"train_from_scratch={train_from_scratch}  total_jobs={len(all_jobs)}"
     )

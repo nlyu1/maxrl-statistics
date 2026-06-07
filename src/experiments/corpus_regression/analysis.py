@@ -21,6 +21,7 @@ from src.experiments.corpus_regression.config import (
     baseline_mode_folder,
     factorized_mode_folder,
     likelihood_mode_folder,
+    lr_schedule_segment,
     sigma_folder,
 )
 
@@ -35,6 +36,30 @@ def _method_dir(method: str, *, train_from_scratch: bool) -> str:
     """Method-level artifact subfolder. From-scratch sweeps land in a parallel
     `<method>_scratch` tree alongside the pretrained-weight `<method>` tree."""
     return f"{method}_scratch" if train_from_scratch else method
+
+
+def _make_attach_sched(
+    *,
+    lr_schedule: Literal["flat", "cosine"],
+    warmup_ratio: float,
+    lr_min_ratio: float,
+):
+    """Closure that appends the optional schedule segment to a path.
+
+    For `lr_schedule == "flat"` returns the identity (default; preserves
+    today's exact paths). For `"cosine"` returns ``p / sched_seg``. The
+    segment string is computed once via the shared `lr_schedule_segment`
+    helper so write-side (config.py) and read-side (analysis.py) cannot
+    drift apart.
+    """
+    sched_seg = lr_schedule_segment(
+        lr_schedule=lr_schedule,
+        warmup_ratio=warmup_ratio,
+        lr_min_ratio=lr_min_ratio,
+    )
+    if sched_seg is None:
+        return lambda p: p
+    return lambda p: p / sched_seg
 
 
 def canonical_dataset_folder_name(
@@ -232,29 +257,42 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
         lr_per_sample: float = 1e-5,
+        lr_schedule: Literal["flat", "cosine"] = "flat",
+        warmup_ratio: float = 0.05,
+        lr_min_ratio: float = 0.1,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/sl[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/`."""
+        """`<artifacts_root>/sl[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/[sched-...]/`.
+
+        The `sched-warmup-X.XXX-cosine-X.XX` segment is appended only for
+        non-flat schedules; defaults reproduce today's flat-LR layout."""
         study_base = artifacts_root / _method_dir(
             "sl", train_from_scratch=train_from_scratch,
         )
         if not study_base.exists():
             return None
         lr_seg = f"lr_{lr_per_sample:.2e}"
+        attach_sched = _make_attach_sched(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             grouped[f"look={n}"] = [
                 (
                     s,
-                    study_base
-                    / _seed_folder_name(s)
-                    / canonical_dataset_folder_name(
-                        num_lookforward_tokens=n, num_samples=num_samples,
-                        label_type=label_type,
-                        normalize_labels=normalize_labels,
-                        label_range=label_range,
-                    )
-                    / lr_seg,
+                    attach_sched(
+                        study_base
+                        / _seed_folder_name(s)
+                        / canonical_dataset_folder_name(
+                            num_lookforward_tokens=n, num_samples=num_samples,
+                            label_type=label_type,
+                            normalize_labels=normalize_labels,
+                            label_range=label_range,
+                        )
+                        / lr_seg
+                    ),
                 )
                 for s in candidate_seeds
             ]
@@ -270,9 +308,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
         lr_per_sample: float = 1e-5,
+        lr_schedule: Literal["flat", "cosine"] = "flat",
+        warmup_ratio: float = 0.05,
+        lr_min_ratio: float = 0.1,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/sl_ce[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/`.
+        """`<artifacts_root>/sl_ce[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/[sched-...]/`.
 
         Identical layout to the SL sweep — `sl_ce` produces the same
         `train_metrics.parquet` / `val_metrics.parquet` schema and the same
@@ -286,20 +327,27 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         if not study_base.exists():
             return None
         lr_seg = f"lr_{lr_per_sample:.2e}"
+        attach_sched = _make_attach_sched(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             grouped[f"look={n}"] = [
                 (
                     s,
-                    study_base
-                    / _seed_folder_name(s)
-                    / canonical_dataset_folder_name(
-                        num_lookforward_tokens=n, num_samples=num_samples,
-                        label_type=label_type,
-                        normalize_labels=normalize_labels,
-                        label_range=label_range,
-                    )
-                    / lr_seg,
+                    attach_sched(
+                        study_base
+                        / _seed_folder_name(s)
+                        / canonical_dataset_folder_name(
+                            num_lookforward_tokens=n, num_samples=num_samples,
+                            label_type=label_type,
+                            normalize_labels=normalize_labels,
+                            label_range=label_range,
+                        )
+                        / lr_seg
+                    ),
                 )
                 for s in candidate_seeds
             ]
@@ -316,9 +364,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
         lr_per_sample: float = 1e-5,
+        lr_schedule: Literal["flat", "cosine"] = "flat",
+        warmup_ratio: float = 0.05,
+        lr_min_ratio: float = 0.1,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/grpo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/lr_{lr}/`."""
+        """`<artifacts_root>/grpo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/lr_{lr}/[sched-...]/`."""
         study_base = artifacts_root / _method_dir(
             "grpo", train_from_scratch=train_from_scratch,
         )
@@ -326,23 +377,30 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             return None
         sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
         lr_seg = f"lr_{lr_per_sample:.2e}"
+        attach_sched = _make_attach_sched(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
                 grouped[f"look={n} r={r}"] = [
                     (
                         s,
-                        study_base
-                        / _seed_folder_name(s)
-                        / f"rollouts-{r}"
-                        / sigma
-                        / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples,
-                            label_type=label_type,
-                            normalize_labels=normalize_labels,
-                            label_range=label_range,
-                        )
-                        / lr_seg,
+                        attach_sched(
+                            study_base
+                            / _seed_folder_name(s)
+                            / f"rollouts-{r}"
+                            / sigma
+                            / canonical_dataset_folder_name(
+                                num_lookforward_tokens=n, num_samples=num_samples,
+                                label_type=label_type,
+                                normalize_labels=normalize_labels,
+                                label_range=label_range,
+                            )
+                            / lr_seg
+                        ),
                     )
                     for s in candidate_seeds
                 ]
@@ -360,9 +418,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
         lr_per_sample: float = 1e-5,
+        lr_schedule: Literal["flat", "cosine"] = "flat",
+        warmup_ratio: float = 0.05,
+        lr_min_ratio: float = 0.1,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/rloo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/lr_{lr}/`.
+        """`<artifacts_root>/rloo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/lr_{lr}/[sched-...]/`.
         `factorized` is fixed per call — surface it in the figure title."""
         study_base = artifacts_root / _method_dir(
             "rloo", train_from_scratch=train_from_scratch,
@@ -372,24 +433,31 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         factorized_mode = factorized_mode_folder(factorized=factorized)
         sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
         lr_seg = f"lr_{lr_per_sample:.2e}"
+        attach_sched = _make_attach_sched(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
                 grouped[f"look={n} r={r}"] = [
                     (
                         s,
-                        study_base
-                        / _seed_folder_name(s)
-                        / f"rollouts-{r}"
-                        / sigma
-                        / factorized_mode
-                        / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples,
-                            label_type=label_type,
-                            normalize_labels=normalize_labels,
-                            label_range=label_range,
-                        )
-                        / lr_seg,
+                        attach_sched(
+                            study_base
+                            / _seed_folder_name(s)
+                            / f"rollouts-{r}"
+                            / sigma
+                            / factorized_mode
+                            / canonical_dataset_folder_name(
+                                num_lookforward_tokens=n, num_samples=num_samples,
+                                label_type=label_type,
+                                normalize_labels=normalize_labels,
+                                label_range=label_range,
+                            )
+                            / lr_seg
+                        ),
                     )
                     for s in candidate_seeds
                 ]
@@ -408,9 +476,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
         lr_per_sample: float = 1e-5,
+        lr_schedule: Literal["flat", "cosine"] = "flat",
+        warmup_ratio: float = 0.05,
+        lr_min_ratio: float = 0.1,
         train_from_scratch: bool = False,
     ) -> Self | None:
-        """`<artifacts_root>/maxrl[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/lr_{lr}/`.
+        """`<artifacts_root>/maxrl[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/lr_{lr}/[sched-...]/`.
         Both flags are fixed per call — surface them in the figure title."""
         study_base = artifacts_root / _method_dir(
             "maxrl", train_from_scratch=train_from_scratch,
@@ -423,25 +494,32 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         )
         sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
         lr_seg = f"lr_{lr_per_sample:.2e}"
+        attach_sched = _make_attach_sched(
+            lr_schedule=lr_schedule,
+            warmup_ratio=warmup_ratio,
+            lr_min_ratio=lr_min_ratio,
+        )
         grouped: dict[str, list[tuple[int, Path]]] = {}
         for n in candidate_lookforward_tokens:
             for r in candidate_rollout_steps:
                 grouped[f"look={n} r={r}"] = [
                     (
                         s,
-                        study_base
-                        / _seed_folder_name(s)
-                        / f"rollouts-{r}"
-                        / sigma
-                        / baseline
-                        / likelihood
-                        / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples,
-                            label_type=label_type,
-                            normalize_labels=normalize_labels,
-                            label_range=label_range,
-                        )
-                        / lr_seg,
+                        attach_sched(
+                            study_base
+                            / _seed_folder_name(s)
+                            / f"rollouts-{r}"
+                            / sigma
+                            / baseline
+                            / likelihood
+                            / canonical_dataset_folder_name(
+                                num_lookforward_tokens=n, num_samples=num_samples,
+                                label_type=label_type,
+                                normalize_labels=normalize_labels,
+                                label_range=label_range,
+                            )
+                            / lr_seg
+                        ),
                     )
                     for s in candidate_seeds
                 ]
@@ -494,7 +572,11 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         # the primary metric was selected at.
         std_aggs: dict[str, pl.DataFrame] = {}
         for split in ("train", "val"):
-            for suffix in ("pred_std", "target_std", "pred_std_ratio"):
+            for suffix in (
+                # "pred_std", 
+                # "target_std", 
+                "pred_std_ratio",
+                ):
                 col = f"{split}_{suffix}"
                 if col in df.columns:
                     std_aggs[col] = self._aggregate_by_step(df=df, y_name=col)
@@ -558,9 +640,15 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     def get_train_dataframe(self) -> pl.DataFrame:
         """Concat per-(study, seed) `train_metrics.parquet` files.
 
-        Returns frame with columns: study, seed, step, loss, mse, corr.
-        Runs that predate the per-step `corr` column get the column
-        synthesized as null so concat schemas line up."""
+        Returns frame with columns: study, seed, step, loss, mse, corr,
+        pred_var, target_var, lr. Parquets that predate any of these
+        columns get them synthesized as null so concat schemas line up:
+        `corr` (added in the per-step-logging migration), `pred_var` /
+        `target_var` (added with the prediction/target sufficient-stat
+        columns), and `lr` (added with the linear-warmup + cosine LR
+        scheduler). Without these backfills, mixing old + new parquets in
+        a single sweep raises `polars.exceptions.ShapeError`."""
+        backfill_cols = ("corr", "pred_var", "target_var", "lr")
         frames: list[pl.DataFrame] = []
         for name, paths in self.studies.items():
             seeds = self.study_seeds[name]
@@ -569,9 +657,10 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 if not train_path.exists():
                     continue
                 df = pl.read_parquet(train_path)
-                if "corr" not in df.columns:
+                missing = [c for c in backfill_cols if c not in df.columns]
+                if missing:
                     df = df.with_columns(
-                        pl.lit(None, dtype=pl.Float64).alias("corr")
+                        [pl.lit(None, dtype=pl.Float64).alias(c) for c in missing]
                     )
                 frames.append(
                     df.with_columns(
@@ -593,6 +682,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     "loss": pl.Float64,
                     "mse": pl.Float64,
                     "corr": pl.Float64,
+                    "pred_var": pl.Float64,
+                    "target_var": pl.Float64,
+                    "lr": pl.Float64,
                 }
             )
         return pl.concat(frames)
