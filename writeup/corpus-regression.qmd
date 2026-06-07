@@ -10,15 +10,20 @@ The corpus-regression task performs next-token regression on natural-language pr
 Placeholder. Sweep pending completion. We do see weak advantage of MaxRL.
 :::
 
-## Dataset
+## Problem setup
 
-See [`src/data/corpus_regression.py`]({{< var repo_url >}}/src/data/corpus_regression.py).
+Fix a document distribution $p$ over fineweb-edu and a prefix length $n = L = 128$. Pick a deterministic observation function $f : V \to \mathbb{R}^k$ on the tokenizer vocabulary $V$. The task is to predict the conditional expectation of $f$ at the $K$-th lookahead token from the prefix only:
+$$
+g(x_{1:n}) \;:=\; \mathbb{E}_{x_{n+K} \,\sim\, p(\cdot \mid x_{1:n})}\, f(x_{n+K}),
+$$
+using a parametric estimator $g_\theta$. Intermediate tokens $x_{n+1}, \dots, x_{n+K-1}$ are **not** exposed to the model; with $K = 1$ this collapses to next-token expectation, and with $K > 1$ it is a skip-ahead target. The same fineweb-edu sample is therefore truncated to its first $n + K$ tokens, the prefix is the first $n$, and the label is derived from the token at position $n + K$ alone.
 
-Each sample is the first ($L=128$) tokens of a fineweb-edu document. The label is a deterministic $D=32$-dimensional Rademacher (random $\pm 1$) embedding of the token at position $L + k - 1$, where $k \ge 1$ is `num_lookforward_tokens`.
+Two label families are implemented in [`src/data/corpus_regression.py`]({{< var repo_url >}}/src/data/corpus_regression.py) (lines 81–202):
 
-With $k = 1$ this is next-token prediction; with $k > 1$ the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding. The random embedding is keyed by token id with a fixed seed for reproducibility.
+- **`token_id`** *(current canonical setting)*. $k = 1$. Either the raw integer id $f(t) = t$, or, when `normalize_labels=True`, the rescaled $f(t) = \mathrm{lo} + (\mathrm{hi} - \mathrm{lo})\cdot t / |V|$ on the configured `label_range` (canonical `(0.0, 1.0)`). The `_enforce_token_id_dim` validator forces `embedding_dim = 1` whenever this label type is selected, so all formulas below carry through with $D = 1$ for the current sweeps.
+- **`rademacher`** *(earlier variant, kept in code)*. $k = D = 32$. $f(t)$ is the row of a vocab-keyed $\pm 1$ matrix `_rademacher_matrix` (`manual_seed(0)`, lines 157–164) — deterministic across runs and configs, so the same token id always maps to the same vector. With $D = 32$ this gives a bounded, isotropic, zero-mean-in-expectation target in $\{-1, +1\}^{32}$.
 
-The canonical configuration uses $L = 128$ prefix length and $D = 32$ embedding, and 100k train / 100k val samples.
+The model is [`CausalLMWithLinearHead`]({{< var repo_url >}}/src/model/minimal.py) (lines 57–105): a SmolLM2-135M backbone followed by a fresh `nn.Linear(hidden_size, D, bias=False)` head applied to the **last-position** hidden state. Head rows are randomly initialized and renormalized to unit norm via `initial_output_norms = [1.0] * D`. The whole stack is fine-tuned in bfloat16 inside `torch.cuda.device(...)` / `torch.autocast(...)` contexts.
 
 ```{=html}
 <iframe src="assets/corpus-regression/demonstrate.html"
@@ -70,6 +75,197 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 ```
+
+## Canonical recipe
+
+The current setting we are adopting is the [`vince-sweep.bash`]({{< var repo_url >}}/experiments/corpus-regression/vince-sweep.bash) recipe: `token_id` labels, normalized to $[0, 1]$, $D = 1$, $K = 1$, three rollout counts, both pretrained and from-scratch SmolLM2-135M.
+
+| Knob | Value | Source |
+|---|---|---|
+| Backbone | SmolLM2-135M (pretrained **and** from-scratch) | `vince-sweep.bash:13–14`, `model/minimal.py:23–34` |
+| `prefix_length` $n$ | 128 | `config.py:57` |
+| `num_lookforward_tokens` $K$ | 1 | `vince-sweep.bash:46` |
+| `label_type` | `token_id`, `normalize_labels=True`, range $[0,1]$ | `vince-sweep.bash:30–34` |
+| `num_samples` per split | 100k and 500k | `vince-sweep.bash:11` |
+| `train_batch_size` | 64 | `config.py:60` |
+| `train_steps` (val every) | 10 000 (every 500) | `vince-sweep.bash:44–45` |
+| `lr_per_sample` | $10^{-4}$ ⇒ head lr $64\!\cdot\!10^{-4}$, backbone lr $\div\,6.66$ | `vince-sweep.bash:15`, `config.py:102–108` |
+| LR schedule | flat (no warmup) | `config.py:65` |
+| `gaussian_stdev` $\sigma$ | 1.0 | `vince-sweep.bash:12` |
+| Rollouts $R$ | 16, 64, 256 | `vince-sweep.bash:10` |
+| Rollout policy | isotropic Gaussian $\mathcal N(g_\theta(x), \sigma^2 I_D)$ | `grpo.py:24–29`, `maxrl.py:25–36`, `rloo.py:23–27` |
+| MaxRL flags | `--subtract-baseline`, `--use-factorized-likelihoods` | `vince-sweep.bash:51–52` |
+| RLOO flag | `--factorized` | `vince-sweep.bash:53` |
+| `clip_grad_norm` | 1.0 | `config.py:70` |
+| Compile | `torch.compile(..., mode="reduce-overhead")` on CUDA | `config.py:241–242` |
+| Precision | bfloat16 autocast inside `torch.cuda.device(...)` | `state.py:241–245` |
+
+## Optimization problem and evaluation metric
+
+### Population objective
+
+Every method below estimates — through some surrogate — the same population MSE,
+$$
+\mathcal{E}(\theta) \;:=\; \mathbb{E}_{x_{1:n} \sim p}\, \mathbb{E}_{x_{n+K} \sim p(\cdot \mid x_{1:n})}\, \bigl\lVert g_\theta(x_{1:n}) - f(x_{n+K}) \bigr\rVert^2.
+$$
+The Bayes-optimal predictor is $g^\ast(x_{1:n}) = \mathbb{E}\bigl[f(x_{n+K}) \mid x_{1:n}\bigr]$, achieving the **intrinsic-variance** lower bound $\mathbb{E}\,\mathrm{Var}\bigl[f(x_{n+K}) \mid x_{1:n}\bigr]$. The NTP baseline (§4.1) is our proxy for this lower bound.
+
+### Held-out evaluation metric
+
+Per-batch sufficient statistics $(xx_d, xy_d, yy_d, \sum_b f_\theta(x_b)_d, \sum_b y_{b,d}, n)$ are accumulated by `RegressionStatCounter` ([`src/metrics.py:56–62`]({{< var repo_url >}}/src/metrics.py)) and reduced to two scalars dim-averaged across $D$ output coordinates ([`_scalar_corr_from_stats`]({{< var repo_url >}}/src/experiments/corpus_regression/state.py), `state.py:121–131`):
+$$
+\widehat{\mathrm{mse}} \;=\; \frac{1}{D}\sum_{d=1}^{D} \frac{xx_d - 2\, xy_d + yy_d}{N},
+\qquad
+\widehat{\mathrm{corr}} \;=\; \frac{1}{D}\sum_{d=1}^{D} \frac{xy_d}{\sqrt{xx_d\, yy_d}}.
+$$
+
+::: {.callout-warning}
+**`corr` is uncentered cosine similarity per dim, not Pearson.** The dataset means $\bar y_d$ are not subtracted in the numerator or denominator. For Rademacher labels $\bar y_d \approx 0$ and the two coincide; for `token_id` labels (target mean far from zero) cosine $\neq$ Pearson and the metric should be read accordingly. The same uncentered formula is applied at plot time in [`_decode_dim_averaged`]({{< var repo_url >}}/src/experiments/corpus_regression/analysis.py) (`analysis.py:90–114`), so written numbers and plotted numbers always agree.
+:::
+
+### Train-window aggregate vs. held-out val
+
+Each row of `val_metrics.parquet` carries **two** sets of sufficient stats: `val_target_*` is computed on the held-out validation set at every val step; `train_target_*` is the sum of the per-batch sufficient stats over **all training batches between val flushes** (`TrainStepOutput` in `state.py:24–46`; `_serialize_val` docstring at `state.py:318–331`). The latter is therefore a **moving aggregate over changing model snapshots within the most recent val window** — it is *not* a held-out train-set evaluation, so it tends to be noisier and slightly more pessimistic than a fresh-pass eval would give.
+
+## Methods
+
+The codebase implements six estimators, all targeting $g_\theta \approx g^\ast$ but with different surrogate losses, gradient identities, and finite-$R$ behaviours.
+
+#### 4.1 NTP baseline — inference-only proxy for $g^\ast$
+
+[`src/experiments/corpus_regression/ntp_baseline.py:105–197`]({{< var repo_url >}}/src/experiments/corpus_regression/ntp_baseline.py).
+
+Use the **pretrained** SmolLM2-135M next-token distribution $p_\phi(\cdot \mid x_{1:n})$ directly:
+$$
+\hat g(x_{1:n}) \;=\; \sum_{t \in V} p_\phi(t \mid x_{1:n})\, f(t) \;=\; \mathrm{softmax}\bigl(\mathrm{logits}\bigr)_{:,-1}\, \Phi,
+$$
+where the **label projector** $\Phi \in \mathbb{R}^{|V| \times D}$ is the Rademacher matrix or, for token-id labels, $\Phi_{t} = (\mathrm{lo} + (\mathrm{hi}-\mathrm{lo})\cdot t / |V|)$ (lines 138–151). This is the exact closed form of $\mathbb{E}_{t \sim p_\phi}[f(t)]$. Under the assumption $p_\phi \approx p$, $\hat g \approx g^\ast$ and the resulting val MSE upper-bounds the intrinsic variance — every other method's MSE is benchmarked against it. No training is involved, so $R$ does not apply.
+
+#### 4.2 SL — direct MSE regression
+
+[`sl.py:25–70`]({{< var repo_url >}}/src/experiments/corpus_regression/sl.py).
+
+Surrogate is plain MSE on the deterministic last-position projection $g_\theta(x) := f_\theta(x)$:
+$$
+\mathcal{L}_{\text{SL}}(\theta) \;=\; \frac{1}{B D} \sum_{b,d} \bigl(g_\theta(x^{(b)})_d - y^{(b)}_d\bigr)^2.
+$$
+The population gradient identity is the standard $\nabla_\theta \mathcal{E}(\theta) = 2\,\mathbb{E}\!\left[(g_\theta(x) - y)\,\nabla_\theta g_\theta(x)\right]$, so the minibatch gradient is an unbiased Monte-Carlo estimate independent of any rollout count. SL is the reference all RL methods are compared against.
+
+#### 4.3 SL-CE — NTP cross-entropy with projected eval
+
+[`sl_ce.py:312–398`]({{< var repo_url >}}/src/experiments/corpus_regression/sl_ce.py).
+
+Trains the **native** SmolLM2 `lm_head` end-to-end (no swapped regression head). Training loss is plain cross-entropy on the lookahead token id:
+$$
+\mathcal{L}_{\text{SL-CE}}(\theta) \;=\; -\frac{1}{B}\sum_{b} \log p_\theta\bigl(x^{(b)}_{n+K} \,\bigm|\, x^{(b)}_{1:n}\bigr).
+$$
+Intermediate tokens are not exposed: the CE always fires at the $K$-th-ahead position. The current sweep uses $K = 1$, but the formulation is well-defined for any $K$.
+
+For evaluation we project the softmax through the same label projector $\Phi$ used by the NTP baseline,
+$$
+\hat g_\theta(x_{1:n}) \;:=\; \mathrm{softmax}\bigl(\mathrm{logits}_\theta(x_{1:n})\bigr)_{:,-1}\, \Phi,
+$$
+so val MSE / `corr` live in the same target space as SL/RL methods (`sl_ce.py:336–351`). As $p_\theta \to p$ pointwise, $\hat g_\theta \to g^\ast$. When $f$ is bijective on $V$ (e.g. token-id labels), CE on $p_\theta$ is in fact a **stronger** training signal than SL on $f$: $p_\theta$ is a sufficient statistic for any downstream observation function.
+
+#### 4.4 RLOO — per-dim leave-one-out advantages
+
+[`rloo.py:69–174`]({{< var repo_url >}}/src/experiments/corpus_regression/rloo.py).
+
+Wrap the deterministic prediction in an isotropic Gaussian rollout policy
+$$
+\pi_\theta(z \mid x) \;=\; \mathcal{N}\!\bigl(g_\theta(x),\, \sigma^2 I_D\bigr),
+$$
+sample $R$ rollouts $z_1, \dots, z_R$ per prompt, and use the negative squared error as reward. With `factorized=True` (the canonical setting in `vince-sweep.bash`), the reward is **per output dimension**:
+$$
+r_{j,d} \;=\; -(z_{j,d} - y_d)^2,
+\qquad
+A_{j,d} \;=\; r_{j,d} - \frac{1}{R-1}\sum_{i \neq j} r_{i,d} \;=\; \frac{R}{R-1}\bigl(r_{j,d} - \bar r_d\bigr).
+$$
+(In `factorized=False` mode the reward is joint, $r_j = -\lVert z_j - y\rVert^2$, and the same scalar $A_j$ is broadcast across $D$.) The per-dim log-policy drops $\theta$-independent constants:
+$$
+\log \pi_\theta(z_j \mid x)_d \;=\; -\tfrac{1}{2\sigma^2}(z_{j,d} - g_\theta(x)_d)^2 + \mathrm{const}(\theta).
+$$
+The surrogate loss in code (line 160) is
+$$
+\mathcal{L}_{\text{RLOO}}(\theta) \;=\; -\frac{1}{B R}\sum_{b,j}\sum_d A_{j,d}\, \log \pi_\theta(z_j \mid x^{(b)})_d.
+$$
+
+**Unbiasedness.** REINFORCE gives $\nabla_\theta \mathbb{E}_z[r(z)] = \mathbb{E}_z[r(z)\,\nabla_\theta \log \pi_\theta(z)]$. The leave-one-out baseline depends only on the peer rollouts $z_{-j}$, so for the $j$-th term
+$$
+\mathbb{E}\!\left[A_{j,d}\,\nabla_\theta \log \pi_\theta(z_j)_d \,\middle|\, z_{-j}\right]
+\;=\; \mathbb{E}_{z_j}\!\left[r_{j,d}\,\nabla_\theta \log \pi_\theta(z_j)_d\right] - 0,
+$$
+because the conditional baseline contribution kills under the score-function identity $\mathbb{E}[\nabla_\theta \log \pi_\theta(z_j)] = 0$. Variance drops without bias.
+
+**Limit $R \to \infty$.** With Gaussian policy,
+$$
+\mathbb{E}_{z \sim \mathcal{N}(g_\theta(x), \sigma^2 I)}\bigl[-\lVert z - y\rVert^2\bigr]
+\;=\; -\lVert g_\theta(x) - y\rVert^2 - D\sigma^2,
+$$
+so maximizing the population reward is **identical to minimizing SL's MSE** up to a $\theta$-independent additive constant $D\sigma^2$. RLOO's expected gradient agrees with SL's; only the Monte-Carlo variance (which the leave-one-out baseline reduces) separates them at finite $R$.
+
+#### 4.5 GRPO — group-standardized advantages
+
+[`grpo.py:21–139`]({{< var repo_url >}}/src/experiments/corpus_regression/grpo.py).
+
+Same isotropic Gaussian policy as RLOO, **joint** reward $r_j = -\lVert z_j - y\rVert^2$, but with group-standardized advantage
+$$
+A_j \;=\; \frac{r_j - \bar r}{\mathrm{std}(r) + 10^{-8}}.
+$$
+The surrogate loss couples the joint log-policy $\log\pi_\theta(z_j \mid x) = -\tfrac{1}{2\sigma^2}\lVert z_j - g_\theta(x)\rVert^2 + \mathrm{const}$ to $A_j$:
+$$
+\mathcal{L}_{\text{GRPO}}(\theta) \;=\; -\frac{1}{B R}\sum_{b,j} A_j\, \log \pi_\theta(z_j \mid x^{(b)}).
+$$
+
+**Unbiasedness — careful.** Unlike the RLOO leave-one-out baseline, GRPO's $\mathrm{std}(r)$ divisor is computed from **all** $z_{1:R}$, including $z_j$. The score-function identity therefore does not cleanly collapse the baseline term, and GRPO targets a *whitened* surrogate of the REINFORCE gradient rather than the bare REINFORCE gradient. This is a deliberate variance-reduction / step-size-stabilization heuristic, not a bias-free reduction.
+
+**Limit $R \to \infty$.** $\mathrm{std}(r) \to \sigma_r(\theta)$ deterministically, so the gradient direction approaches RLOO's joint variant — which itself collapses to SL's gradient direction by the calculation in §4.4 — modulo the multiplicative scalar $1/\sigma_r(\theta)$.
+
+#### 4.6 MaxRL — leave-one-out U-statistic
+
+[`maxrl.py:24–198`]({{< var repo_url >}}/src/experiments/corpus_regression/maxrl.py); estimator in [`src/maxrl_estimator.py`]({{< var repo_url >}}/src/maxrl_estimator.py). Sketch + link; full DP derivation lives in [MaxRL gradient estimator details](gradient-estimator.qmd).
+
+Same Gaussian rollout policy. Define the per-rollout **likelihood** $\ell(y, z) := \mathcal{N}(y;\, z,\, \sigma^2 I_D)$, supremum $L = (2\pi\sigma^2)^{-D/2}$, and normalized $\sigma_j := \ell(y, z_j) / L \in [0, 1]$. Let $\sigma_\theta := \mathbb{E}_z[\sigma_j]$ be the marginal normalized likelihood.
+
+**Population objective.** Degree-$D$ Maclaurin truncation of $\log \sigma_\theta$ about $\sigma_\theta = 1$:
+$$
+J_D(\theta) \;:=\; -\sum_{k=1}^{D} \frac{(1 - \sigma_\theta)^k}{k},
+\qquad
+J_\infty(\theta) \;=\; \log \sigma_\theta \;=\; \log \mathbb{E}_z\!\left[\ell(y, z)\right] - \log L.
+$$
+This matches the $\log \mathbb{E}_y \exp(-\lVert y - z\rVert^2)$ form in `nogit_draft.tex` up to additive constants.
+
+**Estimator.** With `subtract_baseline=True` (canonical),
+$$
+\hat g_D \;=\; \frac{1}{R}\sum_{j=1}^R \omega_j\, \sigma^{(\text{eff})}_j\, \nabla_\theta \log \pi_\theta(z_j \mid x),
+\qquad
+\sigma^{(\text{eff})}_j \;=\; \frac{R}{R-1}\bigl(\sigma_j - \bar\sigma\bigr).
+$$
+Each $\omega_j$ is a **leave-one-out U-statistic** over the peer complements $a_{-j} = (1 - \sigma_i)_{i \neq j}$, satisfying $\mathbb{E}[\omega_j] = w_D(\sigma_\theta) := \sum_{d=0}^{D-1}(1 - \sigma_\theta)^d$. The U-statistic is computed in log-space via a bidiagonal-recurrence prefix/suffix scan; see [gradient-estimator.qmd](gradient-estimator.qmd) for the DP and numerics. Unbiasedness follows because $\omega_j$ depends only on $z_{-j}$ and the peer-mean baseline $\bar\sigma_{-j} = (R\bar\sigma - \sigma_j)/(R-1)$ likewise decouples from $z_j$.
+
+**Factorized vs joint.** The canonical sweep uses `use_factorized_likelihoods=True`: each output dim is treated as an independent 1-D Gaussian regression with $\ell_d(y_d, z_d) = \mathcal{N}(y_d; z_d, \sigma^2)$; the U-statistic runs per-dim. This caps $\sigma_\theta \le 1/\sqrt 2$ regardless of $D$, avoiding the $2^{-D/2}$ collapse of the joint variant when $D$ is large (`maxrl.py:24–36, 99–127`).
+
+The surrogate loss in code (line 184) packages this as
+$$
+\mathcal{L}_{\text{MaxRL}}(\theta) \;=\; -\frac{1}{B R}\sum_{b,j} \sum_d c_{b,j,d}\, \log \pi_\theta(z_j \mid x^{(b)})_d,
+\qquad
+c_{b,j,d} = \omega_{b,j,d}\, \sigma^{(\text{eff})}_{b,j,d}.
+$$
+
+**Limit $R \to \infty$ (with degree $D = R$).** $\hat g_D \to \nabla_\theta J_\infty(\theta) = \nabla_\theta \log \mathbb{E}_z[\ell(y, z)]$. For the Gaussian policy and Gaussian likelihood, the convolution identity gives
+$$
+\mathbb{E}_{z \sim \mathcal{N}(g_\theta(x), \sigma^2 I)}\!\left[\mathcal{N}(y; z, \sigma^2 I)\right]
+\;=\; \mathcal{N}\!\bigl(y;\, g_\theta(x),\, 2\sigma^2 I\bigr),
+$$
+so
+$$
+J_\infty(\theta) \;=\; -\frac{1}{4\sigma^2}\, \lVert g_\theta(x) - y\rVert^2 + \mathrm{const}.
+$$
+**MaxRL's $R \to \infty$ limit is therefore exactly SL's MSE objective up to a positive scalar $1/(4\sigma^2)$ and a $\theta$-independent additive constant.**
+
+::: {.callout-note}
+**Limit-behaviour summary.** As the per-prompt rollout count $R$ (and MaxRL's truncation degree $D = R$) goes to infinity, the GRPO / RLOO / MaxRL gradient estimators all converge to a positive multiple of the SL (MSE) gradient — RLOO via $\mathbb{E}_z[-\lVert z - y\rVert^2] = -\lVert g_\theta(x) - y\rVert^2 - D\sigma^2$, MaxRL via the Gaussian-convolution identity above, and GRPO by reduction to RLOO's joint variant. The three RL methods are best read as **finite-$R$ estimators of SL** with different bias/variance trade-offs, not as fundamentally different objectives — a useful lens for the rollout sweeps below.
+:::
 
 ## Experiments
 
@@ -142,7 +338,7 @@ See [`experiments/corpus-regression/README.md`]({{< var repo_url >}}/experiments
 
 #### MaxRL (subtract-baseline + factorized)
 
-See [MaxRL estimator: leave-one-out derivation](maxrl-estimator.qmd) for the estimator math used here.
+See [MaxRL gradient estimator details](gradient-estimator.qmd) for the estimator math used here.
 
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
