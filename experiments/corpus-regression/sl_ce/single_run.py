@@ -44,6 +44,7 @@ METHOD = "sl_ce"
 @click.option("--train-steps", type=int, default=10_000, show_default=True)
 @click.option("--val-every-n-steps", type=int, default=2000, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
+@click.option("--batch-size", type=int, default=64, show_default=True, help="Training batch size; non-default values route artifacts under a `bs-{N}` path segment.")
 @click.option("--lr-per-sample", type=float, default=1e-5, show_default=True, help="Per-sample learning rate; final lr = lr_per_sample × batch_size / divisor.")
 @click.option(
     "--lr-schedule",
@@ -98,6 +99,7 @@ def main(
     train_steps: int,
     val_every_n_steps: int,
     num_samples: int,
+    batch_size: int,
     lr_per_sample: float,
     lr_schedule: str,
     warmup_ratio: float,
@@ -131,6 +133,7 @@ def main(
         train_steps=train_steps,
         val_every_n_steps=val_every_n_steps,
         num_samples=num_samples,
+        batch_size=batch_size,
         lr_per_sample=lr_per_sample,
         lr_schedule=lr_schedule,
         warmup_ratio=warmup_ratio,

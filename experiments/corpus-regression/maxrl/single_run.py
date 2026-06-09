@@ -45,6 +45,7 @@ METHOD = "maxrl"
 @click.option("--train-steps", type=int, default=10_000, show_default=True)
 @click.option("--val-every-n-steps", type=int, default=2000, show_default=True)
 @click.option("--num-samples", type=int, default=100_000, show_default=True)
+@click.option("--batch-size", type=int, default=64, show_default=True, help="Training batch size; non-default values route artifacts under a `bs-{N}` path segment.")
 @click.option("--gaussian-stdev", type=float, default=1.0, show_default=True)
 @click.option("--lr-per-sample", type=float, default=1e-5, show_default=True, help="Per-sample learning rate; final head_lr = lr_per_sample × batch_size.")
 @click.option("--lr-schedule", type=click.Choice(["flat", "cosine"]), default="flat", show_default=True, help="LR schedule shape. 'flat' = no scheduler (today's behaviour). 'cosine' = linear warmup then half-cosine decay to lr_min_ratio × peak.")
@@ -64,6 +65,7 @@ def main(
     train_steps: int,
     val_every_n_steps: int,
     num_samples: int,
+    batch_size: int,
     gaussian_stdev: float,
     lr_per_sample: float,
     lr_schedule: str,
@@ -103,6 +105,7 @@ def main(
         subtract_baseline=subtract_baseline,
         use_factorized_likelihoods=use_factorized_likelihoods,
         num_samples=num_samples,
+        batch_size=batch_size,
         lr_per_sample=lr_per_sample,
         lr_schedule=lr_schedule,
         warmup_ratio=warmup_ratio,

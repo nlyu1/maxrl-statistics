@@ -116,9 +116,12 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
+        bs_segment = batch_size_segment(batch_size=batch_size)
+        study_folder = study_base_folder / dataset_folder.name
+        if bs_segment is not None:
+            study_folder = study_folder / bs_segment
         study_folder = (
-            study_base_folder
-            / dataset_folder.name
+            study_folder
             / f"lr_{lr_per_sample:.2e}"
             / f"steps-{train_steps:06d}"
         )
@@ -268,6 +271,35 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
     ) -> CorpusRegressionStudyBaseState:
         common = self._build_common_state_kwargs(device=device)
         return self.get_state_cls()(**common, **self._extra_state_kwargs())
+
+
+# Default training batch size. Path layouts written before `batch_size` was
+# exposed as a sweep dimension all used this value. `batch_size_segment`
+# returns `None` here so existing artifacts keep their byte-for-byte path.
+DEFAULT_BATCH_SIZE: int = 64
+
+
+def batch_size_segment(*, batch_size: int) -> str | None:
+    """Optional path segment encoding the training batch size, inserted
+    **between** ``{dataset_folder.name}`` and ``lr_<value>`` in study folders
+    and orchestrator log paths.
+
+    Returns ``None`` for the canonical default (`DEFAULT_BATCH_SIZE = 64`)
+    so existing on-disk artifacts keep their byte-for-byte layout — exactly
+    mirroring `lr_schedule_segment`'s ``"flat" → None`` convention. For any
+    other value, returns ``f"bs-{batch_size}"``.
+
+    Both write-side (this module's ``canonical_kwargs``, ``sl_ce.py``'s
+    ``canonical_kwargs``) and read-side (``analysis.py`` ``from_*_sweep``
+    loaders) **must** call this same helper so they cannot drift apart.
+    """
+    if batch_size <= 0:
+        raise ValueError(
+            f"batch_size must be positive, got {batch_size!r}",
+        )
+    if batch_size == DEFAULT_BATCH_SIZE:
+        return None
+    return f"bs-{batch_size}"
 
 
 def baseline_mode_folder(*, subtract_baseline: bool) -> str:

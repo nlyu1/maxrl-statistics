@@ -16,6 +16,7 @@ FLAT=True
 COSINE=True
 LEARNING_RATES=1e-4,5e-5,2e-5
 LR_MIN_RATIO=0.5
+BATCH_SIZE=256
 
 METHOD_ARGS=(
     --method maxrl \
@@ -52,6 +53,7 @@ fi
 TRAIN_ARGS=(
     --train-steps 1500 \
     --val-every-n-steps 50 \
+    --batch-size ${BATCH_SIZE} \
     --lookforward-tokens 1 \
     --rollout-steps ${ROLLOUT_STEPS} \
     --gaussian-stdev ${GAUSSIAN_STDEV} \

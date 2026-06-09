@@ -39,8 +39,10 @@ chdir_repo_base()
 repo_root = get_repo_base()
 
 from src.experiments.corpus_regression.config import (  # noqa: E402
+    DEFAULT_BATCH_SIZE,
     artifacts_dir,
     baseline_mode_folder,
+    batch_size_segment,
     factorized_mode_folder,
     likelihood_mode_folder,
     lr_schedule_segment,
@@ -68,6 +70,15 @@ def _lr_log_segment(lr_per_sample: float) -> str:
     `<artifacts_dir>/<method>/logs/...`. Mirrors `lr_<value>` levels added by
     each method's `study_folder` so logs and parquets stay aligned."""
     return f"lr_{lr_per_sample:.2e}"
+
+
+def _bs_log_segment(batch_size: int) -> str | None:
+    """Path segment that disambiguates concurrent batch-size sweeps in
+    `<artifacts_dir>/<method>/logs/...`. Returns ``None`` for the canonical
+    default (`DEFAULT_BATCH_SIZE = 64`) so existing log paths are byte-for-
+    byte preserved — exactly mirroring `batch_size_segment` from config.py
+    on the artifact side."""
+    return batch_size_segment(batch_size=batch_size)
 
 
 def _steps_log_segment(train_steps: int) -> str:
@@ -213,6 +224,7 @@ def _build_sl_mse_jobs(
     seeds: tuple[int, ...],
     lookforward_tokens: tuple[int, ...],
     num_samples_values: tuple[int, ...],
+    batch_size_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
     lr_per_sample_values: tuple[float, ...],
@@ -233,18 +245,22 @@ def _build_sl_mse_jobs(
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, ns, lr_per_sample in itertools.product(
-        seeds, lookforward_tokens, num_samples_values, lr_per_sample_values,
+    for seed, lft, ns, bs, lr_per_sample in itertools.product(
+        seeds, lookforward_tokens, num_samples_values, batch_size_values,
+        lr_per_sample_values,
     ):
         lr_seg = _lr_log_segment(lr_per_sample)
+        bs_seg = _bs_log_segment(bs)
         label = (
-            f"sl_mse_seed-{seed}_look-{lft}_ns-{ns}"
+            f"sl_mse_seed-{seed}_look-{lft}_ns-{ns}_bs-{bs}"
             f"_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
             f"_lbl-{label_type}{sched_suffix}"
         )
+        log_path = artifacts_dir() / method_dir / "logs" / f"seed-{seed}"
+        if bs_seg is not None:
+            log_path = log_path / bs_seg
         log_path = (
-            artifacts_dir() / method_dir / "logs"
-            / f"seed-{seed}"
+            log_path
             / lr_seg
             / steps_seg
             / label_type
@@ -266,6 +282,7 @@ def _build_sl_mse_jobs(
             "--train-steps", str(train_steps),
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
+            "--batch-size", str(bs),
             "--lr-per-sample", str(lr_per_sample),
             "--lr-schedule", lr_schedule,
             "--warmup-ratio", str(warmup_ratio),
@@ -286,6 +303,7 @@ def _build_sl_ce_jobs(
     seeds: tuple[int, ...],
     lookforward_tokens: tuple[int, ...],
     num_samples_values: tuple[int, ...],
+    batch_size_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
     lr_per_sample_values: tuple[float, ...],
@@ -313,18 +331,22 @@ def _build_sl_ce_jobs(
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, ns, lr_per_sample in itertools.product(
-        seeds, lookforward_tokens, num_samples_values, lr_per_sample_values,
+    for seed, lft, ns, bs, lr_per_sample in itertools.product(
+        seeds, lookforward_tokens, num_samples_values, batch_size_values,
+        lr_per_sample_values,
     ):
         lr_seg = _lr_log_segment(lr_per_sample)
+        bs_seg = _bs_log_segment(bs)
         label = (
-            f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}"
+            f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}_bs-{bs}"
             f"_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
             f"_lbl-{label_type}{sched_suffix}"
         )
+        log_path = artifacts_dir() / method_dir / "logs" / f"seed-{seed}"
+        if bs_seg is not None:
+            log_path = log_path / bs_seg
         log_path = (
-            artifacts_dir() / method_dir / "logs"
-            / f"seed-{seed}"
+            log_path
             / lr_seg
             / steps_seg
             / label_type
@@ -346,6 +368,7 @@ def _build_sl_ce_jobs(
             "--train-steps", str(train_steps),
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
+            "--batch-size", str(bs),
             "--lr-per-sample", str(lr_per_sample),
             "--lr-schedule", lr_schedule,
             "--warmup-ratio", str(warmup_ratio),
@@ -367,6 +390,7 @@ def _build_grpo_jobs(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples_values: tuple[int, ...],
+    batch_size_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
     gaussian_stdev_values: tuple[float, ...],
@@ -388,13 +412,14 @@ def _build_grpo_jobs(
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, rollouts, ns, stdev, lr_per_sample in itertools.product(
+    for seed, lft, rollouts, ns, bs, stdev, lr_per_sample in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values,
-        gaussian_stdev_values, lr_per_sample_values,
+        batch_size_values, gaussian_stdev_values, lr_per_sample_values,
     ):
         lr_seg = _lr_log_segment(lr_per_sample)
+        bs_seg = _bs_log_segment(bs)
         label = (
-            f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}"
+            f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_bs-{bs}"
             f"_sigma-{stdev:.1f}_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
             f"_lbl-{label_type}{sched_suffix}"
         )
@@ -403,6 +428,11 @@ def _build_grpo_jobs(
             / f"seed-{seed}"
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
+        )
+        if bs_seg is not None:
+            log_path = log_path / bs_seg
+        log_path = (
+            log_path
             / lr_seg
             / steps_seg
             / label_type
@@ -425,6 +455,7 @@ def _build_grpo_jobs(
             "--train-steps", str(train_steps),
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
+            "--batch-size", str(bs),
             "--gaussian-stdev", str(stdev),
             "--lr-per-sample", str(lr_per_sample),
             "--lr-schedule", lr_schedule,
@@ -447,6 +478,7 @@ def _build_rloo_jobs(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples_values: tuple[int, ...],
+    batch_size_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
     factorized: bool,
@@ -469,14 +501,15 @@ def _build_rloo_jobs(
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, rollouts, ns, stdev, lr_per_sample in itertools.product(
+    for seed, lft, rollouts, ns, bs, stdev, lr_per_sample in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values,
-        gaussian_stdev_values, lr_per_sample_values,
+        batch_size_values, gaussian_stdev_values, lr_per_sample_values,
     ):
         lr_seg = _lr_log_segment(lr_per_sample)
+        bs_seg = _bs_log_segment(bs)
         label = (
             f"rloo_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_fact-{factorized}_sigma-{stdev:.1f}"
+            f"_ns-{ns}_bs-{bs}_fact-{factorized}_sigma-{stdev:.1f}"
             f"_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
             f"_lbl-{label_type}{sched_suffix}"
         )
@@ -486,6 +519,11 @@ def _build_rloo_jobs(
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
             / factorized_mode_folder(factorized=factorized)
+        )
+        if bs_seg is not None:
+            log_path = log_path / bs_seg
+        log_path = (
+            log_path
             / lr_seg
             / steps_seg
             / label_type
@@ -508,6 +546,7 @@ def _build_rloo_jobs(
             "--train-steps", str(train_steps),
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
+            "--batch-size", str(bs),
             "--factorized", str(factorized),
             "--gaussian-stdev", str(stdev),
             "--lr-per-sample", str(lr_per_sample),
@@ -531,6 +570,7 @@ def _build_maxrl_jobs(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples_values: tuple[int, ...],
+    batch_size_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
     subtract_baseline: bool,
@@ -554,14 +594,15 @@ def _build_maxrl_jobs(
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, rollouts, ns, stdev, lr_per_sample in itertools.product(
+    for seed, lft, rollouts, ns, bs, stdev, lr_per_sample in itertools.product(
         seeds, lookforward_tokens, rollout_steps, num_samples_values,
-        gaussian_stdev_values, lr_per_sample_values,
+        batch_size_values, gaussian_stdev_values, lr_per_sample_values,
     ):
         lr_seg = _lr_log_segment(lr_per_sample)
+        bs_seg = _bs_log_segment(bs)
         label = (
             f"maxrl_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}"
+            f"_ns-{ns}_bs-{bs}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}"
             f"_sigma-{stdev:.1f}_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
             f"_lbl-{label_type}{sched_suffix}"
         )
@@ -572,6 +613,11 @@ def _build_maxrl_jobs(
             / sigma_folder(gaussian_stdev=stdev)
             / baseline_mode_folder(subtract_baseline=subtract_baseline)
             / likelihood_mode_folder(use_factorized_likelihoods=use_factorized_likelihoods)
+        )
+        if bs_seg is not None:
+            log_path = log_path / bs_seg
+        log_path = (
+            log_path
             / lr_seg
             / steps_seg
             / label_type
@@ -594,6 +640,7 @@ def _build_maxrl_jobs(
             "--train-steps", str(train_steps),
             "--val-every-n-steps", str(val_every_n_steps),
             "--num-samples", str(ns),
+            "--batch-size", str(bs),
             "--subtract-baseline", str(subtract_baseline),
             "--use-factorized-likelihoods", str(use_factorized_likelihoods),
             "--gaussian-stdev", str(stdev),
@@ -692,6 +739,19 @@ def _build_pretrained_baseline_jobs(
     default=str(DEFAULT_NUM_SAMPLES),
     show_default=True,
     help="Comma-separated training sample counts to sweep.",
+)
+@click.option(
+    "--batch-size",
+    type=INT_LIST,
+    default=str(DEFAULT_BATCH_SIZE),
+    show_default=True,
+    help=(
+        "Comma-separated training batch sizes to sweep. "
+        f"Non-default values (default = {DEFAULT_BATCH_SIZE}) route artifacts "
+        "and logs under a `bs-{N}` path segment between `<dataset>` and "
+        "`lr_<value>`; the default value is omitted from the path so existing "
+        "artifacts retain byte-for-byte layout. Ignored by pretrained_baseline."
+    ),
 )
 @click.option(
     "--train-steps",
@@ -824,6 +884,7 @@ def main(
     lookforward_tokens: tuple[int, ...],
     rollout_steps: tuple[int, ...],
     num_samples: tuple[int, ...],
+    batch_size: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
     gaussian_stdev: tuple[float, ...],
@@ -854,6 +915,12 @@ def main(
             raise click.BadParameter(
                 f"lr_per_sample must be positive, got {lr}",
                 param_hint="--lr-per-sample",
+            )
+    for bs in batch_size:
+        if bs <= 0:
+            raise click.BadParameter(
+                f"batch_size must be positive, got {bs}",
+                param_hint="--batch-size",
             )
     # LR-schedule arg validation. Detailed range checks live in
     # `build_lr_scheduler`; here we just catch obvious nonsense early so
@@ -905,6 +972,7 @@ def main(
                 seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 num_samples_values=num_samples,
+                batch_size_values=batch_size,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 lr_per_sample_values=lr_per_sample,
@@ -921,6 +989,7 @@ def main(
                 seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 num_samples_values=num_samples,
+                batch_size_values=batch_size,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 lr_per_sample_values=lr_per_sample,
@@ -938,6 +1007,7 @@ def main(
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
+                batch_size_values=batch_size,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 gaussian_stdev_values=gaussian_stdev,
@@ -956,6 +1026,7 @@ def main(
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
+                batch_size_values=batch_size,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 factorized=factorized,
@@ -975,6 +1046,7 @@ def main(
                 lookforward_tokens=lookforward_tokens,
                 rollout_steps=rollout_steps,
                 num_samples_values=num_samples,
+                batch_size_values=batch_size,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 subtract_baseline=subtract_baseline,
@@ -1009,7 +1081,8 @@ def main(
     if has_rollouts:
         click.echo(f"rollout_steps={rollout_steps}")
     click.echo(
-        f"num_samples={num_samples}  gaussian_stdev={gaussian_stdev}  "
+        f"num_samples={num_samples}  batch_size={batch_size}  "
+        f"gaussian_stdev={gaussian_stdev}  "
         f"lr_per_sample={lr_per_sample}  "
         f"lr_schedule={lr_schedule}  warmup_ratio={warmup_ratio}  "
         f"lr_min_ratio={lr_min_ratio}  "

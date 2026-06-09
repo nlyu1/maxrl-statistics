@@ -19,6 +19,7 @@ from src.data.corpus_regression import (
 )
 from src.experiments.corpus_regression.config import (
     baseline_mode_folder,
+    batch_size_segment,
     factorized_mode_folder,
     likelihood_mode_folder,
     lr_schedule_segment,
@@ -34,6 +35,7 @@ _ROLLOUTS_RE = re.compile(r" r=(\d+)")
 _AXIS_SHORT: dict[str, str] = {
     "num_lookforward_tokens": "look",
     "num_samples": "N",
+    "batch_size": "bs",
     "lr_per_sample": "lr",
     "train_from_scratch": "scratch",
     "gaussian_stdev": "sigma",
@@ -65,6 +67,7 @@ def _format_group_value(*, axis: str, value: Any) -> str:
     """Render a group-axis value for display in the legend / study-name string.
     Mirrors the on-disk folder convention so legend reads identically to path:
       - num_samples → str(int)
+      - batch_size → str(int)  (matches `bs-{N}` from `batch_size_segment`)
       - lr_per_sample → f"{v:.2e}"  (matches `f\"lr_{lr:.2e}\"` in config.py)
       - train_from_scratch → str(bool)
       - gaussian_stdev → f"{v:.1f}"  (matches `sigma_folder` pin in config.py)
@@ -72,6 +75,8 @@ def _format_group_value(*, axis: str, value: Any) -> str:
       - train_steps → f"{int(v):06d}"  (matches `steps-{N:06d}` in config.py)
     """
     if axis == "num_samples":
+        return str(int(value))
+    if axis == "batch_size":
         return str(int(value))
     if axis == "lr_per_sample":
         return f"{float(value):.2e}"
@@ -123,6 +128,7 @@ def _select_group_value(
     train_from_scratch: Any,
     gaussian_stdev: Any,
     train_steps: Any = None,
+    batch_size: Any = None,
 ) -> Any:
     """Return the current iteration's value for whichever axis is `group_by`.
     Sweep classmethods pass every axis position so this helper can be reused
@@ -135,6 +141,8 @@ def _select_group_value(
         return num_lookforward_tokens
     if group_by == "num_samples":
         return num_samples
+    if group_by == "batch_size":
+        return batch_size
     if group_by == "lr_per_sample":
         return lr_per_sample
     if group_by == "train_from_scratch":
@@ -181,6 +189,28 @@ def _method_dir(method: str, *, train_from_scratch: bool) -> Path:
     `_scratch` suffix."""
     from_dir = "from_scratch" if train_from_scratch else "from_pretrain"
     return Path(method) / from_dir
+
+
+def _attach_bs_segment(*, batch_size: int) -> Path | None:
+    """Translate a batch_size into the optional `bs-{N}` path segment.
+
+    Returns ``None`` for the canonical default (`DEFAULT_BATCH_SIZE = 64`)
+    so existing artifacts (which never wrote a `bs-*` level) are byte-for-
+    byte discoverable. Otherwise returns ``Path(f"bs-{N}")`` for the caller
+    to splice into the path between ``{dataset_folder}`` and ``lr_<value>``.
+
+    Mirrors `batch_size_segment` from config.py but typed as `Path | None`
+    for direct use in path construction.
+    """
+    seg = batch_size_segment(batch_size=batch_size)
+    return Path(seg) if seg is not None else None
+
+
+def _splice_bs(*, path: Path, bs_seg: Path | None) -> Path:
+    """Append the `bs-{N}` segment when present, else identity. Centralizes
+    the omit-at-default convention so all five sweep loaders share the
+    same path-construction code."""
+    return path if bs_seg is None else path / bs_seg
 
 
 def _make_attach_sched(
@@ -339,6 +369,12 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     studies: dict[str, list[Path]]
     study_seeds: dict[str, list[int]]
     study_lookforwards: dict[str, int]
+    # Per-study training batch size, read from `config.json["dataloading"]
+    # ["train_batch_size"]`. Old artifacts that pre-date the `bs-{N}` path
+    # segment all used 64; backcompat is therefore "whatever config.json
+    # says". Surfaced via `get_metric_dataframe` / `get_train_dataframe`
+    # as a `batch_size` column so analyses can group/filter on it.
+    study_batch_sizes: dict[str, int] = {}
     # The axis whose values vary across `studies` (or None if all axes were
     # scalar at construction time). Drives the per-method plot's legend
     # grouping. `"num_lookforward_tokens"` reproduces today's behaviour.
@@ -361,6 +397,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         studies: dict[str, list[Path]] = {}
         study_seeds: dict[str, list[int]] = {}
         study_lookforwards: dict[str, int] = {}
+        study_batch_sizes: dict[str, int] = {}
         surviving_group_values: dict[str, str] = {}
         for name, pairs in grouped.items():
             kept = [
@@ -373,10 +410,15 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             studies[name] = [p for (_, p) in kept]
             study_seeds[name] = [s for (s, _) in kept]
             first_path = kept[0][1]
-            study_lookforwards[name] = int(
-                json.loads((first_path / "config.json").read_text())[
-                    "data"
-                ]["num_lookforward_tokens"]
+            cfg = json.loads((first_path / "config.json").read_text())
+            study_lookforwards[name] = int(cfg["data"]["num_lookforward_tokens"])
+            # `dataloading.train_batch_size` is present in every config.json
+            # this analyzer can read; missing the key would mean a config
+            # written by code older than `CorpusRegressionDataloadingConfig`,
+            # which never landed in this repo. Read straight rather than
+            # imputing 64 to surface schema drift loudly.
+            study_batch_sizes[name] = int(
+                cfg["dataloading"]["train_batch_size"],
             )
             if study_group_values is not None and name in study_group_values:
                 surviving_group_values[name] = study_group_values[name]
@@ -386,6 +428,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             studies=studies,
             study_seeds=study_seeds,
             study_lookforwards=study_lookforwards,
+            study_batch_sizes=study_batch_sizes,
             group_by=group_by,
             study_group_values=surviving_group_values,
         )
@@ -460,6 +503,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         artifacts_root: Path,
         num_lookforward_tokens: int | list[int] = 1,
         num_samples: int | list[int] = 100_000,
+        batch_size: int | list[int] = 64,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
@@ -470,19 +514,22 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         train_from_scratch: bool | list[bool] = False,
         train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/sl_mse/<from_*>/seed-{S}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+        """`<artifacts_root>/sl_mse/<from_*>/seed-{S}/{dataset_folder}/[bs-{B}/]lr_{lr}/steps-{N:06d}/[sched-...]/`.
 
-        At most ONE of {`num_lookforward_tokens`, `num_samples`, `lr_per_sample`,
-        `train_from_scratch`, `train_steps`} may be a `list`; that becomes the
-        legend `group_by` axis for per-method plots. All-scalar (default) →
-        `group_by=None` and a single study (`look=1`).
+        At most ONE of {`num_lookforward_tokens`, `num_samples`, `batch_size`,
+        `lr_per_sample`, `train_from_scratch`, `train_steps`} may be a `list`;
+        that becomes the legend `group_by` axis for per-method plots.
+        All-scalar (default) → `group_by=None` and a single study (`look=1`).
 
-        The `sched-warmup-X.XXX-cosine-X.XX` segment is appended only for
+        The `bs-{N}` segment is omitted at the canonical default (64) so the
+        sweep also discovers pre-batch-size artifacts. The
+        `sched-warmup-X.XXX-cosine-X.XX` segment is appended only for
         non-flat schedules; defaults reproduce today's flat-LR layout."""
         group_by, _ = _resolve_group_axis(
             candidates={
                 "num_lookforward_tokens": num_lookforward_tokens,
                 "num_samples": num_samples,
+                "batch_size": batch_size,
                 "lr_per_sample": lr_per_sample,
                 "train_from_scratch": train_from_scratch,
                 "train_steps": train_steps,
@@ -497,48 +544,59 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         study_group_values: dict[str, str] = {}
         for n in _as_list(num_lookforward_tokens):
             for ns in _as_list(num_samples):
-                for lr in _as_list(lr_per_sample):
-                    for scratch in _as_list(train_from_scratch):
-                        for ts in _as_list(train_steps):
-                            study_base = artifacts_root / _method_dir(
-                                "sl_mse", train_from_scratch=scratch,
-                            )
-                            if not study_base.exists():
-                                continue
-                            lr_seg = f"lr_{lr:.2e}"
-                            steps_seg = f"steps-{int(ts):06d}"
-                            gv = _select_group_value(
-                                group_by=group_by,
-                                num_lookforward_tokens=n, num_samples=ns,
-                                lr_per_sample=lr, train_from_scratch=scratch,
-                                gaussian_stdev=None, train_steps=ts,
-                            )
-                            name = _study_name(
-                                num_lookforward=n, group_by=group_by,
-                                group_value=gv, rollouts=None,
-                            )
-                            grouped[name] = [
-                                (
-                                    s,
-                                    attach_sched(
-                                        study_base
-                                        / _seed_folder_name(s)
-                                        / canonical_dataset_folder_name(
-                                            num_lookforward_tokens=n, num_samples=ns,
-                                            label_type=label_type,
-                                            normalize_labels=normalize_labels,
-                                            label_range=label_range,
-                                        )
-                                        / lr_seg
-                                        / steps_seg
-                                    ),
+                for bs in _as_list(batch_size):
+                    for lr in _as_list(lr_per_sample):
+                        for scratch in _as_list(train_from_scratch):
+                            for ts in _as_list(train_steps):
+                                study_base = artifacts_root / _method_dir(
+                                    "sl_mse", train_from_scratch=scratch,
                                 )
-                                for s in candidate_seeds
-                            ]
-                            if group_by is not None and group_by != "num_lookforward_tokens":
-                                study_group_values[name] = _format_group_value(
-                                    axis=group_by, value=gv,
+                                if not study_base.exists():
+                                    continue
+                                lr_seg = f"lr_{lr:.2e}"
+                                steps_seg = f"steps-{int(ts):06d}"
+                                bs_seg = _attach_bs_segment(batch_size=int(bs))
+                                dataset_seg = canonical_dataset_folder_name(
+                                    num_lookforward_tokens=n, num_samples=ns,
+                                    label_type=label_type,
+                                    normalize_labels=normalize_labels,
+                                    label_range=label_range,
                                 )
+                                gv = _select_group_value(
+                                    group_by=group_by,
+                                    num_lookforward_tokens=n, num_samples=ns,
+                                    batch_size=bs,
+                                    lr_per_sample=lr, train_from_scratch=scratch,
+                                    gaussian_stdev=None, train_steps=ts,
+                                )
+                                name = _study_name(
+                                    num_lookforward=n, group_by=group_by,
+                                    group_value=gv, rollouts=None,
+                                )
+                                # The `bs-{N}` segment sits between
+                                # `{dataset_seg}` and `lr_seg` exactly like
+                                # in `study_folder` written by
+                                # `canonical_kwargs`.
+                                grouped[name] = [
+                                    (
+                                        s,
+                                        attach_sched(
+                                            _splice_bs(
+                                                path=study_base
+                                                / _seed_folder_name(s)
+                                                / dataset_seg,
+                                                bs_seg=bs_seg,
+                                            )
+                                            / lr_seg
+                                            / steps_seg
+                                        ),
+                                    )
+                                    for s in candidate_seeds
+                                ]
+                                if group_by is not None and group_by != "num_lookforward_tokens":
+                                    study_group_values[name] = _format_group_value(
+                                        axis=group_by, value=gv,
+                                    )
         if not grouped:
             return None
         return cls.from_grouped(
@@ -552,6 +610,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         artifacts_root: Path,
         num_lookforward_tokens: int | list[int] = 1,
         num_samples: int | list[int] = 100_000,
+        batch_size: int | list[int] = 64,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
@@ -562,7 +621,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         train_from_scratch: bool | list[bool] = False,
         train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/sl_ce/<from_*>/seed-{S}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+        """`<artifacts_root>/sl_ce/<from_*>/seed-{S}/{dataset_folder}/[bs-{B}/]lr_{lr}/steps-{N:06d}/[sched-...]/`.
 
         Identical layout and group-axis semantics to `from_sl_mse_sweep`.
         Only K=1 is meaningful for the NTP-CE objective, but we keep the
@@ -573,6 +632,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             candidates={
                 "num_lookforward_tokens": num_lookforward_tokens,
                 "num_samples": num_samples,
+                "batch_size": batch_size,
                 "lr_per_sample": lr_per_sample,
                 "train_from_scratch": train_from_scratch,
                 "train_steps": train_steps,
@@ -587,48 +647,55 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         study_group_values: dict[str, str] = {}
         for n in _as_list(num_lookforward_tokens):
             for ns in _as_list(num_samples):
-                for lr in _as_list(lr_per_sample):
-                    for scratch in _as_list(train_from_scratch):
-                        for ts in _as_list(train_steps):
-                            study_base = artifacts_root / _method_dir(
-                                "sl_ce", train_from_scratch=scratch,
-                            )
-                            if not study_base.exists():
-                                continue
-                            lr_seg = f"lr_{lr:.2e}"
-                            steps_seg = f"steps-{int(ts):06d}"
-                            gv = _select_group_value(
-                                group_by=group_by,
-                                num_lookforward_tokens=n, num_samples=ns,
-                                lr_per_sample=lr, train_from_scratch=scratch,
-                                gaussian_stdev=None, train_steps=ts,
-                            )
-                            name = _study_name(
-                                num_lookforward=n, group_by=group_by,
-                                group_value=gv, rollouts=None,
-                            )
-                            grouped[name] = [
-                                (
-                                    s,
-                                    attach_sched(
-                                        study_base
-                                        / _seed_folder_name(s)
-                                        / canonical_dataset_folder_name(
-                                            num_lookforward_tokens=n, num_samples=ns,
-                                            label_type=label_type,
-                                            normalize_labels=normalize_labels,
-                                            label_range=label_range,
-                                        )
-                                        / lr_seg
-                                        / steps_seg
-                                    ),
+                for bs in _as_list(batch_size):
+                    for lr in _as_list(lr_per_sample):
+                        for scratch in _as_list(train_from_scratch):
+                            for ts in _as_list(train_steps):
+                                study_base = artifacts_root / _method_dir(
+                                    "sl_ce", train_from_scratch=scratch,
                                 )
-                                for s in candidate_seeds
-                            ]
-                            if group_by is not None and group_by != "num_lookforward_tokens":
-                                study_group_values[name] = _format_group_value(
-                                    axis=group_by, value=gv,
+                                if not study_base.exists():
+                                    continue
+                                lr_seg = f"lr_{lr:.2e}"
+                                steps_seg = f"steps-{int(ts):06d}"
+                                bs_seg = _attach_bs_segment(batch_size=int(bs))
+                                dataset_seg = canonical_dataset_folder_name(
+                                    num_lookforward_tokens=n, num_samples=ns,
+                                    label_type=label_type,
+                                    normalize_labels=normalize_labels,
+                                    label_range=label_range,
                                 )
+                                gv = _select_group_value(
+                                    group_by=group_by,
+                                    num_lookforward_tokens=n, num_samples=ns,
+                                    batch_size=bs,
+                                    lr_per_sample=lr, train_from_scratch=scratch,
+                                    gaussian_stdev=None, train_steps=ts,
+                                )
+                                name = _study_name(
+                                    num_lookforward=n, group_by=group_by,
+                                    group_value=gv, rollouts=None,
+                                )
+                                grouped[name] = [
+                                    (
+                                        s,
+                                        attach_sched(
+                                            _splice_bs(
+                                                path=study_base
+                                                / _seed_folder_name(s)
+                                                / dataset_seg,
+                                                bs_seg=bs_seg,
+                                            )
+                                            / lr_seg
+                                            / steps_seg
+                                        ),
+                                    )
+                                    for s in candidate_seeds
+                                ]
+                                if group_by is not None and group_by != "num_lookforward_tokens":
+                                    study_group_values[name] = _format_group_value(
+                                        axis=group_by, value=gv,
+                                    )
         if not grouped:
             return None
         return cls.from_grouped(
@@ -642,6 +709,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         artifacts_root: Path,
         num_lookforward_tokens: int | list[int] = 1,
         num_samples: int | list[int] = 100_000,
+        batch_size: int | list[int] = 64,
         gaussian_stdev: float | list[float] = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
@@ -653,16 +721,17 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         train_from_scratch: bool | list[bool] = False,
         train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/grpo/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+        """`<artifacts_root>/grpo/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/[bs-{B}/]lr_{lr}/steps-{N:06d}/[sched-...]/`.
 
-        At most ONE of {`num_lookforward_tokens`, `num_samples`, `lr_per_sample`,
-        `train_from_scratch`, `gaussian_stdev`, `train_steps`} may be a `list`
-        (the chosen `group_by` axis). The rollouts dimension is always swept
-        across `candidate_rollout_steps`."""
+        At most ONE of {`num_lookforward_tokens`, `num_samples`, `batch_size`,
+        `lr_per_sample`, `train_from_scratch`, `gaussian_stdev`, `train_steps`}
+        may be a `list` (the chosen `group_by` axis). The rollouts dimension
+        is always swept across `candidate_rollout_steps`."""
         group_by, _ = _resolve_group_axis(
             candidates={
                 "num_lookforward_tokens": num_lookforward_tokens,
                 "num_samples": num_samples,
+                "batch_size": batch_size,
                 "lr_per_sample": lr_per_sample,
                 "train_from_scratch": train_from_scratch,
                 "gaussian_stdev": gaussian_stdev,
@@ -678,57 +747,64 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         study_group_values: dict[str, str] = {}
         for n in _as_list(num_lookforward_tokens):
             for ns in _as_list(num_samples):
-                for lr in _as_list(lr_per_sample):
-                    for scratch in _as_list(train_from_scratch):
-                        for sigma_v in _as_list(gaussian_stdev):
-                            for ts in _as_list(train_steps):
-                                study_base = artifacts_root / _method_dir(
-                                    "grpo", train_from_scratch=scratch,
-                                )
-                                if not study_base.exists():
-                                    continue
-                                sigma = sigma_folder(gaussian_stdev=sigma_v)
-                                lr_seg = f"lr_{lr:.2e}"
-                                steps_seg = f"steps-{int(ts):06d}"
-                                gv = _select_group_value(
-                                    group_by=group_by,
-                                    num_lookforward_tokens=n, num_samples=ns,
-                                    lr_per_sample=lr, train_from_scratch=scratch,
-                                    gaussian_stdev=sigma_v, train_steps=ts,
-                                )
-                                for r in candidate_rollout_steps:
-                                    name = _study_name(
-                                        num_lookforward=n, group_by=group_by,
-                                        group_value=gv, rollouts=r,
+                for bs in _as_list(batch_size):
+                    for lr in _as_list(lr_per_sample):
+                        for scratch in _as_list(train_from_scratch):
+                            for sigma_v in _as_list(gaussian_stdev):
+                                for ts in _as_list(train_steps):
+                                    study_base = artifacts_root / _method_dir(
+                                        "grpo", train_from_scratch=scratch,
                                     )
-                                    grouped[name] = [
-                                        (
-                                            s,
-                                            attach_sched(
-                                                study_base
-                                                / _seed_folder_name(s)
-                                                / f"rollouts-{r}"
-                                                / sigma
-                                                / canonical_dataset_folder_name(
-                                                    num_lookforward_tokens=n,
-                                                    num_samples=ns,
-                                                    label_type=label_type,
-                                                    normalize_labels=normalize_labels,
-                                                    label_range=label_range,
-                                                )
-                                                / lr_seg
-                                                / steps_seg
-                                            ),
+                                    if not study_base.exists():
+                                        continue
+                                    sigma = sigma_folder(gaussian_stdev=sigma_v)
+                                    lr_seg = f"lr_{lr:.2e}"
+                                    steps_seg = f"steps-{int(ts):06d}"
+                                    bs_seg = _attach_bs_segment(batch_size=int(bs))
+                                    dataset_seg = canonical_dataset_folder_name(
+                                        num_lookforward_tokens=n,
+                                        num_samples=ns,
+                                        label_type=label_type,
+                                        normalize_labels=normalize_labels,
+                                        label_range=label_range,
+                                    )
+                                    gv = _select_group_value(
+                                        group_by=group_by,
+                                        num_lookforward_tokens=n, num_samples=ns,
+                                        batch_size=bs,
+                                        lr_per_sample=lr, train_from_scratch=scratch,
+                                        gaussian_stdev=sigma_v, train_steps=ts,
+                                    )
+                                    for r in candidate_rollout_steps:
+                                        name = _study_name(
+                                            num_lookforward=n, group_by=group_by,
+                                            group_value=gv, rollouts=r,
                                         )
-                                        for s in candidate_seeds
-                                    ]
-                                    if (
-                                        group_by is not None
-                                        and group_by != "num_lookforward_tokens"
-                                    ):
-                                        study_group_values[name] = _format_group_value(
-                                            axis=group_by, value=gv,
-                                        )
+                                        grouped[name] = [
+                                            (
+                                                s,
+                                                attach_sched(
+                                                    _splice_bs(
+                                                        path=study_base
+                                                        / _seed_folder_name(s)
+                                                        / f"rollouts-{r}"
+                                                        / sigma
+                                                        / dataset_seg,
+                                                        bs_seg=bs_seg,
+                                                    )
+                                                    / lr_seg
+                                                    / steps_seg
+                                                ),
+                                            )
+                                            for s in candidate_seeds
+                                        ]
+                                        if (
+                                            group_by is not None
+                                            and group_by != "num_lookforward_tokens"
+                                        ):
+                                            study_group_values[name] = _format_group_value(
+                                                axis=group_by, value=gv,
+                                            )
         if not grouped:
             return None
         return cls.from_grouped(
@@ -743,6 +819,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         factorized: bool,
         num_lookforward_tokens: int | list[int] = 1,
         num_samples: int | list[int] = 100_000,
+        batch_size: int | list[int] = 64,
         gaussian_stdev: float | list[float] = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
@@ -754,7 +831,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         train_from_scratch: bool | list[bool] = False,
         train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/rloo/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+        """`<artifacts_root>/rloo/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/[bs-{B}/]lr_{lr}/steps-{N:06d}/[sched-...]/`.
         `factorized` is fixed per call — surface it in the figure title.
 
         Group-axis semantics match `from_grpo_sweep`."""
@@ -762,6 +839,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             candidates={
                 "num_lookforward_tokens": num_lookforward_tokens,
                 "num_samples": num_samples,
+                "batch_size": batch_size,
                 "lr_per_sample": lr_per_sample,
                 "train_from_scratch": train_from_scratch,
                 "gaussian_stdev": gaussian_stdev,
@@ -778,58 +856,65 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         study_group_values: dict[str, str] = {}
         for n in _as_list(num_lookforward_tokens):
             for ns in _as_list(num_samples):
-                for lr in _as_list(lr_per_sample):
-                    for scratch in _as_list(train_from_scratch):
-                        for sigma_v in _as_list(gaussian_stdev):
-                            for ts in _as_list(train_steps):
-                                study_base = artifacts_root / _method_dir(
-                                    "rloo", train_from_scratch=scratch,
-                                )
-                                if not study_base.exists():
-                                    continue
-                                sigma = sigma_folder(gaussian_stdev=sigma_v)
-                                lr_seg = f"lr_{lr:.2e}"
-                                steps_seg = f"steps-{int(ts):06d}"
-                                gv = _select_group_value(
-                                    group_by=group_by,
-                                    num_lookforward_tokens=n, num_samples=ns,
-                                    lr_per_sample=lr, train_from_scratch=scratch,
-                                    gaussian_stdev=sigma_v, train_steps=ts,
-                                )
-                                for r in candidate_rollout_steps:
-                                    name = _study_name(
-                                        num_lookforward=n, group_by=group_by,
-                                        group_value=gv, rollouts=r,
+                for bs in _as_list(batch_size):
+                    for lr in _as_list(lr_per_sample):
+                        for scratch in _as_list(train_from_scratch):
+                            for sigma_v in _as_list(gaussian_stdev):
+                                for ts in _as_list(train_steps):
+                                    study_base = artifacts_root / _method_dir(
+                                        "rloo", train_from_scratch=scratch,
                                     )
-                                    grouped[name] = [
-                                        (
-                                            s,
-                                            attach_sched(
-                                                study_base
-                                                / _seed_folder_name(s)
-                                                / f"rollouts-{r}"
-                                                / sigma
-                                                / factorized_mode
-                                                / canonical_dataset_folder_name(
-                                                    num_lookforward_tokens=n,
-                                                    num_samples=ns,
-                                                    label_type=label_type,
-                                                    normalize_labels=normalize_labels,
-                                                    label_range=label_range,
-                                                )
-                                                / lr_seg
-                                                / steps_seg
-                                            ),
+                                    if not study_base.exists():
+                                        continue
+                                    sigma = sigma_folder(gaussian_stdev=sigma_v)
+                                    lr_seg = f"lr_{lr:.2e}"
+                                    steps_seg = f"steps-{int(ts):06d}"
+                                    bs_seg = _attach_bs_segment(batch_size=int(bs))
+                                    dataset_seg = canonical_dataset_folder_name(
+                                        num_lookforward_tokens=n,
+                                        num_samples=ns,
+                                        label_type=label_type,
+                                        normalize_labels=normalize_labels,
+                                        label_range=label_range,
+                                    )
+                                    gv = _select_group_value(
+                                        group_by=group_by,
+                                        num_lookforward_tokens=n, num_samples=ns,
+                                        batch_size=bs,
+                                        lr_per_sample=lr, train_from_scratch=scratch,
+                                        gaussian_stdev=sigma_v, train_steps=ts,
+                                    )
+                                    for r in candidate_rollout_steps:
+                                        name = _study_name(
+                                            num_lookforward=n, group_by=group_by,
+                                            group_value=gv, rollouts=r,
                                         )
-                                        for s in candidate_seeds
-                                    ]
-                                    if (
-                                        group_by is not None
-                                        and group_by != "num_lookforward_tokens"
-                                    ):
-                                        study_group_values[name] = _format_group_value(
-                                            axis=group_by, value=gv,
-                                        )
+                                        grouped[name] = [
+                                            (
+                                                s,
+                                                attach_sched(
+                                                    _splice_bs(
+                                                        path=study_base
+                                                        / _seed_folder_name(s)
+                                                        / f"rollouts-{r}"
+                                                        / sigma
+                                                        / factorized_mode
+                                                        / dataset_seg,
+                                                        bs_seg=bs_seg,
+                                                    )
+                                                    / lr_seg
+                                                    / steps_seg
+                                                ),
+                                            )
+                                            for s in candidate_seeds
+                                        ]
+                                        if (
+                                            group_by is not None
+                                            and group_by != "num_lookforward_tokens"
+                                        ):
+                                            study_group_values[name] = _format_group_value(
+                                                axis=group_by, value=gv,
+                                            )
         if not grouped:
             return None
         return cls.from_grouped(
@@ -845,6 +930,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         use_factorized_likelihoods: bool,
         num_lookforward_tokens: int | list[int] = 1,
         num_samples: int | list[int] = 100_000,
+        batch_size: int | list[int] = 64,
         gaussian_stdev: float | list[float] = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
@@ -856,7 +942,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         train_from_scratch: bool | list[bool] = False,
         train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/maxrl/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+        """`<artifacts_root>/maxrl/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/[bs-{B}/]lr_{lr}/steps-{N:06d}/[sched-...]/`.
         Both `subtract_baseline` and `use_factorized_likelihoods` are fixed per
         call — surface them in the figure title.
 
@@ -865,6 +951,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             candidates={
                 "num_lookforward_tokens": num_lookforward_tokens,
                 "num_samples": num_samples,
+                "batch_size": batch_size,
                 "lr_per_sample": lr_per_sample,
                 "train_from_scratch": train_from_scratch,
                 "gaussian_stdev": gaussian_stdev,
@@ -884,59 +971,66 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         study_group_values: dict[str, str] = {}
         for n in _as_list(num_lookforward_tokens):
             for ns in _as_list(num_samples):
-                for lr in _as_list(lr_per_sample):
-                    for scratch in _as_list(train_from_scratch):
-                        for sigma_v in _as_list(gaussian_stdev):
-                            for ts in _as_list(train_steps):
-                                study_base = artifacts_root / _method_dir(
-                                    "maxrl", train_from_scratch=scratch,
-                                )
-                                if not study_base.exists():
-                                    continue
-                                sigma = sigma_folder(gaussian_stdev=sigma_v)
-                                lr_seg = f"lr_{lr:.2e}"
-                                steps_seg = f"steps-{int(ts):06d}"
-                                gv = _select_group_value(
-                                    group_by=group_by,
-                                    num_lookforward_tokens=n, num_samples=ns,
-                                    lr_per_sample=lr, train_from_scratch=scratch,
-                                    gaussian_stdev=sigma_v, train_steps=ts,
-                                )
-                                for r in candidate_rollout_steps:
-                                    name = _study_name(
-                                        num_lookforward=n, group_by=group_by,
-                                        group_value=gv, rollouts=r,
+                for bs in _as_list(batch_size):
+                    for lr in _as_list(lr_per_sample):
+                        for scratch in _as_list(train_from_scratch):
+                            for sigma_v in _as_list(gaussian_stdev):
+                                for ts in _as_list(train_steps):
+                                    study_base = artifacts_root / _method_dir(
+                                        "maxrl", train_from_scratch=scratch,
                                     )
-                                    grouped[name] = [
-                                        (
-                                            s,
-                                            attach_sched(
-                                                study_base
-                                                / _seed_folder_name(s)
-                                                / f"rollouts-{r}"
-                                                / sigma
-                                                / baseline
-                                                / likelihood
-                                                / canonical_dataset_folder_name(
-                                                    num_lookforward_tokens=n,
-                                                    num_samples=ns,
-                                                    label_type=label_type,
-                                                    normalize_labels=normalize_labels,
-                                                    label_range=label_range,
-                                                )
-                                                / lr_seg
-                                                / steps_seg
-                                            ),
+                                    if not study_base.exists():
+                                        continue
+                                    sigma = sigma_folder(gaussian_stdev=sigma_v)
+                                    lr_seg = f"lr_{lr:.2e}"
+                                    steps_seg = f"steps-{int(ts):06d}"
+                                    bs_seg = _attach_bs_segment(batch_size=int(bs))
+                                    dataset_seg = canonical_dataset_folder_name(
+                                        num_lookforward_tokens=n,
+                                        num_samples=ns,
+                                        label_type=label_type,
+                                        normalize_labels=normalize_labels,
+                                        label_range=label_range,
+                                    )
+                                    gv = _select_group_value(
+                                        group_by=group_by,
+                                        num_lookforward_tokens=n, num_samples=ns,
+                                        batch_size=bs,
+                                        lr_per_sample=lr, train_from_scratch=scratch,
+                                        gaussian_stdev=sigma_v, train_steps=ts,
+                                    )
+                                    for r in candidate_rollout_steps:
+                                        name = _study_name(
+                                            num_lookforward=n, group_by=group_by,
+                                            group_value=gv, rollouts=r,
                                         )
-                                        for s in candidate_seeds
-                                    ]
-                                    if (
-                                        group_by is not None
-                                        and group_by != "num_lookforward_tokens"
-                                    ):
-                                        study_group_values[name] = _format_group_value(
-                                            axis=group_by, value=gv,
-                                        )
+                                        grouped[name] = [
+                                            (
+                                                s,
+                                                attach_sched(
+                                                    _splice_bs(
+                                                        path=study_base
+                                                        / _seed_folder_name(s)
+                                                        / f"rollouts-{r}"
+                                                        / sigma
+                                                        / baseline
+                                                        / likelihood
+                                                        / dataset_seg,
+                                                        bs_seg=bs_seg,
+                                                    )
+                                                    / lr_seg
+                                                    / steps_seg
+                                                ),
+                                            )
+                                            for s in candidate_seeds
+                                        ]
+                                        if (
+                                            group_by is not None
+                                            and group_by != "num_lookforward_tokens"
+                                        ):
+                                            study_group_values[name] = _format_group_value(
+                                                axis=group_by, value=gv,
+                                            )
         if not grouped:
             return None
         return cls.from_grouped(
@@ -1041,16 +1135,19 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         """Concat per-(study, seed) `val_metrics.parquet` frames, then append
         scalar `val_corr` / `val_mse` (and `train_corr` / `train_mse` when
         train-window sufficient stats are present) columns. Returned frame
-        always has a `step` column."""
+        always has a `step` column, plus a `batch_size` column read from
+        each study's `config.json`."""
         frames: list[pl.DataFrame] = []
         for name, paths in self.studies.items():
             seeds = self.study_seeds[name]
+            bs = self.study_batch_sizes[name]
             for seed, path in zip(seeds, paths, strict=True):
                 df = pl.read_parquet(path / "val_metrics.parquet")
                 frames.append(
                     df.with_columns(
                         pl.lit(name).alias("study"),
                         pl.lit(seed).alias("seed"),
+                        pl.lit(bs, dtype=pl.Int64).alias("batch_size"),
                     )
                 )
         return _decode_dim_averaged(pl.concat(frames))
@@ -1058,8 +1155,8 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
     def get_train_dataframe(self) -> pl.DataFrame:
         """Concat per-(study, seed) `train_metrics.parquet` files.
 
-        Returns frame with columns: study, seed, step, loss, mse, corr,
-        pred_var, target_var, lr. Parquets that predate any of these
+        Returns frame with columns: study, seed, batch_size, step, loss, mse,
+        corr, pred_var, target_var, lr. Parquets that predate any of these
         columns get them synthesized as null so concat schemas line up:
         `corr` (added in the per-step-logging migration), `pred_var` /
         `target_var` (added with the prediction/target sufficient-stat
@@ -1070,6 +1167,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         frames: list[pl.DataFrame] = []
         for name, paths in self.studies.items():
             seeds = self.study_seeds[name]
+            bs = self.study_batch_sizes[name]
             for seed, path in zip(seeds, paths, strict=True):
                 train_path = path / "train_metrics.parquet"
                 if not train_path.exists():
@@ -1084,6 +1182,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     df.with_columns(
                         pl.lit(name).alias("study"),
                         pl.lit(seed).alias("seed"),
+                        pl.lit(bs, dtype=pl.Int64).alias("batch_size"),
                     )
                 )
         if not frames:
@@ -1096,6 +1195,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 schema={
                     "study": pl.Utf8,
                     "seed": pl.Int64,
+                    "batch_size": pl.Int64,
                     "step": pl.Int64,
                     "loss": pl.Float64,
                     "mse": pl.Float64,

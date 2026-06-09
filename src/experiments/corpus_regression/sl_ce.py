@@ -153,21 +153,27 @@ class CorpusRegressionSLCEConfig(BaseConfig):
             lr_min_ratio=lr_min_ratio,
         )
         # Local import to avoid a top-level circular import via config.py.
-        from src.experiments.corpus_regression.config import lr_schedule_segment
+        from src.experiments.corpus_regression.config import (
+            batch_size_segment,
+            lr_schedule_segment,
+        )
 
         sched_segment = lr_schedule_segment(
             lr_schedule=lr_schedule,
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
+        bs_segment = batch_size_segment(batch_size=batch_size)
         # Mirrors `CorpusRegressionStudyBaseConfig.canonical_kwargs` in
-        # config.py: lr / steps / [sched]. The `steps-{train_steps:06d}`
+        # config.py: [bs] / lr / steps / [sched]. The `steps-{train_steps:06d}`
         # segment must be present so the read-side `from_sl_ce_sweep` in
         # analysis.py can resolve artifacts; without it sl_ce silently
         # writes to a path the analyzer cannot discover.
+        study_folder = study_base_folder / dataset_folder.name
+        if bs_segment is not None:
+            study_folder = study_folder / bs_segment
         study_folder = (
-            study_base_folder
-            / dataset_folder.name
+            study_folder
             / f"lr_{lr_per_sample:.2e}"
             / f"steps-{train_steps:06d}"
         )
