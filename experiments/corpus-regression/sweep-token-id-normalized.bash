@@ -9,11 +9,11 @@ ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 
 # Same sweep as sweep-token-id.bash but with labels normalized to [0, 1].
 uv run python "${ORCHESTRATE}" \
-    --method sl \
+    --method sl_mse \
     --method grpo \
     --method rloo \
     --method maxrl \
-    --method ntp_baseline \
+    --method pretrained_baseline \
     --seeds "${SEEDS}" \
     --label-type token_id \
     --normalize-labels \

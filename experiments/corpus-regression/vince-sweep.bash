@@ -5,18 +5,21 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
-SEEDS="51,61,121"
+SEEDS="51"
 LABEL="token_id"
-ROLLOUT_STEPS=16,64,256
-NUM_SAMPLES=100000,500000
+ROLLOUT_STEPS=256
+NUM_SAMPLES=500000
 GAUSSIAN_STDEV=1.0
-FROM_PRETRAIN=True
-FROM_SCRATCH=True
-LEARNING_RATE=1e-4
+# FROM_PRETRAIN=False
+# FROM_SCRATCH=True
+FLAT=True
+COSINE=True
+LEARNING_RATES=1e-4,5e-5,2e-5
+LR_MIN_RATIO=0.5
 
 METHOD_ARGS=(
     --method maxrl \
-    --method sl \
+    --method sl_mse \
     --method grpo \
     --method rloo \
     --method sl_ce \
@@ -24,6 +27,12 @@ METHOD_ARGS=(
 
 SEED_ARGS=(
     --seeds "${SEEDS}"
+)
+
+SCHEDULER_ARGS=(
+    --lr-schedule cosine \
+    --warmup-ratio 0.05 \
+    --lr-min-ratio ${LR_MIN_RATIO} \
 )
 
 if [ "${LABEL}" = "token_id" ]; then
@@ -41,16 +50,17 @@ if [ "${LABEL}" = "rademacher" ]; then
 fi
 
 TRAIN_ARGS=(
-    --train-steps 10000 \
-    --val-every-n-steps 500 \
+    --train-steps 1500 \
+    --val-every-n-steps 50 \
     --lookforward-tokens 1 \
     --rollout-steps ${ROLLOUT_STEPS} \
     --gaussian-stdev ${GAUSSIAN_STDEV} \
+    --lr-per-sample ${LEARNING_RATES} \
     --num-samples ${NUM_SAMPLES} \
-    --lr-per-sample ${LEARNING_RATE} \
     --subtract-baseline \
     --use-factorized-likelihoods \
     --factorized \
+    --train-from-scratch \
 )
 
 ARGS=(
@@ -60,24 +70,28 @@ ARGS=(
     ${TRAIN_ARGS[@]}
 )
 
-if [ "${FROM_PRETRAIN}" = "True" ] && [ "${FROM_SCRATCH}" = "False" ]; then
+ARGS_WITH_SCHEDULER=(
+    ${METHOD_ARGS[@]}
+    ${SEED_ARGS[@]}
+    ${LABEL_ARGS[@]}
+    ${TRAIN_ARGS[@]}
+    ${SCHEDULER_ARGS[@]}
+)
+
+if [ "${FLAT}" = "True" ] && [ "${COSINE}" = "False" ]; then
     uv run python "${ORCHESTRATE}" \
-        --method ntp_baseline \
         "${ARGS[@]}" 
 fi
 
-if [ "${FROM_SCRATCH}" = "True" ] && [ "${FROM_PRETRAIN}" = "False" ]; then
+if [ "${COSINE}" = "True" ] && [ "${FLAT}" = "False" ]; then
     uv run python "${ORCHESTRATE}" \
-        "${ARGS[@]}" \
-        --train-from-scratch
+        "${ARGS_WITH_SCHEDULER[@]}" 
 fi
 
-if [ "${FROM_SCRATCH}" = "True" ] && [ "${FROM_PRETRAIN}" = "True" ]; then
+if [ "${COSINE}" = "True" ] && [ "${FLAT}" = "True" ]; then
     CUDA_VISIBLE_DEVICES=0,1,2,3 uv run python "${ORCHESTRATE}" \
-        --method ntp_baseline \
         "${ARGS[@]}" &
     CUDA_VISIBLE_DEVICES=4,5,6,7 uv run python "${ORCHESTRATE}" \
-        "${ARGS[@]}" \
-        --train-from-scratch &
+        "${ARGS_WITH_SCHEDULER[@]}" &
     wait
 fi

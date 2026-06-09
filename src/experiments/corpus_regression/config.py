@@ -116,7 +116,12 @@ class CorpusRegressionStudyBaseConfig(BaseConfig):
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
-        study_folder = study_base_folder / dataset_folder.name / f"lr_{lr_per_sample:.2e}"
+        study_folder = (
+            study_base_folder
+            / dataset_folder.name
+            / f"lr_{lr_per_sample:.2e}"
+            / f"steps-{train_steps:06d}"
+        )
         if sched_segment is not None:
             study_folder = study_folder / sched_segment
         return dict(
@@ -278,7 +283,7 @@ def factorized_mode_folder(*, factorized: bool) -> str:
 
 
 def sigma_folder(*, gaussian_stdev: float) -> str:
-    return f"sigma-{gaussian_stdev}"
+    return f"sigma-{gaussian_stdev:.1f}"
 
 
 def lr_schedule_segment(

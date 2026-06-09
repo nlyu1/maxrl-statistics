@@ -30,8 +30,8 @@ repo_root = get_repo_base()
 from src.data.corpus_regression import candidate_lookforward_tokens  # noqa: E402
 from src.experiments.corpus_regression.config import artifacts_dir  # noqa: E402
 
-SINGLE_RUN = repo_root / "experiments" / "corpus-regression" / "sl" / "single_run.py"
-METHOD = "sl"
+SINGLE_RUN = repo_root / "experiments" / "corpus-regression" / "sl_mse" / "single_run.py"
+METHOD = "sl_mse"
 
 
 def build_jobs(*, device_id: int) -> list[int]:

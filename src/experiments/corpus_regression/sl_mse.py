@@ -17,13 +17,13 @@ from src.experiments.corpus_regression.state import (
 )
 
 
-class CorpusRegressionSLConfig(CorpusRegressionStudyBaseConfig):
-    def get_state_cls(self) -> type["CorpusRegressionSLState"]:
-        return CorpusRegressionSLState
+class CorpusRegressionSLMSEConfig(CorpusRegressionStudyBaseConfig):
+    def get_state_cls(self) -> type["CorpusRegressionSLMSEState"]:
+        return CorpusRegressionSLMSEState
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
-class CorpusRegressionSLState(CorpusRegressionStudyBaseState):
+class CorpusRegressionSLMSEState(CorpusRegressionStudyBaseState):
     def compute_last_step_projections(
         self,
         *,

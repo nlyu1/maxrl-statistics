@@ -2,7 +2,7 @@ import json
 import re
 import warnings
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 import numpy as np
 import plotly.graph_objects as go
@@ -27,15 +27,160 @@ from src.experiments.corpus_regression.config import (
 
 _ROLLOUTS_RE = re.compile(r" r=(\d+)")
 
+# Group-axis machinery. Every `from_*_sweep` accepts these axes as either a
+# scalar (fixed across the sweep) or a `list` (the chosen *group-by* axis).
+# At most one may be a list per call; that one becomes `group_by` and is the
+# axis the per-method plots use for legend grouping.
+_AXIS_SHORT: dict[str, str] = {
+    "num_lookforward_tokens": "look",
+    "num_samples": "N",
+    "lr_per_sample": "lr",
+    "train_from_scratch": "scratch",
+    "gaussian_stdev": "sigma",
+    "train_steps": "steps",
+}
+
+
+def _resolve_group_axis(
+    *,
+    candidates: dict[str, Any],
+) -> tuple[str | None, list[Any]]:
+    """Validate that at most one entry of `candidates` is a `list`. Return
+    `(axis_name, values_to_loop)`. When everything is scalar, returns
+    `(None, [None])` — caller treats that single-iteration None as
+    "no group axis active". Raises `ValueError` if two or more are lists."""
+    list_axes = {k: v for k, v in candidates.items() if isinstance(v, list)}
+    if len(list_axes) > 1:
+        raise ValueError(
+            f"At most one of {sorted(candidates.keys())} may be a list "
+            f"(the chosen group-by axis); got lists for: {sorted(list_axes)}."
+        )
+    if not list_axes:
+        return None, [None]
+    name, values = next(iter(list_axes.items()))
+    return name, list(values)
+
+
+def _format_group_value(*, axis: str, value: Any) -> str:
+    """Render a group-axis value for display in the legend / study-name string.
+    Mirrors the on-disk folder convention so legend reads identically to path:
+      - num_samples → str(int)
+      - lr_per_sample → f"{v:.2e}"  (matches `f\"lr_{lr:.2e}\"` in config.py)
+      - train_from_scratch → str(bool)
+      - gaussian_stdev → f"{v:.1f}"  (matches `sigma_folder` pin in config.py)
+      - num_lookforward_tokens → str(int)
+      - train_steps → f"{int(v):06d}"  (matches `steps-{N:06d}` in config.py)
+    """
+    if axis == "num_samples":
+        return str(int(value))
+    if axis == "lr_per_sample":
+        return f"{float(value):.2e}"
+    if axis == "train_from_scratch":
+        return str(bool(value))
+    if axis == "gaussian_stdev":
+        return f"{float(value):.1f}"
+    if axis == "num_lookforward_tokens":
+        return str(int(value))
+    if axis == "train_steps":
+        return f"{int(value):06d}"
+    raise ValueError(f"Unknown group axis: {axis!r}")
+
+
+def _study_name(
+    *,
+    num_lookforward: int,
+    group_by: str | None,
+    group_value: Any,
+    rollouts: int | None,
+) -> str:
+    """Build the study-name string. Single source of truth for the format
+    documented in the design plan.
+
+    When `group_by ∈ {None, "num_lookforward_tokens"}` the format is
+    byte-identical to today's (`"look=N"` / `"look=N r=R"`) so cross-method
+    plots that look up `f"look={N}"`-formatted keys keep working."""
+    name = f"look={num_lookforward}"
+    if group_by is not None and group_by != "num_lookforward_tokens":
+        short = _AXIS_SHORT[group_by]
+        name = f"{name} {short}={_format_group_value(axis=group_by, value=group_value)}"
+    if rollouts is not None:
+        name = f"{name} r={rollouts}"
+    return name
+
+
+def _as_list(value: Any) -> list[Any]:
+    """Wrap scalar inputs to length-1 lists; pass lists through unchanged.
+    Used so each `from_*_sweep` can iterate uniformly over its sweep axes."""
+    return value if isinstance(value, list) else [value]
+
+
+def _select_group_value(
+    *,
+    group_by: str | None,
+    num_lookforward_tokens: Any,
+    num_samples: Any,
+    lr_per_sample: Any,
+    train_from_scratch: Any,
+    gaussian_stdev: Any,
+    train_steps: Any = None,
+) -> Any:
+    """Return the current iteration's value for whichever axis is `group_by`.
+    Sweep classmethods pass every axis position so this helper can be reused
+    across SL / NTP / RL without conditional plumbing at the call site.
+    `None` for axes that don't exist in the calling sweep is fine; we only
+    look up the axis named by `group_by`."""
+    if group_by is None:
+        return None
+    if group_by == "num_lookforward_tokens":
+        return num_lookforward_tokens
+    if group_by == "num_samples":
+        return num_samples
+    if group_by == "lr_per_sample":
+        return lr_per_sample
+    if group_by == "train_from_scratch":
+        return train_from_scratch
+    if group_by == "gaussian_stdev":
+        return gaussian_stdev
+    if group_by == "train_steps":
+        return train_steps
+    raise ValueError(f"Unknown group axis: {group_by!r}")
+
+
+def _filter_studies_by_lookforward(
+    *,
+    studies: dict[str, list[Path]],
+    study_lookforwards: dict[str, int],
+    num_lookforward_tokens: int | None,
+) -> list[str]:
+    """Return the ordered list of study names matching `num_lookforward_tokens`.
+    When the filter is `None`, returns every study key in declaration order
+    (today's behaviour). Raises if the filter is set but no study matches —
+    silent-empty-figure is worse than a clear ValueError."""
+    if num_lookforward_tokens is None:
+        return list(studies.keys())
+    matches = [
+        s for s in studies if study_lookforwards[s] == num_lookforward_tokens
+    ]
+    if not matches:
+        seen = sorted(set(study_lookforwards.values()))
+        raise ValueError(
+            f"No studies with num_lookforward_tokens={num_lookforward_tokens} "
+            f"in this config (have: {seen})"
+        )
+    return matches
+
 
 def _seed_folder_name(seed: int) -> str:
     return f"seed-{seed}"
 
 
-def _method_dir(method: str, *, train_from_scratch: bool) -> str:
-    """Method-level artifact subfolder. From-scratch sweeps land in a parallel
-    `<method>_scratch` tree alongside the pretrained-weight `<method>` tree."""
-    return f"{method}_scratch" if train_from_scratch else method
+def _method_dir(method: str, *, train_from_scratch: bool) -> Path:
+    """Method-level artifact subfolder. From-scratch sweeps land in a
+    `<method>/from_scratch` sibling alongside `<method>/from_pretrain` so the
+    initialization regime is an explicit path level rather than an ad-hoc
+    `_scratch` suffix."""
+    from_dir = "from_scratch" if train_from_scratch else "from_pretrain"
+    return Path(method) / from_dir
 
 
 def _make_attach_sched(
@@ -165,6 +310,16 @@ def _decode_dim_averaged(df: pl.DataFrame) -> pl.DataFrame:
                 pl.Series(f"{split}_target_std", target_std_rows, dtype=pl.Float64),
                 pl.Series(f"{split}_pred_std_ratio", ratio_rows, dtype=pl.Float64),
             )
+            # Variance-normalized MSE: MSE / Var(target) on the same split.
+            # Reads as "fraction of target variance unexplained" — 1 is the
+            # constant-mean baseline, 0 is perfect prediction. `null` when
+            # target_var is missing or non-positive (degenerate eval set).
+            out = out.with_columns(
+                pl.when(pl.col(f"{split}_target_var") > 0.0)
+                .then(pl.col(f"{split}_mse") / pl.col(f"{split}_target_var"))
+                .otherwise(None)
+                .alias(f"{split}_normalized_mse")
+            )
     return out
 
 
@@ -176,20 +331,37 @@ def _has_val_metrics(path: Path) -> bool:
 
 class CorpusRegressionAnalysisConfig(BaseConfig):
     """Grouped view over completed/started study folders. Each `studies` key
-    is a group name (`"look=4"` for SL, `"look=4 r=128"` for GRPO/MaxRL); the
-    value is the list of per-seed study folders backing it."""
+    is a group name (`"look=4"` for SL, `"look=4 r=128"` for GRPO/MaxRL); when
+    a non-lookforward group axis is selected the key is extended with the axis
+    short tag (e.g. `"look=4 N=100000 r=128"`). The value is the list of
+    per-seed study folders backing that key."""
 
     studies: dict[str, list[Path]]
     study_seeds: dict[str, list[int]]
     study_lookforwards: dict[str, int]
+    # The axis whose values vary across `studies` (or None if all axes were
+    # scalar at construction time). Drives the per-method plot's legend
+    # grouping. `"num_lookforward_tokens"` reproduces today's behaviour.
+    group_by: str | None = None
+    # Per-study formatted value of the group axis. Empty when `group_by` is
+    # None or `"num_lookforward_tokens"` (the lookforward value is already in
+    # `study_lookforwards`).
+    study_group_values: dict[str, str] = {}
 
     @classmethod
-    def from_grouped(cls, grouped: dict[str, list[tuple[int, Path]]]) -> Self | None:
+    def from_grouped(
+        cls,
+        grouped: dict[str, list[tuple[int, Path]]],
+        *,
+        group_by: str | None = None,
+        study_group_values: dict[str, str] | None = None,
+    ) -> Self | None:
         """Drop paths missing `val_metrics.parquet` or `config.json`; drop empty
         groups; return None if nothing survives."""
         studies: dict[str, list[Path]] = {}
         study_seeds: dict[str, list[int]] = {}
         study_lookforwards: dict[str, int] = {}
+        surviving_group_values: dict[str, str] = {}
         for name, pairs in grouped.items():
             kept = [
                 (s, p)
@@ -206,205 +378,362 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                     "data"
                 ]["num_lookforward_tokens"]
             )
+            if study_group_values is not None and name in study_group_values:
+                surviving_group_values[name] = study_group_values[name]
         if not studies:
             return None
         return cls(
             studies=studies,
             study_seeds=study_seeds,
             study_lookforwards=study_lookforwards,
+            group_by=group_by,
+            study_group_values=surviving_group_values,
         )
 
     @classmethod
-    def from_ntp_baseline(
+    def from_pretrained_baseline(
         cls,
         *,
         artifacts_root: Path,
-        num_lookforward_tokens: int = 1,
-        num_samples: int = 100_000,
+        num_lookforward_tokens: int | list[int] = 1,
+        num_samples: int | list[int] = 100_000,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
     ) -> Self | None:
-        """`<artifacts_root>/ntp_baseline/{dataset_folder}/`.
+        """`<artifacts_root>/pretrained_baseline/from_pretrain/{dataset_folder}/`.
 
-        NTP baseline has no seeds (deterministic given dataset). We wrap
-        the single result as seed=0 for compatibility with the grouped API.
+        Pretrained-model baseline has no seeds (deterministic given dataset).
+        We wrap the single result as seed=0 for compatibility with the
+        grouped API. The `from_pretrain` level is mandatory — there is no
+        from_scratch counterpart for an inference-only intrinsic-variance
+        baseline.
+
+        Pass either `num_lookforward_tokens` or `num_samples` as a `list` to
+        sweep that axis (becomes `group_by`); the other stays scalar.
         """
-        study_base = artifacts_root / "ntp_baseline"
+        study_base = artifacts_root / "pretrained_baseline" / "from_pretrain"
         if not study_base.exists():
             return None
-        folder_name = canonical_dataset_folder_name(
-            num_lookforward_tokens=num_lookforward_tokens,
-            num_samples=num_samples,
-            label_type=label_type,
-            normalize_labels=normalize_labels,
-            label_range=label_range,
+        group_by, _ = _resolve_group_axis(
+            candidates={
+                "num_lookforward_tokens": num_lookforward_tokens,
+                "num_samples": num_samples,
+            }
         )
-        grouped: dict[str, list[tuple[int, Path]]] = {
-            f"look={num_lookforward_tokens}": [
-                (0, study_base / folder_name),
-            ]
-        }
-        return cls.from_grouped(grouped)
+        looks = _as_list(num_lookforward_tokens)
+        samples = _as_list(num_samples)
+        grouped: dict[str, list[tuple[int, Path]]] = {}
+        study_group_values: dict[str, str] = {}
+        for n in looks:
+            for ns in samples:
+                gv = _select_group_value(
+                    group_by=group_by,
+                    num_lookforward_tokens=n, num_samples=ns,
+                    lr_per_sample=None, train_from_scratch=None,
+                    gaussian_stdev=None,
+                )
+                name = _study_name(
+                    num_lookforward=n, group_by=group_by,
+                    group_value=gv, rollouts=None,
+                )
+                folder_name = canonical_dataset_folder_name(
+                    num_lookforward_tokens=n,
+                    num_samples=ns,
+                    label_type=label_type,
+                    normalize_labels=normalize_labels,
+                    label_range=label_range,
+                )
+                grouped[name] = [(0, study_base / folder_name)]
+                if group_by is not None and group_by != "num_lookforward_tokens":
+                    study_group_values[name] = _format_group_value(
+                        axis=group_by, value=gv,
+                    )
+        return cls.from_grouped(
+            grouped, group_by=group_by, study_group_values=study_group_values,
+        )
 
     @classmethod
-    def from_sl_sweep(
+    def from_sl_mse_sweep(
         cls,
         *,
         artifacts_root: Path,
-        num_samples: int = 100_000,
+        num_lookforward_tokens: int | list[int] = 1,
+        num_samples: int | list[int] = 100_000,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
-        lr_per_sample: float = 1e-5,
+        lr_per_sample: float | list[float] = 1e-5,
         lr_schedule: Literal["flat", "cosine"] = "flat",
         warmup_ratio: float = 0.05,
         lr_min_ratio: float = 0.1,
-        train_from_scratch: bool = False,
+        train_from_scratch: bool | list[bool] = False,
+        train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/sl[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/[sched-...]/`.
+        """`<artifacts_root>/sl_mse/<from_*>/seed-{S}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+
+        At most ONE of {`num_lookforward_tokens`, `num_samples`, `lr_per_sample`,
+        `train_from_scratch`, `train_steps`} may be a `list`; that becomes the
+        legend `group_by` axis for per-method plots. All-scalar (default) →
+        `group_by=None` and a single study (`look=1`).
 
         The `sched-warmup-X.XXX-cosine-X.XX` segment is appended only for
         non-flat schedules; defaults reproduce today's flat-LR layout."""
-        study_base = artifacts_root / _method_dir(
-            "sl", train_from_scratch=train_from_scratch,
+        group_by, _ = _resolve_group_axis(
+            candidates={
+                "num_lookforward_tokens": num_lookforward_tokens,
+                "num_samples": num_samples,
+                "lr_per_sample": lr_per_sample,
+                "train_from_scratch": train_from_scratch,
+                "train_steps": train_steps,
+            }
         )
-        if not study_base.exists():
-            return None
-        lr_seg = f"lr_{lr_per_sample:.2e}"
         attach_sched = _make_attach_sched(
             lr_schedule=lr_schedule,
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
         grouped: dict[str, list[tuple[int, Path]]] = {}
-        for n in candidate_lookforward_tokens:
-            grouped[f"look={n}"] = [
-                (
-                    s,
-                    attach_sched(
-                        study_base
-                        / _seed_folder_name(s)
-                        / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples,
-                            label_type=label_type,
-                            normalize_labels=normalize_labels,
-                            label_range=label_range,
-                        )
-                        / lr_seg
-                    ),
-                )
-                for s in candidate_seeds
-            ]
-        return cls.from_grouped(grouped)
+        study_group_values: dict[str, str] = {}
+        for n in _as_list(num_lookforward_tokens):
+            for ns in _as_list(num_samples):
+                for lr in _as_list(lr_per_sample):
+                    for scratch in _as_list(train_from_scratch):
+                        for ts in _as_list(train_steps):
+                            study_base = artifacts_root / _method_dir(
+                                "sl_mse", train_from_scratch=scratch,
+                            )
+                            if not study_base.exists():
+                                continue
+                            lr_seg = f"lr_{lr:.2e}"
+                            steps_seg = f"steps-{int(ts):06d}"
+                            gv = _select_group_value(
+                                group_by=group_by,
+                                num_lookforward_tokens=n, num_samples=ns,
+                                lr_per_sample=lr, train_from_scratch=scratch,
+                                gaussian_stdev=None, train_steps=ts,
+                            )
+                            name = _study_name(
+                                num_lookforward=n, group_by=group_by,
+                                group_value=gv, rollouts=None,
+                            )
+                            grouped[name] = [
+                                (
+                                    s,
+                                    attach_sched(
+                                        study_base
+                                        / _seed_folder_name(s)
+                                        / canonical_dataset_folder_name(
+                                            num_lookforward_tokens=n, num_samples=ns,
+                                            label_type=label_type,
+                                            normalize_labels=normalize_labels,
+                                            label_range=label_range,
+                                        )
+                                        / lr_seg
+                                        / steps_seg
+                                    ),
+                                )
+                                for s in candidate_seeds
+                            ]
+                            if group_by is not None and group_by != "num_lookforward_tokens":
+                                study_group_values[name] = _format_group_value(
+                                    axis=group_by, value=gv,
+                                )
+        if not grouped:
+            return None
+        return cls.from_grouped(
+            grouped, group_by=group_by, study_group_values=study_group_values,
+        )
 
     @classmethod
     def from_sl_ce_sweep(
         cls,
         *,
         artifacts_root: Path,
-        num_samples: int = 100_000,
+        num_lookforward_tokens: int | list[int] = 1,
+        num_samples: int | list[int] = 100_000,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
-        lr_per_sample: float = 1e-5,
+        lr_per_sample: float | list[float] = 1e-5,
         lr_schedule: Literal["flat", "cosine"] = "flat",
         warmup_ratio: float = 0.05,
         lr_min_ratio: float = 0.1,
-        train_from_scratch: bool = False,
+        train_from_scratch: bool | list[bool] = False,
+        train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/sl_ce[_scratch]/seed-{S}/{dataset_folder}/lr_{lr}/[sched-...]/`.
+        """`<artifacts_root>/sl_ce/<from_*>/seed-{S}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
 
-        Identical layout to the SL sweep — `sl_ce` produces the same
-        `train_metrics.parquet` / `val_metrics.parquet` schema and the same
-        per-seed-per-lookforward folder structure. Only K=1 is meaningful for
-        the NTP-CE objective, but we keep the lookforward sweep loop here so
-        partially-populated trees still render cleanly.
+        Identical layout and group-axis semantics to `from_sl_mse_sweep`.
+        Only K=1 is meaningful for the NTP-CE objective, but we keep the
+        lookforward sweep loop here so partially-populated trees still
+        render cleanly.
         """
-        study_base = artifacts_root / _method_dir(
-            "sl_ce", train_from_scratch=train_from_scratch,
+        group_by, _ = _resolve_group_axis(
+            candidates={
+                "num_lookforward_tokens": num_lookforward_tokens,
+                "num_samples": num_samples,
+                "lr_per_sample": lr_per_sample,
+                "train_from_scratch": train_from_scratch,
+                "train_steps": train_steps,
+            }
         )
-        if not study_base.exists():
-            return None
-        lr_seg = f"lr_{lr_per_sample:.2e}"
         attach_sched = _make_attach_sched(
             lr_schedule=lr_schedule,
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
         grouped: dict[str, list[tuple[int, Path]]] = {}
-        for n in candidate_lookforward_tokens:
-            grouped[f"look={n}"] = [
-                (
-                    s,
-                    attach_sched(
-                        study_base
-                        / _seed_folder_name(s)
-                        / canonical_dataset_folder_name(
-                            num_lookforward_tokens=n, num_samples=num_samples,
-                            label_type=label_type,
-                            normalize_labels=normalize_labels,
-                            label_range=label_range,
-                        )
-                        / lr_seg
-                    ),
-                )
-                for s in candidate_seeds
-            ]
-        return cls.from_grouped(grouped)
+        study_group_values: dict[str, str] = {}
+        for n in _as_list(num_lookforward_tokens):
+            for ns in _as_list(num_samples):
+                for lr in _as_list(lr_per_sample):
+                    for scratch in _as_list(train_from_scratch):
+                        for ts in _as_list(train_steps):
+                            study_base = artifacts_root / _method_dir(
+                                "sl_ce", train_from_scratch=scratch,
+                            )
+                            if not study_base.exists():
+                                continue
+                            lr_seg = f"lr_{lr:.2e}"
+                            steps_seg = f"steps-{int(ts):06d}"
+                            gv = _select_group_value(
+                                group_by=group_by,
+                                num_lookforward_tokens=n, num_samples=ns,
+                                lr_per_sample=lr, train_from_scratch=scratch,
+                                gaussian_stdev=None, train_steps=ts,
+                            )
+                            name = _study_name(
+                                num_lookforward=n, group_by=group_by,
+                                group_value=gv, rollouts=None,
+                            )
+                            grouped[name] = [
+                                (
+                                    s,
+                                    attach_sched(
+                                        study_base
+                                        / _seed_folder_name(s)
+                                        / canonical_dataset_folder_name(
+                                            num_lookforward_tokens=n, num_samples=ns,
+                                            label_type=label_type,
+                                            normalize_labels=normalize_labels,
+                                            label_range=label_range,
+                                        )
+                                        / lr_seg
+                                        / steps_seg
+                                    ),
+                                )
+                                for s in candidate_seeds
+                            ]
+                            if group_by is not None and group_by != "num_lookforward_tokens":
+                                study_group_values[name] = _format_group_value(
+                                    axis=group_by, value=gv,
+                                )
+        if not grouped:
+            return None
+        return cls.from_grouped(
+            grouped, group_by=group_by, study_group_values=study_group_values,
+        )
 
     @classmethod
     def from_grpo_sweep(
         cls,
         *,
         artifacts_root: Path,
-        num_samples: int = 100_000,
-        gaussian_stdev: float = 1.0,
+        num_lookforward_tokens: int | list[int] = 1,
+        num_samples: int | list[int] = 100_000,
+        gaussian_stdev: float | list[float] = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
-        lr_per_sample: float = 1e-5,
+        lr_per_sample: float | list[float] = 1e-5,
         lr_schedule: Literal["flat", "cosine"] = "flat",
         warmup_ratio: float = 0.05,
         lr_min_ratio: float = 0.1,
-        train_from_scratch: bool = False,
+        train_from_scratch: bool | list[bool] = False,
+        train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/grpo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/lr_{lr}/[sched-...]/`."""
-        study_base = artifacts_root / _method_dir(
-            "grpo", train_from_scratch=train_from_scratch,
+        """`<artifacts_root>/grpo/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+
+        At most ONE of {`num_lookforward_tokens`, `num_samples`, `lr_per_sample`,
+        `train_from_scratch`, `gaussian_stdev`, `train_steps`} may be a `list`
+        (the chosen `group_by` axis). The rollouts dimension is always swept
+        across `candidate_rollout_steps`."""
+        group_by, _ = _resolve_group_axis(
+            candidates={
+                "num_lookforward_tokens": num_lookforward_tokens,
+                "num_samples": num_samples,
+                "lr_per_sample": lr_per_sample,
+                "train_from_scratch": train_from_scratch,
+                "gaussian_stdev": gaussian_stdev,
+                "train_steps": train_steps,
+            }
         )
-        if not study_base.exists():
-            return None
-        sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
-        lr_seg = f"lr_{lr_per_sample:.2e}"
         attach_sched = _make_attach_sched(
             lr_schedule=lr_schedule,
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
         grouped: dict[str, list[tuple[int, Path]]] = {}
-        for n in candidate_lookforward_tokens:
-            for r in candidate_rollout_steps:
-                grouped[f"look={n} r={r}"] = [
-                    (
-                        s,
-                        attach_sched(
-                            study_base
-                            / _seed_folder_name(s)
-                            / f"rollouts-{r}"
-                            / sigma
-                            / canonical_dataset_folder_name(
-                                num_lookforward_tokens=n, num_samples=num_samples,
-                                label_type=label_type,
-                                normalize_labels=normalize_labels,
-                                label_range=label_range,
-                            )
-                            / lr_seg
-                        ),
-                    )
-                    for s in candidate_seeds
-                ]
-        return cls.from_grouped(grouped)
+        study_group_values: dict[str, str] = {}
+        for n in _as_list(num_lookforward_tokens):
+            for ns in _as_list(num_samples):
+                for lr in _as_list(lr_per_sample):
+                    for scratch in _as_list(train_from_scratch):
+                        for sigma_v in _as_list(gaussian_stdev):
+                            for ts in _as_list(train_steps):
+                                study_base = artifacts_root / _method_dir(
+                                    "grpo", train_from_scratch=scratch,
+                                )
+                                if not study_base.exists():
+                                    continue
+                                sigma = sigma_folder(gaussian_stdev=sigma_v)
+                                lr_seg = f"lr_{lr:.2e}"
+                                steps_seg = f"steps-{int(ts):06d}"
+                                gv = _select_group_value(
+                                    group_by=group_by,
+                                    num_lookforward_tokens=n, num_samples=ns,
+                                    lr_per_sample=lr, train_from_scratch=scratch,
+                                    gaussian_stdev=sigma_v, train_steps=ts,
+                                )
+                                for r in candidate_rollout_steps:
+                                    name = _study_name(
+                                        num_lookforward=n, group_by=group_by,
+                                        group_value=gv, rollouts=r,
+                                    )
+                                    grouped[name] = [
+                                        (
+                                            s,
+                                            attach_sched(
+                                                study_base
+                                                / _seed_folder_name(s)
+                                                / f"rollouts-{r}"
+                                                / sigma
+                                                / canonical_dataset_folder_name(
+                                                    num_lookforward_tokens=n,
+                                                    num_samples=ns,
+                                                    label_type=label_type,
+                                                    normalize_labels=normalize_labels,
+                                                    label_range=label_range,
+                                                )
+                                                / lr_seg
+                                                / steps_seg
+                                            ),
+                                        )
+                                        for s in candidate_seeds
+                                    ]
+                                    if (
+                                        group_by is not None
+                                        and group_by != "num_lookforward_tokens"
+                                    ):
+                                        study_group_values[name] = _format_group_value(
+                                            axis=group_by, value=gv,
+                                        )
+        if not grouped:
+            return None
+        return cls.from_grouped(
+            grouped, group_by=group_by, study_group_values=study_group_values,
+        )
 
     @classmethod
     def from_rloo_sweep(
@@ -412,56 +741,100 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         *,
         artifacts_root: Path,
         factorized: bool,
-        num_samples: int = 100_000,
-        gaussian_stdev: float = 1.0,
+        num_lookforward_tokens: int | list[int] = 1,
+        num_samples: int | list[int] = 100_000,
+        gaussian_stdev: float | list[float] = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
-        lr_per_sample: float = 1e-5,
+        lr_per_sample: float | list[float] = 1e-5,
         lr_schedule: Literal["flat", "cosine"] = "flat",
         warmup_ratio: float = 0.05,
         lr_min_ratio: float = 0.1,
-        train_from_scratch: bool = False,
+        train_from_scratch: bool | list[bool] = False,
+        train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/rloo[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/lr_{lr}/[sched-...]/`.
-        `factorized` is fixed per call — surface it in the figure title."""
-        study_base = artifacts_root / _method_dir(
-            "rloo", train_from_scratch=train_from_scratch,
+        """`<artifacts_root>/rloo/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{factorized_mode}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+        `factorized` is fixed per call — surface it in the figure title.
+
+        Group-axis semantics match `from_grpo_sweep`."""
+        group_by, _ = _resolve_group_axis(
+            candidates={
+                "num_lookforward_tokens": num_lookforward_tokens,
+                "num_samples": num_samples,
+                "lr_per_sample": lr_per_sample,
+                "train_from_scratch": train_from_scratch,
+                "gaussian_stdev": gaussian_stdev,
+                "train_steps": train_steps,
+            }
         )
-        if not study_base.exists():
-            return None
         factorized_mode = factorized_mode_folder(factorized=factorized)
-        sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
-        lr_seg = f"lr_{lr_per_sample:.2e}"
         attach_sched = _make_attach_sched(
             lr_schedule=lr_schedule,
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
         grouped: dict[str, list[tuple[int, Path]]] = {}
-        for n in candidate_lookforward_tokens:
-            for r in candidate_rollout_steps:
-                grouped[f"look={n} r={r}"] = [
-                    (
-                        s,
-                        attach_sched(
-                            study_base
-                            / _seed_folder_name(s)
-                            / f"rollouts-{r}"
-                            / sigma
-                            / factorized_mode
-                            / canonical_dataset_folder_name(
-                                num_lookforward_tokens=n, num_samples=num_samples,
-                                label_type=label_type,
-                                normalize_labels=normalize_labels,
-                                label_range=label_range,
-                            )
-                            / lr_seg
-                        ),
-                    )
-                    for s in candidate_seeds
-                ]
-        return cls.from_grouped(grouped)
+        study_group_values: dict[str, str] = {}
+        for n in _as_list(num_lookforward_tokens):
+            for ns in _as_list(num_samples):
+                for lr in _as_list(lr_per_sample):
+                    for scratch in _as_list(train_from_scratch):
+                        for sigma_v in _as_list(gaussian_stdev):
+                            for ts in _as_list(train_steps):
+                                study_base = artifacts_root / _method_dir(
+                                    "rloo", train_from_scratch=scratch,
+                                )
+                                if not study_base.exists():
+                                    continue
+                                sigma = sigma_folder(gaussian_stdev=sigma_v)
+                                lr_seg = f"lr_{lr:.2e}"
+                                steps_seg = f"steps-{int(ts):06d}"
+                                gv = _select_group_value(
+                                    group_by=group_by,
+                                    num_lookforward_tokens=n, num_samples=ns,
+                                    lr_per_sample=lr, train_from_scratch=scratch,
+                                    gaussian_stdev=sigma_v, train_steps=ts,
+                                )
+                                for r in candidate_rollout_steps:
+                                    name = _study_name(
+                                        num_lookforward=n, group_by=group_by,
+                                        group_value=gv, rollouts=r,
+                                    )
+                                    grouped[name] = [
+                                        (
+                                            s,
+                                            attach_sched(
+                                                study_base
+                                                / _seed_folder_name(s)
+                                                / f"rollouts-{r}"
+                                                / sigma
+                                                / factorized_mode
+                                                / canonical_dataset_folder_name(
+                                                    num_lookforward_tokens=n,
+                                                    num_samples=ns,
+                                                    label_type=label_type,
+                                                    normalize_labels=normalize_labels,
+                                                    label_range=label_range,
+                                                )
+                                                / lr_seg
+                                                / steps_seg
+                                            ),
+                                        )
+                                        for s in candidate_seeds
+                                    ]
+                                    if (
+                                        group_by is not None
+                                        and group_by != "num_lookforward_tokens"
+                                    ):
+                                        study_group_values[name] = _format_group_value(
+                                            axis=group_by, value=gv,
+                                        )
+        if not grouped:
+            return None
+        return cls.from_grouped(
+            grouped, group_by=group_by, study_group_values=study_group_values,
+        )
 
     @classmethod
     def from_maxrl_sweep(
@@ -470,60 +843,105 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         artifacts_root: Path,
         subtract_baseline: bool,
         use_factorized_likelihoods: bool,
-        num_samples: int = 100_000,
-        gaussian_stdev: float = 1.0,
+        num_lookforward_tokens: int | list[int] = 1,
+        num_samples: int | list[int] = 100_000,
+        gaussian_stdev: float | list[float] = 1.0,
         label_type: Literal["rademacher", "token_id"] = "rademacher",
         normalize_labels: bool = False,
         label_range: tuple[float, float] = (0.0, 1.0),
-        lr_per_sample: float = 1e-5,
+        lr_per_sample: float | list[float] = 1e-5,
         lr_schedule: Literal["flat", "cosine"] = "flat",
         warmup_ratio: float = 0.05,
         lr_min_ratio: float = 0.1,
-        train_from_scratch: bool = False,
+        train_from_scratch: bool | list[bool] = False,
+        train_steps: int | list[int] = 10_000,
     ) -> Self | None:
-        """`<artifacts_root>/maxrl[_scratch]/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/lr_{lr}/[sched-...]/`.
-        Both flags are fixed per call — surface them in the figure title."""
-        study_base = artifacts_root / _method_dir(
-            "maxrl", train_from_scratch=train_from_scratch,
+        """`<artifacts_root>/maxrl/<from_*>/seed-{S}/rollouts-{N}/sigma-{σ}/{baseline_mode}/{likelihood_mode}/{dataset_folder}/lr_{lr}/steps-{N:06d}/[sched-...]/`.
+        Both `subtract_baseline` and `use_factorized_likelihoods` are fixed per
+        call — surface them in the figure title.
+
+        Group-axis semantics match `from_grpo_sweep`."""
+        group_by, _ = _resolve_group_axis(
+            candidates={
+                "num_lookforward_tokens": num_lookforward_tokens,
+                "num_samples": num_samples,
+                "lr_per_sample": lr_per_sample,
+                "train_from_scratch": train_from_scratch,
+                "gaussian_stdev": gaussian_stdev,
+                "train_steps": train_steps,
+            }
         )
-        if not study_base.exists():
-            return None
         baseline = baseline_mode_folder(subtract_baseline=subtract_baseline)
         likelihood = likelihood_mode_folder(
             use_factorized_likelihoods=use_factorized_likelihoods,
         )
-        sigma = sigma_folder(gaussian_stdev=gaussian_stdev)
-        lr_seg = f"lr_{lr_per_sample:.2e}"
         attach_sched = _make_attach_sched(
             lr_schedule=lr_schedule,
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
         grouped: dict[str, list[tuple[int, Path]]] = {}
-        for n in candidate_lookforward_tokens:
-            for r in candidate_rollout_steps:
-                grouped[f"look={n} r={r}"] = [
-                    (
-                        s,
-                        attach_sched(
-                            study_base
-                            / _seed_folder_name(s)
-                            / f"rollouts-{r}"
-                            / sigma
-                            / baseline
-                            / likelihood
-                            / canonical_dataset_folder_name(
-                                num_lookforward_tokens=n, num_samples=num_samples,
-                                label_type=label_type,
-                                normalize_labels=normalize_labels,
-                                label_range=label_range,
-                            )
-                            / lr_seg
-                        ),
-                    )
-                    for s in candidate_seeds
-                ]
-        return cls.from_grouped(grouped)
+        study_group_values: dict[str, str] = {}
+        for n in _as_list(num_lookforward_tokens):
+            for ns in _as_list(num_samples):
+                for lr in _as_list(lr_per_sample):
+                    for scratch in _as_list(train_from_scratch):
+                        for sigma_v in _as_list(gaussian_stdev):
+                            for ts in _as_list(train_steps):
+                                study_base = artifacts_root / _method_dir(
+                                    "maxrl", train_from_scratch=scratch,
+                                )
+                                if not study_base.exists():
+                                    continue
+                                sigma = sigma_folder(gaussian_stdev=sigma_v)
+                                lr_seg = f"lr_{lr:.2e}"
+                                steps_seg = f"steps-{int(ts):06d}"
+                                gv = _select_group_value(
+                                    group_by=group_by,
+                                    num_lookforward_tokens=n, num_samples=ns,
+                                    lr_per_sample=lr, train_from_scratch=scratch,
+                                    gaussian_stdev=sigma_v, train_steps=ts,
+                                )
+                                for r in candidate_rollout_steps:
+                                    name = _study_name(
+                                        num_lookforward=n, group_by=group_by,
+                                        group_value=gv, rollouts=r,
+                                    )
+                                    grouped[name] = [
+                                        (
+                                            s,
+                                            attach_sched(
+                                                study_base
+                                                / _seed_folder_name(s)
+                                                / f"rollouts-{r}"
+                                                / sigma
+                                                / baseline
+                                                / likelihood
+                                                / canonical_dataset_folder_name(
+                                                    num_lookforward_tokens=n,
+                                                    num_samples=ns,
+                                                    label_type=label_type,
+                                                    normalize_labels=normalize_labels,
+                                                    label_range=label_range,
+                                                )
+                                                / lr_seg
+                                                / steps_seg
+                                            ),
+                                        )
+                                        for s in candidate_seeds
+                                    ]
+                                    if (
+                                        group_by is not None
+                                        and group_by != "num_lookforward_tokens"
+                                    ):
+                                        study_group_values[name] = _format_group_value(
+                                            axis=group_by, value=gv,
+                                        )
+        if not grouped:
+            return None
+        return cls.from_grouped(
+            grouped, group_by=group_by, study_group_values=study_group_values,
+        )
 
     def describe(self, label: str) -> None:
         n_runs = sum(len(v) for v in self.studies.values())
@@ -765,45 +1183,118 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         )
 
     def _study_styling(self) -> tuple[
-        dict[str, str], dict[str, str], dict[str, str], bool, str | None,
+        dict[str, str], dict[str, str], dict[str, str], bool, set[str] | None,
     ]:
-        """For SL: each study gets a unique color, no group title. For rollout
-        sweeps: color by rollouts, legend-group by lookforward, default-visible
-        is the min-look group available (so partial sweeps still show
-        something on first render)."""
+        """Visual style derivation. Returns
+        `(study_colors, study_legendgroups, study_legend_names,
+          show_group_title, default_visible_groups)`.
+
+        `default_visible_groups`: a set of legendgroup names that should be
+        visible-by-default at first render, or `None` to mean "no group-level
+        filter" (i.e. only the rollouts filter applies, when present).
+
+        Three regimes:
+
+        1. `group_by ∈ {None, "num_lookforward_tokens"}` reproduces today's
+           behaviour exactly:
+             - SL: each study gets a unique colour, no group title, all visible.
+             - RL: colour by rollouts, legendgroup `look=N`, default-visible =
+               just the min-look group (so partial sweeps still show something).
+
+        2. Custom group axis on a non-rollouts (SL/SL-CE/NTP) config: colour by
+           the group value, no nested group title.
+
+        3. Custom group axis on a rollouts config: colour by rollouts (preserved
+           from today), legendgroup is the formatted group value. All group
+           values are visible-by-default; the rollouts filter
+           (`_DEFAULT_VISIBLE_ROLLOUTS`) still narrows what's drawn within each
+           group.
+        """
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
-        if rollouts is None:
-            study_colors = {
-                s: palette[i % len(palette)] for i, s in enumerate(self.studies)
+        custom_axis = (
+            self.group_by is not None
+            and self.group_by != "num_lookforward_tokens"
+        )
+
+        if not custom_axis:
+            # Today's behaviour preserved verbatim.
+            if rollouts is None:
+                study_colors = {
+                    s: palette[i % len(palette)] for i, s in enumerate(self.studies)
+                }
+                study_legendgroups = {s: s for s in self.studies}
+                study_legend_names = {s: s for s in self.studies}
+                return study_colors, study_legendgroups, study_legend_names, False, None
+            rollouts_colors = {
+                r: palette[i % len(palette)] for i, r in enumerate(rollouts.keys())
             }
-            study_legendgroups = {s: s for s in self.studies}
-            study_legend_names = {s: s for s in self.studies}
-            return study_colors, study_legendgroups, study_legend_names, False, None
+            study_colors_rl: dict[str, str] = {}
+            study_legendgroups_rl: dict[str, str] = {}
+            study_legend_names_rl: dict[str, str] = {}
+            for r, names in rollouts.items():
+                for n in names:
+                    study_colors_rl[n] = rollouts_colors[r]
+                    study_legendgroups_rl[n] = f"look={self.study_lookforwards[n]}"
+                    study_legend_names_rl[n] = f"r={r}"
+            min_look = min(self.study_lookforwards.values())
+            return (
+                study_colors_rl,
+                study_legendgroups_rl,
+                study_legend_names_rl,
+                True,
+                {f"look={min_look}"},
+            )
+
+        # Custom group axis. Studies are tagged with their formatted group
+        # value via `study_group_values`. Format the legendgroup as
+        # "{axis_short}={value}" so the legend reads identically to the
+        # study-name suffix.
+        axis_short = _AXIS_SHORT[self.group_by]
+        legendgroup_label: dict[str, str] = {
+            s: f"{axis_short}={self.study_group_values[s]}"
+            for s in self.studies
+        }
+
+        if rollouts is None:
+            # SL with custom axis: one trace per group value. Colour by
+            # group value, no nested group title.
+            unique_groups = list(dict.fromkeys(legendgroup_label[s] for s in self.studies))
+            group_colors = {
+                g: palette[i % len(palette)] for i, g in enumerate(unique_groups)
+            }
+            study_colors_sl = {s: group_colors[legendgroup_label[s]] for s in self.studies}
+            study_legendgroups_sl = {s: legendgroup_label[s] for s in self.studies}
+            study_legend_names_sl = {s: legendgroup_label[s] for s in self.studies}
+            return study_colors_sl, study_legendgroups_sl, study_legend_names_sl, False, None
+
+        # RL with custom axis: colour by rollouts (today's behaviour),
+        # legendgroup by group value, default-visible = all group values
+        # crossed with `_DEFAULT_VISIBLE_ROLLOUTS` (handled in is_default_visible).
         rollouts_colors = {
             r: palette[i % len(palette)] for i, r in enumerate(rollouts.keys())
         }
-        study_colors: dict[str, str] = {}
-        study_legendgroups: dict[str, str] = {}
-        study_legend_names: dict[str, str] = {}
+        study_colors_rl: dict[str, str] = {}
+        study_legendgroups_rl: dict[str, str] = {}
+        study_legend_names_rl: dict[str, str] = {}
         for r, names in rollouts.items():
             for n in names:
-                study_colors[n] = rollouts_colors[r]
-                study_legendgroups[n] = f"look={self.study_lookforwards[n]}"
-                study_legend_names[n] = f"r={r}"
-        min_look = min(self.study_lookforwards.values())
+                study_colors_rl[n] = rollouts_colors[r]
+                study_legendgroups_rl[n] = legendgroup_label[n]
+                study_legend_names_rl[n] = f"r={r}"
         return (
-            study_colors,
-            study_legendgroups,
-            study_legend_names,
+            study_colors_rl,
+            study_legendgroups_rl,
+            study_legend_names_rl,
             True,
-            f"look={min_look}",
+            None,  # all group values default-visible; rollouts filter handles the rest
         )
 
     def plot_vs_eval(
         self,
         metric: Literal["corr", "mse"],
         *,
+        num_lookforward_tokens: int | None = None,
         title: str | None = None,
         show_seed_bar: bool = False,
         save_path: Path | None = None,
@@ -813,35 +1304,70 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         (seed-mean). Rollout sweeps default-show the min-look group with
         rollouts in `_DEFAULT_VISIBLE_ROLLOUTS`.
 
+        When `num_lookforward_tokens` is provided, only studies with that
+        lookforward value are plotted (single-look view). When `None`, all
+        studies in `self.studies` are plotted (today's behaviour).
+
         When `train_{metric}` is missing from the loaded DataFrame (trained
         methods that don't write the train-window aggregate), the figure
-        collapses to a single val panel."""
+        collapses to a single val panel.
+
+        For `metric="mse"` the y-axis plots the variance-normalized MSE
+        (`{split}_mse / {split}_target_var`, the fraction of target variance
+        unexplained — 1 is the constant-mean baseline, 0 is perfect) and the
+        y-range is hard-capped at `[0, 1]` so early-training spikes don't
+        dominate the display."""
         df = self.get_metric_dataframe()
+        # Normalized-MSE eval rendering: divide each row's MSE by the
+        # per-eval target variance so the y-axis reads as a unitless ratio,
+        # then cap at 1. We swap the column name in place so the rest of the
+        # plotting plumbing (aggregation, hover labels, axis titles) flows
+        # through unchanged.
+        is_normalized_mse = metric == "mse"
+        metric_col = "normalized_mse" if is_normalized_mse else metric
+        if is_normalized_mse and f"val_{metric_col}" not in df.columns:
+            raise ValueError(
+                "plot_vs_eval(metric='mse') requires the val_normalized_mse "
+                "column (MSE / target_var). The loaded parquets are missing "
+                "the *_target_sum sufficient stats; re-run the eval to emit them."
+            )
         rollouts = self._rollouts_groups()
         (
             study_colors,
             study_legendgroups,
             study_legend_names,
             show_group_title,
-            default_visible_group,
+            default_visible_groups,
         ) = self._study_styling()
 
+        studies_to_plot = _filter_studies_by_lookforward(
+            studies=self.studies,
+            study_lookforwards=self.study_lookforwards,
+            num_lookforward_tokens=num_lookforward_tokens,
+        )
+
         def is_default_visible(study: str) -> bool:
-            if default_visible_group is None:
-                return True
-            if study_legendgroups[study] != default_visible_group:
-                return False
+            # SL / no-rollouts: nothing to filter rollouts-wise.
+            if rollouts is None:
+                if default_visible_groups is None:
+                    return True
+                return study_legendgroups[study] in default_visible_groups
+            # RL: rollouts filter always applies.
             r = int(_ROLLOUTS_RE.search(study).group(1))
-            return r in self._DEFAULT_VISIBLE_ROLLOUTS
+            if r not in self._DEFAULT_VISIBLE_ROLLOUTS:
+                return False
+            if default_visible_groups is None:
+                return True
+            return study_legendgroups[study] in default_visible_groups
 
         splits: tuple[str, ...] = (
-            ("train", "val") if f"train_{metric}" in df.columns else ("val",)
+            ("train", "val") if f"train_{metric_col}" in df.columns else ("val",)
         )
         fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
         for col, split in enumerate(splits, start=1):
-            y_name = f"{split}_{metric}"
+            y_name = f"{split}_{metric_col}"
             agg_df = self._aggregate_by_step(df=df, y_name=y_name)
-            for study in self.studies:
+            for study in studies_to_plot:
                 sub = agg_df.filter(pl.col("study") == study).sort("step")
                 if sub.is_empty():
                     continue
@@ -892,6 +1418,9 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
                 )
             fig.update_xaxes(title_text="step", row=1, col=col)
             fig.update_yaxes(title_text=y_name, row=1, col=col)
+            # if is_normalized_mse:
+            #     # Hard-cap the y-axis at 1; users can autoscale to see beyond.
+            #     fig.update_yaxes(range=[0, 1], row=1, col=col)
         if rollouts is not None:
             fig.update_layout(legend=dict(groupclick="togglegroup"))
         if title is not None:
@@ -905,6 +1434,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         self,
         metric: Literal["loss", "mse"],
         *,
+        num_lookforward_tokens: int | None = None,
         title: str | None = None,
         show_seed_bar: bool = False,
         y_clip_quantile: float | None = 0.99,
@@ -913,6 +1443,10 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         """Per-step train metrics (loss or mse) as continuous lines, one per
         study (seed-mean). Requires new-format study folders with
         train_metrics.parquet.
+
+        When `num_lookforward_tokens` is provided, only studies with that
+        lookforward value are plotted (single-look view). When `None`, all
+        studies are plotted (today's behaviour).
 
         Early-training spikes routinely blow up the y-axis. When
         `y_clip_quantile` is not None (default 0.99), the y-axis autorange
@@ -931,16 +1465,26 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             study_legendgroups,
             study_legend_names,
             show_group_title,
-            default_visible_group,
+            default_visible_groups,
         ) = self._study_styling()
 
+        studies_to_plot = _filter_studies_by_lookforward(
+            studies=self.studies,
+            study_lookforwards=self.study_lookforwards,
+            num_lookforward_tokens=num_lookforward_tokens,
+        )
+
         def is_default_visible(study: str) -> bool:
-            if default_visible_group is None:
-                return True
-            if study_legendgroups[study] != default_visible_group:
-                return False
+            if rollouts is None:
+                if default_visible_groups is None:
+                    return True
+                return study_legendgroups[study] in default_visible_groups
             r = int(_ROLLOUTS_RE.search(study).group(1))
-            return r in self._DEFAULT_VISIBLE_ROLLOUTS
+            if r not in self._DEFAULT_VISIBLE_ROLLOUTS:
+                return False
+            if default_visible_groups is None:
+                return True
+            return study_legendgroups[study] in default_visible_groups
 
         fig = go.Figure()
         agg_df = (
@@ -954,7 +1498,7 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
             )
             .sort(["study", "step"])
         )
-        for study in self.studies:
+        for study in studies_to_plot:
             sub = agg_df.filter(pl.col("study") == study).sort("step")
             if sub.is_empty():
                 continue
@@ -1037,8 +1581,19 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
         one curve per rollouts value; only `_DEFAULT_VISIBLE_ROLLOUTS` start
         visible.
 
+        Requires `group_by ∈ {None, "num_lookforward_tokens"}` — i.e. the
+        config must have lookforward as the only swept axis (or no swept axis
+        at all). Custom group axes are not yet supported here; build a
+        separate config to use them.
+
         When `train_{metric}` is missing from the loaded DataFrame the figure
         collapses to a single val panel."""
+        if self.group_by not in (None, "num_lookforward_tokens"):
+            raise NotImplementedError(
+                f"plot_vs_lookforward is not supported with group_by="
+                f"{self.group_by!r}; build a separate config without that "
+                "group axis (or sweep num_lookforward_tokens instead)."
+            )
         df = self.get_metric_dataframe()
         rollouts = self._rollouts_groups()
         palette = qualitative.Plotly
@@ -1134,21 +1689,33 @@ class CorpusRegressionAnalysisConfig(BaseConfig):
 
 # Cross-method comparison helpers.
 
+# On-disk / programmatic method identifiers are lowercase with underscores so
+# they're CLI-friendly and idiomatic Python; the displayed legend strings are
+# uppercase via this map.
+_METHOD_DISPLAY: dict[str, str] = {
+    "sl_mse": "SL_MSE",
+    "sl_ce": "SL_CE",
+    "grpo": "GRPO",
+    "maxrl": "MAXRL",
+    "rloo": "RLOO",
+    "pretrained_baseline": "PRETRAINED_BASELINE",
+}
+
 _METHOD_DASH: dict[str, str] = {
-    "sl": "solid",
+    "sl_mse": "solid",
     "sl_ce": "solid",
     "grpo": "dash",
     "maxrl": "dot",
     "rloo": "longdash",
-    "ntp_baseline": "dashdot",
+    "pretrained_baseline": "dashdot",
 }
 
 _METHOD_COLORS: dict[str, str] = {
-    "sl": qualitative.Plotly[0],
+    "sl_mse": qualitative.Plotly[0],
     "grpo": qualitative.Plotly[1],
     "maxrl": qualitative.Plotly[2],
     "rloo": qualitative.Plotly[3],
-    "ntp_baseline": qualitative.Plotly[4],
+    "pretrained_baseline": qualitative.Plotly[4],
     "sl_ce": qualitative.Plotly[5],
 }
 
@@ -1200,40 +1767,41 @@ def _best_step_rows_for_studies(
 
 def plot_methods_vs_lookforward(
     *,
-    sl: CorpusRegressionAnalysisConfig | None = None,
+    sl_mse: CorpusRegressionAnalysisConfig | None = None,
     sl_ce: CorpusRegressionAnalysisConfig | None = None,
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
     rloo: CorpusRegressionAnalysisConfig | None = None,
-    ntp_baseline: CorpusRegressionAnalysisConfig | None = None,
+    pretrained_baseline: CorpusRegressionAnalysisConfig | None = None,
     metric: Literal["corr", "mse"] = "corr",
     title: str | None = None,
     x_scale: Literal["log", "uniform"] = "uniform",
     save_path: Path | None = None,
 ) -> go.Figure:
     """Cross-method best-step metric vs `num_lookforward_tokens`. Two panels
-    (train, val). SL (when present) is a single standalone curve; GRPO, MaxRL
-    and RLOO traces are grouped by rollouts — one legend group per `r=N`,
-    containing one curve per RL method that ran that rollouts value. Color =
-    method; dash = rollouts. Default-visible: SL plus the highest-rollouts
-    group.
+    (train, val). SL_MSE (when present) is a single standalone curve; GRPO,
+    MaxRL and RLOO traces are grouped by rollouts — one legend group per
+    `r=N`, containing one curve per RL method that ran that rollouts value.
+    Color = method; dash = rollouts. Default-visible: SL_MSE plus the
+    highest-rollouts group.
 
-    `ntp_baseline` (when present) is drawn as a standalone curve representing
-    the intrinsic variance floor. `sl_ce` (when present) is drawn as a
-    standalone curve representing the NTP cross-entropy supervised baseline."""
+    `pretrained_baseline` (when present) is drawn as a standalone curve
+    representing the intrinsic variance floor. `sl_ce` (when present) is
+    drawn as a standalone curve representing the NTP cross-entropy
+    supervised baseline."""
     methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
         (name, cfg)
         for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
         if cfg is not None
     ]
     if (
-        sl is None
+        sl_mse is None
         and sl_ce is None
         and not methods_rl
-        and ntp_baseline is None
+        and pretrained_baseline is None
     ):
         raise ValueError(
-            "at least one of sl/sl_ce/grpo/maxrl/rloo/ntp_baseline must be provided"
+            "at least one of sl_mse/sl_ce/grpo/maxrl/rloo/pretrained_baseline must be provided"
         )
 
     rollouts_seen: list[int] = []
@@ -1251,9 +1819,9 @@ def plot_methods_vs_lookforward(
     }
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
-    sl_df = sl.get_metric_dataframe() if sl is not None else None
+    sl_mse_df = sl_mse.get_metric_dataframe() if sl_mse is not None else None
     sl_ce_df = sl_ce.get_metric_dataframe() if sl_ce is not None else None
-    ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
+    pretrained_df = pretrained_baseline.get_metric_dataframe() if pretrained_baseline is not None else None
     rl_dfs: dict[str, pl.DataFrame] = {
         name: cfg.get_metric_dataframe() for name, cfg in methods_rl
     }
@@ -1270,7 +1838,7 @@ def plot_methods_vs_lookforward(
     # excluded from the train panel rather than raising.
     any_has_train = any(
         _has_train_col(d, metric)
-        for d in (sl_df, sl_ce_df, ntp_df, *rl_dfs.values())
+        for d in (sl_mse_df, sl_ce_df, pretrained_df, *rl_dfs.values())
     )
     splits: tuple[str, ...] = ("train", "val") if any_has_train else ("val",)
 
@@ -1278,21 +1846,21 @@ def plot_methods_vs_lookforward(
     for col, split in enumerate(splits, start=1):
         y_name = f"{split}_{metric}"
 
-        if sl is not None and (split == "val" or _has_train_col(sl_df, metric)):
-            sl_agg = sl._aggregate_by_step(df=sl_df, y_name=y_name)
-            sl_rows = _best_step_rows_for_studies(
-                cfg=sl, agg_df=sl_agg, studies=list(sl.studies.keys()),
+        if sl_mse is not None and (split == "val" or _has_train_col(sl_mse_df, metric)):
+            sl_mse_agg = sl_mse._aggregate_by_step(df=sl_mse_df, y_name=y_name)
+            sl_mse_rows = _best_step_rows_for_studies(
+                cfg=sl_mse, agg_df=sl_mse_agg, studies=list(sl_mse.studies.keys()),
                 higher_is_better=higher_is_better,
             )
-            if sl_rows:
+            if sl_mse_rows:
                 _add_methods_curve(
                     fig=fig,
-                    rows=sl_rows,
+                    rows=sl_mse_rows,
                     col=col,
-                    trace_name="sl",
-                    legendgroup="sl",
+                    trace_name=_METHOD_DISPLAY["sl_mse"],
+                    legendgroup=_METHOD_DISPLAY["sl_mse"],
                     legendgrouptitle_text=None,
-                    color=_METHOD_COLORS["sl"],
+                    color=_METHOD_COLORS["sl_mse"],
                     dash="solid",
                     y_name=y_name,
                     x_scale=x_scale,
@@ -1311,8 +1879,8 @@ def plot_methods_vs_lookforward(
                     fig=fig,
                     rows=sl_ce_rows,
                     col=col,
-                    trace_name="sl_ce",
-                    legendgroup="sl_ce",
+                    trace_name=_METHOD_DISPLAY["sl_ce"],
+                    legendgroup=_METHOD_DISPLAY["sl_ce"],
                     legendgrouptitle_text=None,
                     color=_METHOD_COLORS["sl_ce"],
                     dash=_METHOD_DASH["sl_ce"],
@@ -1322,23 +1890,23 @@ def plot_methods_vs_lookforward(
                     visible_default=True,
                 )
 
-        if ntp_baseline is not None and (
-            split == "val" or _has_train_col(ntp_df, metric)
+        if pretrained_baseline is not None and (
+            split == "val" or _has_train_col(pretrained_df, metric)
         ):
-            ntp_agg = ntp_baseline._aggregate_by_step(df=ntp_df, y_name=y_name)
-            ntp_rows = _best_step_rows_for_studies(
-                cfg=ntp_baseline, agg_df=ntp_agg, studies=list(ntp_baseline.studies.keys()),
+            pretrained_agg = pretrained_baseline._aggregate_by_step(df=pretrained_df, y_name=y_name)
+            pretrained_rows = _best_step_rows_for_studies(
+                cfg=pretrained_baseline, agg_df=pretrained_agg, studies=list(pretrained_baseline.studies.keys()),
                 higher_is_better=higher_is_better,
             )
-            if ntp_rows:
+            if pretrained_rows:
                 _add_methods_curve(
                     fig=fig,
-                    rows=ntp_rows,
+                    rows=pretrained_rows,
                     col=col,
-                    trace_name="ntp_baseline",
-                    legendgroup="ntp_baseline",
+                    trace_name=_METHOD_DISPLAY["pretrained_baseline"],
+                    legendgroup=_METHOD_DISPLAY["pretrained_baseline"],
                     legendgrouptitle_text=None,
-                    color=_METHOD_COLORS["ntp_baseline"],
+                    color=_METHOD_COLORS["pretrained_baseline"],
                     dash="solid",
                     y_name=y_name,
                     x_scale=x_scale,
@@ -1369,7 +1937,7 @@ def plot_methods_vs_lookforward(
                     fig=fig,
                     rows=rows,
                     col=col,
-                    trace_name=method_name,
+                    trace_name=_METHOD_DISPLAY[method_name],
                     legendgroup=f"r={r}",
                     legendgrouptitle_text=f"r={r}",
                     color=_METHOD_COLORS[method_name],
@@ -1527,12 +2095,12 @@ def _add_eval_curve(
 
 def plot_methods_vs_eval(
     *,
-    sl: CorpusRegressionAnalysisConfig | None = None,
+    sl_mse: CorpusRegressionAnalysisConfig | None = None,
     sl_ce: CorpusRegressionAnalysisConfig | None = None,
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
     rloo: CorpusRegressionAnalysisConfig | None = None,
-    ntp_baseline: CorpusRegressionAnalysisConfig | None = None,
+    pretrained_baseline: CorpusRegressionAnalysisConfig | None = None,
     num_lookforward_tokens: int = 1,
     metric: Literal["corr", "mse"] = "corr",
     show_seed_bar: bool = False,
@@ -1541,21 +2109,31 @@ def plot_methods_vs_eval(
 ) -> go.Figure:
     """Cross-method per-eval metric curves for a single `num_lookforward_tokens`
     value. Two panels (train, val); x-axis is training step at validation
-    events. Color = method; dash = rollouts."""
+    events. Color = method; dash = rollouts.
+
+    For `metric="mse"` the y-axis plots the variance-normalized MSE
+    (`{split}_mse / {split}_target_var`, the fraction of target variance
+    unexplained — 1 is the constant-mean baseline, 0 is perfect) and the
+    y-range is hard-capped at `[0, 1]`."""
     methods_rl: list[tuple[str, CorpusRegressionAnalysisConfig]] = [
         (name, cfg)
         for name, cfg in (("grpo", grpo), ("maxrl", maxrl), ("rloo", rloo))
         if cfg is not None
     ]
     if (
-        sl is None
+        sl_mse is None
         and sl_ce is None
         and not methods_rl
-        and ntp_baseline is None
+        and pretrained_baseline is None
     ):
         raise ValueError(
-            "at least one of sl/sl_ce/grpo/maxrl/rloo/ntp_baseline must be provided"
+            "at least one of sl_mse/sl_ce/grpo/maxrl/rloo/pretrained_baseline must be provided"
         )
+
+    # See `plot_vs_eval` — `metric="mse"` swaps to the variance-normalized
+    # column so the y-axis reads as a unitless ratio capped at 1.
+    is_normalized_mse = metric == "mse"
+    metric_col = "normalized_mse" if is_normalized_mse else metric
 
     # Collect rollout values across RL methods.
     rollouts_seen: list[int] = []
@@ -1574,42 +2152,65 @@ def plot_methods_vs_eval(
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
     # Pre-load metric DataFrames.
-    sl_df = sl.get_metric_dataframe() if sl is not None else None
+    sl_mse_df = sl_mse.get_metric_dataframe() if sl_mse is not None else None
     sl_ce_df = sl_ce.get_metric_dataframe() if sl_ce is not None else None
-    ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
+    pretrained_df = pretrained_baseline.get_metric_dataframe() if pretrained_baseline is not None else None
     rl_dfs: dict[str, pl.DataFrame] = {
         name: cfg.get_metric_dataframe() for name, cfg in methods_rl
     }
 
+    if is_normalized_mse:
+        # All present DataFrames must carry the val_normalized_mse column;
+        # otherwise the cross-method comparison would silently mix old and
+        # new schemas.
+        provided = {
+            "sl_mse": sl_mse_df,
+            "sl_ce": sl_ce_df,
+            "pretrained_baseline": pretrained_df,
+            **rl_dfs,
+        }
+        missing = [
+            name
+            for name, d in provided.items()
+            if d is not None and f"val_{metric_col}" not in d.columns
+        ]
+        if missing:
+            raise ValueError(
+                "plot_methods_vs_eval(metric='mse') requires the "
+                "val_normalized_mse column on every supplied method; missing "
+                f"on: {sorted(missing)}. Re-run those evals to emit the "
+                "*_target_sum sufficient stats."
+            )
+
     any_has_train = any(
-        _has_train_col(d, metric)
-        for d in (sl_df, sl_ce_df, ntp_df, *rl_dfs.values())
+        _has_train_col(d, metric_col)
+        for d in (sl_mse_df, sl_ce_df, pretrained_df, *rl_dfs.values())
     )
     splits: tuple[str, ...] = ("train", "val") if any_has_train else ("val",)
     fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
     for col, split in enumerate(splits, start=1):
-        y_name = f"{split}_{metric}"
+        y_name = f"{split}_{metric_col}"
 
-        # SL (no rollouts): single study "look=N".
+        # SL_MSE (no rollouts): single study "look=N".
         if (
-            sl is not None
-            and sl_df is not None
-            and (split == "val" or _has_train_col(sl_df, metric))
+            sl_mse is not None
+            and sl_mse_df is not None
+            and (split == "val" or _has_train_col(sl_mse_df, metric_col))
         ):
             study_name = f"look={num_lookforward_tokens}"
-            if study_name in sl.studies:
-                agg = sl._aggregate_by_step(
-                    df=sl_df.filter(pl.col("study") == study_name), y_name=y_name
+            if study_name in sl_mse.studies:
+                agg = sl_mse._aggregate_by_step(
+                    df=sl_mse_df.filter(pl.col("study") == study_name), y_name=y_name
                 )
                 if not agg.is_empty():
                     _add_eval_curve(
                         fig=fig,
                         agg_df=agg,
                         col=col,
-                        trace_name="sl",
-                        legendgroup="sl",
+                        trace_name=_METHOD_DISPLAY["sl_mse"],
+                        legendgroup=_METHOD_DISPLAY["sl_mse"],
                         legendgrouptitle_text=None,
-                        color=_METHOD_COLORS["sl"],
+                        color=_METHOD_COLORS["sl_mse"],
                         dash="solid",
                         y_name=y_name,
                         show_legend=(split == "val"),
@@ -1621,7 +2222,7 @@ def plot_methods_vs_eval(
         if (
             sl_ce is not None
             and sl_ce_df is not None
-            and (split == "val" or _has_train_col(sl_ce_df, metric))
+            and (split == "val" or _has_train_col(sl_ce_df, metric_col))
         ):
             study_name = f"look={num_lookforward_tokens}"
             if study_name in sl_ce.studies:
@@ -1634,8 +2235,8 @@ def plot_methods_vs_eval(
                         fig=fig,
                         agg_df=agg,
                         col=col,
-                        trace_name="sl_ce",
-                        legendgroup="sl_ce",
+                        trace_name=_METHOD_DISPLAY["sl_ce"],
+                        legendgroup=_METHOD_DISPLAY["sl_ce"],
                         legendgrouptitle_text=None,
                         color=_METHOD_COLORS["sl_ce"],
                         dash=_METHOD_DASH["sl_ce"],
@@ -1645,26 +2246,26 @@ def plot_methods_vs_eval(
                         show_seed_bar=show_seed_bar,
                     )
 
-        # NTP baseline: single study "look=N".
+        # Pretrained-model intrinsic-variance baseline: single study "look=N".
         if (
-            ntp_baseline is not None
-            and ntp_df is not None
-            and (split == "val" or _has_train_col(ntp_df, metric))
+            pretrained_baseline is not None
+            and pretrained_df is not None
+            and (split == "val" or _has_train_col(pretrained_df, metric_col))
         ):
             study_name = f"look={num_lookforward_tokens}"
-            if study_name in ntp_baseline.studies:
-                agg = ntp_baseline._aggregate_by_step(
-                    df=ntp_df.filter(pl.col("study") == study_name), y_name=y_name
+            if study_name in pretrained_baseline.studies:
+                agg = pretrained_baseline._aggregate_by_step(
+                    df=pretrained_df.filter(pl.col("study") == study_name), y_name=y_name
                 )
                 if not agg.is_empty():
                     _add_eval_curve(
                         fig=fig,
                         agg_df=agg,
                         col=col,
-                        trace_name="ntp_baseline",
-                        legendgroup="ntp_baseline",
+                        trace_name=_METHOD_DISPLAY["pretrained_baseline"],
+                        legendgroup=_METHOD_DISPLAY["pretrained_baseline"],
                         legendgrouptitle_text=None,
-                        color=_METHOD_COLORS["ntp_baseline"],
+                        color=_METHOD_COLORS["pretrained_baseline"],
                         dash="solid",
                         y_name=y_name,
                         show_legend=(split == "val"),
@@ -1676,7 +2277,7 @@ def plot_methods_vs_eval(
         for r in rollouts_seen:
             for method_name, cfg in methods_rl:
                 if split == "train" and not _has_train_col(
-                    rl_dfs[method_name], metric
+                    rl_dfs[method_name], metric_col
                 ):
                     continue
                 study_name = f"look={num_lookforward_tokens} r={r}"
@@ -1692,7 +2293,7 @@ def plot_methods_vs_eval(
                     fig=fig,
                     agg_df=agg,
                     col=col,
-                    trace_name=method_name,
+                    trace_name=_METHOD_DISPLAY[method_name],
                     legendgroup=f"r={r}",
                     legendgrouptitle_text=f"r={r}",
                     color=_METHOD_COLORS[method_name],
@@ -1705,6 +2306,9 @@ def plot_methods_vs_eval(
 
         fig.update_xaxes(title_text="step", row=1, col=col)
         fig.update_yaxes(title_text=y_name, row=1, col=col)
+        # if is_normalized_mse:
+        #     # Hard-cap the y-axis at 1; users can autoscale to see beyond.
+        #     fig.update_yaxes(range=[0, 1], row=1, col=col)
 
     fig.update_layout(legend=dict(groupclick="togglegroup"))
     if title is not None:
@@ -1719,12 +2323,12 @@ def plot_methods_vs_eval(
 
 def plot_methods_pred_std_vs_eval(
     *,
-    sl: CorpusRegressionAnalysisConfig | None = None,
+    sl_mse: CorpusRegressionAnalysisConfig | None = None,
     sl_ce: CorpusRegressionAnalysisConfig | None = None,
     grpo: CorpusRegressionAnalysisConfig | None = None,
     maxrl: CorpusRegressionAnalysisConfig | None = None,
     rloo: CorpusRegressionAnalysisConfig | None = None,
-    ntp_baseline: CorpusRegressionAnalysisConfig | None = None,
+    pretrained_baseline: CorpusRegressionAnalysisConfig | None = None,
     num_lookforward_tokens: int = 1,
     quantity: Literal["pred_std", "pred_std_ratio"] = "pred_std_ratio",
     show_seed_bar: bool = False,
@@ -1747,13 +2351,13 @@ def plot_methods_pred_std_vs_eval(
         if cfg is not None
     ]
     if (
-        sl is None
+        sl_mse is None
         and sl_ce is None
         and not methods_rl
-        and ntp_baseline is None
+        and pretrained_baseline is None
     ):
         raise ValueError(
-            "at least one of sl/sl_ce/grpo/maxrl/rloo/ntp_baseline must be provided"
+            "at least one of sl_mse/sl_ce/grpo/maxrl/rloo/pretrained_baseline must be provided"
         )
 
     rollouts_seen: list[int] = []
@@ -1771,9 +2375,9 @@ def plot_methods_pred_std_vs_eval(
     }
     max_rollouts = rollouts_seen[-1] if rollouts_seen else None
 
-    sl_df = sl.get_metric_dataframe() if sl is not None else None
+    sl_mse_df = sl_mse.get_metric_dataframe() if sl_mse is not None else None
     sl_ce_df = sl_ce.get_metric_dataframe() if sl_ce is not None else None
-    ntp_df = ntp_baseline.get_metric_dataframe() if ntp_baseline is not None else None
+    pretrained_df = pretrained_baseline.get_metric_dataframe() if pretrained_baseline is not None else None
     rl_dfs: dict[str, pl.DataFrame] = {
         name: cfg.get_metric_dataframe() for name, cfg in methods_rl
     }
@@ -1783,7 +2387,7 @@ def plot_methods_pred_std_vs_eval(
 
     any_has_train = any(
         has_quantity(d, "train")
-        for d in (sl_df, sl_ce_df, ntp_df, *rl_dfs.values())
+        for d in (sl_mse_df, sl_ce_df, pretrained_df, *rl_dfs.values())
     )
     splits: tuple[str, ...] = ("train", "val") if any_has_train else ("val",)
     fig = make_subplots(rows=1, cols=len(splits), horizontal_spacing=0.08)
@@ -1791,24 +2395,24 @@ def plot_methods_pred_std_vs_eval(
         y_name = f"{split}_{quantity}"
 
         if (
-            sl is not None
-            and sl_df is not None
-            and has_quantity(sl_df, split)
+            sl_mse is not None
+            and sl_mse_df is not None
+            and has_quantity(sl_mse_df, split)
         ):
             study_name = f"look={num_lookforward_tokens}"
-            if study_name in sl.studies:
-                agg = sl._aggregate_by_step(
-                    df=sl_df.filter(pl.col("study") == study_name), y_name=y_name
+            if study_name in sl_mse.studies:
+                agg = sl_mse._aggregate_by_step(
+                    df=sl_mse_df.filter(pl.col("study") == study_name), y_name=y_name
                 )
                 if not agg.is_empty():
                     _add_eval_curve(
                         fig=fig,
                         agg_df=agg,
                         col=col,
-                        trace_name="sl",
-                        legendgroup="sl",
+                        trace_name=_METHOD_DISPLAY["sl_mse"],
+                        legendgroup=_METHOD_DISPLAY["sl_mse"],
                         legendgrouptitle_text=None,
-                        color=_METHOD_COLORS["sl"],
+                        color=_METHOD_COLORS["sl_mse"],
                         dash="solid",
                         y_name=y_name,
                         show_legend=(split == "val"),
@@ -1832,8 +2436,8 @@ def plot_methods_pred_std_vs_eval(
                         fig=fig,
                         agg_df=agg,
                         col=col,
-                        trace_name="sl_ce",
-                        legendgroup="sl_ce",
+                        trace_name=_METHOD_DISPLAY["sl_ce"],
+                        legendgroup=_METHOD_DISPLAY["sl_ce"],
                         legendgrouptitle_text=None,
                         color=_METHOD_COLORS["sl_ce"],
                         dash=_METHOD_DASH["sl_ce"],
@@ -1844,14 +2448,14 @@ def plot_methods_pred_std_vs_eval(
                     )
 
         if (
-            ntp_baseline is not None
-            and ntp_df is not None
-            and has_quantity(ntp_df, split)
+            pretrained_baseline is not None
+            and pretrained_df is not None
+            and has_quantity(pretrained_df, split)
         ):
             study_name = f"look={num_lookforward_tokens}"
-            if study_name in ntp_baseline.studies:
-                agg = ntp_baseline._aggregate_by_step(
-                    df=ntp_df.filter(pl.col("study") == study_name),
+            if study_name in pretrained_baseline.studies:
+                agg = pretrained_baseline._aggregate_by_step(
+                    df=pretrained_df.filter(pl.col("study") == study_name),
                     y_name=y_name,
                 )
                 if not agg.is_empty():
@@ -1859,10 +2463,10 @@ def plot_methods_pred_std_vs_eval(
                         fig=fig,
                         agg_df=agg,
                         col=col,
-                        trace_name="ntp_baseline",
-                        legendgroup="ntp_baseline",
+                        trace_name=_METHOD_DISPLAY["pretrained_baseline"],
+                        legendgroup=_METHOD_DISPLAY["pretrained_baseline"],
                         legendgrouptitle_text=None,
-                        color=_METHOD_COLORS["ntp_baseline"],
+                        color=_METHOD_COLORS["pretrained_baseline"],
                         dash="solid",
                         y_name=y_name,
                         show_legend=(split == "val"),
@@ -1887,7 +2491,7 @@ def plot_methods_pred_std_vs_eval(
                     fig=fig,
                     agg_df=agg,
                     col=col,
-                    trace_name=method_name,
+                    trace_name=_METHOD_DISPLAY[method_name],
                     legendgroup=f"r={r}",
                     legendgrouptitle_text=f"r={r}",
                     color=_METHOD_COLORS[method_name],

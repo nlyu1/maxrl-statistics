@@ -13,6 +13,7 @@ where {dataset_name} encodes num_lookforward_tokens (e.g. ..._look4_dim32).
 """
 
 import sys
+from pathlib import Path
 
 import click
 import torch
@@ -79,7 +80,7 @@ def main(
     likelihood_mode = likelihood_mode_folder(
         use_factorized_likelihoods=use_factorized_likelihoods,
     )
-    method_dir = METHOD + ("_scratch" if train_from_scratch else "")
+    method_dir = Path(METHOD) / ("from_scratch" if train_from_scratch else "from_pretrain")
     study_base = (
         artifacts_dir()
         / method_dir

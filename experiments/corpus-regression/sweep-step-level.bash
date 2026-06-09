@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Production sweep using the new per-step logging regime.
-# Runs all methods (SL, GRPO, RLOO, MaxRL, NTP baseline) with canonical
-# step-level defaults: 10K train steps, validation every 2K steps.
+# Runs all methods (SL_MSE, GRPO, RLOO, MaxRL, pretrained baseline) with
+# canonical step-level defaults: 10K train steps, validation every 2K steps.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
@@ -12,11 +12,11 @@ SEEDS="51,61,121"
 ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 
 uv run python "${ORCHESTRATE}" \
-    --method sl \
+    --method sl_mse \
     --method grpo \
     --method rloo \
     --method maxrl \
-    --method ntp_baseline \
+    --method pretrained_baseline \
     --method sl_ce \
     --seeds "${SEEDS}" \
     --train-steps 10000 \
@@ -30,11 +30,11 @@ uv run python "${ORCHESTRATE}" \
     --factorized
 
 uv run python "${ORCHESTRATE}" \
-    --method sl \
+    --method sl_mse \
     --method grpo \
     --method rloo \
     --method maxrl \
-    --method ntp_baseline \
+    --method pretrained_baseline \
     --method sl_ce \
     --seeds "${SEEDS}" \
     --label-type token_id \

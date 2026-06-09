@@ -6,11 +6,11 @@ set -euo pipefail
 #   - Uses the new sl_ce trainer (CE on the lookahead token id; full-param
 #     fine-tune of an AutoModelForCausalLM that retains its native lm_head).
 #   - --train-from-scratch (random-init backbone; artifacts land under
-#     sl_ce_scratch/ alongside the from-scratch sl/grpo/rloo/maxrl trees).
+#     sl_ce/from_scratch/ alongside the from-scratch sl_mse/grpo/rloo/maxrl trees).
 #   - K=1 only — token-level CE only makes sense at the next-token horizon.
-# Validation reuses the projection from ntp_baseline.py:
+# Validation reuses the projection from pretrained_baseline.py:
 #     softmax(logits) @ label_projector  →  MSE
-# so the projected MSE is directly comparable to SL/GRPO/RLOO/MaxRL.
+# so the projected MSE is directly comparable to SL_MSE/GRPO/RLOO/MaxRL.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"

@@ -1,15 +1,16 @@
 """
-Single SL training run on the corpus-regression task.
+Single SL_MSE training run on the corpus-regression task.
 
 Usage:
-    uv run python experiments/corpus-regression/sl/single_run.py \\
+    uv run python experiments/corpus-regression/sl_mse/single_run.py \\
         --num-lookforward-tokens 4 --seed 51 --device cuda:0
 
-Artifacts -> artifacts/corpus-regression/artifacts/sl/seed-{S}/{dataset_name}/
-where {dataset_name} encodes num_lookforward_tokens (e.g. ..._look4_dim32).
+Artifacts -> artifacts/corpus-regression/artifacts/sl_mse/from_pretrain/seed-{S}/{dataset_name}/
+(or .../sl_mse/from_scratch/seed-{S}/... when --train-from-scratch is set).
 """
 
 import sys
+from pathlib import Path
 
 import click
 import torch
@@ -22,10 +23,10 @@ from src.experiments.corpus_regression.config import (  # noqa: E402
     artifacts_dir,
     data_dir,
 )
-from src.experiments.corpus_regression.sl import CorpusRegressionSLConfig  # noqa: E402
+from src.experiments.corpus_regression.sl_mse import CorpusRegressionSLMSEConfig  # noqa: E402
 from src.experiments.utils import cleanup_cuda, set_seeds  # noqa: E402
 
-METHOD = "sl"
+METHOD = "sl_mse"
 
 
 @click.command()
@@ -61,11 +62,11 @@ def main(
 ) -> None:
     set_seeds(seed)
 
-    method_dir = METHOD + ("_scratch" if train_from_scratch else "")
+    method_dir = Path(METHOD) / ("from_scratch" if train_from_scratch else "from_pretrain")
     study_base = artifacts_dir() / method_dir / f"seed-{seed}"
     torch_device = torch.device(device)
 
-    config = CorpusRegressionSLConfig.get_canonical(
+    config = CorpusRegressionSLMSEConfig.get_canonical(
         dataset_base_folder=data_dir(),
         study_base_folder=study_base,
         num_lookforward_tokens=num_lookforward_tokens,
@@ -84,7 +85,7 @@ def main(
     tag = f"seed={seed} look={num_lookforward_tokens}"
     study_folder = config.study_folder
 
-    if not CorpusRegressionSLConfig.prepare_study_folder(
+    if not CorpusRegressionSLMSEConfig.prepare_study_folder(
         study_folder=study_folder, tag=tag,
     ):
         sys.exit(0)

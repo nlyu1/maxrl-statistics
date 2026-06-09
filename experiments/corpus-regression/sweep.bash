@@ -14,7 +14,7 @@ uv run python "${ORCHESTRATE}" \
     --use-factorized-likelihoods
 
 uv run python "${ORCHESTRATE}" \
-    --method sl \
+    --method sl_mse \
     --seeds "${SEEDS}"
 
 uv run python "${ORCHESTRATE}" \

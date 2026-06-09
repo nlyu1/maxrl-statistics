@@ -1,5 +1,5 @@
 """
-NTP baseline for corpus-regression: intrinsic variance proxy.
+Pretrained-model intrinsic-variance baseline for corpus-regression.
 
 Uses the pretrained SmolLM2-135M model's next-token distribution to compute
 the Bayes-optimal prediction E[label | prefix] = Σ_t P(t|prefix) × Rademacher[t].
@@ -31,7 +31,6 @@ from src.data.corpus_regression import (
     CorpusRegressionDataset,
     CorpusRegressionDatasetConfig,
 )
-from src.experiments.corpus_regression.config import data_dir, artifacts_dir
 from src.experiments.corpus_regression.state import (
     CorpusRegressionValidationOutput,
     _per_dim_stats,
@@ -39,8 +38,8 @@ from src.experiments.corpus_regression.state import (
 from src.metrics import RegressionStatCounter
 
 
-class NTPBaselineConfig(BaseConfig):
-    """Configuration for the NTP intrinsic-variance baseline.
+class PretrainedBaselineConfig(BaseConfig):
+    """Configuration for the pretrained-model intrinsic-variance baseline.
 
     No optimizer or training-loop config — this is inference-only.
     """
@@ -66,7 +65,7 @@ class NTPBaselineConfig(BaseConfig):
         num_samples: int = 100_000,
         model_name: str = "HuggingFaceTB/SmolLM2-135M",
         eval_batch_size: int = 128,
-    ) -> "NTPBaselineConfig":
+    ) -> "PretrainedBaselineConfig":
         data_config = CorpusRegressionDatasetConfig(
             prefix_length=prefix_length,
             num_samples=num_samples,
@@ -102,12 +101,12 @@ class NTPBaselineConfig(BaseConfig):
         return config
 
 
-def run_ntp_baseline(
-    config: NTPBaselineConfig,
+def run_pretrained_baseline(
+    config: PretrainedBaselineConfig,
     *,
     device: torch.device,
 ) -> None:
-    """Run the NTP intrinsic-variance baseline (inference-only).
+    """Run the pretrained-model intrinsic-variance baseline (inference-only).
 
     For each prefix, computes:
         E[label | prefix] = softmax(logits) @ label_projector
@@ -156,14 +155,14 @@ def run_ntp_baseline(
         dataloader=train_dl,
         label_projector=label_projector,
         device=device,
-        desc="ntp_baseline train",
+        desc="pretrained_baseline train",
     )
     val_output = _evaluate_split_full(
         model=model,
         dataloader=val_dl,
         label_projector=label_projector,
         device=device,
-        desc="ntp_baseline val",
+        desc="pretrained_baseline val",
     )
     val_counter = val_output.compute_counter()
 
@@ -187,7 +186,7 @@ def run_ntp_baseline(
     val_stats = val_counter.get_stats()
     D = label_projector.shape[1]
     print(f"\n{'='*60}")
-    print(f"NTP Baseline — Intrinsic Variance Proxy (label_type={config.data.label_type}, D={D})")
+    print(f"Pretrained-Model Baseline — Intrinsic Variance Proxy (label_type={config.data.label_type}, D={D})")
     print(f"{'='*60}")
     print(f"  Train MSE (mean over dims): {float(train_stats.mse.mean()):.6f}")
     print(f"  Val   MSE (mean over dims): {float(val_stats.mse.mean()):.6f}")
@@ -206,7 +205,7 @@ def _evaluate_split(
     device: torch.device,
     desc: str,
 ) -> RegressionStatCounter:
-    """Evaluate NTP baseline on a split, returning sufficient statistics."""
+    """Evaluate pretrained-model baseline on a split, returning sufficient statistics."""
     D = label_projector.shape[1]
     counter = RegressionStatCounter.initialize(dim=D)
 
@@ -239,7 +238,7 @@ def _evaluate_split_full(
     device: torch.device,
     desc: str,
 ) -> CorpusRegressionValidationOutput:
-    """Evaluate NTP baseline on a split, returning full per-sample predictions."""
+    """Evaluate pretrained-model baseline on a split, returning full per-sample predictions."""
     predictions: list[Float[Tensor, "batch D"]] = []
     targets: list[Float[Tensor, "batch D"]] = []
 

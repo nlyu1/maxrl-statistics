@@ -1,11 +1,11 @@
 """
-NTP baseline: intrinsic variance proxy for corpus-regression.
+Pretrained-model intrinsic-variance baseline for corpus-regression.
 
 Usage:
-    uv run python experiments/corpus-regression/ntp_baseline/single_run.py \
+    uv run python experiments/corpus-regression/pretrained_baseline/single_run.py \
         --num-lookforward-tokens 1 --device cuda:0
 
-Artifacts -> artifacts/corpus-regression/artifacts/ntp_baseline/{dataset_name}/
+Artifacts -> artifacts/corpus-regression/artifacts/pretrained_baseline/from_pretrain/{dataset_name}/
 This is inference-only (no training). Runs in under 1 minute on GPU.
 """
 
@@ -19,16 +19,15 @@ from src import chdir_repo_base
 chdir_repo_base()
 
 from src.experiments.corpus_regression.config import (  # noqa: E402
-    CorpusRegressionStudyBaseConfig,
     artifacts_dir,
     data_dir,
 )
-from src.experiments.corpus_regression.ntp_baseline import (  # noqa: E402
-    NTPBaselineConfig,
-    run_ntp_baseline,
+from src.experiments.corpus_regression.pretrained_baseline import (  # noqa: E402
+    PretrainedBaselineConfig,
+    run_pretrained_baseline,
 )
 
-METHOD = "ntp_baseline"
+METHOD = "pretrained_baseline"
 
 
 @click.command()
@@ -49,9 +48,12 @@ def main(
     label_range: tuple[float, float],
 ) -> None:
     torch_device = torch.device(device)
-    study_base = artifacts_dir() / METHOD
+    # `from_pretrain` is included for layout uniformity with the trained
+    # methods even though pretrained_baseline has no from_scratch counterpart
+    # (it's inference-only on pretrained weights).
+    study_base = artifacts_dir() / METHOD / "from_pretrain"
 
-    config = NTPBaselineConfig.get_canonical(
+    config = PretrainedBaselineConfig.get_canonical(
         dataset_base_folder=data_dir(),
         study_base_folder=study_base,
         num_lookforward_tokens=num_lookforward_tokens,
@@ -62,7 +64,7 @@ def main(
         label_range=label_range,
     )
 
-    tag = f"ntp_baseline look={num_lookforward_tokens}"
+    tag = f"pretrained_baseline look={num_lookforward_tokens}"
     study_folder = config.study_folder
 
     # Skip if already complete.
@@ -71,7 +73,7 @@ def main(
         sys.exit(0)
 
     print(f"=== {tag}  folder={study_folder} ===")
-    run_ntp_baseline(config, device=torch_device)
+    run_pretrained_baseline(config, device=torch_device)
 
 
 if __name__ == "__main__":

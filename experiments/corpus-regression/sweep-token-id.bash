@@ -9,11 +9,11 @@ ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 
 # SL sweep (token_id)
 uv run python "${ORCHESTRATE}" \
-    --method sl \
+    --method sl_mse \
     --method grpo \
     --method rloo \
     --method maxrl \
-    --method ntp_baseline \
+    --method pretrained_baseline \
     --seeds "${SEEDS}" \
     --label-type token_id \
     --lookforward-tokens 1 \

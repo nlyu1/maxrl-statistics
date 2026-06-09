@@ -11,11 +11,12 @@ Usage:
     uv run python experiments/corpus-regression/sl_ce/single_run.py \\
         --num-lookforward-tokens 1 --seed 51 --device cuda:0
 
-Artifacts -> artifacts/corpus-regression/artifacts/sl_ce/seed-{S}/{dataset_name}/
-(or .../sl_ce_scratch/seed-{S}/... when --train-from-scratch is set).
+Artifacts -> artifacts/corpus-regression/artifacts/sl_ce/from_pretrain/seed-{S}/{dataset_name}/
+(or .../sl_ce/from_scratch/seed-{S}/... when --train-from-scratch is set).
 """
 
 import sys
+from pathlib import Path
 
 import click
 import torch
@@ -119,7 +120,7 @@ def main(
 
     set_seeds(seed)
 
-    method_dir = METHOD + ("_scratch" if train_from_scratch else "")
+    method_dir = Path(METHOD) / ("from_scratch" if train_from_scratch else "from_pretrain")
     study_base = artifacts_dir() / method_dir / f"seed-{seed}"
     torch_device = torch.device(device)
 

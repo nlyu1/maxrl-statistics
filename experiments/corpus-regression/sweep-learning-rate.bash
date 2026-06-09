@@ -26,7 +26,7 @@ for LEARNING_RATE in "${LEARNING_RATES[@]}"; do
 
         METHOD_ARGS=(
             --method maxrl \
-            --method sl \
+            --method sl_mse \
             --method grpo \
             --method rloo \
             --method sl_ce \
@@ -79,8 +79,8 @@ for LEARNING_RATE in "${LEARNING_RATES[@]}"; do
 
         if [ "${FROM_PRETRAIN}" = "True" ] && [ "${FROM_SCRATCH}" = "False" ]; then
             uv run python "${ORCHESTRATE}" \
-                --method ntp_baseline \
-                "${ARGS[@]}" 
+                --method pretrained_baseline \
+                "${ARGS[@]}"
         fi
 
         if [ "${FROM_SCRATCH}" = "True" ] && [ "${FROM_PRETRAIN}" = "False" ]; then
@@ -91,7 +91,7 @@ for LEARNING_RATE in "${LEARNING_RATES[@]}"; do
 
         if [ "${FROM_SCRATCH}" = "True" ] && [ "${FROM_PRETRAIN}" = "True" ]; then
             CUDA_VISIBLE_DEVICES=0,1,2,3 uv run python "${ORCHESTRATE}" \
-                --method ntp_baseline \
+                --method pretrained_baseline \
                 "${ARGS[@]}" &
             CUDA_VISIBLE_DEVICES=4,5,6,7 uv run python "${ORCHESTRATE}" \
                 "${ARGS[@]}" \

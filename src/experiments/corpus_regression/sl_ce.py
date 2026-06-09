@@ -4,7 +4,7 @@ SL with NTP cross-entropy loss for corpus-regression.
 Variant of `sl.py` that fine-tunes the pretrained `AutoModelForCausalLM`
 end-to-end (no swapped-in regression head) using cross-entropy on the
 lookahead token id (K=1 only). Validation reuses the projection from
-`ntp_baseline.py`:
+`pretrained_baseline.py`:
 
     expected_label = softmax(logits[:, -1, :]) @ label_projector
 
@@ -160,7 +160,17 @@ class CorpusRegressionSLCEConfig(BaseConfig):
             warmup_ratio=warmup_ratio,
             lr_min_ratio=lr_min_ratio,
         )
-        study_folder = study_base_folder / dataset_folder.name / f"lr_{lr_per_sample:.2e}"
+        # Mirrors `CorpusRegressionStudyBaseConfig.canonical_kwargs` in
+        # config.py: lr / steps / [sched]. The `steps-{train_steps:06d}`
+        # segment must be present so the read-side `from_sl_ce_sweep` in
+        # analysis.py can resolve artifacts; without it sl_ce silently
+        # writes to a path the analyzer cannot discover.
+        study_folder = (
+            study_base_folder
+            / dataset_folder.name
+            / f"lr_{lr_per_sample:.2e}"
+            / f"steps-{train_steps:06d}"
+        )
         if sched_segment is not None:
             study_folder = study_folder / sched_segment
         return dict(
@@ -243,7 +253,7 @@ class CorpusRegressionSLCEConfig(BaseConfig):
     def _build_label_projector(
         self, *, vocab_size: int, device: torch.device
     ) -> Float[Tensor, "vocab D"]:
-        """Mirror of `ntp_baseline.run_ntp_baseline` lines 137–151. The
+        """Mirror of `pretrained_baseline.run_pretrained_baseline` lines 137–151. The
         projector turns next-token probabilities into the regression target
         space, so the projected MSE is comparable to SL/RL methods."""
         if self.data.label_type == "rademacher":
@@ -340,7 +350,7 @@ class CorpusRegressionSLCEState:
     ) -> Float[Tensor, "batch D"]:
         """Project last-position next-token logits through the label projector.
 
-        Identical to the formula in `ntp_baseline.py` lines 219–224, exposed
+        Identical to the formula in `pretrained_baseline.py` lines 219–224, exposed
         as a method so `compute_validation` produces predictions in the same
         target space as SL/GRPO/RLOO/MaxRL.
         """
@@ -378,7 +388,7 @@ class CorpusRegressionSLCEState:
             output = self.model(input_ids=tokens, use_cache=False)
             logits: Float[Tensor, "batch vocab"] = output.logits[:, -1, :]
             # CE always in float32 for numerical stability — matches the
-            # `softmax(logits.float())` pattern in ntp_baseline.py.
+            # `softmax(logits.float())` pattern in pretrained_baseline.py.
             loss = F.cross_entropy(logits.float(), lookahead_token_ids)
             with torch.no_grad():
                 probs: Float[Tensor, "batch vocab"] = F.softmax(

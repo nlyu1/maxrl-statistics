@@ -4,10 +4,10 @@ set -euo pipefail
 # From-scratch sweep using the new per-step logging regime.
 # Mirror of sweep-step-level.bash with two differences:
 #   - --train-from-scratch appended (random-init backbone, lr_divisor forced
-#     to 1.0, artifacts land under <method>_scratch/).
-#   - ntp_baseline excluded (inference-only on pretrained weights, has no
-#     meaningful from-scratch counterpart).
-# Trains SL, GRPO, RLOO, MaxRL with canonical step-level defaults.
+#     to 1.0, artifacts land under <method>/from_scratch/).
+#   - pretrained_baseline excluded (inference-only on pretrained weights, has
+#     no meaningful from-scratch counterpart).
+# Trains SL_MSE, GRPO, RLOO, MaxRL with canonical step-level defaults.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
@@ -16,7 +16,7 @@ SEEDS="51,61,121"
 ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
 
 uv run python "${ORCHESTRATE}" \
-    --method sl \
+    --method sl_mse \
     --method grpo \
     --method rloo \
     --method maxrl \
@@ -34,7 +34,7 @@ uv run python "${ORCHESTRATE}" \
     --train-from-scratch
 
 uv run python "${ORCHESTRATE}" \
-    --method sl \
+    --method sl_mse \
     --method grpo \
     --method rloo \
     --method maxrl \

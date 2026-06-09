@@ -151,7 +151,7 @@ class CorpusRegressionDatasetConfig(BaseConfig):
         slug += f"_{self.label_type}"
         if self.normalize_labels:
             lo, hi = self.label_range
-            slug += f"_norm{lo:.2g}_{hi:.2g}"
+            slug += f"_norm{lo:.1f}_{hi:.1f}"
         return base_path / slug
 
     def _rademacher_matrix(self, vocab_size: int) -> Int[Tensor, "vocab embedding_dim"]:
@@ -165,14 +165,19 @@ class CorpusRegressionDatasetConfig(BaseConfig):
 
     def build(self) -> "CorpusRegressionDataset":
         """Stream fineweb-edu, tokenize, compute labels, shuffle,
-        and return a train/val split."""
+        and return a train/val split.
+
+        Train = first `num_samples` shuffled prefixes; val = next
+        `int(num_samples * 0.2)` (i.e. eval is 0.2× the training set).
+        """
         min_length = self.prefix_length + self.num_lookforward_tokens
         tok = AutoTokenizer.from_pretrained(self.pretrained_tokenizer_model_name)
 
+        num_val = int(self.num_samples * 0.2)
         collected = _stream_token_prefixes(
             tokenizer=tok,
             min_length=min_length,
-            target_count=2 * self.num_samples,
+            target_count=self.num_samples + num_val,
             desc="collecting samples",
         )
 
@@ -212,9 +217,11 @@ class CorpusRegressionDatasetConfig(BaseConfig):
             train_tokens=all_tokens[: self.num_samples],
             train_labels=all_labels[: self.num_samples],
             train_lookahead_token_ids=all_lookahead_token_ids[: self.num_samples],
-            val_tokens=all_tokens[self.num_samples :],
-            val_labels=all_labels[self.num_samples :],
-            val_lookahead_token_ids=all_lookahead_token_ids[self.num_samples :],
+            val_tokens=all_tokens[self.num_samples : self.num_samples + num_val],
+            val_labels=all_labels[self.num_samples : self.num_samples + num_val],
+            val_lookahead_token_ids=all_lookahead_token_ids[
+                self.num_samples : self.num_samples + num_val
+            ],
         )
 
     def demonstrate(self, num_samples: int = 50):

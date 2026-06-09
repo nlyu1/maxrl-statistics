@@ -6,7 +6,7 @@ that supports configurable sweep grids and dynamic GPU scheduling.
 
 Usage:
     uv run python experiments/corpus-regression/orchestrate.py \
-        --method sl --seeds 51,61 --train-steps 5
+        --method sl_mse --seeds 51,61 --train-steps 5
 
     uv run python experiments/corpus-regression/orchestrate.py \
         --method maxrl --seeds 51 \
@@ -20,7 +20,7 @@ Usage:
         --method grpo --seeds 51 --gpu-ids 0,1,2,3 --dry-run
 
     uv run python experiments/corpus-regression/orchestrate.py \
-        --method sl --method maxrl --seeds 51,61 \
+        --method sl_mse --method maxrl --seeds 51,61 \
         --gaussian-stdev 0.5,1.0 --num-samples 50000,100000
 """
 
@@ -48,7 +48,7 @@ from src.experiments.corpus_regression.config import (  # noqa: E402
 )
 from src.experiments.gpu_pool import GPUPool, Job  # noqa: E402
 
-Method = Literal["sl", "sl_ce", "grpo", "rloo", "maxrl", "ntp_baseline"]
+Method = Literal["sl_mse", "sl_ce", "grpo", "rloo", "maxrl", "pretrained_baseline"]
 LRSchedule = Literal["flat", "cosine"]
 
 DEFAULT_LOOKFORWARD_TOKENS = (1, 2, 3, 4, 5, 6, 7, 8)
@@ -68,6 +68,14 @@ def _lr_log_segment(lr_per_sample: float) -> str:
     `<artifacts_dir>/<method>/logs/...`. Mirrors `lr_<value>` levels added by
     each method's `study_folder` so logs and parquets stay aligned."""
     return f"lr_{lr_per_sample:.2e}"
+
+
+def _steps_log_segment(train_steps: int) -> str:
+    """Path segment that disambiguates concurrent train-steps sweeps. Mirrors
+    `steps-{N:06d}` added by `canonical_kwargs`'s `study_folder` so logs and
+    parquets stay aligned. Zero-pad to 6 digits so lexicographic sort matches
+    numeric order up to 999_999 steps."""
+    return f"steps-{train_steps:06d}"
 
 
 def _schedule_label_suffix(
@@ -93,14 +101,15 @@ def _append_schedule_segment(
     lr_min_ratio: float,
 ) -> Path:
     """Insert the optional schedule segment into a log path **between** the
-    `lr_<value>` directory and the `<label_type>/<filename>.log` tail.
+    `steps-{N:06d}` directory and the `<label_type>/<filename>.log` tail.
 
     The incoming `log_path` ends in
-    ``.../<lr_seg>/<label_type>/<look-{K}_ns-{N}.log>`` (or with a
-    ``normalized/`` prefix on the basename's parent). For non-flat schedules
-    we slot the schedule segment between `<lr_seg>` and `<label_type>` so
-    the log tree mirrors the corresponding study_folder layout under
-    `lr_schedule_segment`. For flat schedules this is a no-op.
+    ``.../<lr_seg>/<steps_seg>/<label_type>/<look-{K}_ns-{N}.log>`` (or with
+    a ``normalized/`` prefix on the basename's parent). For non-flat
+    schedules we slot the schedule segment between `<steps_seg>` and
+    `<label_type>` so the log tree mirrors the corresponding study_folder
+    layout (where `lr_schedule_segment` is also appended after
+    `steps-{N:06d}`). For flat schedules this is a no-op.
     """
     sched = lr_schedule_segment(
         lr_schedule=lr_schedule,
@@ -109,22 +118,22 @@ def _append_schedule_segment(
     )
     if sched is None:
         return log_path
-    # `log_path` is .../<lr_seg>/<...tail>` — peel off the tail (label_type
-    # subdir + filename, possibly with a `normalized/` parent), insert the
-    # schedule segment after lr_seg, and re-append the tail. We assert the
-    # `lr_` prefix matches so misuse is caught loudly.
+    # `log_path` is .../<lr_seg>/<steps_seg>/<...tail>` — peel off the tail
+    # (label_type subdir + filename, possibly with a `normalized/` parent),
+    # insert the schedule segment after steps_seg, and re-append the tail.
+    # We assert the `steps-` prefix matches so misuse is caught loudly.
     ancestor_parts = log_path.parts
-    lr_idx: int | None = None
+    steps_idx: int | None = None
     for idx in range(len(ancestor_parts) - 1, -1, -1):
-        if ancestor_parts[idx].startswith("lr_"):
-            lr_idx = idx
+        if ancestor_parts[idx].startswith("steps-"):
+            steps_idx = idx
             break
-    if lr_idx is None:
+    if steps_idx is None:
         raise ValueError(
-            f"Expected log_path to contain an `lr_*` segment; got {log_path}",
+            f"Expected log_path to contain a `steps-*` segment; got {log_path}",
         )
-    head = Path(*ancestor_parts[: lr_idx + 1])
-    tail_parts = ancestor_parts[lr_idx + 1 :]
+    head = Path(*ancestor_parts[: steps_idx + 1])
+    tail_parts = ancestor_parts[steps_idx + 1 :]
     return head.joinpath(sched, *tail_parts)
 
 
@@ -190,20 +199,23 @@ def _script_path(method: str) -> Path:
     )
 
 
-def _method_dir(method: str, *, train_from_scratch: bool) -> str:
-    """Method-level artifact subfolder. From-scratch sweeps land in a parallel
-    `<method>_scratch` tree alongside the pretrained-weight `<method>` tree."""
-    return f"{method}_scratch" if train_from_scratch else method
+def _method_dir(method: str, *, train_from_scratch: bool) -> Path:
+    """Method-level artifact subfolder. From-scratch sweeps land in a
+    `<method>/from_scratch` sibling alongside `<method>/from_pretrain` so the
+    initialization regime is an explicit path level rather than an ad-hoc
+    `_scratch` suffix."""
+    from_dir = "from_scratch" if train_from_scratch else "from_pretrain"
+    return Path(method) / from_dir
 
 
-def _build_sl_jobs(
+def _build_sl_mse_jobs(
     *,
     seeds: tuple[int, ...],
     lookforward_tokens: tuple[int, ...],
     num_samples_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
-    lr_per_sample: float,
+    lr_per_sample_values: tuple[float, ...],
     lr_schedule: str,
     warmup_ratio: float,
     lr_min_ratio: float,
@@ -212,21 +224,29 @@ def _build_sl_jobs(
     label_range: tuple[float, float],
     train_from_scratch: bool,
 ) -> list[Job]:
-    script = str(_script_path("sl"))
-    method_dir = _method_dir("sl", train_from_scratch=train_from_scratch)
-    lr_seg = _lr_log_segment(lr_per_sample)
+    script = str(_script_path("sl_mse"))
+    method_dir = _method_dir("sl_mse", train_from_scratch=train_from_scratch)
+    steps_seg = _steps_log_segment(train_steps)
     sched_suffix = _schedule_label_suffix(
         lr_schedule=lr_schedule,
         warmup_ratio=warmup_ratio,
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
-        label = f"sl_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
+    for seed, lft, ns, lr_per_sample in itertools.product(
+        seeds, lookforward_tokens, num_samples_values, lr_per_sample_values,
+    ):
+        lr_seg = _lr_log_segment(lr_per_sample)
+        label = (
+            f"sl_mse_seed-{seed}_look-{lft}_ns-{ns}"
+            f"_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
+            f"_lbl-{label_type}{sched_suffix}"
+        )
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / lr_seg
+            / steps_seg
             / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
@@ -268,7 +288,7 @@ def _build_sl_ce_jobs(
     num_samples_values: tuple[int, ...],
     train_steps: int,
     val_every_n_steps: int,
-    lr_per_sample: float,
+    lr_per_sample_values: tuple[float, ...],
     lr_schedule: str,
     warmup_ratio: float,
     lr_min_ratio: float,
@@ -277,7 +297,7 @@ def _build_sl_ce_jobs(
     label_range: tuple[float, float],
     train_from_scratch: bool,
 ) -> list[Job]:
-    """Mirror of `_build_sl_jobs` for the NTP-CE supervised variant.
+    """Mirror of `_build_sl_mse_jobs` for the NTP-CE supervised variant.
 
     `sl_ce` only supports K=1 — `single_run.py` rejects other values — but
     we keep the same CLI surface as SL so the orchestrator's `--lookforward-
@@ -286,19 +306,27 @@ def _build_sl_ce_jobs(
     """
     script = str(_script_path("sl_ce"))
     method_dir = _method_dir("sl_ce", train_from_scratch=train_from_scratch)
-    lr_seg = _lr_log_segment(lr_per_sample)
+    steps_seg = _steps_log_segment(train_steps)
     sched_suffix = _schedule_label_suffix(
         lr_schedule=lr_schedule,
         warmup_ratio=warmup_ratio,
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, ns in itertools.product(seeds, lookforward_tokens, num_samples_values):
-        label = f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
+    for seed, lft, ns, lr_per_sample in itertools.product(
+        seeds, lookforward_tokens, num_samples_values, lr_per_sample_values,
+    ):
+        lr_seg = _lr_log_segment(lr_per_sample)
+        label = (
+            f"sl_ce_seed-{seed}_look-{lft}_ns-{ns}"
+            f"_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
+            f"_lbl-{label_type}{sched_suffix}"
+        )
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / lr_seg
+            / steps_seg
             / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
@@ -342,7 +370,7 @@ def _build_grpo_jobs(
     train_steps: int,
     val_every_n_steps: int,
     gaussian_stdev_values: tuple[float, ...],
-    lr_per_sample: float,
+    lr_per_sample_values: tuple[float, ...],
     lr_schedule: str,
     warmup_ratio: float,
     lr_min_ratio: float,
@@ -353,23 +381,30 @@ def _build_grpo_jobs(
 ) -> list[Job]:
     script = str(_script_path("grpo"))
     method_dir = _method_dir("grpo", train_from_scratch=train_from_scratch)
-    lr_seg = _lr_log_segment(lr_per_sample)
+    steps_seg = _steps_log_segment(train_steps)
     sched_suffix = _schedule_label_suffix(
         lr_schedule=lr_schedule,
         warmup_ratio=warmup_ratio,
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, rollouts, ns, stdev in itertools.product(
-        seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
+    for seed, lft, rollouts, ns, stdev, lr_per_sample in itertools.product(
+        seeds, lookforward_tokens, rollout_steps, num_samples_values,
+        gaussian_stdev_values, lr_per_sample_values,
     ):
-        label = f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
+        lr_seg = _lr_log_segment(lr_per_sample)
+        label = (
+            f"grpo_seed-{seed}_look-{lft}_roll-{rollouts}_ns-{ns}"
+            f"_sigma-{stdev:.1f}_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
+            f"_lbl-{label_type}{sched_suffix}"
+        )
         log_path = (
             artifacts_dir() / method_dir / "logs"
             / f"seed-{seed}"
             / f"rollouts-{rollouts}"
             / sigma_folder(gaussian_stdev=stdev)
             / lr_seg
+            / steps_seg
             / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
@@ -416,7 +451,7 @@ def _build_rloo_jobs(
     val_every_n_steps: int,
     factorized: bool,
     gaussian_stdev_values: tuple[float, ...],
-    lr_per_sample: float,
+    lr_per_sample_values: tuple[float, ...],
     lr_schedule: str,
     warmup_ratio: float,
     lr_min_ratio: float,
@@ -427,19 +462,23 @@ def _build_rloo_jobs(
 ) -> list[Job]:
     script = str(_script_path("rloo"))
     method_dir = _method_dir("rloo", train_from_scratch=train_from_scratch)
-    lr_seg = _lr_log_segment(lr_per_sample)
+    steps_seg = _steps_log_segment(train_steps)
     sched_suffix = _schedule_label_suffix(
         lr_schedule=lr_schedule,
         warmup_ratio=warmup_ratio,
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, rollouts, ns, stdev in itertools.product(
-        seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
+    for seed, lft, rollouts, ns, stdev, lr_per_sample in itertools.product(
+        seeds, lookforward_tokens, rollout_steps, num_samples_values,
+        gaussian_stdev_values, lr_per_sample_values,
     ):
+        lr_seg = _lr_log_segment(lr_per_sample)
         label = (
             f"rloo_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_fact-{factorized}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
+            f"_ns-{ns}_fact-{factorized}_sigma-{stdev:.1f}"
+            f"_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
+            f"_lbl-{label_type}{sched_suffix}"
         )
         log_path = (
             artifacts_dir() / method_dir / "logs"
@@ -448,6 +487,7 @@ def _build_rloo_jobs(
             / sigma_folder(gaussian_stdev=stdev)
             / factorized_mode_folder(factorized=factorized)
             / lr_seg
+            / steps_seg
             / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
@@ -496,7 +536,7 @@ def _build_maxrl_jobs(
     subtract_baseline: bool,
     use_factorized_likelihoods: bool,
     gaussian_stdev_values: tuple[float, ...],
-    lr_per_sample: float,
+    lr_per_sample_values: tuple[float, ...],
     lr_schedule: str,
     warmup_ratio: float,
     lr_min_ratio: float,
@@ -507,19 +547,23 @@ def _build_maxrl_jobs(
 ) -> list[Job]:
     script = str(_script_path("maxrl"))
     method_dir = _method_dir("maxrl", train_from_scratch=train_from_scratch)
-    lr_seg = _lr_log_segment(lr_per_sample)
+    steps_seg = _steps_log_segment(train_steps)
     sched_suffix = _schedule_label_suffix(
         lr_schedule=lr_schedule,
         warmup_ratio=warmup_ratio,
         lr_min_ratio=lr_min_ratio,
     )
     jobs: list[Job] = []
-    for seed, lft, rollouts, ns, stdev in itertools.product(
-        seeds, lookforward_tokens, rollout_steps, num_samples_values, gaussian_stdev_values,
+    for seed, lft, rollouts, ns, stdev, lr_per_sample in itertools.product(
+        seeds, lookforward_tokens, rollout_steps, num_samples_values,
+        gaussian_stdev_values, lr_per_sample_values,
     ):
+        lr_seg = _lr_log_segment(lr_per_sample)
         label = (
             f"maxrl_seed-{seed}_look-{lft}_roll-{rollouts}"
-            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}_sigma-{stdev}_lr-{lr_per_sample}_lbl-{label_type}{sched_suffix}"
+            f"_ns-{ns}_bl-{subtract_baseline}_fact-{use_factorized_likelihoods}"
+            f"_sigma-{stdev:.1f}_lr-{lr_per_sample:.2e}_steps-{train_steps:06d}"
+            f"_lbl-{label_type}{sched_suffix}"
         )
         log_path = (
             artifacts_dir() / method_dir / "logs"
@@ -529,6 +573,7 @@ def _build_maxrl_jobs(
             / baseline_mode_folder(subtract_baseline=subtract_baseline)
             / likelihood_mode_folder(use_factorized_likelihoods=use_factorized_likelihoods)
             / lr_seg
+            / steps_seg
             / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
@@ -567,7 +612,7 @@ def _build_maxrl_jobs(
     return jobs
 
 
-def _build_ntp_jobs(
+def _build_pretrained_baseline_jobs(
     *,
     lookforward_tokens: tuple[int, ...],
     num_samples_values: tuple[int, ...],
@@ -575,15 +620,20 @@ def _build_ntp_jobs(
     normalize_labels: bool,
     label_range: tuple[float, float],
 ) -> list[Job]:
-    """NTP baseline is inference-only and deterministic — no seeds, rollouts,
-    stdev, train_steps, baseline, or factorized flags. The cross-product is
-    only over (lookforward_tokens × num_samples_values)."""
-    script = str(_script_path("ntp_baseline"))
+    """Pretrained-model intrinsic-variance baseline is inference-only and
+    deterministic — no seeds, rollouts, stdev, train_steps, baseline, or
+    factorized flags. The cross-product is only over
+    (lookforward_tokens × num_samples_values).
+
+    Path layout mirrors the trained methods' `<method>/<from_*>/...` shape:
+    pretrained_baseline always lives under `from_pretrain` (there is no
+    from_scratch counterpart — it's inference-only on pretrained weights)."""
+    script = str(_script_path("pretrained_baseline"))
     jobs: list[Job] = []
     for lft, ns in itertools.product(lookforward_tokens, num_samples_values):
-        label = f"ntp_baseline_look-{lft}_ns-{ns}_lbl-{label_type}"
+        label = f"pretrained_baseline_look-{lft}_ns-{ns}_lbl-{label_type}"
         log_path = (
-            artifacts_dir() / "ntp_baseline" / "logs" / label_type
+            artifacts_dir() / "pretrained_baseline" / "from_pretrain" / "logs" / label_type
             / f"look-{lft}_ns-{ns}.log"
         )
         if normalize_labels:
@@ -608,7 +658,7 @@ def _build_ntp_jobs(
 @click.command()
 @click.option(
     "--method",
-    type=click.Choice(["sl", "sl_ce", "grpo", "rloo", "maxrl", "ntp_baseline"]),
+    type=click.Choice(["sl_mse", "sl_ce", "grpo", "rloo", "maxrl", "pretrained_baseline"]),
     multiple=True,
     required=True,
     help="Training method(s) to run. Repeat for cross-algorithm batching.",
@@ -619,7 +669,7 @@ def _build_ntp_jobs(
     default=None,
     help=(
         "Comma-separated random seeds (e.g. '51,61,121'). "
-        "Required when any non-NTP method is selected; ignored by ntp_baseline."
+        "Required when any non-baseline method is selected; ignored by pretrained_baseline."
     ),
 )
 @click.option(
@@ -666,13 +716,14 @@ def _build_ntp_jobs(
 )
 @click.option(
     "--lr-per-sample",
-    type=float,
-    default=DEFAULT_LR_PER_SAMPLE,
+    type=FLOAT_LIST,
+    default=str(DEFAULT_LR_PER_SAMPLE),
     show_default=True,
     help=(
-        "Per-sample learning rate. Final head_lr = lr_per_sample × batch_size; "
+        "Comma-separated per-sample learning rates to sweep. "
+        "Final head_lr = lr_per_sample × batch_size; "
         "backbone gets head_lr / divisor (divisor=6.66 for fine-tune, 1.0 for "
-        "from-scratch). Affects every method except ntp_baseline (inference-only)."
+        "from-scratch). Affects every method except pretrained_baseline (inference-only)."
     ),
 )
 @click.option(
@@ -753,8 +804,8 @@ def _build_ntp_jobs(
     show_default=True,
     help=(
         "Random-init the backbone instead of loading pretrained weights. "
-        "Routes artifacts to <method>_scratch/ subtrees. Incompatible with "
-        "ntp_baseline (inference-only)."
+        "Routes artifacts to <method>/from_scratch/ subtrees. Incompatible with "
+        "pretrained_baseline (inference-only)."
     ),
 )
 @click.option(
@@ -776,7 +827,7 @@ def main(
     train_steps: int,
     val_every_n_steps: int,
     gaussian_stdev: tuple[float, ...],
-    lr_per_sample: float,
+    lr_per_sample: tuple[float, ...],
     lr_schedule: str,
     warmup_ratio: float,
     lr_min_ratio: float,
@@ -798,11 +849,12 @@ def main(
                 f"gaussian_stdev must be positive, got {stdev}",
                 param_hint="--gaussian-stdev",
             )
-    if lr_per_sample <= 0.0:
-        raise click.BadParameter(
-            f"lr_per_sample must be positive, got {lr_per_sample}",
-            param_hint="--lr-per-sample",
-        )
+    for lr in lr_per_sample:
+        if lr <= 0.0:
+            raise click.BadParameter(
+                f"lr_per_sample must be positive, got {lr}",
+                param_hint="--lr-per-sample",
+            )
     # LR-schedule arg validation. Detailed range checks live in
     # `build_lr_scheduler`; here we just catch obvious nonsense early so
     # `--dry-run` surfaces the error before any subprocess is spawned.
@@ -825,20 +877,22 @@ def main(
     # Deduplicate methods, preserving order.
     methods = list(dict.fromkeys(method))
 
-    # NTP baseline is inference-only on the pretrained model — there's no
-    # meaningful "from scratch" version of an intrinsic-variance baseline.
-    if train_from_scratch and "ntp_baseline" in methods:
+    # Pretrained-model baseline is inference-only on the pretrained model —
+    # there's no meaningful "from scratch" version of an intrinsic-variance
+    # baseline.
+    if train_from_scratch and "pretrained_baseline" in methods:
         raise click.BadParameter(
-            "ntp_baseline cannot be combined with --train-from-scratch "
-            "(NTP baseline is inference-only on pretrained weights).",
+            "pretrained_baseline cannot be combined with --train-from-scratch "
+            "(pretrained_baseline is inference-only on pretrained weights).",
             param_hint="--train-from-scratch",
         )
 
-    # NTP baseline is deterministic and ignores --seeds. Other methods require it.
-    non_ntp_methods = [m for m in methods if m != "ntp_baseline"]
-    if non_ntp_methods and not seeds:
+    # Pretrained-model baseline is deterministic and ignores --seeds. Other
+    # methods require it.
+    non_baseline_methods = [m for m in methods if m != "pretrained_baseline"]
+    if non_baseline_methods and not seeds:
         raise click.BadParameter(
-            f"--seeds is required when any non-NTP method is selected (got methods={methods})",
+            f"--seeds is required when any non-baseline method is selected (got methods={methods})",
             param_hint="--seeds",
         )
     seeds_tuple: tuple[int, ...] = seeds if seeds is not None else ()
@@ -846,14 +900,14 @@ def main(
     # Build job list per method.
     jobs_by_method: dict[str, list[Job]] = {}
     for m in methods:
-        if m == "sl":
-            jobs_by_method[m] = _build_sl_jobs(
+        if m == "sl_mse":
+            jobs_by_method[m] = _build_sl_mse_jobs(
                 seeds=seeds_tuple,
                 lookforward_tokens=lookforward_tokens,
                 num_samples_values=num_samples,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
-                lr_per_sample=lr_per_sample,
+                lr_per_sample_values=lr_per_sample,
                 lr_schedule=lr_schedule,
                 warmup_ratio=warmup_ratio,
                 lr_min_ratio=lr_min_ratio,
@@ -869,7 +923,7 @@ def main(
                 num_samples_values=num_samples,
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
-                lr_per_sample=lr_per_sample,
+                lr_per_sample_values=lr_per_sample,
                 lr_schedule=lr_schedule,
                 warmup_ratio=warmup_ratio,
                 lr_min_ratio=lr_min_ratio,
@@ -887,7 +941,7 @@ def main(
                 train_steps=train_steps,
                 val_every_n_steps=val_every_n_steps,
                 gaussian_stdev_values=gaussian_stdev,
-                lr_per_sample=lr_per_sample,
+                lr_per_sample_values=lr_per_sample,
                 lr_schedule=lr_schedule,
                 warmup_ratio=warmup_ratio,
                 lr_min_ratio=lr_min_ratio,
@@ -906,7 +960,7 @@ def main(
                 val_every_n_steps=val_every_n_steps,
                 factorized=factorized,
                 gaussian_stdev_values=gaussian_stdev,
-                lr_per_sample=lr_per_sample,
+                lr_per_sample_values=lr_per_sample,
                 lr_schedule=lr_schedule,
                 warmup_ratio=warmup_ratio,
                 lr_min_ratio=lr_min_ratio,
@@ -926,7 +980,7 @@ def main(
                 subtract_baseline=subtract_baseline,
                 use_factorized_likelihoods=use_factorized_likelihoods,
                 gaussian_stdev_values=gaussian_stdev,
-                lr_per_sample=lr_per_sample,
+                lr_per_sample_values=lr_per_sample,
                 lr_schedule=lr_schedule,
                 warmup_ratio=warmup_ratio,
                 lr_min_ratio=lr_min_ratio,
@@ -935,8 +989,8 @@ def main(
                 label_range=label_range,
                 train_from_scratch=train_from_scratch,
             )
-        elif m == "ntp_baseline":
-            jobs_by_method[m] = _build_ntp_jobs(
+        elif m == "pretrained_baseline":
+            jobs_by_method[m] = _build_pretrained_baseline_jobs(
                 lookforward_tokens=lookforward_tokens,
                 num_samples_values=num_samples,
                 label_type=label_type,
@@ -951,7 +1005,7 @@ def main(
     # Summary.
     pool = GPUPool(device_ids=list(gpu_ids) if gpu_ids else None)
     click.echo(f"methods={methods}  seeds={seeds_tuple}  lookforward_tokens={lookforward_tokens}")
-    has_rollouts = any(m not in ("sl", "sl_ce", "ntp_baseline") for m in methods)
+    has_rollouts = any(m not in ("sl_mse", "sl_ce", "pretrained_baseline") for m in methods)
     if has_rollouts:
         click.echo(f"rollout_steps={rollout_steps}")
     click.echo(
