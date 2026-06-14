@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -39,10 +39,10 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-719edf7fba01f5a886ffab10bbd48302.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-ece42c8223ec2bf36298a08f122c9a68.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -158,13 +158,32 @@ window.Quarto = {
    
   <ul>
   <li><a href="#tl-dr" id="toc-tl-dr" class="nav-link active" data-scroll-target="#tl-dr">TL; DR</a></li>
-  <li><a href="#dataset" id="toc-dataset" class="nav-link" data-scroll-target="#dataset">Dataset</a></li>
+  <li><a href="#problem-setup" id="toc-problem-setup" class="nav-link" data-scroll-target="#problem-setup">Problem setup</a></li>
+  <li><a href="#canonical-recipe" id="toc-canonical-recipe" class="nav-link" data-scroll-target="#canonical-recipe">Canonical recipe</a></li>
+  <li><a href="#optimization-problem-and-evaluation-metric" id="toc-optimization-problem-and-evaluation-metric" class="nav-link" data-scroll-target="#optimization-problem-and-evaluation-metric">Optimization problem and evaluation metric</a>
+  <ul>
+  <li><a href="#population-objective" id="toc-population-objective" class="nav-link" data-scroll-target="#population-objective">Population objective</a></li>
+  <li><a href="#held-out-evaluation-metric" id="toc-held-out-evaluation-metric" class="nav-link" data-scroll-target="#held-out-evaluation-metric">Held-out evaluation metric</a></li>
+  <li><a href="#train-window-aggregate-vs.-held-out-val" id="toc-train-window-aggregate-vs.-held-out-val" class="nav-link" data-scroll-target="#train-window-aggregate-vs.-held-out-val">Train-window aggregate vs.&nbsp;held-out val</a></li>
+  </ul></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul>
+  <li><a href="#ntp-baseline-inference-only-proxy-for-gast" id="toc-ntp-baseline-inference-only-proxy-for-gast" class="nav-link" data-scroll-target="#ntp-baseline-inference-only-proxy-for-gast">4.1 NTP baseline — inference-only proxy for <span class="math inline">\(g^\ast\)</span></a></li>
+  <li><a href="#sl-direct-mse-regression" id="toc-sl-direct-mse-regression" class="nav-link" data-scroll-target="#sl-direct-mse-regression">4.2 SL — direct MSE regression</a></li>
+  <li><a href="#sl-ce-ntp-cross-entropy-with-projected-eval" id="toc-sl-ce-ntp-cross-entropy-with-projected-eval" class="nav-link" data-scroll-target="#sl-ce-ntp-cross-entropy-with-projected-eval">4.3 SL-CE — NTP cross-entropy with projected eval</a></li>
+  <li><a href="#rloo-per-dim-leave-one-out-advantages" id="toc-rloo-per-dim-leave-one-out-advantages" class="nav-link" data-scroll-target="#rloo-per-dim-leave-one-out-advantages">4.4 RLOO — per-dim leave-one-out advantages</a></li>
+  <li><a href="#grpo-group-standardized-advantages" id="toc-grpo-group-standardized-advantages" class="nav-link" data-scroll-target="#grpo-group-standardized-advantages">4.5 GRPO — group-standardized advantages</a></li>
+  <li><a href="#maxrl-leave-one-out-u-statistic" id="toc-maxrl-leave-one-out-u-statistic" class="nav-link" data-scroll-target="#maxrl-leave-one-out-u-statistic">4.6 MaxRL — leave-one-out U-statistic</a></li>
+  </ul></li>
   <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a>
   <ul>
   <li><a href="#cross-method-comparison" id="toc-cross-method-comparison" class="nav-link" data-scroll-target="#cross-method-comparison">Cross-method comparison</a></li>
+  <li><a href="#plot-of-prediction-variance" id="toc-plot-of-prediction-variance" class="nav-link" data-scroll-target="#plot-of-prediction-variance">Plot of prediction variance</a></li>
+  <li><a href="#supervised-learning-with-ce-loss" id="toc-supervised-learning-with-ce-loss" class="nav-link" data-scroll-target="#supervised-learning-with-ce-loss">Supervised learning with CE loss</a></li>
   <li><a href="#supervised-learning" id="toc-supervised-learning" class="nav-link" data-scroll-target="#supervised-learning">Supervised learning</a></li>
   <li><a href="#grpo" id="toc-grpo" class="nav-link" data-scroll-target="#grpo">GRPO</a></li>
   <li><a href="#maxrl-subtract-baseline-factorized" id="toc-maxrl-subtract-baseline-factorized" class="nav-link" data-scroll-target="#maxrl-subtract-baseline-factorized">MaxRL (subtract-baseline + factorized)</a></li>
+  <li><a href="#rloo" id="toc-rloo" class="nav-link" data-scroll-target="#rloo">RLOO</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -204,15 +223,21 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Placeholder — experiments pending.</p>
+<p>Placeholder. Sweep pending completion. We do see weak advantage of MaxRL.</p>
 </div>
 </div>
 </section>
-<section id="dataset" class="level2">
-<h2 class="anchored" data-anchor-id="dataset">Dataset</h2>
-<p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/corpus_regression.py"><code>src/data/corpus_regression.py</code></a>.</p>
-<p>Each sample is the first (<span class="math inline">\(L=128\)</span>) tokens of a fineweb-edu document. The label is a deterministic <span class="math inline">\(D=32\)</span>-dimensional Rademacher (<span class="math inline">\(\pm 1\)</span>) embedding of the token at position <span class="math inline">\(L + k - 1\)</span>, where <span class="math inline">\(k \ge 1\)</span> is <code>num_lookforward_tokens</code>. With <span class="math inline">\(k = 1\)</span> this is one-step prediction; with <span class="math inline">\(k &gt; 1\)</span> the intermediate tokens are hidden from the model, so the target is a skip-ahead embedding rather than next-token prediction. The Rademacher matrix is keyed by token id with a fixed seed, so labels are reproducible across runs and configs and have <span class="math inline">\(\mathbb{E}[\text{label}] = 0\)</span>, <span class="math inline">\(\text{Var}(\text{label}_d) = 1\)</span> per coordinate.</p>
-<p>The canonical configuration uses the SmolLM2-135M tokenizer, <span class="math inline">\(L = 128\)</span>, <span class="math inline">\(k = 1\)</span>, <span class="math inline">\(D = 32\)</span>, and <span class="math inline">\(50{,}000\)</span> train / <span class="math inline">\(50{,}000\)</span> val samples.</p>
+<section id="problem-setup" class="level2">
+<h2 class="anchored" data-anchor-id="problem-setup">Problem setup</h2>
+<p>Fix a document distribution <span class="math inline">\(p\)</span> over fineweb-edu and a prefix length <span class="math inline">\(n = L = 128\)</span>. Pick a deterministic observation function <span class="math inline">\(f : V \to \mathbb{R}^k\)</span> on the tokenizer vocabulary <span class="math inline">\(V\)</span>. The task is to predict the conditional expectation of <span class="math inline">\(f\)</span> at the <span class="math inline">\(K\)</span>-th lookahead token from the prefix only: <span class="math display">\[
+g(x_{1:n}) \;:=\; \mathbb{E}_{x_{n+K} \,\sim\, p(\cdot \mid x_{1:n})}\, f(x_{n+K}),
+\]</span> using a parametric estimator <span class="math inline">\(g_\theta\)</span>. Intermediate tokens <span class="math inline">\(x_{n+1}, \dots, x_{n+K-1}\)</span> are <strong>not</strong> exposed to the model; with <span class="math inline">\(K = 1\)</span> this collapses to next-token expectation, and with <span class="math inline">\(K &gt; 1\)</span> it is a skip-ahead target. The same fineweb-edu sample is therefore truncated to its first <span class="math inline">\(n + K\)</span> tokens, the prefix is the first <span class="math inline">\(n\)</span>, and the label is derived from the token at position <span class="math inline">\(n + K\)</span> alone.</p>
+<p>Two label families are implemented in <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/data/corpus_regression.py"><code>src/data/corpus_regression.py</code></a> (lines 81–202):</p>
+<ul>
+<li><strong><code>token_id</code></strong> <em>(current canonical setting)</em>. <span class="math inline">\(k = 1\)</span>. Either the raw integer id <span class="math inline">\(f(t) = t\)</span>, or, when <code>normalize_labels=True</code>, the rescaled <span class="math inline">\(f(t) = \mathrm{lo} + (\mathrm{hi} - \mathrm{lo})\cdot t / |V|\)</span> on the configured <code>label_range</code> (canonical <code>(0.0, 1.0)</code>). The <code>_enforce_token_id_dim</code> validator forces <code>embedding_dim = 1</code> whenever this label type is selected, so all formulas below carry through with <span class="math inline">\(D = 1\)</span> for the current sweeps.</li>
+<li><strong><code>rademacher</code></strong> <em>(earlier variant, kept in code)</em>. <span class="math inline">\(k = D = 32\)</span>. <span class="math inline">\(f(t)\)</span> is the row of a vocab-keyed <span class="math inline">\(\pm 1\)</span> matrix <code>_rademacher_matrix</code> (<code>manual_seed(0)</code>, lines 157–164) — deterministic across runs and configs, so the same token id always maps to the same vector. With <span class="math inline">\(D = 32\)</span> this gives a bounded, isotropic, zero-mean-in-expectation target in <span class="math inline">\(\{-1, +1\}^{32}\)</span>.</li>
+</ul>
+<p>The model is <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/model/minimal.py"><code>CausalLMWithLinearHead</code></a> (lines 57–105): a SmolLM2-135M backbone followed by a fresh <code>nn.Linear(hidden_size, D, bias=False)</code> head applied to the <strong>last-position</strong> hidden state. Head rows are randomly initialized and renormalized to unit norm via <code>initial_output_norms = [1.0] * D</code>. The whole stack is fine-tuned in bfloat16 inside <code>torch.cuda.device(...)</code> / <code>torch.autocast(...)</code> contexts.</p>
 <iframe src="assets/corpus-regression/demonstrate.html" style="width:100%; height:220px; border:0; display:block;" scrolling="auto"></iframe>
 <script>
 window.fitScaledIframeContainer = function(frame) {
@@ -258,10 +283,251 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 </section>
+<section id="canonical-recipe" class="level2">
+<h2 class="anchored" data-anchor-id="canonical-recipe">Canonical recipe</h2>
+<p>The current setting we are adopting is the <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/corpus-regression/vince-sweep.bash"><code>vince-sweep.bash</code></a> recipe: <code>token_id</code> labels, normalized to <span class="math inline">\([0, 1]\)</span>, <span class="math inline">\(D = 1\)</span>, <span class="math inline">\(K = 1\)</span>, three rollout counts, both pretrained and from-scratch SmolLM2-135M.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Knob</th>
+<th>Value</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Backbone</td>
+<td>SmolLM2-135M (pretrained <strong>and</strong> from-scratch)</td>
+<td><code>vince-sweep.bash:13–14</code>, <code>model/minimal.py:23–34</code></td>
+</tr>
+<tr class="even">
+<td><code>prefix_length</code> <span class="math inline">\(n\)</span></td>
+<td>128</td>
+<td><code>config.py:57</code></td>
+</tr>
+<tr class="odd">
+<td><code>num_lookforward_tokens</code> <span class="math inline">\(K\)</span></td>
+<td>1</td>
+<td><code>vince-sweep.bash:46</code></td>
+</tr>
+<tr class="even">
+<td><code>label_type</code></td>
+<td><code>token_id</code>, <code>normalize_labels=True</code>, range <span class="math inline">\([0,1]\)</span></td>
+<td><code>vince-sweep.bash:30–34</code></td>
+</tr>
+<tr class="odd">
+<td><code>num_samples</code> per split</td>
+<td>100k and 500k</td>
+<td><code>vince-sweep.bash:11</code></td>
+</tr>
+<tr class="even">
+<td><code>train_batch_size</code></td>
+<td>64</td>
+<td><code>config.py:60</code></td>
+</tr>
+<tr class="odd">
+<td><code>train_steps</code> (val every)</td>
+<td>10 000 (every 500)</td>
+<td><code>vince-sweep.bash:44–45</code></td>
+</tr>
+<tr class="even">
+<td><code>lr_per_sample</code></td>
+<td><span class="math inline">\(10^{-4}\)</span> ⇒ head lr <span class="math inline">\(64\!\cdot\!10^{-4}\)</span>, backbone lr <span class="math inline">\(\div\,6.66\)</span></td>
+<td><code>vince-sweep.bash:15</code>, <code>config.py:102–108</code></td>
+</tr>
+<tr class="odd">
+<td>LR schedule</td>
+<td>flat (no warmup)</td>
+<td><code>config.py:65</code></td>
+</tr>
+<tr class="even">
+<td><code>gaussian_stdev</code> <span class="math inline">\(\sigma\)</span></td>
+<td>1.0</td>
+<td><code>vince-sweep.bash:12</code></td>
+</tr>
+<tr class="odd">
+<td>Rollouts <span class="math inline">\(R\)</span></td>
+<td>16, 64, 256</td>
+<td><code>vince-sweep.bash:10</code></td>
+</tr>
+<tr class="even">
+<td>Rollout policy</td>
+<td>isotropic Gaussian <span class="math inline">\(\mathcal N(g_\theta(x), \sigma^2 I_D)\)</span></td>
+<td><code>grpo.py:24–29</code>, <code>maxrl.py:25–36</code>, <code>rloo.py:23–27</code></td>
+</tr>
+<tr class="odd">
+<td>MaxRL flags</td>
+<td><code>--subtract-baseline</code>, <code>--use-factorized-likelihoods</code></td>
+<td><code>vince-sweep.bash:51–52</code></td>
+</tr>
+<tr class="even">
+<td>RLOO flag</td>
+<td><code>--factorized</code></td>
+<td><code>vince-sweep.bash:53</code></td>
+</tr>
+<tr class="odd">
+<td><code>clip_grad_norm</code></td>
+<td>1.0</td>
+<td><code>config.py:70</code></td>
+</tr>
+<tr class="even">
+<td>Compile</td>
+<td><code>torch.compile(..., mode="reduce-overhead")</code> on CUDA</td>
+<td><code>config.py:241–242</code></td>
+</tr>
+<tr class="odd">
+<td>Precision</td>
+<td>bfloat16 autocast inside <code>torch.cuda.device(...)</code></td>
+<td><code>state.py:241–245</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="optimization-problem-and-evaluation-metric" class="level2">
+<h2 class="anchored" data-anchor-id="optimization-problem-and-evaluation-metric">Optimization problem and evaluation metric</h2>
+<section id="population-objective" class="level3">
+<h3 class="anchored" data-anchor-id="population-objective">Population objective</h3>
+<p>Every method below estimates — through some surrogate — the same population MSE, <span class="math display">\[
+\mathcal{E}(\theta) \;:=\; \mathbb{E}_{x_{1:n} \sim p}\, \mathbb{E}_{x_{n+K} \sim p(\cdot \mid x_{1:n})}\, \bigl\lVert g_\theta(x_{1:n}) - f(x_{n+K}) \bigr\rVert^2.
+\]</span> The Bayes-optimal predictor is <span class="math inline">\(g^\ast(x_{1:n}) = \mathbb{E}\bigl[f(x_{n+K}) \mid x_{1:n}\bigr]\)</span>, achieving the <strong>intrinsic-variance</strong> lower bound <span class="math inline">\(\mathbb{E}\,\mathrm{Var}\bigl[f(x_{n+K}) \mid x_{1:n}\bigr]\)</span>. The NTP baseline (§4.1) is our proxy for this lower bound.</p>
+</section>
+<section id="held-out-evaluation-metric" class="level3">
+<h3 class="anchored" data-anchor-id="held-out-evaluation-metric">Held-out evaluation metric</h3>
+<p>Per-batch sufficient statistics <span class="math inline">\((xx_d, xy_d, yy_d, \sum_b f_\theta(x_b)_d, \sum_b y_{b,d}, n)\)</span> are accumulated by <code>RegressionStatCounter</code> (<a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/metrics.py"><code>src/metrics.py:56–62</code></a>) and reduced to two scalars dim-averaged across <span class="math inline">\(D\)</span> output coordinates (<a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/state.py"><code>_scalar_corr_from_stats</code></a>, <code>state.py:121–131</code>): <span class="math display">\[
+\widehat{\mathrm{mse}} \;=\; \frac{1}{D}\sum_{d=1}^{D} \frac{xx_d - 2\, xy_d + yy_d}{N},
+\qquad
+\widehat{\mathrm{corr}} \;=\; \frac{1}{D}\sum_{d=1}^{D} \frac{xy_d}{\sqrt{xx_d\, yy_d}}.
+\]</span></p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong><code>corr</code> is uncentered cosine similarity per dim, not Pearson.</strong> The dataset means <span class="math inline">\(\bar y_d\)</span> are not subtracted in the numerator or denominator. For Rademacher labels <span class="math inline">\(\bar y_d \approx 0\)</span> and the two coincide; for <code>token_id</code> labels (target mean far from zero) cosine <span class="math inline">\(\neq\)</span> Pearson and the metric should be read accordingly. The same uncentered formula is applied at plot time in <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/analysis.py"><code>_decode_dim_averaged</code></a> (<code>analysis.py:90–114</code>), so written numbers and plotted numbers always agree.</p>
+</div>
+</div>
+</section>
+<section id="train-window-aggregate-vs.-held-out-val" class="level3">
+<h3 class="anchored" data-anchor-id="train-window-aggregate-vs.-held-out-val">Train-window aggregate vs.&nbsp;held-out val</h3>
+<p>Each row of <code>val_metrics.parquet</code> carries <strong>two</strong> sets of sufficient stats: <code>val_target_*</code> is computed on the held-out validation set at every val step; <code>train_target_*</code> is the sum of the per-batch sufficient stats over <strong>all training batches between val flushes</strong> (<code>TrainStepOutput</code> in <code>state.py:24–46</code>; <code>_serialize_val</code> docstring at <code>state.py:318–331</code>). The latter is therefore a <strong>moving aggregate over changing model snapshots within the most recent val window</strong> — it is <em>not</em> a held-out train-set evaluation, so it tends to be noisier and slightly more pessimistic than a fresh-pass eval would give.</p>
+</section>
+</section>
+<section id="methods" class="level2">
+<h2 class="anchored" data-anchor-id="methods">Methods</h2>
+<p>The codebase implements six estimators, all targeting <span class="math inline">\(g_\theta \approx g^\ast\)</span> but with different surrogate losses, gradient identities, and finite-<span class="math inline">\(R\)</span> behaviours.</p>
+<section id="ntp-baseline-inference-only-proxy-for-gast" class="level4">
+<h4 class="anchored" data-anchor-id="ntp-baseline-inference-only-proxy-for-gast">4.1 NTP baseline — inference-only proxy for <span class="math inline">\(g^\ast\)</span></h4>
+<p><a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/ntp_baseline.py"><code>src/experiments/corpus_regression/ntp_baseline.py:105–197</code></a>.</p>
+<p>Use the <strong>pretrained</strong> SmolLM2-135M next-token distribution <span class="math inline">\(p_\phi(\cdot \mid x_{1:n})\)</span> directly: <span class="math display">\[
+\hat g(x_{1:n}) \;=\; \sum_{t \in V} p_\phi(t \mid x_{1:n})\, f(t) \;=\; \mathrm{softmax}\bigl(\mathrm{logits}\bigr)_{:,-1}\, \Phi,
+\]</span> where the <strong>label projector</strong> <span class="math inline">\(\Phi \in \mathbb{R}^{|V| \times D}\)</span> is the Rademacher matrix or, for token-id labels, <span class="math inline">\(\Phi_{t} = (\mathrm{lo} + (\mathrm{hi}-\mathrm{lo})\cdot t / |V|)\)</span> (lines 138–151). This is the exact closed form of <span class="math inline">\(\mathbb{E}_{t \sim p_\phi}[f(t)]\)</span>. Under the assumption <span class="math inline">\(p_\phi \approx p\)</span>, <span class="math inline">\(\hat g \approx g^\ast\)</span> and the resulting val MSE upper-bounds the intrinsic variance — every other method’s MSE is benchmarked against it. No training is involved, so <span class="math inline">\(R\)</span> does not apply.</p>
+</section>
+<section id="sl-direct-mse-regression" class="level4">
+<h4 class="anchored" data-anchor-id="sl-direct-mse-regression">4.2 SL — direct MSE regression</h4>
+<p><a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/sl.py"><code>sl.py:25–70</code></a>.</p>
+<p>Surrogate is plain MSE on the deterministic last-position projection <span class="math inline">\(g_\theta(x) := f_\theta(x)\)</span>: <span class="math display">\[
+\mathcal{L}_{\text{SL}}(\theta) \;=\; \frac{1}{B D} \sum_{b,d} \bigl(g_\theta(x^{(b)})_d - y^{(b)}_d\bigr)^2.
+\]</span> The population gradient identity is the standard <span class="math inline">\(\nabla_\theta \mathcal{E}(\theta) = 2\,\mathbb{E}\!\left[(g_\theta(x) - y)\,\nabla_\theta g_\theta(x)\right]\)</span>, so the minibatch gradient is an unbiased Monte-Carlo estimate independent of any rollout count. SL is the reference all RL methods are compared against.</p>
+</section>
+<section id="sl-ce-ntp-cross-entropy-with-projected-eval" class="level4">
+<h4 class="anchored" data-anchor-id="sl-ce-ntp-cross-entropy-with-projected-eval">4.3 SL-CE — NTP cross-entropy with projected eval</h4>
+<p><a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/sl_ce.py"><code>sl_ce.py:312–398</code></a>.</p>
+<p>Trains the <strong>native</strong> SmolLM2 <code>lm_head</code> end-to-end (no swapped regression head). Training loss is plain cross-entropy on the lookahead token id: <span class="math display">\[
+\mathcal{L}_{\text{SL-CE}}(\theta) \;=\; -\frac{1}{B}\sum_{b} \log p_\theta\bigl(x^{(b)}_{n+K} \,\bigm|\, x^{(b)}_{1:n}\bigr).
+\]</span> Intermediate tokens are not exposed: the CE always fires at the <span class="math inline">\(K\)</span>-th-ahead position. The current sweep uses <span class="math inline">\(K = 1\)</span>, but the formulation is well-defined for any <span class="math inline">\(K\)</span>.</p>
+<p>For evaluation we project the softmax through the same label projector <span class="math inline">\(\Phi\)</span> used by the NTP baseline, <span class="math display">\[
+\hat g_\theta(x_{1:n}) \;:=\; \mathrm{softmax}\bigl(\mathrm{logits}_\theta(x_{1:n})\bigr)_{:,-1}\, \Phi,
+\]</span> so val MSE / <code>corr</code> live in the same target space as SL/RL methods (<code>sl_ce.py:336–351</code>). As <span class="math inline">\(p_\theta \to p\)</span> pointwise, <span class="math inline">\(\hat g_\theta \to g^\ast\)</span>. When <span class="math inline">\(f\)</span> is bijective on <span class="math inline">\(V\)</span> (e.g.&nbsp;token-id labels), CE on <span class="math inline">\(p_\theta\)</span> is in fact a <strong>stronger</strong> training signal than SL on <span class="math inline">\(f\)</span>: <span class="math inline">\(p_\theta\)</span> is a sufficient statistic for any downstream observation function.</p>
+</section>
+<section id="rloo-per-dim-leave-one-out-advantages" class="level4">
+<h4 class="anchored" data-anchor-id="rloo-per-dim-leave-one-out-advantages">4.4 RLOO — per-dim leave-one-out advantages</h4>
+<p><a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/rloo.py"><code>rloo.py:69–174</code></a>.</p>
+<p>Wrap the deterministic prediction in an isotropic Gaussian rollout policy <span class="math display">\[
+\pi_\theta(z \mid x) \;=\; \mathcal{N}\!\bigl(g_\theta(x),\, \sigma^2 I_D\bigr),
+\]</span> sample <span class="math inline">\(R\)</span> rollouts <span class="math inline">\(z_1, \dots, z_R\)</span> per prompt, and use the negative squared error as reward. With <code>factorized=True</code> (the canonical setting in <code>vince-sweep.bash</code>), the reward is <strong>per output dimension</strong>: <span class="math display">\[
+r_{j,d} \;=\; -(z_{j,d} - y_d)^2,
+\qquad
+A_{j,d} \;=\; r_{j,d} - \frac{1}{R-1}\sum_{i \neq j} r_{i,d} \;=\; \frac{R}{R-1}\bigl(r_{j,d} - \bar r_d\bigr).
+\]</span> (In <code>factorized=False</code> mode the reward is joint, <span class="math inline">\(r_j = -\lVert z_j - y\rVert^2\)</span>, and the same scalar <span class="math inline">\(A_j\)</span> is broadcast across <span class="math inline">\(D\)</span>.) The per-dim log-policy drops <span class="math inline">\(\theta\)</span>-independent constants: <span class="math display">\[
+\log \pi_\theta(z_j \mid x)_d \;=\; -\tfrac{1}{2\sigma^2}(z_{j,d} - g_\theta(x)_d)^2 + \mathrm{const}(\theta).
+\]</span> The surrogate loss in code (line 160) is <span class="math display">\[
+\mathcal{L}_{\text{RLOO}}(\theta) \;=\; -\frac{1}{B R}\sum_{b,j}\sum_d A_{j,d}\, \log \pi_\theta(z_j \mid x^{(b)})_d.
+\]</span></p>
+<p><strong>Unbiasedness.</strong> REINFORCE gives <span class="math inline">\(\nabla_\theta \mathbb{E}_z[r(z)] = \mathbb{E}_z[r(z)\,\nabla_\theta \log \pi_\theta(z)]\)</span>. The leave-one-out baseline depends only on the peer rollouts <span class="math inline">\(z_{-j}\)</span>, so for the <span class="math inline">\(j\)</span>-th term <span class="math display">\[
+\mathbb{E}\!\left[A_{j,d}\,\nabla_\theta \log \pi_\theta(z_j)_d \,\middle|\, z_{-j}\right]
+\;=\; \mathbb{E}_{z_j}\!\left[r_{j,d}\,\nabla_\theta \log \pi_\theta(z_j)_d\right] - 0,
+\]</span> because the conditional baseline contribution kills under the score-function identity <span class="math inline">\(\mathbb{E}[\nabla_\theta \log \pi_\theta(z_j)] = 0\)</span>. Variance drops without bias.</p>
+<p><strong>Limit <span class="math inline">\(R \to \infty\)</span>.</strong> With Gaussian policy, <span class="math display">\[
+\mathbb{E}_{z \sim \mathcal{N}(g_\theta(x), \sigma^2 I)}\bigl[-\lVert z - y\rVert^2\bigr]
+\;=\; -\lVert g_\theta(x) - y\rVert^2 - D\sigma^2,
+\]</span> so maximizing the population reward is <strong>identical to minimizing SL’s MSE</strong> up to a <span class="math inline">\(\theta\)</span>-independent additive constant <span class="math inline">\(D\sigma^2\)</span>. RLOO’s expected gradient agrees with SL’s; only the Monte-Carlo variance (which the leave-one-out baseline reduces) separates them at finite <span class="math inline">\(R\)</span>.</p>
+</section>
+<section id="grpo-group-standardized-advantages" class="level4">
+<h4 class="anchored" data-anchor-id="grpo-group-standardized-advantages">4.5 GRPO — group-standardized advantages</h4>
+<p><a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/grpo.py"><code>grpo.py:21–139</code></a>.</p>
+<p>Same isotropic Gaussian policy as RLOO, <strong>joint</strong> reward <span class="math inline">\(r_j = -\lVert z_j - y\rVert^2\)</span>, but with group-standardized advantage <span class="math display">\[
+A_j \;=\; \frac{r_j - \bar r}{\mathrm{std}(r) + 10^{-8}}.
+\]</span> The surrogate loss couples the joint log-policy <span class="math inline">\(\log\pi_\theta(z_j \mid x) = -\tfrac{1}{2\sigma^2}\lVert z_j - g_\theta(x)\rVert^2 + \mathrm{const}\)</span> to <span class="math inline">\(A_j\)</span>: <span class="math display">\[
+\mathcal{L}_{\text{GRPO}}(\theta) \;=\; -\frac{1}{B R}\sum_{b,j} A_j\, \log \pi_\theta(z_j \mid x^{(b)}).
+\]</span></p>
+<p><strong>Unbiasedness — careful.</strong> Unlike the RLOO leave-one-out baseline, GRPO’s <span class="math inline">\(\mathrm{std}(r)\)</span> divisor is computed from <strong>all</strong> <span class="math inline">\(z_{1:R}\)</span>, including <span class="math inline">\(z_j\)</span>. The score-function identity therefore does not cleanly collapse the baseline term, and GRPO targets a <em>whitened</em> surrogate of the REINFORCE gradient rather than the bare REINFORCE gradient. This is a deliberate variance-reduction / step-size-stabilization heuristic, not a bias-free reduction.</p>
+<p><strong>Limit <span class="math inline">\(R \to \infty\)</span>.</strong> <span class="math inline">\(\mathrm{std}(r) \to \sigma_r(\theta)\)</span> deterministically, so the gradient direction approaches RLOO’s joint variant — which itself collapses to SL’s gradient direction by the calculation in §4.4 — modulo the multiplicative scalar <span class="math inline">\(1/\sigma_r(\theta)\)</span>.</p>
+</section>
+<section id="maxrl-leave-one-out-u-statistic" class="level4">
+<h4 class="anchored" data-anchor-id="maxrl-leave-one-out-u-statistic">4.6 MaxRL — leave-one-out U-statistic</h4>
+<p><a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/corpus_regression/maxrl.py"><code>maxrl.py:24–198</code></a>; estimator in <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/maxrl_estimator.py"><code>src/maxrl_estimator.py</code></a>. Sketch + link; full DP derivation lives in <a href="./gradient-estimator.html">MaxRL gradient estimator details</a>.</p>
+<p>Same Gaussian rollout policy. Define the per-rollout <strong>likelihood</strong> <span class="math inline">\(\ell(y, z) := \mathcal{N}(y;\, z,\, \sigma^2 I_D)\)</span>, supremum <span class="math inline">\(L = (2\pi\sigma^2)^{-D/2}\)</span>, and normalized <span class="math inline">\(\sigma_j := \ell(y, z_j) / L \in [0, 1]\)</span>. Let <span class="math inline">\(\sigma_\theta := \mathbb{E}_z[\sigma_j]\)</span> be the marginal normalized likelihood.</p>
+<p><strong>Population objective.</strong> Degree-<span class="math inline">\(D\)</span> Maclaurin truncation of <span class="math inline">\(\log \sigma_\theta\)</span> about <span class="math inline">\(\sigma_\theta = 1\)</span>: <span class="math display">\[
+J_D(\theta) \;:=\; -\sum_{k=1}^{D} \frac{(1 - \sigma_\theta)^k}{k},
+\qquad
+J_\infty(\theta) \;=\; \log \sigma_\theta \;=\; \log \mathbb{E}_z\!\left[\ell(y, z)\right] - \log L.
+\]</span> This matches the <span class="math inline">\(\log \mathbb{E}_y \exp(-\lVert y - z\rVert^2)\)</span> form in <code>nogit_draft.tex</code> up to additive constants.</p>
+<p><strong>Estimator.</strong> With <code>subtract_baseline=True</code> (canonical), <span class="math display">\[
+\hat g_D \;=\; \frac{1}{R}\sum_{j=1}^R \omega_j\, \sigma^{(\text{eff})}_j\, \nabla_\theta \log \pi_\theta(z_j \mid x),
+\qquad
+\sigma^{(\text{eff})}_j \;=\; \frac{R}{R-1}\bigl(\sigma_j - \bar\sigma\bigr).
+\]</span> Each <span class="math inline">\(\omega_j\)</span> is a <strong>leave-one-out U-statistic</strong> over the peer complements <span class="math inline">\(a_{-j} = (1 - \sigma_i)_{i \neq j}\)</span>, satisfying <span class="math inline">\(\mathbb{E}[\omega_j] = w_D(\sigma_\theta) := \sum_{d=0}^{D-1}(1 - \sigma_\theta)^d\)</span>. The U-statistic is computed in log-space via a bidiagonal-recurrence prefix/suffix scan; see <a href="./gradient-estimator.html">gradient-estimator.qmd</a> for the DP and numerics. Unbiasedness follows because <span class="math inline">\(\omega_j\)</span> depends only on <span class="math inline">\(z_{-j}\)</span> and the peer-mean baseline <span class="math inline">\(\bar\sigma_{-j} = (R\bar\sigma - \sigma_j)/(R-1)\)</span> likewise decouples from <span class="math inline">\(z_j\)</span>.</p>
+<p><strong>Factorized vs joint.</strong> The canonical sweep uses <code>use_factorized_likelihoods=True</code>: each output dim is treated as an independent 1-D Gaussian regression with <span class="math inline">\(\ell_d(y_d, z_d) = \mathcal{N}(y_d; z_d, \sigma^2)\)</span>; the U-statistic runs per-dim. This caps <span class="math inline">\(\sigma_\theta \le 1/\sqrt 2\)</span> regardless of <span class="math inline">\(D\)</span>, avoiding the <span class="math inline">\(2^{-D/2}\)</span> collapse of the joint variant when <span class="math inline">\(D\)</span> is large (<code>maxrl.py:24–36, 99–127</code>).</p>
+<p>The surrogate loss in code (line 184) packages this as <span class="math display">\[
+\mathcal{L}_{\text{MaxRL}}(\theta) \;=\; -\frac{1}{B R}\sum_{b,j} \sum_d c_{b,j,d}\, \log \pi_\theta(z_j \mid x^{(b)})_d,
+\qquad
+c_{b,j,d} = \omega_{b,j,d}\, \sigma^{(\text{eff})}_{b,j,d}.
+\]</span></p>
+<p><strong>Limit <span class="math inline">\(R \to \infty\)</span> (with degree <span class="math inline">\(D = R\)</span>).</strong> <span class="math inline">\(\hat g_D \to \nabla_\theta J_\infty(\theta) = \nabla_\theta \log \mathbb{E}_z[\ell(y, z)]\)</span>. For the Gaussian policy and Gaussian likelihood, the convolution identity gives <span class="math display">\[
+\mathbb{E}_{z \sim \mathcal{N}(g_\theta(x), \sigma^2 I)}\!\left[\mathcal{N}(y; z, \sigma^2 I)\right]
+\;=\; \mathcal{N}\!\bigl(y;\, g_\theta(x),\, 2\sigma^2 I\bigr),
+\]</span> so <span class="math display">\[
+J_\infty(\theta) \;=\; -\frac{1}{4\sigma^2}\, \lVert g_\theta(x) - y\rVert^2 + \mathrm{const}.
+\]</span> <strong>MaxRL’s <span class="math inline">\(R \to \infty\)</span> limit is therefore exactly SL’s MSE objective up to a positive scalar <span class="math inline">\(1/(4\sigma^2)\)</span> and a <span class="math inline">\(\theta\)</span>-independent additive constant.</strong></p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Limit-behaviour summary.</strong> As the per-prompt rollout count <span class="math inline">\(R\)</span> (and MaxRL’s truncation degree <span class="math inline">\(D = R\)</span>) goes to infinity, the GRPO / RLOO / MaxRL gradient estimators all converge to a positive multiple of the SL (MSE) gradient — RLOO via <span class="math inline">\(\mathbb{E}_z[-\lVert z - y\rVert^2] = -\lVert g_\theta(x) - y\rVert^2 - D\sigma^2\)</span>, MaxRL via the Gaussian-convolution identity above, and GRPO by reduction to RLOO’s joint variant. The three RL methods are best read as <strong>finite-<span class="math inline">\(R\)</span> estimators of SL</strong> with different bias/variance trade-offs, not as fundamentally different objectives — a useful lens for the rollout sweeps below.</p>
+</div>
+</div>
+</section>
+</section>
 <section id="experiments" class="level2">
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -270,25 +536,55 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-2" class="callout-2-contents callout-collapse collapse">
+<div id="callout-4" class="callout-4-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <p>See <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/corpus-regression/README.md"><code>experiments/corpus-regression/README.md</code></a> for sweep and single-run instructions.</p>
 </div>
 </div>
 </div>
-<section id="cross-method-comparison" class="level3">
-<h3 class="anchored" data-anchor-id="cross-method-comparison">Cross-method comparison</h3>
+<section id="cross-method-comparison" class="level4">
+<h4 class="anchored" data-anchor-id="cross-method-comparison">Cross-method comparison</h4>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/methods_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_vs_eval_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_vs_eval_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 </section>
-<section id="supervised-learning" class="level3">
-<h3 class="anchored" data-anchor-id="supervised-learning">Supervised learning</h3>
+<section id="plot-of-prediction-variance" class="level4">
+<h4 class="anchored" data-anchor-id="plot-of-prediction-variance">Plot of prediction variance</h4>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>(Graphics) Per-method training and evaluation variance of output
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-5" class="callout-5-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/sl_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_pred_std_ratio.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_pred_std.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="supervised-learning-with-ce-loss" class="level4">
+<h4 class="anchored" data-anchor-id="supervised-learning-with-ce-loss">Supervised learning with CE loss</h4>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_eval_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_eval_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-6-contents" aria-controls="callout-6" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -297,25 +593,58 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div id="callout-6" class="callout-6-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/sl_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_step_loss.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/sl_per_epoch_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_step_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 </div>
 </div>
 </div>
 </section>
-<section id="grpo" class="level3">
-<h3 class="anchored" data-anchor-id="grpo">GRPO</h3>
+<section id="supervised-learning" class="level4">
+<h4 class="anchored" data-anchor-id="supervised-learning">Supervised learning</h4>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/grpo_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_eval_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_eval_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-7-contents" aria-controls="callout-7" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>(Graphics): SL training corr and mse
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-7" class="callout-7-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_step_loss.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_step_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="grpo" class="level4">
+<h4 class="anchored" data-anchor-id="grpo">GRPO</h4>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_eval_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_eval_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-8-contents" aria-controls="callout-8" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -324,26 +653,29 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-4" class="callout-4-contents callout-collapse collapse">
+<div id="callout-8" class="callout-8-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/grpo_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_step_loss.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/grpo_per_epoch_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_step_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 </div>
 </div>
 </div>
 </section>
-<section id="maxrl-subtract-baseline-factorized" class="level3">
-<h3 class="anchored" data-anchor-id="maxrl-subtract-baseline-factorized">MaxRL (subtract-baseline + factorized)</h3>
-<p>See <a href="maxrl-estimator.qmd">MaxRL estimator: leave-one-out derivation</a> for the estimator math used here.</p>
+<section id="maxrl-subtract-baseline-factorized" class="level4">
+<h4 class="anchored" data-anchor-id="maxrl-subtract-baseline-factorized">MaxRL (subtract-baseline + factorized)</h4>
+<p>See <a href="./gradient-estimator.html">MaxRL gradient estimator details</a> for the estimator math used here.</p>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/maxrl_sub_fact_vs_lookforward.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_eval_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_eval_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-9-contents" aria-controls="callout-9" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -352,13 +684,43 @@ window.addEventListener("DOMContentLoaded", () => {
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-5" class="callout-5-contents callout-collapse collapse">
+<div id="callout-9" class="callout-9-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_step_loss.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_step_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="rloo" class="level4">
+<h4 class="anchored" data-anchor-id="rloo">RLOO</h4>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_eval_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_eval_corr.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-10-contents" aria-controls="callout-10" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>(Graphics): SL training corr and mse
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-10" class="callout-10-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_step_loss.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_step_mse.html" width="1000" height="320" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 </div>
 </div>

@@ -5,25 +5,25 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 ORCHESTRATE="experiments/corpus-regression/orchestrate.py"
-SEEDS="51"
+SEEDS="51,61,121"
 LABEL="token_id"
-ROLLOUT_STEPS=256
+ROLLOUT_STEPS=16,256
 NUM_SAMPLES=500000
 GAUSSIAN_STDEV=1.0
 # FROM_PRETRAIN=False
 # FROM_SCRATCH=True
 FLAT=True
 COSINE=True
-LEARNING_RATES=1e-4,5e-5,2e-5
-LR_MIN_RATIO=0.5
+LEARNING_RATES=2e-5,1e-5
+LR_MIN_RATIO=0.1
 BATCH_SIZE=256
 
 METHOD_ARGS=(
     --method maxrl \
     --method sl_mse \
+    --method sl_ce \
     --method grpo \
     --method rloo \
-    --method sl_ce \
 )
 
 SEED_ARGS=(

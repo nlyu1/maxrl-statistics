@@ -278,17 +278,48 @@ See [`experiments/corpus-regression/README.md`]({{< var repo_url >}}/experiments
 
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/methods_vs_lookforward.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_vs_eval_corr.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 ```
 
-#### Supervised learning
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_vs_eval_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+#### Plot of prediction variance
+
+::: {.callout-note collapse="true"}
+## (Graphics) Per-method training and evaluation variance of output
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_pred_std_ratio.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/methods_pred_std.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+:::
+
+#### Supervised learning with CE loss
 
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/sl_vs_lookforward.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_eval_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_eval_corr.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -298,12 +329,43 @@ See [`experiments/corpus-regression/README.md`]({{< var repo_url >}}/experiments
 ## (Graphics): SL training corr and mse
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/sl_per_epoch_corr.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_step_loss.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/sl_per_epoch_mse.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_ce_per_step_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+:::
+
+#### Supervised learning
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_eval_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_eval_corr.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+::: {.callout-note collapse="true"}
+## (Graphics): SL training corr and mse
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_step_loss.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/sl_per_step_mse.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -314,7 +376,12 @@ See [`experiments/corpus-regression/README.md`]({{< var repo_url >}}/experiments
 
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/grpo_vs_lookforward.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_eval_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_eval_corr.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -324,12 +391,12 @@ See [`experiments/corpus-regression/README.md`]({{< var repo_url >}}/experiments
 ## (Graphics): GRPO training corr and mse
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/grpo_per_epoch_corr.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_step_loss.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/grpo_per_epoch_mse.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/grpo_per_step_mse.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -342,7 +409,12 @@ See [MaxRL gradient estimator details](gradient-estimator.qmd) for the estimator
 
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/maxrl_sub_fact_vs_lookforward.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_eval_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_eval_corr.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
@@ -352,12 +424,44 @@ See [MaxRL gradient estimator details](gradient-estimator.qmd) for the estimator
 ## (Graphics): MaxRL training corr and mse
 ```{=html}
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_corr.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_step_loss.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
-  <iframe src="assets/corpus-regression/maxrl_sub_fact_per_epoch_mse.html"
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/maxrl_sub_fact_per_step_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+:::
+
+
+#### RLOO
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_eval_mse.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_eval_corr.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
+::: {.callout-note collapse="true"}
+## (Graphics): SL training corr and mse
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_step_loss.html"
+          width="1000" height="320" scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="320">
+  <iframe src="assets/corpus-regression/n500k_sigma1.0_token_id_normalized_lr2e-05_bs256_sched-cosine_warm-0.050_min-0.50_scratch_steps-001500_look1/rloo_factorized_per_step_mse.html"
           width="1000" height="320" scrolling="no"
           onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
