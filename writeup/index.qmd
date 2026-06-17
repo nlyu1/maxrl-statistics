@@ -16,4 +16,5 @@ Experiments:
 
 - [Regression: bag of words](bag-of-words.qmd) — noise-robustness in the zero-step sampling setting.
 - [Regression: corpus regression](corpus-regression.qmd) — same zero-step setting on natural-language prefixes. WIP.
+- [Scalar pretrain](scalar-pretrain.qmd) — scalar-observation LM pretraining with hidden token states. WIP.
 - [Regression: DAG-reasoning](dag-reasoning.qmd) — reasoning advantage and rollout efficiency. Not started.

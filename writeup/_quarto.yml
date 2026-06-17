@@ -16,6 +16,8 @@ website:
         text: Bag of Words
       - href: corpus-regression.qmd
         text: Corpus Regression (WIP)
+      - href: scalar-pretrain.qmd
+        text: Scalar Pretrain (WIP)
       - href: dag-reasoning.qmd
         text: DAG Reasoning (Empty)
 

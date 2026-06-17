@@ -68,15 +68,6 @@ $$
   = \sum_{t \in V} q_{\theta, i}(t \mid C_i)\,\varphi(t).
 $$
 
-<!-- ::: {.callout-warning}
-This formulation assumes standard teacher forcing: the prefix tokens
-$Z_{<i}$ are fed to the LM as inputs, while the current token identity $Z_i$ is
-withheld from the scalar-only losses. If the intended setting is instead that
-all tokens, including prefixes, are unobserved and only scalar labels are
-available, then the problem becomes a latent sequential filtering problem rather
-than ordinary causal LM pretraining. The method definitions below would need a
-different state posterior over prefixes.
-::: -->
 
 ## Canonical recipe
 
@@ -163,15 +154,6 @@ $$
 $$
 The denominator is exactly the held-out MSE of the constant empirical-mean
 predictor, so that the mean baseline has normalized MSE $1$.
-
-<!-- ::: {.callout-warning}
-The empirical-mean denominator is a marginal label variance, not the conditional
-Bayes intrinsic variance
-$\mathbb{E}_{C_i}\mathrm{Var}(Y_i \mid C_i)$. It is still a useful
-normalization because it makes the trivial baseline equal to $1$, but it should
-not be described as the irreducible optimum unless the prefix carries no
-information about the label.
-::: -->
 
 ## Methods
 
@@ -317,24 +299,6 @@ model-predicted mean. It also penalizes the variance of scalar labels under the
 model's proposal distribution. Therefore, its optimum for a fixed observed
 label is a concentrated distribution over tokens whose labels are near $y$,
 not merely any distribution whose mean equals $y$.
-
-::: {.callout-warning}
-If the intended RL method is supposed to be an unbiased score-function
-estimator of SL-LM-MSE, the reward cannot simply be
-$-(\varphi(S)-y)^2$. One valid score-function identity for maximizing
-$-(\mu-y)^2$ is
-$$
-\nabla_\theta[-(\mu-y)^2]
-  =
-  \mathbb{E}_{S\sim q_\theta}
-  \left[
-    -2(\mu-y)(\varphi(S)-\mu)\,
-    \nabla_\theta \log q_\theta(S \mid C)
-  \right].
-$$
-That is a different estimator from the sampled-token-MSE reward described in
-the rest of this section.
-:::
 
 #### 4.5 RLOO - leave-one-out sampled-token MSE rewards
 
@@ -594,7 +558,108 @@ $$
 $$
 with $c_{b,i,j}$ detached.
 
-The no-sampling probability limit is straightforward because $V$ is finite:
+::: {.callout-note collapse="true"}
+
+## Unbiasedness of the sampled estimator. 
+
+Let
+$$
+G_R
+  :=
+  \frac{1}{R}\sum_{j=1}^{R}
+  c_j\,\nabla_\theta \log q_\theta(S_j\mid C)
+$$
+be the stochastic gradient estimator for one context-label pair. First consider
+the no-baseline coefficient $c_j=\omega_j\sigma_j$. For each $k$,
+$$
+\mathbb{E}
+\left[
+  \frac{
+    e_k\bigl((a_\ell)_{\ell\ne j}\bigr)
+  }{
+    \binom{R-1}{k}
+  }
+\right]
+=
+\mathbb{E}_{I}
+\mathbb{E}
+\left[
+  \prod_{\ell\in I}a_\ell
+\right]
+=
+\bigl(\mathbb{E}[a]\bigr)^k
+=
+(1-\sigma_\theta)^k,
+$$
+where $I$ is a uniformly chosen $k$-subset of the $R-1$ peer rollouts. The
+second equality uses iid peer rollouts. Therefore
+$$
+\mathbb{E}[\omega_j]
+  =
+  \sum_{k=0}^{M-1}(1-\sigma_\theta)^k
+  =
+  w_M(\sigma_\theta).
+$$
+Moreover, $\omega_j$ is a function only of the peer samples $S_{-j}$ and is
+independent of $S_j$. Hence
+$$
+\begin{aligned}
+\mathbb{E}[G_R]
+&=
+\mathbb{E}
+\left[
+  \omega_1\sigma_1\nabla_\theta\log q_\theta(S_1\mid C)
+\right] \\
+&=
+\mathbb{E}[\omega_1]\,
+\mathbb{E}_{S\sim q_\theta}
+\left[
+  \sigma_S(y)\nabla_\theta\log q_\theta(S\mid C)
+\right] \\
+&=
+w_M(\sigma_\theta)\,\nabla_\theta\sigma_\theta
+=
+\nabla_\theta J_M(\theta; C,y).
+\end{aligned}
+$$
+The baseline-subtracted coefficient is unbiased for the same reason. Since
+$$
+\frac{R}{R-1}(\sigma_j-\bar\sigma)
+  =
+  \sigma_j-\bar\sigma_{-j},
+\qquad
+\bar\sigma_{-j}
+  :=
+  \frac{1}{R-1}\sum_{\ell\ne j}\sigma_\ell,
+$$
+the baseline term obeys
+$$
+\mathbb{E}
+\left[
+  \omega_j\bar\sigma_{-j}
+  \nabla_\theta\log q_\theta(S_j\mid C)
+  \,\middle|\, S_{-j}
+\right]
+=
+\omega_j\bar\sigma_{-j}
+\mathbb{E}_{S_j}
+\left[
+  \nabla_\theta\log q_\theta(S_j\mid C)
+\right]
+=0.
+$$
+Thus leave-one-out baseline subtraction changes the variance but not the
+expected gradient.
+
+:::
+
+::: {.callout-note collapse="true"}
+
+## Unbiasedness of the Exact probability limit estimator.
+
+The no-sampling limit is not a new stochastic
+estimator. It is the same MaxRL population objective with the categorical
+expectation evaluated exactly over the finite vocabulary:
 $$
 \sigma_\theta = \sum_t q_t\sigma_t(y).
 $$
@@ -604,7 +669,39 @@ J_M(\theta; C,y)
   =
   -\sum_{k=1}^{M}\frac{(1-\sum_t q_t\sigma_t(y))^k}{k}.
 $$
-Equivalently, the exact score coefficient is
+The chain rule gives
+$$
+\nabla_\theta J_M
+  =
+  w_M(\sigma_\theta)\nabla_\theta\sigma_\theta,
+\qquad
+w_M(\sigma_\theta)
+  =
+  \sum_{k=0}^{M-1}(1-\sigma_\theta)^k.
+$$
+Because $\sigma_t(y)$ is fixed with respect to $\theta$ for the observed
+example,
+$$
+\nabla_\theta\sigma_\theta
+  =
+  \nabla_\theta\sum_t q_t\sigma_t(y)
+  =
+  \sum_t \sigma_t(y)\nabla_\theta q_t
+  =
+  \sum_t q_t\sigma_t(y)
+     \nabla_\theta\log q_\theta(t\mid C).
+$$
+Subtracting the exact baseline $\sigma_\theta$ is valid because
+$$
+\sum_t q_t\nabla_\theta\log q_\theta(t\mid C)
+  =
+  \sum_t \nabla_\theta q_t
+  =
+  \nabla_\theta\sum_t q_t
+  =
+  0.
+$$
+Therefore the exact full-vocabulary score form is
 $$
 c_t^\infty
   =
@@ -617,16 +714,12 @@ $$
   \sum_t q_t c_t^\infty
   \nabla_\theta \log q_\theta(t\mid C).
 $$
-As $M\to\infty$,
-$$
-J_\infty(\theta; C,y)
-  =
-  \log \sigma_\theta
-  =
-  \log\sum_t
-  q_t
-  \exp\!\left(-\frac{(\phi_t-y)^2}{2\tau^2}\right).
-$$
+This is the deterministic counterpart of the leave-one-out sampled estimator:
+the peer-estimated $\omega_j$ has been replaced by its exact value
+$w_M(\sigma_\theta)$, and the peer-estimated baseline has been replaced by the
+exact marginal $\sigma_\theta$.
+
+:::
 
 There is no Gaussian-convolution identity here like in corpus-regression. The
 proposal is categorical over hidden tokens, and the likelihood is a scalar
@@ -695,10 +788,6 @@ labels are compatible with the observed scalar label?
 
 ## Open choices before implementation
 
-- Confirm that scalar-only methods still receive teacher-forced token prefixes.
-  If not, the experiment is no longer standard LM pretraining.
-- Fix the exact token-id normalization, either $t/(|V|-1)$ for exact $[0,1]$
-  endpoints or the existing corpus-regression convention $t/|V|$.
 - Choose the MaxRL label-likelihood temperature $\tau$. This is not a harmless
   constant: it determines whether MaxRL behaves more like CE or more like
   sampled-token MSE.
