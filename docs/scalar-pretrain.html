@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Scalar-pretrain – MaxRL Statistics</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-ece42c8223ec2bf36298a08f122c9a68.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">MaxRL Statistics</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./theory.html"> 
+<span class="menu-text">Theory</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./gradient-estimator.html"> 
+<span class="menu-text">Gradient Estimator</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./bag-of-words.html"> 
+<span class="menu-text">Bag of Words</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./corpus-regression.html"> 
+<span class="menu-text">Corpus Regression (WIP)</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./dag-reasoning.html"> 
+<span class="menu-text">DAG Reasoning (Empty)</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tl-dr" id="toc-tl-dr" class="nav-link active" data-scroll-target="#tl-dr">TL; DR</a></li>
+  <li><a href="#problem-setup" id="toc-problem-setup" class="nav-link" data-scroll-target="#problem-setup">Problem setup</a></li>
+  <li><a href="#canonical-recipe" id="toc-canonical-recipe" class="nav-link" data-scroll-target="#canonical-recipe">Canonical recipe</a></li>
+  <li><a href="#optimization-problem-and-evaluation-metric" id="toc-optimization-problem-and-evaluation-metric" class="nav-link" data-scroll-target="#optimization-problem-and-evaluation-metric">Optimization problem and evaluation metric</a>
+  <ul>
+  <li><a href="#population-scalar-objective" id="toc-population-scalar-objective" class="nav-link" data-scroll-target="#population-scalar-objective">Population scalar objective</a></li>
+  <li><a href="#held-out-metric" id="toc-held-out-metric" class="nav-link" data-scroll-target="#held-out-metric">Held-out metric</a></li>
+  </ul></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul>
+  <li><a href="#mean-baseline---inference-only-normalization" id="toc-mean-baseline---inference-only-normalization" class="nav-link" data-scroll-target="#mean-baseline---inference-only-normalization">4.1 Mean baseline - inference-only normalization</a></li>
+  <li><a href="#sl-ce---ordinary-lm-pretraining-with-scalar-evaluation" id="toc-sl-ce---ordinary-lm-pretraining-with-scalar-evaluation" class="nav-link" data-scroll-target="#sl-ce---ordinary-lm-pretraining-with-scalar-evaluation">4.2 SL-CE - ordinary LM pretraining with scalar evaluation</a></li>
+  <li><a href="#sl-lm-mse---direct-softmax-projected-scalar-mse" id="toc-sl-lm-mse---direct-softmax-projected-scalar-mse" class="nav-link" data-scroll-target="#sl-lm-mse---direct-softmax-projected-scalar-mse">4.3 SL-LM-MSE - direct softmax-projected scalar MSE</a></li>
+  <li><a href="#rl-common-setup---categorical-proposal-over-hidden-tokens" id="toc-rl-common-setup---categorical-proposal-over-hidden-tokens" class="nav-link" data-scroll-target="#rl-common-setup---categorical-proposal-over-hidden-tokens">4.4 RL common setup - categorical proposal over hidden tokens</a></li>
+  <li><a href="#rloo---leave-one-out-sampled-token-mse-rewards" id="toc-rloo---leave-one-out-sampled-token-mse-rewards" class="nav-link" data-scroll-target="#rloo---leave-one-out-sampled-token-mse-rewards">4.5 RLOO - leave-one-out sampled-token MSE rewards</a></li>
+  <li><a href="#grpo---group-standardized-sampled-token-mse-rewards" id="toc-grpo---group-standardized-sampled-token-mse-rewards" class="nav-link" data-scroll-target="#grpo---group-standardized-sampled-token-mse-rewards">4.6 GRPO - group-standardized sampled-token MSE rewards</a></li>
+  <li><a href="#maxrl---discrete-scalar-observation-likelihood" id="toc-maxrl---discrete-scalar-observation-likelihood" class="nav-link" data-scroll-target="#maxrl---discrete-scalar-observation-likelihood">4.7 MaxRL - discrete scalar-observation likelihood</a></li>
+  </ul></li>
+  <li><a href="#limit-behaviour-summary" id="toc-limit-behaviour-summary" class="nav-link" data-scroll-target="#limit-behaviour-summary">Limit-behaviour summary</a></li>
+  <li><a href="#implementation-notes" id="toc-implementation-notes" class="nav-link" data-scroll-target="#implementation-notes">Implementation notes</a></li>
+  <li><a href="#open-choices-before-implementation" id="toc-open-choices-before-implementation" class="nav-link" data-scroll-target="#open-choices-before-implementation">Open choices before implementation</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Scalar-pretrain</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>The scalar-pretrain setup keeps the architecture of ordinary causal language model pretraining, including the native <code>lm_head</code>, but changes what supervision is allowed to see. The underlying corpus token at each position is treated as a hidden categorical state. The observed target is only a scalar label attached to that token, currently the token id normalized to <span class="math inline">\([0, 1]\)</span>.</p>
+<section id="tl-dr" class="level3">
+<h3 class="anchored" data-anchor-id="tl-dr">TL; DR</h3>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>All methods train a full LM from scratch and evaluate the same scalar prediction metric over all <span class="math inline">\(T = 128\)</span> autoregressive positions. SL-CE observes the hidden token ids and is the usual LM-pretraining upper reference. SL-LM-MSE does not train on token ids; it directly optimizes the MSE of the softmax-projected scalar mean. RLOO and GRPO, if they reward sampled hidden tokens by their scalar MSE, optimize the expected sampled-token MSE, which differs from the evaluation MSE by an extra model-variance term. Discrete MaxRL optimizes a log expected scalar likelihood under the LM proposal; with a small label-likelihood temperature it becomes CE-like, while with a large temperature it approaches the same expected sampled-token MSE as RLOO.</p>
+</div>
+</div>
+</section>
+<section id="problem-setup" class="level2">
+<h2 class="anchored" data-anchor-id="problem-setup">Problem setup</h2>
+<p>Fix a corpus distribution <span class="math inline">\(p\)</span> over token sequences and a tokenizer vocabulary <span class="math inline">\(V\)</span>. In the canonical scalar-pretrain setting, each training row is a length <span class="math inline">\(T = 128\)</span> token sequence <span class="math display">\[
+Z_{1:T} \sim p,
+\]</span> with a beginning-of-sequence token available as context for the first position. At autoregressive position <span class="math inline">\(i\)</span>, define <span class="math display">\[
+C_i := (Z_0, Z_1, \dots, Z_{i-1}), \qquad Z_0 := \mathrm{BOS},
+\]</span> so the model predicts the hidden current token <span class="math inline">\(Z_i\)</span> from its teacher-forced prefix <span class="math inline">\(C_i\)</span>. This gives <span class="math inline">\(T\)</span> supervised positions per row, not only the final position.</p>
+<p>The observed scalar label is a deterministic map <span class="math display">\[
+\varphi : V \to [0, 1].
+\]</span> For the current token-id label, <span class="math display">\[
+Y_i := \varphi(Z_i), \qquad
+\varphi(t) := \frac{t}{|V| - 1}
+\]</span> assuming token ids are indexed from <span class="math inline">\(0\)</span> to <span class="math inline">\(|V|-1\)</span>. If implementation wants to match the corpus-regression convention exactly, this can instead use <span class="math inline">\(t / |V|\)</span>; the difference is negligible numerically but should be fixed once in the canonical config.</p>
+<p>Every method uses the same causal transformer and the same native LM head. Let the logits at position <span class="math inline">\(i\)</span> be <span class="math display">\[
+a_{\theta, i}(t) \in \mathbb{R}, \qquad t \in V,
+\]</span> and let the LM-head induced categorical distribution be <span class="math display">\[
+q_{\theta, i}(t \mid C_i)
+  := \frac{\exp a_{\theta, i}(t)}
+          {\sum_{u \in V} \exp a_{\theta, i}(u)}.
+\]</span> The scalar prediction used for evaluation is the softmax-projected mean <span class="math display">\[
+\mu_{\theta, i}(C_i)
+  := \mathbb{E}_{t \sim q_{\theta, i}(\cdot \mid C_i)}[\varphi(t)]
+  = \sum_{t \in V} q_{\theta, i}(t \mid C_i)\,\varphi(t).
+\]</span></p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This formulation assumes standard teacher forcing: the prefix tokens <span class="math inline">\(Z_{&lt;i}\)</span> are fed to the LM as inputs, while the current token identity <span class="math inline">\(Z_i\)</span> is withheld from the scalar-only losses. If the intended setting is instead that all tokens, including prefixes, are unobserved and only scalar labels are available, then the problem becomes a latent sequential filtering problem rather than ordinary causal LM pretraining. The method definitions below would need a different state posterior over prefixes.</p>
+</div>
+</div>
+</section>
+<section id="canonical-recipe" class="level2">
+<h2 class="anchored" data-anchor-id="canonical-recipe">Canonical recipe</h2>
+<p>This is the proposed recipe, mirroring corpus-regression but changing the head and the supervised positions.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Knob</th>
+<th>Proposed value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Backbone</td>
+<td>Causal LM trained from scratch</td>
+</tr>
+<tr class="even">
+<td>Prediction head</td>
+<td>Native <code>lm_head</code> for every method</td>
+</tr>
+<tr class="odd">
+<td>Sequence length <span class="math inline">\(T\)</span></td>
+<td>128 autoregressive target positions</td>
+</tr>
+<tr class="even">
+<td>Label</td>
+<td><code>token_id</code> normalized to <span class="math inline">\([0,1]\)</span></td>
+</tr>
+<tr class="odd">
+<td>Scalar dimension</td>
+<td><span class="math inline">\(D_y = 1\)</span></td>
+</tr>
+<tr class="even">
+<td>Training contexts</td>
+<td>Teacher-forced token prefixes <span class="math inline">\(C_i = Z_{&lt;i}\)</span></td>
+</tr>
+<tr class="odd">
+<td>Evaluation prediction</td>
+<td><span class="math inline">\(\mu_{\theta,i} = \sum_t q_{\theta,i}(t)\varphi(t)\)</span></td>
+</tr>
+<tr class="even">
+<td>Main evaluation metric</td>
+<td>MSE of <span class="math inline">\(\mu_{\theta,i}\)</span> against <span class="math inline">\(Y_i\)</span></td>
+</tr>
+<tr class="odd">
+<td>Normalization</td>
+<td>MSE divided by empirical-mean baseline variance</td>
+</tr>
+<tr class="even">
+<td>Sampling methods</td>
+<td>RLOO, GRPO, MaxRL with categorical LM proposal</td>
+</tr>
+<tr class="odd">
+<td>Exact-limit variants</td>
+<td>Replace rollout averages by full softmax sums over <span class="math inline">\(V\)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="optimization-problem-and-evaluation-metric" class="level2">
+<h2 class="anchored" data-anchor-id="optimization-problem-and-evaluation-metric">Optimization problem and evaluation metric</h2>
+<section id="population-scalar-objective" class="level3">
+<h3 class="anchored" data-anchor-id="population-scalar-objective">Population scalar objective</h3>
+<p>The evaluation target is the conditional expectation of the scalar label, <span class="math display">\[
+\mu_i^\ast(C_i)
+  := \mathbb{E}_{Z_i \sim p(\cdot \mid C_i)}[\varphi(Z_i)]
+  = \sum_{t \in V} p(t \mid C_i)\,\varphi(t).
+\]</span> The scalar MSE risk of a model is <span class="math display">\[
+\mathcal{E}_{\mathrm{mean}}(\theta)
+  := \mathbb{E}_{Z_{1:T} \sim p}
+      \left[
+        \frac{1}{T}\sum_{i=1}^{T}
+        \bigl(\mu_{\theta,i}(C_i) - Y_i\bigr)^2
+      \right].
+\]</span> Conditioning on a prefix <span class="math inline">\(C_i\)</span>, this decomposes as <span class="math display">\[
+\mathbb{E}\!\left[
+  \bigl(\mu_{\theta,i}(C_i) - Y_i\bigr)^2
+  \,\middle|\, C_i
+\right]
+=
+\bigl(\mu_{\theta,i}(C_i) - \mu_i^\ast(C_i)\bigr)^2
++ \mathrm{Var}\!\left(Y_i \mid C_i\right).
+\]</span> Thus the Bayes-optimal scalar predictor is <span class="math inline">\(\mu_i^\ast\)</span>, and the irreducible Bayes lower bound is <span class="math display">\[
+\mathbb{E}_{C_i}\,\mathrm{Var}(Y_i \mid C_i).
+\]</span> The loss generally will not go to zero because the same prefix can lead to many next-token labels.</p>
+</section>
+<section id="held-out-metric" class="level3">
+<h3 class="anchored" data-anchor-id="held-out-metric">Held-out metric</h3>
+<p>For a validation batch with mask <span class="math inline">\(m_{b,i} \in \{0,1\}\)</span> and <span class="math inline">\(N = \sum_{b,i} m_{b,i}\)</span> valid positions, use <span class="math display">\[
+\widehat{\mathrm{MSE}}
+  = \frac{1}{N}
+    \sum_{b,i} m_{b,i}
+    \bigl(\mu_{\theta,i}(C_i^{(b)}) - Y_i^{(b)}\bigr)^2.
+\]</span> For scalar labels <span class="math inline">\(D_y = 1\)</span>. If this is later generalized to vector labels, the natural extension is to average the squared error over both positions and label dimensions.</p>
+<p>The normalized metric should be <span class="math display">\[
+\widehat{\mathrm{NMSE}}
+  := \frac{\widehat{\mathrm{MSE}}}{\widehat{\mathcal{V}}_{\mathrm{mean}}},
+\qquad
+\widehat{\mathcal{V}}_{\mathrm{mean}}
+  := \frac{1}{N}\sum_{b,i} m_{b,i}
+       \bigl(Y_i^{(b)} - \bar Y\bigr)^2,
+\]</span> where <span class="math display">\[
+\bar Y := \frac{1}{N}\sum_{b,i} m_{b,i}Y_i^{(b)}.
+\]</span> The denominator is exactly the held-out MSE of the constant empirical-mean predictor, so that the mean baseline has normalized MSE <span class="math inline">\(1\)</span>.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The empirical-mean denominator is a marginal label variance, not the conditional Bayes intrinsic variance <span class="math inline">\(\mathbb{E}_{C_i}\mathrm{Var}(Y_i \mid C_i)\)</span>. It is still a useful normalization because it makes the trivial baseline equal to <span class="math inline">\(1\)</span>, but it should not be described as the irreducible optimum unless the prefix carries no information about the label.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="methods" class="level2">
+<h2 class="anchored" data-anchor-id="methods">Methods</h2>
+<p>The methods differ only in the training signal attached to the shared LM-head distribution <span class="math inline">\(q_{\theta,i}(\cdot \mid C_i)\)</span>. In the formulas below, suppress batch and position indices and write <span class="math display">\[
+q_t := q_\theta(t \mid C), \qquad
+\phi_t := \varphi(t), \qquad
+y := \varphi(z), \qquad
+\mu_\theta(C) := \sum_{t \in V} q_t \phi_t.
+\]</span></p>
+<section id="mean-baseline---inference-only-normalization" class="level4">
+<h4 class="anchored" data-anchor-id="mean-baseline---inference-only-normalization">4.1 Mean baseline - inference-only normalization</h4>
+<p>The constant baseline predicts <span class="math display">\[
+\mu_0(C_i) := \bar Y_{\mathrm{train}}
+\]</span> at every position. It does not train an LM and does not use the prefix. On the validation split, if <span class="math inline">\(\bar Y_{\mathrm{train}} \approx \bar Y_{\mathrm{val}}\)</span>, its normalized MSE is approximately <span class="math inline">\(1\)</span> by construction.</p>
+<p>This baseline is deliberately weak. It measures whether the LM has extracted any useful scalar information from the prefix beyond the corpus-wide token-id mean.</p>
+</section>
+<section id="sl-ce---ordinary-lm-pretraining-with-scalar-evaluation" class="level4">
+<h4 class="anchored" data-anchor-id="sl-ce---ordinary-lm-pretraining-with-scalar-evaluation">4.2 SL-CE - ordinary LM pretraining with scalar evaluation</h4>
+<p>SL-CE is the vanilla supervised LM objective. It observes the hidden current token id <span class="math inline">\(Z_i\)</span> and minimizes cross-entropy across all autoregressive positions: <span class="math display">\[
+\mathcal{L}_{\mathrm{SL\mbox{-}CE}}(\theta)
+  = -\mathbb{E}_{Z_{1:T}\sim p}
+      \left[
+        \frac{1}{T}\sum_{i=1}^{T}
+        \log q_{\theta,i}(Z_i \mid C_i)
+      \right].
+\]</span> In minibatch form, <span class="math display">\[
+\widehat{\mathcal{L}}_{\mathrm{SL\mbox{-}CE}}
+  = -\frac{1}{N}\sum_{b,i} m_{b,i}
+      \log q_{\theta,i}(Z_i^{(b)} \mid C_i^{(b)}).
+\]</span></p>
+<p>Evaluation still uses only the scalar mean <span class="math display">\[
+\mu_{\theta,i}(C_i)
+  = \sum_{t \in V} q_{\theta,i}(t \mid C_i)\,\varphi(t),
+\]</span> so SL-CE and scalar-only methods are compared in the same target space.</p>
+<p>If <span class="math inline">\(q_\theta(\cdot \mid C)\)</span> converges to the true next-token distribution <span class="math inline">\(p(\cdot \mid C)\)</span>, then <span class="math display">\[
+\mu_\theta(C) \to \sum_t p(t \mid C)\varphi(t) = \mu^\ast(C),
+\]</span> which is Bayes-optimal for scalar MSE. Because token-id normalization is injective on <span class="math inline">\(V\)</span>, CE is strictly stronger supervision than scalar MSE: it tries to recover the full hidden-token distribution, while the scalar metric only cares about one expectation under that distribution.</p>
+</section>
+<section id="sl-lm-mse---direct-softmax-projected-scalar-mse" class="level4">
+<h4 class="anchored" data-anchor-id="sl-lm-mse---direct-softmax-projected-scalar-mse">4.3 SL-LM-MSE - direct softmax-projected scalar MSE</h4>
+<p>SL-LM-MSE does not put CE loss on the hidden token id. It computes the full LM-head distribution, projects it through the label map, and directly minimizes the scalar prediction error: <span class="math display">\[
+\mathcal{L}_{\mathrm{SL\mbox{-}LM\mbox{-}MSE}}(\theta)
+  = \mathbb{E}_{Z_{1:T}\sim p}
+      \left[
+        \frac{1}{T}\sum_{i=1}^{T}
+        \left(
+          \sum_{t \in V} q_{\theta,i}(t \mid C_i)\varphi(t)
+          - Y_i
+        \right)^2
+      \right].
+\]</span> The minibatch estimator is exactly the held-out metric without the validation split: <span class="math display">\[
+\widehat{\mathcal{L}}_{\mathrm{SL\mbox{-}LM\mbox{-}MSE}}
+  = \frac{1}{N}\sum_{b,i} m_{b,i}
+      \bigl(\mu_{\theta,i}(C_i^{(b)}) - Y_i^{(b)}\bigr)^2.
+\]</span></p>
+<p>For one position, let the logits be <span class="math inline">\(a_t\)</span> and <span class="math inline">\(q_t=\mathrm{softmax}(a)_t\)</span>. Since <span class="math display">\[
+\frac{\partial \mu}{\partial a_t}
+  = q_t(\phi_t - \mu),
+\]</span> the logit gradient is <span class="math display">\[
+\frac{\partial}{\partial a_t}(\mu - y)^2
+  = 2(\mu - y)\,q_t(\phi_t - \mu).
+\]</span> Equivalently, <span class="math display">\[
+\nabla_\theta(\mu - y)^2
+  =
+  2(\mu-y)\,
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    (\varphi(S)-\mu)\,
+    \nabla_\theta \log q_\theta(S \mid C)
+  \right].
+\]</span></p>
+<p>This is the clean scalar objective. It exactly targets the evaluation risk, but it is a weaker training signal than CE. Many different token distributions can have the same scalar mean, especially once the label is one-dimensional.</p>
+</section>
+<section id="rl-common-setup---categorical-proposal-over-hidden-tokens" class="level4">
+<h4 class="anchored" data-anchor-id="rl-common-setup---categorical-proposal-over-hidden-tokens">4.4 RL common setup - categorical proposal over hidden tokens</h4>
+<p>For the RL-style methods, the LM head defines a proposal distribution over the hidden current token: <span class="math display">\[
+S_j \sim q_\theta(\cdot \mid C), \qquad j = 1,\dots,R.
+\]</span> A natural scalar-MSE reward for a sampled hidden token is <span class="math display">\[
+r(S_j; y) := -\bigl(\varphi(S_j) - y\bigr)^2.
+\]</span> The exact expected reward under the LM proposal is <span class="math display">\[
+J_{\mathrm{tok}}(\theta; C, y)
+  := \mathbb{E}_{S\sim q_\theta}[r(S;y)]
+  = -\sum_{t \in V} q_t(\phi_t-y)^2.
+\]</span> The negative of this objective is <span class="math display">\[
+-J_{\mathrm{tok}}
+  = \sum_t q_t(\phi_t-y)^2
+  = (\mu-y)^2 + \underbrace{\sum_t q_t(\phi_t-\mu)^2}
+      _{\mathrm{Var}_{S\sim q_\theta}[\varphi(S)]}.
+\]</span></p>
+<p>This identity is the main conceptual distinction from SL-LM-MSE. Sampling a hidden token and rewarding its scalar MSE does not optimize only the MSE of the model-predicted mean. It also penalizes the variance of scalar labels under the model’s proposal distribution. Therefore, its optimum for a fixed observed label is a concentrated distribution over tokens whose labels are near <span class="math inline">\(y\)</span>, not merely any distribution whose mean equals <span class="math inline">\(y\)</span>.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If the intended RL method is supposed to be an unbiased score-function estimator of SL-LM-MSE, the reward cannot simply be <span class="math inline">\(-(\varphi(S)-y)^2\)</span>. One valid score-function identity for maximizing <span class="math inline">\(-(\mu-y)^2\)</span> is <span class="math display">\[
+\nabla_\theta[-(\mu-y)^2]
+  =
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    -2(\mu-y)(\varphi(S)-\mu)\,
+    \nabla_\theta \log q_\theta(S \mid C)
+  \right].
+\]</span> That is a different estimator from the sampled-token-MSE reward described in the rest of this section.</p>
+</div>
+</div>
+</section>
+<section id="rloo---leave-one-out-sampled-token-mse-rewards" class="level4">
+<h4 class="anchored" data-anchor-id="rloo---leave-one-out-sampled-token-mse-rewards">4.5 RLOO - leave-one-out sampled-token MSE rewards</h4>
+<p>For each position, draw <span class="math inline">\(R \ge 2\)</span> iid hidden-token rollouts <span class="math display">\[
+S_1,\dots,S_R \sim q_\theta(\cdot \mid C),
+\]</span> and compute rewards <span class="math display">\[
+r_j := -(\varphi(S_j)-y)^2.
+\]</span> The leave-one-out advantage is <span class="math display">\[
+A_j
+  := r_j - \frac{1}{R-1}\sum_{k\ne j} r_k
+  = \frac{R}{R-1}(r_j-\bar r),
+\qquad
+\bar r := \frac{1}{R}\sum_{k=1}^{R} r_k.
+\]</span> The score-function loss is <span class="math display">\[
+\widehat{\mathcal{L}}_{\mathrm{RLOO}}
+  =
+  -\frac{1}{N R}
+   \sum_{b,i}m_{b,i}\sum_{j=1}^{R}
+   A_{b,i,j}\,
+   \log q_{\theta,i}(S_{b,i,j} \mid C_i^{(b)}),
+\]</span> with <span class="math inline">\(A_{b,i,j}\)</span> detached.</p>
+<p>RLOO is an unbiased estimator of the expected sampled-token reward gradient. Conditioned on peer samples <span class="math inline">\(S_{-j}\)</span>, <span class="math display">\[
+\mathbb{E}_{S_j}
+\left[
+  A_j \nabla_\theta \log q_\theta(S_j \mid C)
+  \,\middle|\, S_{-j}
+\right]
+=
+\mathbb{E}_{S_j}
+\left[
+  r_j \nabla_\theta \log q_\theta(S_j \mid C)
+\right],
+\]</span> because the peer baseline is independent of <span class="math inline">\(S_j\)</span> and <span class="math inline">\(\mathbb{E}_{S_j}\nabla_\theta \log q_\theta(S_j \mid C)=0\)</span>.</p>
+<p>The no-sampling probability limit is obtained by replacing the rollout average with the exact categorical expectation: <span class="math display">\[
+J_{\mathrm{tok}}(\theta; C, y)
+  = \sum_{t \in V} q_t r_t,
+\qquad
+r_t := -(\phi_t-y)^2.
+\]</span> The exact advantage form is <span class="math display">\[
+A_t^\infty := r_t - J_{\mathrm{tok}},
+\]</span> and <span class="math display">\[
+\nabla_\theta J_{\mathrm{tok}}
+  =
+  \sum_{t \in V} q_t A_t^\infty
+  \nabla_\theta \log q_\theta(t \mid C).
+\]</span> Equivalently, the exact differentiable loss is <span class="math display">\[
+\mathcal{L}_{\mathrm{RLOO}}^\infty
+  := -J_{\mathrm{tok}}
+  = \sum_{t \in V} q_t(\phi_t-y)^2
+  = (\mu-y)^2 + \mathrm{Var}_{q_\theta}[\varphi(S)].
+\]</span></p>
+<p>Thus finite-<span class="math inline">\(R\)</span> RLOO estimates the gradient of the exact sampled-token-MSE objective above. It does not estimate the gradient of SL-LM-MSE unless the proposal variance term is zero or deliberately removed by changing the reward.</p>
+</section>
+<section id="grpo---group-standardized-sampled-token-mse-rewards" class="level4">
+<h4 class="anchored" data-anchor-id="grpo---group-standardized-sampled-token-mse-rewards">4.6 GRPO - group-standardized sampled-token MSE rewards</h4>
+<p>GRPO uses the same categorical rollouts and rewards as RLOO, <span class="math display">\[
+S_j \sim q_\theta(\cdot \mid C), \qquad
+r_j = -(\varphi(S_j)-y)^2,
+\]</span> but replaces the leave-one-out advantage with a group-standardized advantage: <span class="math display">\[
+A_j
+  := \frac{r_j-\bar r}{s_r+\epsilon},
+\qquad
+s_r^2 := \frac{1}{R}\sum_{k=1}^{R}(r_k-\bar r)^2.
+\]</span> The score-function loss is <span class="math display">\[
+\widehat{\mathcal{L}}_{\mathrm{GRPO}}
+  =
+  -\frac{1}{N R}
+   \sum_{b,i}m_{b,i}\sum_{j=1}^{R}
+   A_{b,i,j}\,
+   \log q_{\theta,i}(S_{b,i,j}\mid C_i^{(b)}),
+\]</span> again with <span class="math inline">\(A_{b,i,j}\)</span> detached.</p>
+<p>As in corpus-regression, finite-<span class="math inline">\(R\)</span> GRPO is not an unbiased estimator of the plain REINFORCE gradient. The mean and standard deviation are computed from the same group that contains <span class="math inline">\(S_j\)</span>, so the score-function baseline is not cleanly independent of the scored sample.</p>
+<p>In the no-sampling limit, define <span class="math display">\[
+J_{\mathrm{tok}} := \sum_t q_t r_t,
+\qquad
+\sigma_r^2 := \sum_t q_t(r_t-J_{\mathrm{tok}})^2.
+\]</span> Then the limiting standardized advantage is <span class="math display">\[
+A_t^\infty := \frac{r_t-J_{\mathrm{tok}}}{\sigma_r+\epsilon},
+\]</span> and the limiting score-field is <span class="math display">\[
+\sum_t q_t A_t^\infty \nabla_\theta \log q_\theta(t\mid C)
+  =
+  \frac{1}{\sigma_r+\epsilon}
+  \nabla_\theta J_{\mathrm{tok}}
+\]</span> up to the <span class="math inline">\(\epsilon\)</span> stabilization. Therefore, when the reward variance is nonzero, probability-exact GRPO points in the same direction as probability exact RLOO, but rescales the step by the inverse reward standard deviation.</p>
+<p>Implementation detail: the exact GRPO limit should be implemented as a detached score-function surrogate, for example <span class="math display">\[
+\mathcal{L}_{\mathrm{GRPO}}^\infty
+  =
+  -\sum_t q_t\,\mathrm{stopgrad}(A_t^\infty),
+\]</span> or equivalently with detached <span class="math inline">\(q_tA_t^\infty\)</span> multiplying <span class="math inline">\(\log q_t\)</span>. Directly differentiating a fully attached expression involving standardized advantages does not reproduce the sampled GRPO estimator.</p>
+</section>
+<section id="maxrl---discrete-scalar-observation-likelihood" class="level4">
+<h4 class="anchored" data-anchor-id="maxrl---discrete-scalar-observation-likelihood">4.7 MaxRL - discrete scalar-observation likelihood</h4>
+<p>MaxRL needs a nonnegative likelihood-like score for the observed scalar label under each sampled hidden token. A natural choice is a Gaussian observation likelihood in label space: <span class="math display">\[
+\ell_y(t)
+  :=
+  \mathcal{N}\!\left(y;\,\phi_t,\tau^2\right)
+  =
+  \frac{1}{\sqrt{2\pi}\tau}
+  \exp\!\left(-\frac{(\phi_t-y)^2}{2\tau^2}\right),
+\]</span> with supremum <span class="math display">\[
+L := \frac{1}{\sqrt{2\pi}\tau}.
+\]</span> The normalized likelihood is therefore <span class="math display">\[
+\sigma_t(y)
+  := \frac{\ell_y(t)}{L}
+  =
+  \exp\!\left(-\frac{(\phi_t-y)^2}{2\tau^2}\right)
+  \in (0,1].
+\]</span> Here <span class="math inline">\(\tau\)</span> is a label-likelihood temperature, not a rollout standard deviation; the rollout distribution is categorical and comes entirely from the LM head.</p>
+<p>For one context-label pair, define the marginal normalized likelihood under the LM proposal <span class="math display">\[
+\sigma_\theta(C,y)
+  := \mathbb{E}_{S\sim q_\theta(\cdot\mid C)}[\sigma_S(y)]
+  = \sum_{t \in V} q_t\sigma_t(y).
+\]</span> The degree-<span class="math inline">\(M\)</span> MaxRL population objective is the same Maclaurin truncation used in <a href="./gradient-estimator.html">MaxRL gradient estimator details</a>: <span class="math display">\[
+J_M(\theta; C,y)
+  :=
+  -\sum_{k=1}^{M}\frac{(1-\sigma_\theta)^k}{k},
+\qquad
+w_M(\sigma_\theta)
+  :=
+  \sum_{k=0}^{M-1}(1-\sigma_\theta)^k.
+\]</span> Its gradient is <span class="math display">\[
+\nabla_\theta J_M
+  =
+  w_M(\sigma_\theta)
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    \sigma_S(y)\,
+    \nabla_\theta \log q_\theta(S\mid C)
+  \right].
+\]</span> With a baseline, this can also be written <span class="math display">\[
+\nabla_\theta J_M
+  =
+  w_M(\sigma_\theta)
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    \bigl(\sigma_S(y)-\sigma_\theta\bigr)
+    \nabla_\theta \log q_\theta(S\mid C)
+  \right].
+\]</span></p>
+<p>For a sampled degree <span class="math inline">\(M\)</span> estimator, require <span class="math inline">\(1 \le M \le R\)</span>. The sampled estimator draws <span class="math inline">\(R\)</span> hidden tokens <span class="math display">\[
+S_1,\dots,S_R \sim q_\theta(\cdot\mid C),
+\]</span> computes <span class="math display">\[
+\sigma_j := \sigma_{S_j}(y), \qquad a_j := 1-\sigma_j,
+\]</span> and forms the leave-one-out MaxRL weight <span class="math display">\[
+\omega_j
+  :=
+  \sum_{k=0}^{M-1}
+  \frac{
+    e_k\bigl((a_\ell)_{\ell\ne j}\bigr)
+  }{
+    \binom{R-1}{k}
+  },
+\]</span> where <span class="math inline">\(e_k\)</span> is the <span class="math inline">\(k\)</span>-th elementary symmetric polynomial. This is exactly the prefix-suffix dynamic program described in <a href="./gradient-estimator.html">MaxRL gradient estimator details</a>, specialized to a categorical rollout distribution.</p>
+<p>Without baseline subtraction, <span class="math display">\[
+c_j := \omega_j\sigma_j.
+\]</span> With the canonical leave-one-out baseline, <span class="math display">\[
+c_j
+  :=
+  \omega_j
+  \frac{R}{R-1}(\sigma_j-\bar\sigma),
+\qquad
+\bar\sigma := \frac{1}{R}\sum_{k=1}^{R}\sigma_k.
+\]</span> The sampled score-function loss is <span class="math display">\[
+\widehat{\mathcal{L}}_{\mathrm{MaxRL}}
+  =
+  -\frac{1}{N R}
+   \sum_{b,i}m_{b,i}\sum_{j=1}^{R}
+   c_{b,i,j}
+   \log q_{\theta,i}(S_{b,i,j}\mid C_i^{(b)}),
+\]</span> with <span class="math inline">\(c_{b,i,j}\)</span> detached.</p>
+<p>The no-sampling probability limit is straightforward because <span class="math inline">\(V\)</span> is finite: <span class="math display">\[
+\sigma_\theta = \sum_t q_t\sigma_t(y).
+\]</span> For finite degree <span class="math inline">\(M\)</span>, one can directly maximize <span class="math display">\[
+J_M(\theta; C,y)
+  =
+  -\sum_{k=1}^{M}\frac{(1-\sum_t q_t\sigma_t(y))^k}{k}.
+\]</span> Equivalently, the exact score coefficient is <span class="math display">\[
+c_t^\infty
+  =
+  w_M(\sigma_\theta)\bigl(\sigma_t(y)-\sigma_\theta\bigr),
+\]</span> and <span class="math display">\[
+\nabla_\theta J_M
+  =
+  \sum_t q_t c_t^\infty
+  \nabla_\theta \log q_\theta(t\mid C).
+\]</span> As <span class="math inline">\(M\to\infty\)</span>, <span class="math display">\[
+J_\infty(\theta; C,y)
+  =
+  \log \sigma_\theta
+  =
+  \log\sum_t
+  q_t
+  \exp\!\left(-\frac{(\phi_t-y)^2}{2\tau^2}\right).
+\]</span></p>
+<p>There is no Gaussian-convolution identity here like in corpus-regression. The proposal is categorical over hidden tokens, and the likelihood is a scalar observation likelihood attached to each token. MaxRL’s limit is therefore a log expected scalar likelihood, not automatically the MSE of the projected mean.</p>
+<p>The temperature <span class="math inline">\(\tau\)</span> controls what this objective resembles:</p>
+<ul>
+<li><strong>Small <span class="math inline">\(\tau\)</span></strong>. If <span class="math inline">\(\varphi\)</span> is injective and <span class="math inline">\(y=\varphi(z)\)</span>, then <span class="math inline">\(\sigma_z(y)\approx 1\)</span> and <span class="math inline">\(\sigma_t(y)\approx 0\)</span> for <span class="math inline">\(t\ne z\)</span> when <span class="math inline">\(\tau\)</span> is much smaller than the token-label spacing. Then <span class="math inline">\(J_\infty \approx \log q_\theta(z\mid C)\)</span>, so MaxRL becomes CE-like. If <span class="math inline">\(\varphi\)</span> is non-injective, it instead maximizes the total probability of tokens sharing the observed label.</li>
+<li><strong>Large <span class="math inline">\(\tau\)</span></strong>. Let <span class="math inline">\(E_t=(\phi_t-y)^2\)</span> and <span class="math inline">\(\alpha=(2\tau^2)^{-1}\)</span>. Then <span class="math display">\[
+\log\mathbb{E}_{t\sim q}\exp(-\alpha E_t)
+=
+-\alpha\,\mathbb{E}_{t\sim q}[E_t]
++ \frac{\alpha^2}{2}\mathrm{Var}_{t\sim q}(E_t)
++ O(\alpha^3).
+\]</span> To first order, maximizing MaxRL is equivalent to minimizing <span class="math inline">\(\sum_t q_t(\phi_t-y)^2\)</span>, the same expected sampled-token MSE targeted by RLOO.</li>
+</ul>
+</section>
+</section>
+<section id="limit-behaviour-summary" class="level2">
+<h2 class="anchored" data-anchor-id="limit-behaviour-summary">Limit-behaviour summary</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The exact softmax limit separates the methods cleanly:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Exact no-sampling target</th>
+<th>Relationship to eval MSE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>SL-CE</td>
+<td><span class="math inline">\(\mathbb{E}_{p}[-\log q_\theta(Z_i\mid C_i)]\)</span></td>
+<td>Stronger full-token supervision; Bayes-optimal scalar mean if <span class="math inline">\(q_\theta\to p\)</span></td>
+</tr>
+<tr class="even">
+<td>SL-LM-MSE</td>
+<td><span class="math inline">\((\sum_t q_t\phi_t-y)^2\)</span></td>
+<td>Exactly the scalar evaluation loss</td>
+</tr>
+<tr class="odd">
+<td>RLOO</td>
+<td><span class="math inline">\(\sum_t q_t(\phi_t-y)^2\)</span></td>
+<td>Eval loss plus <span class="math inline">\(\mathrm{Var}_{q_\theta}[\phi(S)]\)</span></td>
+</tr>
+<tr class="even">
+<td>GRPO</td>
+<td>Whitened score field for RLOO target</td>
+<td>Same limiting direction as RLOO, scaled by reward std</td>
+</tr>
+<tr class="odd">
+<td>MaxRL</td>
+<td><span class="math inline">\(\log\sum_t q_t\exp(-(\phi_t-y)^2/(2\tau^2))\)</span></td>
+<td>CE-like for small <span class="math inline">\(\tau\)</span>; RLOO-like to first order for large <span class="math inline">\(\tau\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>The main practical implication is that SL-LM-MSE is the only scalar-only method above that exactly optimizes the evaluation metric as written. The sampled-token RL methods are still meaningful, but they answer a slightly different question: how much probability mass does the LM proposal put on hidden tokens whose scalar labels are compatible with the observed scalar label?</p>
+</section>
+<section id="implementation-notes" class="level2">
+<h2 class="anchored" data-anchor-id="implementation-notes">Implementation notes</h2>
+<ol type="1">
+<li>Compute logits with the standard causal shift over all 128 positions. The logits at context position <span class="math inline">\(i-1\)</span> predict <span class="math inline">\(Z_i\)</span>.</li>
+<li>Keep the native <code>lm_head</code> for every method. Do not replace it with a scalar regression head.</li>
+<li>Build a label vector <span class="math inline">\(\phi \in \mathbb{R}^{|V|}\)</span> once and keep it on the active device. The projected scalar mean is <code>softmax(logits.float()) @ phi</code>.</li>
+<li>For exact probability-limit RL variants, preserve the score-function gradient when using advantages. In particular, detach advantages in the probability-exact GRPO and MaxRL score surrogates.</li>
+<li>Full <code>[batch, position, vocab]</code> probability tensors can be large. The exact variants may need vocab or position chunking, even though the mathematical formulation is just a finite sum over <span class="math inline">\(V\)</span>.</li>
+<li>Use the empirical-mean baseline variance for normalized MSE, but report raw MSE as well. The normalization is helpful for comparison, while raw MSE avoids hiding changes in label scaling.</li>
+</ol>
+</section>
+<section id="open-choices-before-implementation" class="level2">
+<h2 class="anchored" data-anchor-id="open-choices-before-implementation">Open choices before implementation</h2>
+<ul>
+<li>Confirm that scalar-only methods still receive teacher-forced token prefixes. If not, the experiment is no longer standard LM pretraining.</li>
+<li>Fix the exact token-id normalization, either <span class="math inline">\(t/(|V|-1)\)</span> for exact <span class="math inline">\([0,1]\)</span> endpoints or the existing corpus-regression convention <span class="math inline">\(t/|V|\)</span>.</li>
+<li>Choose the MaxRL label-likelihood temperature <span class="math inline">\(\tau\)</span>. This is not a harmless constant: it determines whether MaxRL behaves more like CE or more like sampled-token MSE.</li>
+<li>Decide whether the primary RL comparison should use sampled-token-MSE rewards or the alternative score-function estimator that is unbiased for SL-LM-MSE itself.</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

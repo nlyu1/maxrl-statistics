@@ -1,0 +1,707 @@
+---
+title: "Scalar-pretrain"
+---
+
+The scalar-pretrain setup keeps the architecture of ordinary causal language
+model pretraining, including the native `lm_head`, but changes what supervision
+is allowed to see. The underlying corpus token at each position is treated as a
+hidden categorical state. The observed target is only a scalar label attached to
+that token, currently the token id normalized to $[0, 1]$.
+
+### TL; DR
+
+::: {.callout-note}
+All methods train a full LM from scratch and evaluate the same scalar prediction
+metric over all $T = 128$ autoregressive positions. SL-CE observes the hidden
+token ids and is the usual LM-pretraining upper reference. SL-LM-MSE does not
+train on token ids; it directly optimizes the MSE of the softmax-projected
+scalar mean. RLOO and GRPO, if they reward sampled hidden tokens by their scalar
+MSE, optimize the expected sampled-token MSE, which differs from the evaluation
+MSE by an extra model-variance term. Discrete MaxRL optimizes a log expected
+scalar likelihood under the LM proposal; with a small label-likelihood
+temperature it becomes CE-like, while with a large temperature it approaches the
+same expected sampled-token MSE as RLOO.
+:::
+
+## Problem setup
+
+Fix a corpus distribution $p$ over token sequences and a tokenizer vocabulary
+$V$. In the canonical scalar-pretrain setting, each training row is a length
+$T = 128$ token sequence
+$$
+Z_{1:T} \sim p,
+$$
+with a beginning-of-sequence token available as context for the first position.
+At autoregressive position $i$, define
+$$
+C_i := (Z_0, Z_1, \dots, Z_{i-1}), \qquad Z_0 := \mathrm{BOS},
+$$
+so the model predicts the hidden current token $Z_i$ from its teacher-forced
+prefix $C_i$. This gives $T$ supervised positions per row, not only the final
+position.
+
+The observed scalar label is a deterministic map
+$$
+\varphi : V \to [0, 1].
+$$
+For the current token-id label,
+$$
+Y_i := \varphi(Z_i), \qquad
+\varphi(t) := \frac{t}{|V|}
+$$
+
+Every method uses the same causal transformer and the same native LM head. Let
+the logits at position $i$ be
+$$
+a_{\theta, i}(t) \in \mathbb{R}, \qquad t \in V,
+$$
+and let the LM-head induced categorical distribution be
+$$
+q_{\theta, i}(t \mid C_i)
+  := \frac{\exp a_{\theta, i}(t)}
+          {\sum_{u \in V} \exp a_{\theta, i}(u)}.
+$$
+The scalar prediction used for evaluation is the softmax-projected mean
+$$
+\mu_{\theta, i}(C_i)
+  := \mathbb{E}_{t \sim q_{\theta, i}(\cdot \mid C_i)}[\varphi(t)]
+  = \sum_{t \in V} q_{\theta, i}(t \mid C_i)\,\varphi(t).
+$$
+
+<!-- ::: {.callout-warning}
+This formulation assumes standard teacher forcing: the prefix tokens
+$Z_{<i}$ are fed to the LM as inputs, while the current token identity $Z_i$ is
+withheld from the scalar-only losses. If the intended setting is instead that
+all tokens, including prefixes, are unobserved and only scalar labels are
+available, then the problem becomes a latent sequential filtering problem rather
+than ordinary causal LM pretraining. The method definitions below would need a
+different state posterior over prefixes.
+::: -->
+
+## Canonical recipe
+
+This is the proposed recipe, mirroring corpus-regression but changing the head
+and the supervised positions.
+
+| Knob | Proposed value |
+|---|---|
+| Backbone | Causal LM trained from scratch |
+| Prediction head | Native `lm_head` for every method |
+| Sequence length $T$ | 128 autoregressive target positions |
+| Label | `token_id` normalized to $[0,1]$ |
+| Scalar dimension | $D_y = 1$ |
+| Training contexts | Teacher-forced token prefixes $C_i = Z_{<i}$ |
+| Evaluation prediction | $\mu_{\theta,i} = \sum_t q_{\theta,i}(t)\varphi(t)$ |
+| Main evaluation metric | MSE of $\mu_{\theta,i}$ against $Y_i$ |
+| Normalization | MSE divided by empirical-mean baseline variance |
+| Sampling methods | RLOO, GRPO, MaxRL with categorical LM proposal |
+| Exact-limit variants | Replace rollout averages by full softmax sums over $V$ |
+
+## Optimization problem and evaluation metric
+
+### Population scalar objective
+
+The evaluation target is the conditional expectation of the scalar label,
+$$
+\mu_i^\ast(C_i)
+  := \mathbb{E}_{Z_i \sim p(\cdot \mid C_i)}[\varphi(Z_i)]
+  = \sum_{t \in V} p(t \mid C_i)\,\varphi(t).
+$$
+The scalar MSE risk of a model is
+$$
+\mathcal{E}_{\mathrm{mean}}(\theta)
+  := \mathbb{E}_{Z_{1:T} \sim p}
+      \left[
+        \frac{1}{T}\sum_{i=1}^{T}
+        \bigl(\mu_{\theta,i}(C_i) - Y_i\bigr)^2
+      \right].
+$$
+Conditioning on a prefix $C_i$, this decomposes as
+$$
+\mathbb{E}\!\left[
+  \bigl(\mu_{\theta,i}(C_i) - Y_i\bigr)^2
+  \,\middle|\, C_i
+\right]
+=
+\bigl(\mu_{\theta,i}(C_i) - \mu_i^\ast(C_i)\bigr)^2
++ \mathrm{Var}\!\left(Y_i \mid C_i\right).
+$$
+Thus the Bayes-optimal scalar predictor is $\mu_i^\ast$, and the irreducible
+Bayes lower bound is
+$$
+\mathbb{E}_{C_i}\,\mathrm{Var}(Y_i \mid C_i).
+$$
+The loss generally will not go to zero because the same prefix can lead to many
+next-token labels.
+
+### Held-out metric
+
+For a validation batch with mask $m_{b,i} \in \{0,1\}$ and
+$N = \sum_{b,i} m_{b,i}$ valid positions, use
+$$
+\widehat{\mathrm{MSE}}
+  = \frac{1}{N}
+    \sum_{b,i} m_{b,i}
+    \bigl(\mu_{\theta,i}(C_i^{(b)}) - Y_i^{(b)}\bigr)^2.
+$$
+For scalar labels $D_y = 1$. If this is later generalized to vector labels,
+the natural extension is to average the squared error over both positions and
+label dimensions.
+
+The normalized metric should be
+$$
+\widehat{\mathrm{NMSE}}
+  := \frac{\widehat{\mathrm{MSE}}}{\widehat{\mathcal{V}}_{\mathrm{mean}}},
+\qquad
+\widehat{\mathcal{V}}_{\mathrm{mean}}
+  := \frac{1}{N}\sum_{b,i} m_{b,i}
+       \bigl(Y_i^{(b)} - \bar Y\bigr)^2,
+$$
+where
+$$
+\bar Y := \frac{1}{N}\sum_{b,i} m_{b,i}Y_i^{(b)}.
+$$
+The denominator is exactly the held-out MSE of the constant empirical-mean
+predictor, so that the mean baseline has normalized MSE $1$.
+
+<!-- ::: {.callout-warning}
+The empirical-mean denominator is a marginal label variance, not the conditional
+Bayes intrinsic variance
+$\mathbb{E}_{C_i}\mathrm{Var}(Y_i \mid C_i)$. It is still a useful
+normalization because it makes the trivial baseline equal to $1$, but it should
+not be described as the irreducible optimum unless the prefix carries no
+information about the label.
+::: -->
+
+## Methods
+
+The methods differ only in the training signal attached to the shared LM-head
+distribution $q_{\theta,i}(\cdot \mid C_i)$. In the formulas below, suppress
+batch and position indices and write
+$$
+q_t := q_\theta(t \mid C), \qquad
+\phi_t := \varphi(t), \qquad
+y := \varphi(z), \qquad
+\mu_\theta(C) := \sum_{t \in V} q_t \phi_t.
+$$
+
+#### 4.1 Mean baseline - inference-only normalization
+
+The constant baseline predicts
+$$
+\mu_0(C_i) := \bar Y_{\mathrm{train}}
+$$
+at every position. It does not train an LM and does not use the prefix. On the
+validation split, if $\bar Y_{\mathrm{train}} \approx \bar Y_{\mathrm{val}}$,
+its normalized MSE is approximately $1$ by construction.
+
+This baseline is deliberately weak. It measures whether the LM has extracted
+any useful scalar information from the prefix beyond the corpus-wide token-id
+mean.
+
+#### 4.2 SL-CE - ordinary LM pretraining with scalar evaluation
+
+SL-CE is the vanilla supervised LM objective. It observes the hidden current
+token id $Z_i$ and minimizes cross-entropy across all autoregressive positions:
+$$
+\mathcal{L}_{\mathrm{SL\mbox{-}CE}}(\theta)
+  = -\mathbb{E}_{Z_{1:T}\sim p}
+      \left[
+        \frac{1}{T}\sum_{i=1}^{T}
+        \log q_{\theta,i}(Z_i \mid C_i)
+      \right].
+$$
+In minibatch form,
+$$
+\widehat{\mathcal{L}}_{\mathrm{SL\mbox{-}CE}}
+  = -\frac{1}{N}\sum_{b,i} m_{b,i}
+      \log q_{\theta,i}(Z_i^{(b)} \mid C_i^{(b)}).
+$$
+
+Evaluation still uses only the scalar mean
+$$
+\mu_{\theta,i}(C_i)
+  = \sum_{t \in V} q_{\theta,i}(t \mid C_i)\,\varphi(t),
+$$
+so SL-CE and scalar-only methods are compared in the same target space.
+
+If $q_\theta(\cdot \mid C)$ converges to the true next-token distribution
+$p(\cdot \mid C)$, then
+$$
+\mu_\theta(C) \to \sum_t p(t \mid C)\varphi(t) = \mu^\ast(C),
+$$
+which is Bayes-optimal for scalar MSE. Because token-id normalization is
+injective on $V$, CE is strictly stronger supervision than scalar MSE: it tries
+to recover the full hidden-token distribution, while the scalar metric only
+cares about one expectation under that distribution.
+
+#### 4.3 SL-LM-MSE - direct softmax-projected scalar MSE
+
+SL-LM-MSE does not put CE loss on the hidden token id. It computes the full
+LM-head distribution, projects it through the label map, and directly minimizes
+the scalar prediction error:
+$$
+\mathcal{L}_{\mathrm{SL\mbox{-}LM\mbox{-}MSE}}(\theta)
+  = \mathbb{E}_{Z_{1:T}\sim p}
+      \left[
+        \frac{1}{T}\sum_{i=1}^{T}
+        \left(
+          \sum_{t \in V} q_{\theta,i}(t \mid C_i)\varphi(t)
+          - Y_i
+        \right)^2
+      \right].
+$$
+The minibatch estimator is exactly the held-out metric without the validation
+split:
+$$
+\widehat{\mathcal{L}}_{\mathrm{SL\mbox{-}LM\mbox{-}MSE}}
+  = \frac{1}{N}\sum_{b,i} m_{b,i}
+      \bigl(\mu_{\theta,i}(C_i^{(b)}) - Y_i^{(b)}\bigr)^2.
+$$
+
+For one position, let the logits be $a_t$ and $q_t=\mathrm{softmax}(a)_t$.
+Since
+$$
+\frac{\partial \mu}{\partial a_t}
+  = q_t(\phi_t - \mu),
+$$
+the logit gradient is
+$$
+\frac{\partial}{\partial a_t}(\mu - y)^2
+  = 2(\mu - y)\,q_t(\phi_t - \mu).
+$$
+Equivalently,
+$$
+\nabla_\theta(\mu - y)^2
+  =
+  2(\mu-y)\,
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    (\varphi(S)-\mu)\,
+    \nabla_\theta \log q_\theta(S \mid C)
+  \right].
+$$
+
+This is the clean scalar objective. It exactly targets the evaluation risk, but
+it is a weaker training signal than CE. Many different token distributions can
+have the same scalar mean, especially once the label is one-dimensional.
+
+#### 4.4 RL common setup - categorical proposal over hidden tokens
+
+For the RL-style methods, the LM head defines a proposal distribution over the
+hidden current token:
+$$
+S_j \sim q_\theta(\cdot \mid C), \qquad j = 1,\dots,R.
+$$
+A natural scalar-MSE reward for a sampled hidden token is
+$$
+r(S_j; y) := -\bigl(\varphi(S_j) - y\bigr)^2.
+$$
+The exact expected reward under the LM proposal is
+$$
+J_{\mathrm{tok}}(\theta; C, y)
+  := \mathbb{E}_{S\sim q_\theta}[r(S;y)]
+  = -\sum_{t \in V} q_t(\phi_t-y)^2.
+$$
+The negative of this objective is
+$$
+-J_{\mathrm{tok}}
+  = \sum_t q_t(\phi_t-y)^2
+  = (\mu-y)^2 + \underbrace{\sum_t q_t(\phi_t-\mu)^2}
+      _{\mathrm{Var}_{S\sim q_\theta}[\varphi(S)]}.
+$$
+
+This identity is the main conceptual distinction from SL-LM-MSE. Sampling a
+hidden token and rewarding its scalar MSE does not optimize only the MSE of the
+model-predicted mean. It also penalizes the variance of scalar labels under the
+model's proposal distribution. Therefore, its optimum for a fixed observed
+label is a concentrated distribution over tokens whose labels are near $y$,
+not merely any distribution whose mean equals $y$.
+
+::: {.callout-warning}
+If the intended RL method is supposed to be an unbiased score-function
+estimator of SL-LM-MSE, the reward cannot simply be
+$-(\varphi(S)-y)^2$. One valid score-function identity for maximizing
+$-(\mu-y)^2$ is
+$$
+\nabla_\theta[-(\mu-y)^2]
+  =
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    -2(\mu-y)(\varphi(S)-\mu)\,
+    \nabla_\theta \log q_\theta(S \mid C)
+  \right].
+$$
+That is a different estimator from the sampled-token-MSE reward described in
+the rest of this section.
+:::
+
+#### 4.5 RLOO - leave-one-out sampled-token MSE rewards
+
+For each position, draw $R \ge 2$ iid hidden-token rollouts
+$$
+S_1,\dots,S_R \sim q_\theta(\cdot \mid C),
+$$
+and compute rewards
+$$
+r_j := -(\varphi(S_j)-y)^2.
+$$
+The leave-one-out advantage is
+$$
+A_j
+  := r_j - \frac{1}{R-1}\sum_{k\ne j} r_k
+  = \frac{R}{R-1}(r_j-\bar r),
+\qquad
+\bar r := \frac{1}{R}\sum_{k=1}^{R} r_k.
+$$
+The score-function loss is
+$$
+\widehat{\mathcal{L}}_{\mathrm{RLOO}}
+  =
+  -\frac{1}{N R}
+   \sum_{b,i}m_{b,i}\sum_{j=1}^{R}
+   A_{b,i,j}\,
+   \log q_{\theta,i}(S_{b,i,j} \mid C_i^{(b)}),
+$$
+with $A_{b,i,j}$ detached.
+
+RLOO is an unbiased estimator of the expected sampled-token reward gradient.
+Conditioned on peer samples $S_{-j}$,
+$$
+\mathbb{E}_{S_j}
+\left[
+  A_j \nabla_\theta \log q_\theta(S_j \mid C)
+  \,\middle|\, S_{-j}
+\right]
+=
+\mathbb{E}_{S_j}
+\left[
+  r_j \nabla_\theta \log q_\theta(S_j \mid C)
+\right],
+$$
+because the peer baseline is independent of $S_j$ and
+$\mathbb{E}_{S_j}\nabla_\theta \log q_\theta(S_j \mid C)=0$.
+
+The no-sampling probability limit is obtained by replacing the rollout average
+with the exact categorical expectation:
+$$
+J_{\mathrm{tok}}(\theta; C, y)
+  = \sum_{t \in V} q_t r_t,
+\qquad
+r_t := -(\phi_t-y)^2.
+$$
+The exact advantage form is
+$$
+A_t^\infty := r_t - J_{\mathrm{tok}},
+$$
+and
+$$
+\nabla_\theta J_{\mathrm{tok}}
+  =
+  \sum_{t \in V} q_t A_t^\infty
+  \nabla_\theta \log q_\theta(t \mid C).
+$$
+Equivalently, the exact differentiable loss is
+$$
+\mathcal{L}_{\mathrm{RLOO}}^\infty
+  := -J_{\mathrm{tok}}
+  = \sum_{t \in V} q_t(\phi_t-y)^2
+  = (\mu-y)^2 + \mathrm{Var}_{q_\theta}[\varphi(S)].
+$$
+
+Thus finite-$R$ RLOO estimates the gradient of the exact sampled-token-MSE
+objective above. It does not estimate the gradient of SL-LM-MSE unless the
+proposal variance term is zero or deliberately removed by changing the reward.
+
+#### 4.6 GRPO - group-standardized sampled-token MSE rewards
+
+GRPO uses the same categorical rollouts and rewards as RLOO,
+$$
+S_j \sim q_\theta(\cdot \mid C), \qquad
+r_j = -(\varphi(S_j)-y)^2,
+$$
+but replaces the leave-one-out advantage with a group-standardized advantage:
+$$
+A_j
+  := \frac{r_j-\bar r}{s_r+\epsilon},
+\qquad
+s_r^2 := \frac{1}{R}\sum_{k=1}^{R}(r_k-\bar r)^2.
+$$
+The score-function loss is
+$$
+\widehat{\mathcal{L}}_{\mathrm{GRPO}}
+  =
+  -\frac{1}{N R}
+   \sum_{b,i}m_{b,i}\sum_{j=1}^{R}
+   A_{b,i,j}\,
+   \log q_{\theta,i}(S_{b,i,j}\mid C_i^{(b)}),
+$$
+again with $A_{b,i,j}$ detached.
+
+As in corpus-regression, finite-$R$ GRPO is not an unbiased estimator of the
+plain REINFORCE gradient. The mean and standard deviation are computed from the
+same group that contains $S_j$, so the score-function baseline is not cleanly
+independent of the scored sample.
+
+In the no-sampling limit, define
+$$
+J_{\mathrm{tok}} := \sum_t q_t r_t,
+\qquad
+\sigma_r^2 := \sum_t q_t(r_t-J_{\mathrm{tok}})^2.
+$$
+Then the limiting standardized advantage is
+$$
+A_t^\infty := \frac{r_t-J_{\mathrm{tok}}}{\sigma_r+\epsilon},
+$$
+and the limiting score-field is
+$$
+\sum_t q_t A_t^\infty \nabla_\theta \log q_\theta(t\mid C)
+  =
+  \frac{1}{\sigma_r+\epsilon}
+  \nabla_\theta J_{\mathrm{tok}}
+$$
+up to the $\epsilon$ stabilization. Therefore, when the reward variance is
+nonzero, probability-exact GRPO points in the same direction as probability
+exact RLOO, but rescales the step by the inverse reward standard deviation.
+
+Implementation detail: the exact GRPO limit should be implemented as a detached
+score-function surrogate, for example
+$$
+\mathcal{L}_{\mathrm{GRPO}}^\infty
+  =
+  -\sum_t q_t\,\mathrm{stopgrad}(A_t^\infty),
+$$
+or equivalently with detached $q_tA_t^\infty$ multiplying $\log q_t$. Directly
+differentiating a fully attached expression involving standardized advantages
+does not reproduce the sampled GRPO estimator.
+
+#### 4.7 MaxRL - discrete scalar-observation likelihood
+
+MaxRL needs a nonnegative likelihood-like score for the observed scalar label
+under each sampled hidden token. A natural choice is a Gaussian observation
+likelihood in label space:
+$$
+\ell_y(t)
+  :=
+  \mathcal{N}\!\left(y;\,\phi_t,\tau^2\right)
+  =
+  \frac{1}{\sqrt{2\pi}\tau}
+  \exp\!\left(-\frac{(\phi_t-y)^2}{2\tau^2}\right),
+$$
+with supremum
+$$
+L := \frac{1}{\sqrt{2\pi}\tau}.
+$$
+The normalized likelihood is therefore
+$$
+\sigma_t(y)
+  := \frac{\ell_y(t)}{L}
+  =
+  \exp\!\left(-\frac{(\phi_t-y)^2}{2\tau^2}\right)
+  \in (0,1].
+$$
+Here $\tau$ is a label-likelihood temperature, not a rollout standard
+deviation; the rollout distribution is categorical and comes entirely from the
+LM head.
+
+For one context-label pair, define the marginal normalized likelihood under the
+LM proposal
+$$
+\sigma_\theta(C,y)
+  := \mathbb{E}_{S\sim q_\theta(\cdot\mid C)}[\sigma_S(y)]
+  = \sum_{t \in V} q_t\sigma_t(y).
+$$
+The degree-$M$ MaxRL population objective is the same Maclaurin truncation used
+in [MaxRL gradient estimator details](gradient-estimator.qmd):
+$$
+J_M(\theta; C,y)
+  :=
+  -\sum_{k=1}^{M}\frac{(1-\sigma_\theta)^k}{k},
+\qquad
+w_M(\sigma_\theta)
+  :=
+  \sum_{k=0}^{M-1}(1-\sigma_\theta)^k.
+$$
+Its gradient is
+$$
+\nabla_\theta J_M
+  =
+  w_M(\sigma_\theta)
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    \sigma_S(y)\,
+    \nabla_\theta \log q_\theta(S\mid C)
+  \right].
+$$
+With a baseline, this can also be written
+$$
+\nabla_\theta J_M
+  =
+  w_M(\sigma_\theta)
+  \mathbb{E}_{S\sim q_\theta}
+  \left[
+    \bigl(\sigma_S(y)-\sigma_\theta\bigr)
+    \nabla_\theta \log q_\theta(S\mid C)
+  \right].
+$$
+
+For a sampled degree $M$ estimator, require $1 \le M \le R$. The sampled
+estimator draws $R$ hidden tokens
+$$
+S_1,\dots,S_R \sim q_\theta(\cdot\mid C),
+$$
+computes
+$$
+\sigma_j := \sigma_{S_j}(y), \qquad a_j := 1-\sigma_j,
+$$
+and forms the leave-one-out MaxRL weight
+$$
+\omega_j
+  :=
+  \sum_{k=0}^{M-1}
+  \frac{
+    e_k\bigl((a_\ell)_{\ell\ne j}\bigr)
+  }{
+    \binom{R-1}{k}
+  },
+$$
+where $e_k$ is the $k$-th elementary symmetric polynomial. This is exactly the
+prefix-suffix dynamic program described in
+[MaxRL gradient estimator details](gradient-estimator.qmd), specialized to a
+categorical rollout distribution.
+
+Without baseline subtraction,
+$$
+c_j := \omega_j\sigma_j.
+$$
+With the canonical leave-one-out baseline,
+$$
+c_j
+  :=
+  \omega_j
+  \frac{R}{R-1}(\sigma_j-\bar\sigma),
+\qquad
+\bar\sigma := \frac{1}{R}\sum_{k=1}^{R}\sigma_k.
+$$
+The sampled score-function loss is
+$$
+\widehat{\mathcal{L}}_{\mathrm{MaxRL}}
+  =
+  -\frac{1}{N R}
+   \sum_{b,i}m_{b,i}\sum_{j=1}^{R}
+   c_{b,i,j}
+   \log q_{\theta,i}(S_{b,i,j}\mid C_i^{(b)}),
+$$
+with $c_{b,i,j}$ detached.
+
+The no-sampling probability limit is straightforward because $V$ is finite:
+$$
+\sigma_\theta = \sum_t q_t\sigma_t(y).
+$$
+For finite degree $M$, one can directly maximize
+$$
+J_M(\theta; C,y)
+  =
+  -\sum_{k=1}^{M}\frac{(1-\sum_t q_t\sigma_t(y))^k}{k}.
+$$
+Equivalently, the exact score coefficient is
+$$
+c_t^\infty
+  =
+  w_M(\sigma_\theta)\bigl(\sigma_t(y)-\sigma_\theta\bigr),
+$$
+and
+$$
+\nabla_\theta J_M
+  =
+  \sum_t q_t c_t^\infty
+  \nabla_\theta \log q_\theta(t\mid C).
+$$
+As $M\to\infty$,
+$$
+J_\infty(\theta; C,y)
+  =
+  \log \sigma_\theta
+  =
+  \log\sum_t
+  q_t
+  \exp\!\left(-\frac{(\phi_t-y)^2}{2\tau^2}\right).
+$$
+
+There is no Gaussian-convolution identity here like in corpus-regression. The
+proposal is categorical over hidden tokens, and the likelihood is a scalar
+observation likelihood attached to each token. MaxRL's limit is therefore a
+log expected scalar likelihood, not automatically the MSE of the projected
+mean.
+
+The temperature $\tau$ controls what this objective resembles:
+
+- **Small $\tau$**. If $\varphi$ is injective and $y=\varphi(z)$, then
+  $\sigma_z(y)\approx 1$ and $\sigma_t(y)\approx 0$ for $t\ne z$ when $\tau$
+  is much smaller than the token-label spacing. Then
+  $J_\infty \approx \log q_\theta(z\mid C)$, so MaxRL becomes CE-like. If
+  $\varphi$ is non-injective, it instead maximizes the total probability of
+  tokens sharing the observed label.
+- **Large $\tau$**. Let $E_t=(\phi_t-y)^2$ and
+  $\alpha=(2\tau^2)^{-1}$. Then
+  $$
+  \log\mathbb{E}_{t\sim q}\exp(-\alpha E_t)
+  =
+  -\alpha\,\mathbb{E}_{t\sim q}[E_t]
+  + \frac{\alpha^2}{2}\mathrm{Var}_{t\sim q}(E_t)
+  + O(\alpha^3).
+  $$
+  To first order, maximizing MaxRL is equivalent to minimizing
+  $\sum_t q_t(\phi_t-y)^2$, the same expected sampled-token MSE targeted by
+  RLOO.
+
+## Limit-behaviour summary
+
+::: {.callout-note}
+The exact softmax limit separates the methods cleanly:
+
+| Method | Exact no-sampling target | Relationship to eval MSE |
+|---|---|---|
+| SL-CE | $\mathbb{E}_{p}[-\log q_\theta(Z_i\mid C_i)]$ | Stronger full-token supervision; Bayes-optimal scalar mean if $q_\theta\to p$ |
+| SL-LM-MSE | $(\sum_t q_t\phi_t-y)^2$ | Exactly the scalar evaluation loss |
+| RLOO | $\sum_t q_t(\phi_t-y)^2$ | Eval loss plus $\mathrm{Var}_{q_\theta}[\phi(S)]$ |
+| GRPO | Whitened score field for RLOO target | Same limiting direction as RLOO, scaled by reward std |
+| MaxRL | $\log\sum_t q_t\exp(-(\phi_t-y)^2/(2\tau^2))$ | CE-like for small $\tau$; RLOO-like to first order for large $\tau$ |
+:::
+
+The main practical implication is that SL-LM-MSE is the only scalar-only method
+above that exactly optimizes the evaluation metric as written. The sampled-token
+RL methods are still meaningful, but they answer a slightly different question:
+how much probability mass does the LM proposal put on hidden tokens whose scalar
+labels are compatible with the observed scalar label?
+
+## Implementation notes
+
+1. Compute logits with the standard causal shift over all 128 positions. The
+   logits at context position $i-1$ predict $Z_i$.
+2. Keep the native `lm_head` for every method. Do not replace it with a scalar
+   regression head.
+3. Build a label vector $\phi \in \mathbb{R}^{|V|}$ once and keep it on the
+   active device. The projected scalar mean is `softmax(logits.float()) @ phi`.
+4. For exact probability-limit RL variants, preserve the score-function
+   gradient when using advantages. In particular, detach advantages in the
+   probability-exact GRPO and MaxRL score surrogates.
+5. Full `[batch, position, vocab]` probability tensors can be large. The exact
+   variants may need vocab or position chunking, even though the mathematical
+   formulation is just a finite sum over $V$.
+6. Use the empirical-mean baseline variance for normalized MSE, but report raw
+   MSE as well. The normalization is helpful for comparison, while raw MSE
+   avoids hiding changes in label scaling.
+
+## Open choices before implementation
+
+- Confirm that scalar-only methods still receive teacher-forced token prefixes.
+  If not, the experiment is no longer standard LM pretraining.
+- Fix the exact token-id normalization, either $t/(|V|-1)$ for exact $[0,1]$
+  endpoints or the existing corpus-regression convention $t/|V|$.
+- Choose the MaxRL label-likelihood temperature $\tau$. This is not a harmless
+  constant: it determines whether MaxRL behaves more like CE or more like
+  sampled-token MSE.
+- Decide whether the primary RL comparison should use sampled-token-MSE rewards
+  or the alternative score-function estimator that is unbiased for
+  SL-LM-MSE itself.
