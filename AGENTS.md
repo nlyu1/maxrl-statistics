@@ -25,5 +25,7 @@ Use polars, not pandas.
 
 Before adding code for new functionality, especially if we're bootstrapping from similar code of implemented functionalities, if we're adding things to the shared library, make sure to check for duplicates and code which can be reused.
 
+Minimal code / markdown comments. Strongly prefer self-explanatory code over verbose code with comments.
+
 ## Testing Guidelines
 This is a research repo, so snippet validation is the default. Use focused `uv run python -c ...` checks to validate imports, shapes, and control flow. If you add tests, place them in `tests/` and name files `test_<feature>.py`.
