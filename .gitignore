@@ -25,3 +25,4 @@ CLAUDE.md
 writeup/assets/
 **.bak
 nogit**
+*.parquet
