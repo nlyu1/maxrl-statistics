@@ -18,6 +18,8 @@ website:
         text: Corpus Regression (WIP)
       - href: scalar-pretrain.qmd
         text: Scalar Pretrain (WIP)
+      - href: code_regression.qmd
+        text: Code Regression (WIP)
       - href: dag-reasoning.qmd
         text: DAG Reasoning (Empty)
 

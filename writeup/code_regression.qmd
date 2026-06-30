@@ -1,0 +1,413 @@
+---
+title: "Code Regression"
+---
+
+The code-regression setup asks whether we can predict execution-memory
+statistics from source code. Our current slice takes the CDSS rows from the
+[Code-Regression dataset](https://huggingface.co/datasets/akhauriyash/Code-Regression)
+and predicts the memory target from the submitted program text. The broader
+dataset and RegressLM baseline are described in
+[Regression Language Models for Code](https://arxiv.org/abs/2509.26476); our
+current model family uses [T5Gemma](https://huggingface.co/google/t5gemma-s-s-prefixlm)
+encoders and compares supervised regression with rollout-based MaxRL methods
+from [Maximum Likelihood Reinforcement Learning](https://arxiv.org/abs/2602.02710).
+
+### TL; DR
+
+::: {.callout-note}
+The task is scalar CDSS memory prediction from code. We keep two target variants:
+raw `memory_bytes` and a per-language quantile-normalized memory score. The CE
+pretraining route is a RegressLM-style text-to-number language model: a
+T5Gemma encoder conditions a small decoder that predicts P10 numeric tokens
+with cross-entropy. The regression-head route predicts one scalar directly and
+trains it with SL-MSE, RLOO, or MaxRL. In the Gaussian rollout setting used by
+RLOO and MaxRL, the infinite-rollout population objectives collapse back to MSE
+up to constants or positive scale; finite rollout behavior is the real
+comparison.
+:::
+
+## Problem setup
+
+Each row is a code submission with metadata and a scalar memory target. After
+preprocessing, we keep only CDSS examples and format the model input as
+
+```text
+# CDSS
+# Language: Python
+<source code>
+```
+
+where `Python` is replaced by the metadata language when available. The
+prediction target has two current forms:
+
+- **Raw memory**. `target = memory_bytes`, copied from the original dataset
+  target column after filtering finite CDSS rows.
+- **Per-language quantile-normalized memory**. Within each CDSS language, raw
+  memory values are ranked and mapped through the standard normal inverse CDF.
+  This keeps ordering inside each language while removing language-specific
+  scale and marginal-shape differences.
+
+Let $X$ denote the formatted code prompt, $Y_{\mathrm{raw}}$ the raw memory
+value, and $Y_{\mathrm{qn}}$ the quantile-normalized value. In either variant
+the supervised target is a scalar
+$$
+Y \in \mathbb{R},
+$$
+and the ideal predictor is the conditional mean
+$$
+g^\ast(x) := \mathbb{E}[Y \mid X=x].
+$$
+The main held-out risk is therefore
+$$
+\mathcal{E}(\theta)
+  :=
+  \mathbb{E}\left[(g_\theta(X)-Y)^2\right].
+$$
+
+The raw target is the literal memory-prediction task. The quantile-normalized
+target answers a different but useful question: can the model rank and calibrate
+memory usage relative to other submissions in the same programming language?
+Those are not interchangeable. A method that looks strong on the normalized
+target may be learning within-language ordering while avoiding the harder
+cross-language unit scale of raw bytes.
+
+## Canonical recipe
+
+| Knob | Current value |
+|---|---|
+| Data source | CDSS subset of `akhauriyash/Code-Regression` |
+| Input | `# CDSS`, language header, then submitted source code |
+| Targets | raw `memory_bytes` and per-language quantile-normalized memory |
+| Encoder | `google/t5gemma-s-s-prefixlm` through the local T5Gemma wrapper |
+| Default encoder training | frozen unless `--train-encoder` is passed |
+| Max input length | 2048 encoder tokens |
+| Optimizer | Adafactor |
+| Default learning rate | `1e-3` |
+| LR schedule | 10% warmup, then cosine decay to zero |
+| Precision | bfloat16 autocast on CUDA |
+| Gradient clipping | max norm `2.0` |
+| Modal pretraining default | 2000 steps, total batch 2048, device batch 64, 8 GPUs |
+| CE eval aggregation | sample 64 numeric decodes per example, then take the median |
+| Modal regression-head default | 2000 steps, total batch 2048, device batch 256 |
+| Evaluation cap | 256 examples per retained CDSS language in the Modal recipes |
+| RLOO / MaxRL rollout default | 128 Gaussian rollouts, rollout std `1.0` |
+
+## Methods
+
+The current methods use two related model families. The CE pretraining route is
+an encoder-decoder language model over numeric target tokens. The SL-MSE, RLOO,
+and MaxRL route uses the same T5Gemma encoder idea but replaces numeric token
+decoding with a direct scalar value head.
+
+### CE pretraining - text-to-number language modeling
+
+`pretrain_code_regression` trains a RegressLM-style conditional decoder. The
+encoder reads the code prompt, and the decoder autoregressively emits a fixed
+P10 scientific-notation representation of the scalar target. With the default
+P10 tokenizer, one number uses
+
+$$
+2 + d = 6
+$$
+
+tokens: one sign token, four mantissa digit tokens, and one exponent token. For
+example, under the default four-digit P10 representation,
+
+```text
+256.0   -> <+> <2> <5> <6> <0> <E-1>
+-1.25   -> <-> <1> <2> <5> <0> <E-3>
+0.1234  -> <+> <1> <2> <3> <4> <E-4>
+```
+
+The important detail is that training is ordinary language modeling. If
+$T(Y) = (Z_1,\dots,Z_L)$ is the target tokenization of the numeric label, the
+model minimizes token-level cross entropy
+$$
+\mathcal{L}_{\mathrm{CE}}(\theta)
+  =
+  -\mathbb{E}
+  \left[
+    \frac{1}{L}\sum_{\ell=1}^{L}
+      \log q_\theta(Z_\ell \mid X, Z_{<\ell})
+  \right].
+$$
+
+This is not MSE on the scalar memory value. It is CE on a symbolic
+sign-digit-exponent sequence. The numeric scale enters through the tokenizer's
+rounding, clipping, and exponent range. A one-digit mistake can have very
+different numeric consequences depending on whether it occurs in the mantissa or
+the exponent. The digit targets are unnormalized discrete classes: predicting
+`<6>` means assigning probability to the token class `<6>`, not regressing to
+the scalar value `0.6`. That is a useful baseline because it follows the standard
+pretraining recipe, but it is also a hidden assumption: good token likelihood is
+not guaranteed to mean good numeric MSE.
+
+Decoding is also language-model-like. At each decoder step, impossible P10
+tokens are masked out: the first position can only be a sign, middle positions
+are digits, and the final position is an exponent token. Evaluation samples 64
+complete numeric decodes per example and reports the median decoded value before
+computing scalar metrics.
+
+### Regression-head model
+
+The regression-head methods use a deterministic scalar predictor
+$$
+g_\theta(x) \in \mathbb{R}.
+$$
+The architecture is a T5Gemma encoder, a learned one-token query passed through
+a transformer decoder over the encoder memory, and a linear value head. In
+code, the model predicts from the decoded query state:
+$$
+g_\theta(x)
+  =
+  w^\top h_\theta(x) + b.
+$$
+
+This architecture removes the numeric tokenizer from the output side. The model
+is judged directly in the same scalar space as the target variant being trained:
+raw bytes for the raw task, or normal scores for the quantile-normalized task.
+
+### SL-MSE - direct scalar regression
+
+The supervised regression baseline minimizes the same squared error used by the
+primary evaluation:
+$$
+\mathcal{L}_{\mathrm{SL\mbox{-}MSE}}(\theta)
+  =
+  \mathbb{E}\left[(g_\theta(X)-Y)^2\right].
+$$
+
+For a minibatch,
+$$
+\widehat{\mathcal{L}}_{\mathrm{SL\mbox{-}MSE}}
+  =
+  \frac{1}{B}\sum_{b=1}^{B}
+    (g_\theta(x_b)-y_b)^2.
+$$
+
+This is the cleanest reference objective: if the evaluation target is MSE, then
+SL-MSE is optimizing it directly. It does not need rollouts, likelihood
+temperatures, tokenization choices, or a policy-gradient estimator.
+
+### RLOO - Gaussian rollout policy with leave-one-out rewards
+
+RLOO turns the scalar predictor into the mean of a Gaussian rollout policy:
+$$
+Z_j \sim \pi_\theta(\cdot \mid x)
+      =
+      \mathcal{N}(g_\theta(x), \sigma^2),
+\qquad j=1,\dots,R.
+$$
+
+The reward is negative squared error against the scalar target:
+$$
+r_j = -(Z_j - y)^2.
+$$
+
+The leave-one-out advantage is
+$$
+A_j
+  =
+  r_j - \frac{1}{R-1}\sum_{k\ne j}r_k
+  =
+  \frac{R}{R-1}(r_j-\bar r),
+\qquad
+\bar r := \frac{1}{R}\sum_{k=1}^{R}r_k.
+$$
+
+The score-function surrogate is
+$$
+\widehat{\mathcal{L}}_{\mathrm{RLOO}}
+  =
+  -\frac{1}{BR}\sum_{b=1}^{B}\sum_{j=1}^{R}
+    A_{b,j}\,
+    \log \pi_\theta(Z_{b,j}\mid x_b),
+$$
+with the sampled advantages detached.
+
+The leave-one-out baseline is unbiased because it depends only on peer rollouts,
+not on the sampled rollout whose score is being multiplied. In the population
+limit,
+$$
+\mathbb{E}_{Z\sim\mathcal{N}(g_\theta(x),\sigma^2)}
+  [-(Z-y)^2]
+  =
+  -(g_\theta(x)-y)^2 - \sigma^2.
+$$
+The extra $\sigma^2$ term is independent of $\theta$, so maximizing expected
+RLOO reward has the same optimum and gradient direction as minimizing scalar
+MSE. Finite $R$ changes the variance of the gradient estimator, not the
+population target.
+
+### MaxRL - likelihood-weighted rollout estimator
+
+MaxRL uses the same Gaussian rollout policy,
+$$
+Z_j \sim \mathcal{N}(g_\theta(x),\sigma^2),
+$$
+but scores each rollout by a Gaussian observation likelihood of the target:
+$$
+\ell_y(z)
+  =
+  \mathcal{N}(y; z, \sigma^2).
+$$
+
+The supremum of this one-dimensional likelihood is
+$$
+L = \frac{1}{\sqrt{2\pi}\sigma},
+$$
+so the normalized likelihood is
+$$
+\sigma_j
+  :=
+  \frac{\ell_y(Z_j)}{L}
+  =
+  \exp\left(-\frac{(Z_j-y)^2}{2\sigma^2}\right)
+  \in (0,1].
+$$
+
+For one example, define the marginal normalized likelihood
+$$
+\sigma_\theta(x,y)
+  :=
+  \mathbb{E}_{Z\sim\pi_\theta(\cdot\mid x)}
+    [\sigma_y(Z)].
+$$
+The degree-$M$ MaxRL objective is the same truncation used in
+[MaxRL gradient estimator details](gradient-estimator.qmd):
+$$
+J_M(\theta)
+  =
+  -\sum_{k=1}^{M}
+    \frac{(1-\sigma_\theta)^k}{k}.
+$$
+As $M\to\infty$, this approaches
+$$
+J_\infty(\theta) = \log \sigma_\theta.
+$$
+
+The sampled estimator forms leave-one-out weights from the peer complements
+$a_i = 1-\sigma_i$. For rollout $j$,
+$$
+\omega_j
+  =
+  \sum_{k=0}^{M-1}
+  \frac{
+    e_k((a_i)_{i\ne j})
+  }{
+    \binom{R-1}{k}
+  },
+$$
+where $e_k$ is the $k$-th elementary symmetric polynomial. With baseline
+subtraction, the effective normalized likelihood term is
+$$
+\sigma^{\mathrm{eff}}_j
+  =
+  \frac{R}{R-1}(\sigma_j-\bar\sigma),
+\qquad
+\bar\sigma := \frac{1}{R}\sum_{i=1}^{R}\sigma_i.
+$$
+The policy-gradient surrogate is
+$$
+\widehat{\mathcal{L}}_{\mathrm{MaxRL}}
+  =
+  -\frac{1}{BR}\sum_{b=1}^{B}\sum_{j=1}^{R}
+    \omega_{b,j}\sigma^{\mathrm{eff}}_{b,j}
+    \log \pi_\theta(Z_{b,j}\mid x_b),
+$$
+with the score weights detached.
+
+In the exact Gaussian limit, MaxRL also reduces to MSE. The convolution identity
+gives
+$$
+\mathbb{E}_{Z\sim\mathcal{N}(g_\theta(x),\sigma^2)}
+  [\mathcal{N}(y;Z,\sigma^2)]
+  =
+  \mathcal{N}(y;g_\theta(x),2\sigma^2),
+$$
+so
+$$
+\log \sigma_\theta(x,y)
+  =
+  -\frac{(g_\theta(x)-y)^2}{4\sigma^2}
+  + \mathrm{const}.
+$$
+Thus the infinite-rollout MaxRL objective is a positive rescaling of negative
+MSE plus a constant. As with RLOO, the finite-rollout estimator is the
+interesting object: it changes how noisy or selective the update is, not the
+ideal scalar target in this Gaussian setup.
+
+## Evaluation
+
+For now the writeup should focus on CDSS metrics rather than the full
+multi-space Code-Regression aggregate. The primary keys are
+
+| Metric key | Meaning |
+|---|---|
+| `eval-core/mse/space/CDSS` | pooled CDSS mean squared error |
+| `eval-core/mae/space/CDSS` | pooled CDSS mean absolute error |
+| `eval-core/spearman/space/CDSS` | pooled CDSS Spearman rank correlation |
+
+### Evaluation set construction
+
+The eval set is balanced by CDSS language. For each `cdss_language/<language>`
+group, the cache builder keeps at most `eval_cap_per_group` examples; in the
+current Modal recipes this cap is 256. Languages with fewer than 256 valid CDSS
+examples are not evaluated. Thus, if $|\mathcal{L}|$ languages survive the
+threshold, the pooled CDSS eval set contains exactly
+$$
+256 \cdot |\mathcal{L}|
+$$
+examples, with the same number of examples from each retained language.
+
+Selection is deterministic: examples are ordered by a stable hash of their
+identifier, then capped within language. Each retained row is assigned both its
+auxiliary language group, such as `cdss_language/Python`, and the pooled
+`space/CDSS` group.
+
+The pooled CDSS metric treats all selected CDSS eval examples as one population.
+For MSE, with selected CDSS pairs $(y_i,\hat y_i)$,
+$$
+\widehat{\mathrm{MSE}}_{\mathrm{CDSS}}
+  =
+  \frac{1}{N}\sum_{i=1}^{N}(\hat y_i-y_i)^2.
+$$
+MAE is the same pooled average with absolute error, and Spearman is computed
+once over the pooled CDSS target and prediction vectors.
+
+Language-mean metrics answer a different question. The auxiliary
+`cdss_language/<language>` groups first compute a metric within each language.
+Then `eval-core/<metric>/space/CDSS_language_mean` averages those language
+scores equally:
+$$
+\widehat{m}_{\mathrm{language\ mean}}
+  =
+  \frac{1}{|\mathcal{L}|}
+  \sum_{\ell\in\mathcal{L}}
+    \widehat{m}_\ell.
+$$
+
+The two model families produce predictions differently before metrics are
+computed:
+
+- CE pretraining samples 64 numeric decodes and uses the per-example
+  median decoded value as the prediction.
+- Regression-head methods produce one deterministic scalar prediction
+  $g_\theta(x)$.
+
+After that, both are evaluated with the same target/prediction metric code.
+
+## Critical notes
+
+1. Raw memory and quantile-normalized memory are different tasks. Raw memory
+   tests physical scale prediction; the normalized target tests within-language
+   relative memory prediction.
+2. CE pretraining is a strong RegressLM-style baseline, but its loss is token
+   CE over P10 digits, not numeric MSE. A CE improvement can come from better
+   exponent/sign/digit likelihood without matching scalar error improvements
+   one-for-one.
+3. In the current one-dimensional Gaussian rollout setup, RLOO and MaxRL have
+   MSE as their exact infinite-rollout target up to constants or scale. Any
+   empirical gap against SL-MSE should be interpreted as finite-rollout
+   estimator behavior, optimizer interaction, or architecture/training
+   difference, not as a fundamentally different Bayes target.
