@@ -222,6 +222,49 @@ Note
 <p>The task is scalar CDSS memory prediction from code. We keep two target variants: raw <code>memory_bytes</code> and a per-language quantile-normalized memory score. The CE pretraining route is a RegressLM-style text-to-number language model: a T5Gemma encoder conditions a small decoder that predicts P10 numeric tokens with cross-entropy. The regression-head route predicts one scalar directly and trains it with SL-MSE, RLOO, or MaxRL. In the Gaussian rollout setting used by RLOO and MaxRL, the infinite-rollout population objectives collapse back to MSE up to constants or positive scale; finite rollout behavior is the real comparison.</p>
 </div>
 </div>
+<script>
+window.fitScaledIframeContainer = function(frame) {
+  const iframe = frame.querySelector("iframe");
+  const sourceWidth = Number(frame.dataset.sourceWidth);
+  const sourceHeight = Number(frame.dataset.sourceHeight);
+  if (!iframe || !sourceWidth || !sourceHeight) return;
+
+  const displayWidth = frame.clientWidth;
+  if (!displayWidth) return;
+
+  const scale = Math.min(1, displayWidth / sourceWidth);
+  frame.style.maxWidth = "100%";
+  frame.style.overflow = "hidden";
+  frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
+  iframe.style.width = `${sourceWidth}px`;
+  iframe.style.height = `${sourceHeight}px`;
+  iframe.style.display = "block";
+  iframe.style.border = "0";
+  iframe.style.transformOrigin = "top left";
+  iframe.style.transform = `scale(${scale})`;
+};
+window.addEventListener("DOMContentLoaded", () => {
+  const frames = document.querySelectorAll(".scaled-plotly-frame");
+  frames.forEach(window.fitScaledIframeContainer);
+  if ("ResizeObserver" in window) {
+    const obs = new ResizeObserver((es) =>
+      es.forEach((e) => window.fitScaledIframeContainer(e.target))
+    );
+    frames.forEach((f) => obs.observe(f));
+  } else {
+    window.addEventListener("resize", () =>
+      frames.forEach(window.fitScaledIframeContainer)
+    );
+  }
+  document.addEventListener("shown.bs.collapse", (event) => {
+    event.target
+      .querySelectorAll(".scaled-plotly-frame")
+      .forEach((frame) => {
+        requestAnimationFrame(() => window.fitScaledIframeContainer(frame));
+      });
+  });
+});
+</script>
 </section>
 <section id="problem-setup" class="level2">
 <h2 class="anchored" data-anchor-id="problem-setup">Problem setup</h2>
@@ -507,6 +550,9 @@ J_\infty(\theta) = \log \sigma_\theta.
 </tr>
 </tbody>
 </table>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="1274">
+  <iframe src="assets/code-regression/evaluation-by-language.html" title="Step-2000 Spearman by CDSS language" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
 <section id="evaluation-set-construction" class="level3">
 <h3 class="anchored" data-anchor-id="evaluation-set-construction">Evaluation set construction</h3>
 <p>The eval set is balanced by CDSS language. For each <code>cdss_language/&lt;language&gt;</code> group, the cache builder keeps at most <code>eval_cap_per_group</code> examples; in the current Modal recipes this cap is 256. Languages with fewer than 256 valid CDSS examples are not evaluated. Thus, if <span class="math inline">\(|\mathcal{L}|\)</span> languages survive the threshold, the pooled CDSS eval set contains exactly <span class="math display">\[

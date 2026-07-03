@@ -26,6 +26,52 @@ up to constants or positive scale; finite rollout behavior is the real
 comparison.
 :::
 
+```{=html}
+<script>
+window.fitScaledIframeContainer = function(frame) {
+  const iframe = frame.querySelector("iframe");
+  const sourceWidth = Number(frame.dataset.sourceWidth);
+  const sourceHeight = Number(frame.dataset.sourceHeight);
+  if (!iframe || !sourceWidth || !sourceHeight) return;
+
+  const displayWidth = frame.clientWidth;
+  if (!displayWidth) return;
+
+  const scale = Math.min(1, displayWidth / sourceWidth);
+  frame.style.maxWidth = "100%";
+  frame.style.overflow = "hidden";
+  frame.style.height = `${Math.ceil(sourceHeight * scale)}px`;
+  iframe.style.width = `${sourceWidth}px`;
+  iframe.style.height = `${sourceHeight}px`;
+  iframe.style.display = "block";
+  iframe.style.border = "0";
+  iframe.style.transformOrigin = "top left";
+  iframe.style.transform = `scale(${scale})`;
+};
+window.addEventListener("DOMContentLoaded", () => {
+  const frames = document.querySelectorAll(".scaled-plotly-frame");
+  frames.forEach(window.fitScaledIframeContainer);
+  if ("ResizeObserver" in window) {
+    const obs = new ResizeObserver((es) =>
+      es.forEach((e) => window.fitScaledIframeContainer(e.target))
+    );
+    frames.forEach((f) => obs.observe(f));
+  } else {
+    window.addEventListener("resize", () =>
+      frames.forEach(window.fitScaledIframeContainer)
+    );
+  }
+  document.addEventListener("shown.bs.collapse", (event) => {
+    event.target
+      .querySelectorAll(".scaled-plotly-frame")
+      .forEach((frame) => {
+        requestAnimationFrame(() => window.fitScaledIframeContainer(frame));
+      });
+  });
+});
+</script>
+```
+
 ## Problem setup
 
 Each row is a code submission with metadata and a scalar memory target. After
@@ -347,6 +393,15 @@ multi-space Code-Regression aggregate. The primary keys are
 | `eval-core/mse/space/CDSS` | pooled CDSS mean squared error |
 | `eval-core/mae/space/CDSS` | pooled CDSS mean absolute error |
 | `eval-core/spearman/space/CDSS` | pooled CDSS Spearman rank correlation |
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="1274">
+  <iframe src="assets/code-regression/evaluation-by-language.html"
+          title="Step-2000 Spearman by CDSS language"
+          scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
 
 ### Evaluation set construction
 
