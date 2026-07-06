@@ -165,6 +165,18 @@ example, under the default four-digit P10 representation,
 0.1234  -> <+> <1> <2> <3> <4> <E-4>
 ```
 
+The table below shows representative raw and quantile-normalized CDSS targets
+under this P10 tokenization.
+
+```{=html}
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="1350">
+  <iframe src="assets/code-regression/cdss-target-tokenization-samples.html"
+          title="CDSS target tokenization samples"
+          scrolling="no"
+          onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
+```
+
 The important detail is that training is ordinary language modeling. If
 $T(Y) = (Z_1,\dots,Z_L)$ is the target tokenization of the numeric label, the
 model minimizes token-level cross entropy

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDSS Target Tokenization Samples</title>
+  <style>
+    body {
+      color: #1f2933;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+      margin: 24px;
+    }
+    h1 { margin: 0 0 12px; }
+    .meta { color: #52606d; }
+    .controls {
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .controls label { color: #52606d; font-size: 14px; }
+    .controls select {
+      border: 1px solid #bcccdc;
+      border-radius: 4px;
+      color: #1f2933;
+      font: inherit;
+      padding: 4px 8px;
+    }
+    table { border-collapse: collapse; font-size: 14px; margin-top: 18px; width: 100%; }
+    th, td { border-bottom: 1px solid #d9e2ec; padding: 7px 8px; text-align: left; vertical-align: top; }
+    th { background: #f0f4f8; position: sticky; top: 0; }
+    td:nth-child(2), td:nth-child(3), td:nth-child(5) { text-align: right; }
+    code { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <h1>CDSS Target Tokenization Samples</h1>
+  <p class="meta">
+    Languages: Python, Perl.
+  </p>
+  <p class="meta">
+    Unnormalized data: /cache/datasets/CDSS/train_unnormalized.parquet<br>
+    Quantile-normalized data:
+    /cache/datasets/CDSS/train_quantile_normalized.parquet
+  </p>
+  <div class="controls">
+    <label for="language-filter">Language</label>
+    <select id="language-filter">
+      <option value="Python">Python</option>
+      <option value="Perl">Perl</option>
+    </select>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Language</th>
+        <th>Raw percentile</th>
+        <th>Raw target</th>
+        <th>Raw P10 tokens</th>
+        <th>Normalized target</th>
+        <th>Normalized P10 tokens</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr data-language="Python"><td>Python</td><td>0.00%</td><td>2568</td><td><code>&lt;+&gt; &lt;2&gt; &lt;5&gt; &lt;6&gt; &lt;8&gt; &lt;E0&gt;</code></td><td>-2.825510919</td><td><code>&lt;-&gt; &lt;2&gt; &lt;8&gt; &lt;2&gt; &lt;6&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>6.67%</td><td>2940</td><td><code>&lt;+&gt; &lt;2&gt; &lt;9&gt; &lt;4&gt; &lt;0&gt; &lt;E0&gt;</code></td><td>-1.137185183</td><td><code>&lt;-&gt; &lt;1&gt; &lt;1&gt; &lt;3&gt; &lt;7&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>13.33%</td><td>2940</td><td><code>&lt;+&gt; &lt;2&gt; &lt;9&gt; &lt;4&gt; &lt;0&gt; &lt;E0&gt;</code></td><td>-1.137185183</td><td><code>&lt;-&gt; &lt;1&gt; &lt;1&gt; &lt;3&gt; &lt;7&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>20.00%</td><td>2940</td><td><code>&lt;+&gt; &lt;2&gt; &lt;9&gt; &lt;4&gt; &lt;0&gt; &lt;E0&gt;</code></td><td>-1.137185183</td><td><code>&lt;-&gt; &lt;1&gt; &lt;1&gt; &lt;3&gt; &lt;7&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>26.67%</td><td>3060</td><td><code>&lt;+&gt; &lt;3&gt; &lt;0&gt; &lt;6&gt; &lt;0&gt; &lt;E0&gt;</code></td><td>-0.5629316383</td><td><code>&lt;-&gt; &lt;5&gt; &lt;6&gt; &lt;2&gt; &lt;9&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>33.33%</td><td>3064</td><td><code>&lt;+&gt; &lt;3&gt; &lt;0&gt; &lt;6&gt; &lt;4&gt; &lt;E0&gt;</code></td><td>-0.3767084288</td><td><code>&lt;-&gt; &lt;3&gt; &lt;7&gt; &lt;6&gt; &lt;7&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>40.00%</td><td>3316</td><td><code>&lt;+&gt; &lt;3&gt; &lt;3&gt; &lt;1&gt; &lt;6&gt; &lt;E0&gt;</code></td><td>-0.2387164287</td><td><code>&lt;-&gt; &lt;2&gt; &lt;3&gt; &lt;8&gt; &lt;7&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>46.67%</td><td>5596</td><td><code>&lt;+&gt; &lt;5&gt; &lt;5&gt; &lt;9&gt; &lt;6&gt; &lt;E0&gt;</code></td><td>-0.08747980429</td><td><code>&lt;-&gt; &lt;8&gt; &lt;7&gt; &lt;4&gt; &lt;8&gt; &lt;E-5&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>53.33%</td><td>8992</td><td><code>&lt;+&gt; &lt;8&gt; &lt;9&gt; &lt;9&gt; &lt;2&gt; &lt;E0&gt;</code></td><td>0.08319378178</td><td><code>&lt;+&gt; &lt;8&gt; &lt;3&gt; &lt;1&gt; &lt;9&gt; &lt;E-5&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>60.00%</td><td>9144</td><td><code>&lt;+&gt; &lt;9&gt; &lt;1&gt; &lt;4&gt; &lt;4&gt; &lt;E0&gt;</code></td><td>0.2526822035</td><td><code>&lt;+&gt; &lt;2&gt; &lt;5&gt; &lt;2&gt; &lt;7&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>66.67%</td><td>9468</td><td><code>&lt;+&gt; &lt;9&gt; &lt;4&gt; &lt;6&gt; &lt;8&gt; &lt;E0&gt;</code></td><td>0.4305461599</td><td><code>&lt;+&gt; &lt;4&gt; &lt;3&gt; &lt;0&gt; &lt;5&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>73.33%</td><td>17272</td><td><code>&lt;+&gt; &lt;1&gt; &lt;7&gt; &lt;2&gt; &lt;7&gt; &lt;E1&gt;</code></td><td>0.6229198992</td><td><code>&lt;+&gt; &lt;6&gt; &lt;2&gt; &lt;2&gt; &lt;9&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>80.00%</td><td>32296</td><td><code>&lt;+&gt; &lt;3&gt; &lt;2&gt; &lt;3&gt; &lt;0&gt; &lt;E1&gt;</code></td><td>0.8417811173</td><td><code>&lt;+&gt; &lt;8&gt; &lt;4&gt; &lt;1&gt; &lt;8&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>86.67%</td><td>42884</td><td><code>&lt;+&gt; &lt;4&gt; &lt;2&gt; &lt;8&gt; &lt;8&gt; &lt;E1&gt;</code></td><td>1.110767819</td><td><code>&lt;+&gt; &lt;1&gt; &lt;1&gt; &lt;1&gt; &lt;1&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>93.33%</td><td>69392</td><td><code>&lt;+&gt; &lt;6&gt; &lt;9&gt; &lt;3&gt; &lt;9&gt; &lt;E1&gt;</code></td><td>1.50108063</td><td><code>&lt;+&gt; &lt;1&gt; &lt;5&gt; &lt;0&gt; &lt;1&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Python"><td>Python</td><td>100.00%</td><td>1285440</td><td><code>&lt;+&gt; &lt;1&gt; &lt;2&gt; &lt;8&gt; &lt;5&gt; &lt;E3&gt;</code></td><td>5.005425024</td><td><code>&lt;+&gt; &lt;5&gt; &lt;0&gt; &lt;0&gt; &lt;5&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>0.01%</td><td>384</td><td><code>&lt;+&gt; &lt;3&gt; &lt;8&gt; &lt;4&gt; &lt;0&gt; &lt;E-1&gt;</code></td><td>-1.733134746</td><td><code>&lt;-&gt; &lt;1&gt; &lt;7&gt; &lt;3&gt; &lt;3&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>6.67%</td><td>384</td><td><code>&lt;+&gt; &lt;3&gt; &lt;8&gt; &lt;4&gt; &lt;0&gt; &lt;E-1&gt;</code></td><td>-1.733134746</td><td><code>&lt;-&gt; &lt;1&gt; &lt;7&gt; &lt;3&gt; &lt;3&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>13.34%</td><td>512</td><td><code>&lt;+&gt; &lt;5&gt; &lt;1&gt; &lt;2&gt; &lt;0&gt; &lt;E-1&gt;</code></td><td>-0.9915441466</td><td><code>&lt;-&gt; &lt;9&gt; &lt;9&gt; &lt;1&gt; &lt;5&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>20.00%</td><td>512</td><td><code>&lt;+&gt; &lt;5&gt; &lt;1&gt; &lt;2&gt; &lt;0&gt; &lt;E-1&gt;</code></td><td>-0.9915441466</td><td><code>&lt;-&gt; &lt;9&gt; &lt;9&gt; &lt;1&gt; &lt;5&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>26.67%</td><td>640</td><td><code>&lt;+&gt; &lt;6&gt; &lt;4&gt; &lt;0&gt; &lt;0&gt; &lt;E-1&gt;</code></td><td>-0.549607306</td><td><code>&lt;-&gt; &lt;5&gt; &lt;4&gt; &lt;9&gt; &lt;6&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>33.33%</td><td>640</td><td><code>&lt;+&gt; &lt;6&gt; &lt;4&gt; &lt;0&gt; &lt;0&gt; &lt;E-1&gt;</code></td><td>-0.549607306</td><td><code>&lt;-&gt; &lt;5&gt; &lt;4&gt; &lt;9&gt; &lt;6&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>40.00%</td><td>768</td><td><code>&lt;+&gt; &lt;7&gt; &lt;6&gt; &lt;8&gt; &lt;0&gt; &lt;E-1&gt;</code></td><td>-0.2925549505</td><td><code>&lt;-&gt; &lt;2&gt; &lt;9&gt; &lt;2&gt; &lt;6&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>46.66%</td><td>1664</td><td><code>&lt;+&gt; &lt;1&gt; &lt;6&gt; &lt;6&gt; &lt;4&gt; &lt;E0&gt;</code></td><td>-0.07998739238</td><td><code>&lt;-&gt; &lt;7&gt; &lt;9&gt; &lt;9&gt; &lt;9&gt; &lt;E-5&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>53.34%</td><td>4808</td><td><code>&lt;+&gt; &lt;4&gt; &lt;8&gt; &lt;0&gt; &lt;8&gt; &lt;E0&gt;</code></td><td>0.08439081023</td><td><code>&lt;+&gt; &lt;8&gt; &lt;4&gt; &lt;3&gt; &lt;9&gt; &lt;E-5&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>60.00%</td><td>10880</td><td><code>&lt;+&gt; &lt;1&gt; &lt;0&gt; &lt;8&gt; &lt;8&gt; &lt;E1&gt;</code></td><td>0.2534408634</td><td><code>&lt;+&gt; &lt;2&gt; &lt;5&gt; &lt;3&gt; &lt;4&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>66.67%</td><td>22676</td><td><code>&lt;+&gt; &lt;2&gt; &lt;2&gt; &lt;6&gt; &lt;8&gt; &lt;E1&gt;</code></td><td>0.430616609</td><td><code>&lt;+&gt; &lt;4&gt; &lt;3&gt; &lt;0&gt; &lt;6&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>73.33%</td><td>37340</td><td><code>&lt;+&gt; &lt;3&gt; &lt;7&gt; &lt;3&gt; &lt;4&gt; &lt;E1&gt;</code></td><td>0.6229379721</td><td><code>&lt;+&gt; &lt;6&gt; &lt;2&gt; &lt;2&gt; &lt;9&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>80.00%</td><td>55312</td><td><code>&lt;+&gt; &lt;5&gt; &lt;5&gt; &lt;3&gt; &lt;1&gt; &lt;E1&gt;</code></td><td>0.8415781057</td><td><code>&lt;+&gt; &lt;8&gt; &lt;4&gt; &lt;1&gt; &lt;6&gt; &lt;E-4&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>86.66%</td><td>66232</td><td><code>&lt;+&gt; &lt;6&gt; &lt;6&gt; &lt;2&gt; &lt;3&gt; &lt;E1&gt;</code></td><td>1.110640753</td><td><code>&lt;+&gt; &lt;1&gt; &lt;1&gt; &lt;1&gt; &lt;1&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>93.33%</td><td>92804</td><td><code>&lt;+&gt; &lt;9&gt; &lt;2&gt; &lt;8&gt; &lt;0&gt; &lt;E1&gt;</code></td><td>1.500743649</td><td><code>&lt;+&gt; &lt;1&gt; &lt;5&gt; &lt;0&gt; &lt;1&gt; &lt;E-3&gt;</code></td></tr><tr data-language="Perl"><td>Perl</td><td>99.99%</td><td>794528</td><td><code>&lt;+&gt; &lt;7&gt; &lt;9&gt; &lt;4&gt; &lt;5&gt; &lt;E2&gt;</code></td><td>3.844611082</td><td><code>&lt;+&gt; &lt;3&gt; &lt;8&gt; &lt;4&gt; &lt;5&gt; &lt;E-3&gt;</code></td></tr>
+    </tbody>
+  </table>
+  <script>
+    const languageFilter = document.getElementById("language-filter");
+    const sampleRows = Array.from(document.querySelectorAll("tbody tr[data-language]"));
+
+    function applyLanguageFilter() {
+      const selectedLanguage = languageFilter.value;
+      sampleRows.forEach((row) => {
+        row.hidden = row.dataset.language !== selectedLanguage;
+      });
+    }
+
+    languageFilter.addEventListener("change", applyLanguageFilter);
+    applyLanguageFilter();
+  </script>
+</body>
+</html>

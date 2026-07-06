@@ -382,6 +382,10 @@ g^\ast(x) := \mathbb{E}[Y \mid X=x].
 <pre class="text"><code>256.0   -&gt; &lt;+&gt; &lt;2&gt; &lt;5&gt; &lt;6&gt; &lt;0&gt; &lt;E-1&gt;
 -1.25   -&gt; &lt;-&gt; &lt;1&gt; &lt;2&gt; &lt;5&gt; &lt;0&gt; &lt;E-3&gt;
 0.1234  -&gt; &lt;+&gt; &lt;1&gt; &lt;2&gt; &lt;3&gt; &lt;4&gt; &lt;E-4&gt;</code></pre>
+<p>The table below shows representative raw and quantile-normalized CDSS targets under this P10 tokenization.</p>
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="1350">
+  <iframe src="assets/code-regression/cdss-target-tokenization-samples.html" title="CDSS target tokenization samples" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
+</div>
 <p>The important detail is that training is ordinary language modeling. If <span class="math inline">\(T(Y) = (Z_1,\dots,Z_L)\)</span> is the target tokenization of the numeric label, the model minimizes token-level cross entropy <span class="math display">\[
 \mathcal{L}_{\mathrm{CE}}(\theta)
   =
