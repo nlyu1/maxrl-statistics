@@ -407,7 +407,7 @@ multi-space Code-Regression aggregate. The primary keys are
 | `eval-core/spearman/space/CDSS` | pooled CDSS Spearman rank correlation |
 
 ```{=html}
-<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="1274">
+<div class="scaled-plotly-frame" data-source-width="1000" data-source-height="2200">
   <iframe src="assets/code-regression/evaluation-by-language.html"
           title="Step-2000 Spearman by CDSS language"
           scrolling="no"
