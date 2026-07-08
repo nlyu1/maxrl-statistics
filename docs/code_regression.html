@@ -165,12 +165,18 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tl-dr" id="toc-tl-dr" class="nav-link active" data-scroll-target="#tl-dr">TL; DR</a></li>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
   <li><a href="#problem-setup" id="toc-problem-setup" class="nav-link" data-scroll-target="#problem-setup">Problem setup</a></li>
   <li><a href="#canonical-recipe" id="toc-canonical-recipe" class="nav-link" data-scroll-target="#canonical-recipe">Canonical recipe</a></li>
   <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
   <ul>
   <li><a href="#ce-pretraining---text-to-number-language-modeling" id="toc-ce-pretraining---text-to-number-language-modeling" class="nav-link" data-scroll-target="#ce-pretraining---text-to-number-language-modeling">CE pretraining - text-to-number language modeling</a></li>
+  <li><a href="#lm-rl---token-rollouts-with-scalar-rewards" id="toc-lm-rl---token-rollouts-with-scalar-rewards" class="nav-link" data-scroll-target="#lm-rl---token-rollouts-with-scalar-rewards">LM-RL - token rollouts with scalar rewards</a>
+  <ul class="collapse">
+  <li><a href="#lm-rloo" id="toc-lm-rloo" class="nav-link" data-scroll-target="#lm-rloo">LM-RLOO</a></li>
+  <li><a href="#lm-maxrl" id="toc-lm-maxrl" class="nav-link" data-scroll-target="#lm-maxrl">LM-MaxRL</a></li>
+  <li><a href="#optimization-targets-and-limits" id="toc-optimization-targets-and-limits" class="nav-link" data-scroll-target="#optimization-targets-and-limits">Optimization targets and limits</a></li>
+  </ul></li>
   <li><a href="#regression-head-model" id="toc-regression-head-model" class="nav-link" data-scroll-target="#regression-head-model">Regression-head model</a></li>
   <li><a href="#sl-mse---direct-scalar-regression" id="toc-sl-mse---direct-scalar-regression" class="nav-link" data-scroll-target="#sl-mse---direct-scalar-regression">SL-MSE - direct scalar regression</a></li>
   <li><a href="#rloo---gaussian-rollout-policy-with-leave-one-out-rewards" id="toc-rloo---gaussian-rollout-policy-with-leave-one-out-rewards" class="nav-link" data-scroll-target="#rloo---gaussian-rollout-policy-with-leave-one-out-rewards">RLOO - Gaussian rollout policy with leave-one-out rewards</a></li>
@@ -180,7 +186,6 @@ window.Quarto = {
   <ul>
   <li><a href="#evaluation-set-construction" id="toc-evaluation-set-construction" class="nav-link" data-scroll-target="#evaluation-set-construction">Evaluation set construction</a></li>
   </ul></li>
-  <li><a href="#critical-notes" id="toc-critical-notes" class="nav-link" data-scroll-target="#critical-notes">Critical notes</a></li>
   </ul>
 </nav>
     </div>
@@ -207,19 +212,19 @@ window.Quarto = {
 
 
 <p>The code-regression setup asks whether we can predict execution-memory statistics from source code. Our current slice takes the CDSS rows from the <a href="https://huggingface.co/datasets/akhauriyash/Code-Regression">Code-Regression dataset</a> and predicts the memory target from the submitted program text. The broader dataset and RegressLM baseline are described in <a href="https://arxiv.org/abs/2509.26476">Regression Language Models for Code</a>; our current model family uses <a href="https://huggingface.co/google/t5gemma-s-s-prefixlm">T5Gemma</a> encoders and compares supervised regression with rollout-based MaxRL methods from <a href="https://arxiv.org/abs/2602.02710">Maximum Likelihood Reinforcement Learning</a>.</p>
-<section id="tl-dr" class="level3">
-<h3 class="anchored" data-anchor-id="tl-dr">TL; DR</h3>
-<div class="callout callout-style-default callout-note callout-titled">
+<section id="overview" class="level3">
+<h3 class="anchored" data-anchor-id="overview">Overview</h3>
+<div class="callout callout-style-default callout-note callout-titled" title="Main thread">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Note
+<span class="screen-reader-only">Note</span>Main thread
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The task is scalar CDSS memory prediction from code. We keep two target variants: raw <code>memory_bytes</code> and a per-language quantile-normalized memory score. The CE pretraining route is a RegressLM-style text-to-number language model: a T5Gemma encoder conditions a small decoder that predicts P10 numeric tokens with cross-entropy. The regression-head route predicts one scalar directly and trains it with SL-MSE, RLOO, or MaxRL. In the Gaussian rollout setting used by RLOO and MaxRL, the infinite-rollout population objectives collapse back to MSE up to constants or positive scale; finite rollout behavior is the real comparison.</p>
+<p>This writeup studies scalar CDSS memory prediction from source code. We track two target variants: raw <code>memory_bytes</code> and a per-language quantile-normalized memory score. The experiments then branch into three training routes. CE pretraining follows a RegressLM-style text-to-number recipe and learns one canonical P10 tokenization of the label. LM-RLOO and LM-MaxRL keep the language-model decoder while using sampled token sequences as latent rollouts: each rollout is parsed back to a number and scored against the scalar label. The regression-head route predicts one scalar directly and trains it with SL-MSE, RLOO, or MaxRL. The organizing distinction is between objectives over a token representation and objectives over scalar prediction error.</p>
 </div>
 </div>
 <script>
@@ -286,7 +291,21 @@ g^\ast(x) := \mathbb{E}[Y \mid X=x].
   :=
   \mathbb{E}\left[(g_\theta(X)-Y)^2\right].
 \]</span></p>
-<p>The raw target is the literal memory-prediction task. The quantile-normalized target answers a different but useful question: can the model rank and calibrate memory usage relative to other submissions in the same programming language? Those are not interchangeable. A method that looks strong on the normalized target may be learning within-language ordering while avoiding the harder cross-language unit scale of raw bytes.</p>
+<p>The raw target is the literal memory-prediction task. The quantile-normalized target turns the question toward within-language ranking and calibration: can the model place a submission correctly relative to other submissions in the same programming language? Performance on this normalized target should be read as evidence about relative memory behavior inside each language. Raw-byte performance additionally tests whether the model can handle the cross-language unit scale.</p>
+<p>Output-side tokenization adds one more layer of notation. Let <span class="math display">\[
+\mathcal{Z}
+\]</span> be the finite set of syntactically valid decoder token sequences under the P10 grammar, and let <span class="math display">\[
+\phi:\mathcal{Z}\to\mathbb{R}
+\]</span> be the deterministic parser that extracts the numeric value represented by a complete token sequence. A language-model decoder defines a conditional distribution <span class="math display">\[
+q_\theta(z\mid x),\qquad z\in\mathcal{Z}.
+\]</span> The latent rollout is the token sequence <span class="math inline">\(Z\sim q_\theta(\cdot\mid x)\)</span>; the decoded prediction candidate is the scalar <span class="math inline">\(\phi(Z)\)</span>.</p>
+<p>The targeted regression problem follows the scalar label <span class="math inline">\(Y\)</span>. Token strings enter as one way to produce candidate numeric values. For example, if the final predictor is the median of decoded samples, then the induced predictor is <span class="math display">\[
+m_\theta(x) := \operatorname{median}\{\phi(Z):Z\sim q_\theta(\cdot\mid x)\},
+\]</span> and the corresponding scalar risk is <span class="math display">\[
+\mathbb{E}\left[(m_\theta(X)-Y)^2\right].
+\]</span> Training methods below use different surrogates for this target. Many token sequences can parse to the same number: <span class="math display">\[
+\mathcal{Z}(v) := \{z\in\mathcal{Z}: \phi(z)=v\}
+\]</span> can contain several valid strings.</p>
 </section>
 <section id="canonical-recipe" class="level2">
 <h2 class="anchored" data-anchor-id="canonical-recipe">Canonical recipe</h2>
@@ -332,7 +351,7 @@ g^\ast(x) := \mathbb{E}[Y \mid X=x].
 </tr>
 <tr class="even">
 <td>Default learning rate</td>
-<td><code>1e-3</code></td>
+<td><code>1e-3</code>; LM-RL Modal recipes use <code>5e-3</code></td>
 </tr>
 <tr class="odd">
 <td>LR schedule</td>
@@ -355,6 +374,14 @@ g^\ast(x) := \mathbb{E}[Y \mid X=x].
 <td>sample 64 numeric decodes per example, then take the median</td>
 </tr>
 <tr class="even">
+<td>Modal LM-RLOO / LM-MaxRL default</td>
+<td>2000 steps, total batch 2048, device batch 32, 8 token rollouts, rollout temperature <code>1.0</code></td>
+</tr>
+<tr class="odd">
+<td>LM-MaxRL score std</td>
+<td><code>1.0</code></td>
+</tr>
+<tr class="even">
 <td>Modal regression-head default</td>
 <td>2000 steps, total batch 2048, device batch 256</td>
 </tr>
@@ -363,7 +390,7 @@ g^\ast(x) := \mathbb{E}[Y \mid X=x].
 <td>256 examples per retained CDSS language in the Modal recipes</td>
 </tr>
 <tr class="even">
-<td>RLOO / MaxRL rollout default</td>
+<td>Regression-head RLOO / MaxRL rollout default</td>
 <td>128 Gaussian rollouts, rollout std <code>1.0</code></td>
 </tr>
 </tbody>
@@ -371,7 +398,7 @@ g^\ast(x) := \mathbb{E}[Y \mid X=x].
 </section>
 <section id="methods" class="level2">
 <h2 class="anchored" data-anchor-id="methods">Methods</h2>
-<p>The current methods use two related model families. The CE pretraining route is an encoder-decoder language model over numeric target tokens. The SL-MSE, RLOO, and MaxRL route uses the same T5Gemma encoder idea but replaces numeric token decoding with a direct scalar value head.</p>
+<p>The current methods combine two related architectures with three objective families. CE pretraining and LM-RL both use an encoder-decoder language model over numeric target tokens. CE learns the canonical token string itself. LM-RLOO and LM-MaxRL sample token strings, parse them to numbers, and optimize scalar reward or likelihood of the parsed value. The regression-head route keeps the T5Gemma encoder idea and predicts through a direct scalar value head, trained with SL-MSE, RLOO, or MaxRL.</p>
 <section id="ce-pretraining---text-to-number-language-modeling" class="level3">
 <h3 class="anchored" data-anchor-id="ce-pretraining---text-to-number-language-modeling">CE pretraining - text-to-number language modeling</h3>
 <p><code>pretrain_code_regression</code> trains a RegressLM-style conditional decoder. The encoder reads the code prompt, and the decoder autoregressively emits a fixed P10 scientific-notation representation of the scalar target. With the default P10 tokenizer, one number uses</p>
@@ -386,17 +413,185 @@ g^\ast(x) := \mathbb{E}[Y \mid X=x].
 <div class="scaled-plotly-frame" data-source-width="1000" data-source-height="1350">
   <iframe src="assets/code-regression/cdss-target-tokenization-samples.html" title="CDSS target tokenization samples" scrolling="no" onload="window.fitScaledIframeContainer(this.parentElement);"></iframe>
 </div>
-<p>The important detail is that training is ordinary language modeling. If <span class="math inline">\(T(Y) = (Z_1,\dots,Z_L)\)</span> is the target tokenization of the numeric label, the model minimizes token-level cross entropy <span class="math display">\[
+<p>The important detail is that training is ordinary language modeling. If <span class="math inline">\(c(Y) = (Z^c_1,\dots,Z^c_L)\)</span> is the canonical target tokenization of the numeric label, the model minimizes token-level cross entropy <span class="math display">\[
 \mathcal{L}_{\mathrm{CE}}(\theta)
   =
   -\mathbb{E}
   \left[
     \frac{1}{L}\sum_{\ell=1}^{L}
-      \log q_\theta(Z_\ell \mid X, Z_{&lt;\ell})
+      \log q_\theta(Z^c_\ell \mid X, Z^c_{&lt;\ell})
   \right].
 \]</span></p>
-<p>This is not MSE on the scalar memory value. It is CE on a symbolic sign-digit-exponent sequence. The numeric scale enters through the tokenizer’s rounding, clipping, and exponent range. A one-digit mistake can have very different numeric consequences depending on whether it occurs in the mantissa or the exponent. The digit targets are unnormalized discrete classes: predicting <code>&lt;6&gt;</code> means assigning probability to the token class <code>&lt;6&gt;</code>, not regressing to the scalar value <code>0.6</code>. That is a useful baseline because it follows the standard pretraining recipe, but it is also a hidden assumption: good token likelihood is not guaranteed to mean good numeric MSE.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="CE learns a numeric spelling">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>CE learns a numeric spelling
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>CE pretraining learns a symbolic sign-digit-exponent sequence. Numeric scale enters through the tokenizer’s rounding, clipping, and exponent range, so a single token error can have very different scalar consequences depending on whether it lands in the mantissa or exponent. The digit targets are discrete classes: predicting <code>&lt;6&gt;</code> means assigning probability to the token class <code>&lt;6&gt;</code>. This makes CE a useful RegressLM-style baseline and also makes token likelihood an indirect proxy for numeric MSE.</p>
+</div>
+</div>
+<p>There is an additional representation issue. The P10 grammar allows valid non-canonical strings with leading zero mantissas, and multiple valid strings can decode to exactly the same number. For example,</p>
+<pre class="text"><code>&lt;+&gt; &lt;1&gt; &lt;0&gt; &lt;0&gt; &lt;0&gt; &lt;E-3&gt;  -&gt; 1.0
+&lt;+&gt; &lt;0&gt; &lt;1&gt; &lt;0&gt; &lt;0&gt; &lt;E-2&gt;  -&gt; 1.0
+&lt;+&gt; &lt;0&gt; &lt;0&gt; &lt;1&gt; &lt;0&gt; &lt;E-1&gt;  -&gt; 1.0
+&lt;+&gt; &lt;0&gt; &lt;0&gt; &lt;0&gt; &lt;1&gt; &lt;E0&gt;   -&gt; 1.0</code></pre>
+<p>CE assigns training mass to the single string selected by the canonicalizer <span class="math inline">\(c(y)\)</span>. Numerically equivalent strings receive no target mass under this CE objective, even though <span class="math inline">\(\phi(z)\)</span> is correct. When the exact label falls outside the finite P10 grid or between grid points, the canonicalizer first rounds or clips to a representable token string. Thus the CE population target is <span class="math display">\[
+q^\ast_{\mathrm{CE}}(z\mid x)
+  =
+  \mathbb{P}(c(Y)=z\mid X=x),
+\]</span> The corresponding set-valued numeric target is <span class="math display">\[
+\mathcal{Z}(Y)=\{z:\phi(z)=Y\}.
+\]</span> For deterministic labels and infinite model capacity this distinction can be small, because the canonical string decodes to a good numeric approximation. For finite models it matters: probability mass on a numerically equivalent non-canonical rollout helps scalar prediction while receiving no CE credit.</p>
 <p>Decoding is also language-model-like. At each decoder step, impossible P10 tokens are masked out: the first position can only be a sign, middle positions are digits, and the final position is an exponent token. Evaluation samples 64 complete numeric decodes per example and reports the median decoded value before computing scalar metrics.</p>
+</section>
+<section id="lm-rl---token-rollouts-with-scalar-rewards" class="level3">
+<h3 class="anchored" data-anchor-id="lm-rl---token-rollouts-with-scalar-rewards">LM-RL - token rollouts with scalar rewards</h3>
+<p>LM-RL keeps the same constrained language-model policy as CE and changes the object being optimized. We draw rollout token sequences from the model itself: <span class="math display">\[
+Z_j \sim q_{\theta,T}(\cdot\mid x),\qquad j=1,\dots,R,
+\]</span> where <span class="math inline">\(T&gt;0\)</span> is the sampling temperature used for both sampling and sequence log-probabilities. Each rollout is parsed to a scalar <span class="math display">\[
+V_j := \phi(Z_j).
+\]</span> The loss functions then compare <span class="math inline">\(V_j\)</span> to the exact target value <span class="math inline">\(y\)</span> stored in the dataset. The learning signal rewards token strings whose extracted number is close to <span class="math inline">\(y\)</span>.</p>
+<p>The sequence score used by policy gradients is <span class="math display">\[
+\log q_{\theta,T}(Z_j\mid x)
+  =
+  \sum_{\ell=1}^L
+  \log q_{\theta,T}(Z_{j,\ell}\mid x,Z_{j,&lt;\ell}),
+\]</span> with the same P10 validity mask as CE decoding. The sampled scalar values are detached when constructing rewards or score weights; gradients flow through the sequence log-probability.</p>
+<section id="lm-rloo" class="level4">
+<h4 class="anchored" data-anchor-id="lm-rloo">LM-RLOO</h4>
+<p>LM-RLOO uses negative squared scalar error as the reward: <span class="math display">\[
+r_j := -(V_j-y)^2.
+\]</span> For <span class="math inline">\(R\geq 2\)</span> rollouts, the leave-one-out advantage is <span class="math display">\[
+A_j
+  =
+  r_j - \frac{1}{R-1}\sum_{k\ne j} r_k
+  =
+  \frac{R}{R-1}(r_j-\bar r),
+\qquad
+\bar r := \frac{1}{R}\sum_{k=1}^R r_k.
+\]</span> The minibatch surrogate minimized in code is <span class="math display">\[
+\widehat{\mathcal{L}}_{\mathrm{LM\mbox{-}RLOO}}
+  =
+  -\frac{1}{BR}
+  \sum_{b=1}^B\sum_{j=1}^R
+    A_{b,j}\log q_{\theta,T}(Z_{b,j}\mid x_b),
+\]</span> where <span class="math inline">\(A_{b,j}\)</span> is detached. The corresponding population objective is <span class="math display">\[
+J_{\mathrm{LM\mbox{-}RLOO}}(\theta)
+  =
+  \mathbb{E}_{X,Y}
+  \mathbb{E}_{Z\sim q_{\theta,T}(\cdot\mid X)}
+  \left[-(\phi(Z)-Y)^2\right].
+\]</span> Equivalently, LM-RLOO minimizes the expected squared error of decoded token rollouts: <span class="math display">\[
+\mathbb{E}_{X,Y,Z}\left[(\phi(Z)-Y)^2\right].
+\]</span> Thus all token strings with the same decoded value are interchangeable to LM-RLOO. If <span class="math inline">\(\phi(z)=y\)</span> exactly, the reward is zero regardless of whether <span class="math inline">\(z\)</span> is the canonical P10 string.</p>
+</section>
+<section id="lm-maxrl" class="level4">
+<h4 class="anchored" data-anchor-id="lm-maxrl">LM-MaxRL</h4>
+<p>LM-MaxRL replaces the raw squared-error reward by a normalized Gaussian likelihood score. Let <span class="math inline">\(\tau&gt;0\)</span> denote <code>score_std</code>. For a rollout <span class="math inline">\(z\)</span>, define <span class="math display">\[
+s_\tau(y,z)
+  :=
+  \exp\left(-\frac{(\phi(z)-y)^2}{2\tau^2}\right)
+  \in (0,1].
+\]</span> This is the Gaussian observation likelihood <span class="math inline">\(\mathcal{N}(y;\phi(z),\tau^2)\)</span> divided by its supremum <span class="math inline">\((\sqrt{2\pi}\tau)^{-1}\)</span>, so the maximum possible score is one. For one example, the marginal normalized likelihood under the LM policy is <span class="math display">\[
+S_{\theta,\tau}(x,y)
+  :=
+  \mathbb{E}_{Z\sim q_{\theta,T}(\cdot\mid x)}
+  [s_\tau(y,Z)].
+\]</span></p>
+<p>The degree-<span class="math inline">\(D\)</span> MaxRL target is the truncated log-likelihood objective <span class="math display">\[
+J_D(\theta)
+  =
+  \mathbb{E}_{X,Y}
+  \left[
+    -\sum_{k=1}^{D}
+    \frac{(1-S_{\theta,\tau}(X,Y))^k}{k}
+  \right].
+\]</span> As <span class="math inline">\(D\to\infty\)</span> this becomes <span class="math display">\[
+J_\infty(\theta)
+  =
+  \mathbb{E}_{X,Y}\left[\log S_{\theta,\tau}(X,Y)\right].
+\]</span></p>
+<p>The sampled implementation uses the same leave-one-out MaxRL estimator described in <a href="./gradient-estimator.html">MaxRL gradient estimator details</a>. For sampled scores <span class="math inline">\(s_j=s_\tau(y,Z_j)\)</span>, define complements <span class="math inline">\(a_j=1-s_j\)</span>. The leave-one-out weight for rollout <span class="math inline">\(j\)</span> is <span class="math display">\[
+\omega_j
+  =
+  \sum_{k=0}^{D-1}
+  \frac{e_k((a_i)_{i\ne j})}{\binom{R-1}{k}},
+\]</span> where <span class="math inline">\(e_k\)</span> is the <span class="math inline">\(k\)</span>-th elementary symmetric polynomial and <span class="math inline">\(e_0=1\)</span>. The current LM-MaxRL recipe always subtracts a rollout baseline: <span class="math display">\[
+s^{\mathrm{eff}}_j
+  =
+  \frac{R}{R-1}(s_j-\bar s),
+\qquad
+\bar s := \frac{1}{R}\sum_{i=1}^{R}s_i.
+\]</span> The surrogate loss is <span class="math display">\[
+\widehat{\mathcal{L}}_{\mathrm{LM\mbox{-}MaxRL}}
+  =
+  -\frac{1}{BR}
+  \sum_{b=1}^{B}\sum_{j=1}^{R}
+    \omega_{b,j}s^{\mathrm{eff}}_{b,j}
+    \log q_{\theta,T}(Z_{b,j}\mid x_b),
+\]</span> with the weights detached. By default, the implementation uses <span class="math inline">\(D=R\)</span> unless a separate degree is provided.</p>
+</section>
+<section id="optimization-targets-and-limits" class="level4">
+<h4 class="anchored" data-anchor-id="optimization-targets-and-limits">Optimization targets and limits</h4>
+<p>The CE and LM-RL methods can share a decoder and tokenizer while optimizing different population quantities:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Population target</th>
+<th>What is treated as correct?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>CE pretraining</td>
+<td>Maximize <span class="math inline">\(\mathbb{E}[\log q_\theta(c(Y)\mid X)]\)</span> token by token</td>
+<td>Only the canonical token string <span class="math inline">\(c(Y)\)</span></td>
+</tr>
+<tr class="even">
+<td>LM-RLOO</td>
+<td>Maximize <span class="math inline">\(\mathbb{E}[-(\phi(Z)-Y)^2]\)</span> for <span class="math inline">\(Z\sim q_{\theta,T}(\cdot\mid X)\)</span></td>
+<td>Any rollout whose decoded number is close to <span class="math inline">\(Y\)</span></td>
+</tr>
+<tr class="odd">
+<td>LM-MaxRL</td>
+<td>Maximize <span class="math inline">\(J_D\)</span> or, as <span class="math inline">\(D\to\infty\)</span>, <span class="math inline">\(\mathbb{E}[\log \mathbb{E}_{Z\sim q_{\theta,T}(\cdot\mid X)}s_\tau(Y,Z)]\)</span></td>
+<td>Any rollout with high Gaussian score after decoding</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled" title="Shared decoder, different target">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Shared decoder, different target
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>CE, LM-RLOO, and LM-MaxRL can use the same P10 decoder while learning from different signals. CE concentrates probability on a canonical string. LM-RLOO and LM-MaxRL score decoded scalar values, so token strings that parse to the same useful number are equivalent for the rollout objective.</p>
+</div>
+</div>
+<p>CE has no training rollout count or score standard deviation. As the evaluation sample count grows, its reported median prediction converges to the median of <span class="math inline">\(\phi(Z)\)</span> under the learned decoder distribution. This affects evaluation Monte Carlo error while leaving the CE training target unchanged.</p>
+<p>As the number of LM-RL training rollouts <span class="math inline">\(R\)</span> grows, LM-RLOO converges to the exact policy gradient of <span class="math inline">\(J_{\mathrm{LM\mbox{-}RLOO}}\)</span>. The leave-one-out baseline leaves the population target unchanged and changes estimator variance. LM-MaxRL converges to the gradient of the degree-<span class="math inline">\(D\)</span> MaxRL target when <span class="math inline">\(D\)</span> is fixed. Under the default choice <span class="math inline">\(D=R\)</span>, sending <span class="math inline">\(R\to\infty\)</span> also sends <span class="math inline">\(D\to\infty\)</span>, so the target approaches the log marginal score <span class="math inline">\(J_\infty\)</span>.</p>
+<p>The <code>score_std</code> limit only applies directly to LM-MaxRL and is separate from the rollout sampling temperature. LM-RLOO has no <code>score_std</code> hyperparameter in the current implementation. For LM-MaxRL:</p>
+<ul>
+<li>As <span class="math inline">\(\tau\to 0\)</span>, <span class="math inline">\(s_\tau(y,z)\)</span> approaches an indicator of exact numeric equality <span class="math inline">\(\phi(z)=y\)</span>. If <span class="math inline">\(y\)</span> is exactly representable, the limiting objective rewards the total probability of all exact representations <span class="math inline">\(\sum_{z:\phi(z)=y}q_\theta(z\mid x)\)</span>, including non-canonical strings. If <span class="math inline">\(y\)</span> falls between representable decoded values, the signal concentrates on the nearest grid points and can become extremely sparse in finite rollouts.</li>
+<li>As <span class="math inline">\(\tau\to\infty\)</span>, <span class="math inline">\(s_\tau(y,z)=1-(\phi(z)-y)^2/(2\tau^2)+O(\tau^{-4})\)</span>. Therefore <span class="math inline">\(\log S_{\theta,\tau}(x,y)\)</span> is <span class="math inline">\(-\mathbb{E}_{Z}[(\phi(Z)-y)^2]/(2\tau^2)+O(\tau^{-4})\)</span> up to constants. The target becomes expected decoded MSE, and the gradient scale vanishes like <span class="math inline">\(\tau^{-2}\)</span>.</li>
+</ul>
+<p>For LM-RLOO, introducing an artificial reward scale <span class="math inline">\(-(\phi(z)-y)^2/(2\tau^2)\)</span> would leave the optimum unchanged for any finite <span class="math inline">\(\tau&gt;0\)</span> and would simply rescale the gradient. The current code fixes this scale implicitly by using <span class="math inline">\(-(\phi(z)-y)^2\)</span>.</p>
+</section>
 </section>
 <section id="regression-head-model" class="level3">
 <h3 class="anchored" data-anchor-id="regression-head-model">Regression-head model</h3>
@@ -422,7 +617,7 @@ g_\theta(x)
   \frac{1}{B}\sum_{b=1}^{B}
     (g_\theta(x_b)-y_b)^2.
 \]</span></p>
-<p>This is the cleanest reference objective: if the evaluation target is MSE, then SL-MSE is optimizing it directly. It does not need rollouts, likelihood temperatures, tokenization choices, or a policy-gradient estimator.</p>
+<p>This is the cleanest reference objective: if the evaluation target is MSE, then SL-MSE optimizes it directly. It uses no rollouts, likelihood temperatures, tokenization choices, or policy-gradient estimator.</p>
 </section>
 <section id="rloo---gaussian-rollout-policy-with-leave-one-out-rewards" class="level3">
 <h3 class="anchored" data-anchor-id="rloo---gaussian-rollout-policy-with-leave-one-out-rewards">RLOO - Gaussian rollout policy with leave-one-out rewards</h3>
@@ -451,18 +646,18 @@ A_j
     A_{b,j}\,
     \log \pi_\theta(Z_{b,j}\mid x_b),
 \]</span> with the sampled advantages detached.</p>
-<p>The leave-one-out baseline is unbiased because it depends only on peer rollouts, not on the sampled rollout whose score is being multiplied. In the population limit, <span class="math display">\[
+<p>The leave-one-out baseline is unbiased because it depends only on peer rollouts for the current example. In the population limit, <span class="math display">\[
 \mathbb{E}_{Z\sim\mathcal{N}(g_\theta(x),\sigma^2)}
   [-(Z-y)^2]
   =
   -(g_\theta(x)-y)^2 - \sigma^2.
-\]</span> The extra <span class="math inline">\(\sigma^2\)</span> term is independent of <span class="math inline">\(\theta\)</span>, so maximizing expected RLOO reward has the same optimum and gradient direction as minimizing scalar MSE. Finite <span class="math inline">\(R\)</span> changes the variance of the gradient estimator, not the population target.</p>
+\]</span> The extra <span class="math inline">\(\sigma^2\)</span> term is independent of <span class="math inline">\(\theta\)</span>, so maximizing expected RLOO reward has the same optimum and gradient direction as minimizing scalar MSE. Finite <span class="math inline">\(R\)</span> changes the variance of the gradient estimator while preserving the population target.</p>
 </section>
 <section id="maxrl---likelihood-weighted-rollout-estimator" class="level3">
 <h3 class="anchored" data-anchor-id="maxrl---likelihood-weighted-rollout-estimator">MaxRL - likelihood-weighted rollout estimator</h3>
 <p>MaxRL uses the same Gaussian rollout policy, <span class="math display">\[
 Z_j \sim \mathcal{N}(g_\theta(x),\sigma^2),
-\]</span> but scores each rollout by a Gaussian observation likelihood of the target: <span class="math display">\[
+\]</span> and scores each rollout by a Gaussian observation likelihood of the target: <span class="math display">\[
 \ell_y(z)
   =
   \mathcal{N}(y; z, \sigma^2).
@@ -522,12 +717,12 @@ J_\infty(\theta) = \log \sigma_\theta.
   =
   -\frac{(g_\theta(x)-y)^2}{4\sigma^2}
   + \mathrm{const}.
-\]</span> Thus the infinite-rollout MaxRL objective is a positive rescaling of negative MSE plus a constant. As with RLOO, the finite-rollout estimator is the interesting object: it changes how noisy or selective the update is, not the ideal scalar target in this Gaussian setup.</p>
+\]</span> Thus the infinite-rollout MaxRL objective is a positive rescaling of negative MSE plus a constant. As with RLOO, the finite-rollout estimator is the interesting object: it changes how noisy or selective the update is while the ideal scalar target remains MSE in this Gaussian setup.</p>
 </section>
 </section>
 <section id="evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="evaluation">Evaluation</h2>
-<p>For now the writeup should focus on CDSS metrics rather than the full multi-space Code-Regression aggregate. The primary keys are</p>
+<p>This writeup focuses on CDSS metrics. The primary keys are</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -559,7 +754,7 @@ J_\infty(\theta) = \log \sigma_\theta.
 </div>
 <section id="evaluation-set-construction" class="level3">
 <h3 class="anchored" data-anchor-id="evaluation-set-construction">Evaluation set construction</h3>
-<p>The eval set is balanced by CDSS language. For each <code>cdss_language/&lt;language&gt;</code> group, the cache builder keeps at most <code>eval_cap_per_group</code> examples; in the current Modal recipes this cap is 256. Languages with fewer than 256 valid CDSS examples are not evaluated. Thus, if <span class="math inline">\(|\mathcal{L}|\)</span> languages survive the threshold, the pooled CDSS eval set contains exactly <span class="math display">\[
+<p>The eval set is balanced by CDSS language. For each <code>cdss_language/&lt;language&gt;</code> group, the cache builder keeps at most <code>eval_cap_per_group</code> examples; in the current Modal recipes this cap is 256. Languages with at least 256 valid CDSS examples enter the evaluation. Thus, if <span class="math inline">\(|\mathcal{L}|\)</span> languages survive the threshold, the pooled CDSS eval set contains exactly <span class="math display">\[
 256 \cdot |\mathcal{L}|
 \]</span> examples, with the same number of examples from each retained language.</p>
 <p>Selection is deterministic: examples are ordered by a stable hash of their identifier, then capped within language. Each retained row is assigned both its auxiliary language group, such as <code>cdss_language/Python</code>, and the pooled <code>space/CDSS</code> group.</p>
@@ -568,30 +763,22 @@ J_\infty(\theta) = \log \sigma_\theta.
   =
   \frac{1}{N}\sum_{i=1}^{N}(\hat y_i-y_i)^2.
 \]</span> MAE is the same pooled average with absolute error, and Spearman is computed once over the pooled CDSS target and prediction vectors.</p>
-<p>Language-mean metrics answer a different question. The auxiliary <code>cdss_language/&lt;language&gt;</code> groups first compute a metric within each language. Then <code>eval-core/&lt;metric&gt;/space/CDSS_language_mean</code> averages those language scores equally: <span class="math display">\[
+<p>Language-mean metrics shift the estimand. The auxiliary <code>cdss_language/&lt;language&gt;</code> groups first compute a metric within each language. Then <code>eval-core/&lt;metric&gt;/space/CDSS_language_mean</code> averages those language scores equally: <span class="math display">\[
 \widehat{m}_{\mathrm{language\ mean}}
   =
   \frac{1}{|\mathcal{L}|}
   \sum_{\ell\in\mathcal{L}}
     \widehat{m}_\ell.
 \]</span></p>
-<p>The two model families produce predictions differently before metrics are computed:</p>
+<p>The decoder-LM and regression-head routes produce predictions differently before metrics are computed:</p>
 <ul>
-<li>CE pretraining samples 64 numeric decodes and uses the per-example median decoded value as the prediction.</li>
+<li>CE pretraining, LM-RLOO, and LM-MaxRL sample numeric decodes and use the per-example median decoded value as the prediction.</li>
 <li>Regression-head methods produce one deterministic scalar prediction <span class="math inline">\(g_\theta(x)\)</span>.</li>
 </ul>
-<p>After that, both are evaluated with the same target/prediction metric code.</p>
-</section>
-</section>
-<section id="critical-notes" class="level2">
-<h2 class="anchored" data-anchor-id="critical-notes">Critical notes</h2>
-<ol type="1">
-<li>Raw memory and quantile-normalized memory are different tasks. Raw memory tests physical scale prediction; the normalized target tests within-language relative memory prediction.</li>
-<li>CE pretraining is a strong RegressLM-style baseline, but its loss is token CE over P10 digits, not numeric MSE. A CE improvement can come from better exponent/sign/digit likelihood without matching scalar error improvements one-for-one.</li>
-<li>In the current one-dimensional Gaussian rollout setup, RLOO and MaxRL have MSE as their exact infinite-rollout target up to constants or scale. Any empirical gap against SL-MSE should be interpreted as finite-rollout estimator behavior, optimizer interaction, or architecture/training difference, not as a fundamentally different Bayes target.</li>
-</ol>
+<p>After that, all methods are evaluated with the same target/prediction metric code.</p>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->
