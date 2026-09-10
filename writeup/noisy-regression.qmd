@@ -266,8 +266,10 @@ The predictor is a **Qwen2 decoder-only transformer initialized from scratch**, 
 The input embedding matrix has shape $24\times128$, assigning a learned vector to each vocabulary entry. Each transformer block applies attention and a feed-forward network with residual connections and normalization **before** each operation. Writing $H$ for the sequence of hidden states, a block has the form
 
 $$
-U=H+\operatorname{Attention}(\operatorname{RMSNorm}(H)),\qquad
-H_{\mathrm{next}}=U+\operatorname{MLP}(\operatorname{RMSNorm}(U)).
+\begin{aligned}
+U&=H+\operatorname{Attention}(\operatorname{RMSNorm}(H)),\\
+H_{\mathrm{next}}&=U+\operatorname{MLP}(\operatorname{RMSNorm}(U)).
+\end{aligned}
 $$ {#eq-transformer-block}
 
 **Attention reads the preceding sequence.** There are four query heads and two key/value heads, each with head dimension $128/4=32$. In this grouped-query arrangement, each key/value head is shared by two query heads. A head forms a weighted combination of values at accessible positions; the causal mask lets the current token attend to earlier tokens and itself. The four head outputs are concatenated and projected back to width 128. Attention is full-context, with a capacity of 1,024 tokens, no sliding window and no attention dropout.
