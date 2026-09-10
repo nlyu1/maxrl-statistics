@@ -152,8 +152,14 @@ def test_rendered_layout_links_and_screenshots(browser_page, tmp_path):
         )
     page.screenshot(path=str(tmp_path / "desktop-page.png"), full_page=True)
     page.set_viewport_size({"width": 390, "height": 844})
+    page.screenshot(path=str(tmp_path / "mobile-page.png"), full_page=True)
     assert page.evaluate(
         "document.documentElement.scrollWidth <= window.innerWidth + 1"
+    ), (
+        page.evaluate("""() => [...document.querySelectorAll('main *')]
+        .filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
+        .slice(0, 20).map(element => ({tag: element.tagName, class: element.className,
+            width: element.getBoundingClientRect().width, text: element.textContent.slice(0, 80)}))""")
     )
     for selector in [
         "#nr-population",
