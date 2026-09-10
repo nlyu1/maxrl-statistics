@@ -117,7 +117,9 @@
       if (bin >= 0 && bin < bins) histogram[bin]++;
       else outside++;
     }
-    const left = 55, top = 18, width = 705, height = 220;
+    const canvasWidth = Math.max(300, Math.min(790, byId("nr-pop-chart").clientWidth));
+    const narrow = canvasWidth < 500;
+    const left = 55, top = 18, width = canvasWidth - 85, height = 220;
     const ymax = Math.max(0.8, ...histogram.map((v) => v / (count * spacing))) * 1.08;
     const X = (x) => left + (x - lo) / (hi - lo) * width;
     const Y = (y) => top + height * (1 - y / ymax);
@@ -139,11 +141,12 @@
     }
     body += path(normal, `fill="none" stroke="${ink}" stroke-width="2.5" stroke-dasharray="6 4"`);
     if (!conditional && dimension === 2) body += path(laplace, `fill="none" stroke="${orange}" stroke-width="2"`);
-    for (let x = -5; x <= 5; x++) body += text(X(x), 258, x, 'text-anchor="middle"');
-    body += text(405, 281, "Clean signal s", 'text-anchor="middle" class="nr-axis-label"');
+    for (let x = narrow ? -4 : -5; x <= 5; x += narrow ? 2 : 1) body += text(X(x), 258, x, 'text-anchor="middle"');
+    body += text(left + width / 2, 281, "Clean signal s", 'text-anchor="middle" class="nr-axis-label"');
     body += text(16, 125, "Density", 'text-anchor="middle" transform="rotate(-90 16 125)"');
-    body += text(55, 308, `Teal: samples · Dashed: N(0, 1)${!conditional && dimension === 2 ? " · Orange: exact d = 2 Laplace law" : ""}`, 'class="nr-legend"');
-    svgFrame("nr-pop-chart", 790, 325, "Signal histogram and Gaussian comparison", body);
+    body += text(narrow ? 25 : 55, 308, `Teal: samples · Dashed: N(0, 1)${!narrow && !conditional && dimension === 2 ? " · Orange: exact d = 2 Laplace law" : ""}`, 'class="nr-legend"');
+    if (narrow && !conditional && dimension === 2) body += text(25, 326, "Orange: exact d = 2 Laplace law", 'class="nr-legend"');
+    svgFrame("nr-pop-chart", canvasWidth, narrow ? 342 : 325, "Signal histogram and Gaussian comparison", body);
     const variance = sum2 / count - (sum / count) ** 2;
     byId("nr-pop-readout").textContent = `${conditional ? "Fixed unit-norm rule: exactly Gaussian for every d." : `Across tasks, d = ${dimension}: theoretical excess kurtosis = ${compact(6 / dimension)} (Gaussian: 0).`} Population mean = 0; variance = 1. This draw: mean ${fixed(sum / count)}, variance ${fixed(variance)}. ${outside} of ${count.toLocaleString("en-US")} signals lie outside the plotted [−5, 5]; histogram normalization includes them.`;
   }
@@ -158,7 +161,9 @@
       return normalMass((lower - signal) / sigma, (upper - signal) / sigma);
     });
     const targetBin = quantize(signal, range, levels), span = Math.max(2.2 * spacing, 3.8 * sigma);
-    const xmin = signal - span, xmax = signal + span, left = 60, width = 690;
+    const canvasWidth = Math.max(300, Math.min(790, byId("nr-q-chart").clientWidth));
+    const narrow = canvasWidth < 500;
+    const xmin = signal - span, xmax = signal + span, left = 50, width = canvasWidth - 80;
     const X = (x) => left + (x - xmin) / (xmax - xmin) * width;
     const topBase = 157, bottomBase = 322;
     let body = "";
@@ -185,13 +190,15 @@
     body += line(X(signal), 20, X(signal), bottomBase, `stroke="${orange}" stroke-width="1.5" stroke-dasharray="5 4"`);
     body += text(left + 7, 18, `Gaussian density (peak ${compact(peak)})`, 'class="nr-legend"');
     body += text(left + 7, 191, "Probability per output bin", 'class="nr-legend"');
-    for (let i = 0; i <= 4; i++) {
-      const x = xmin + (xmax - xmin) * i / 4;
+    const ticks = narrow ? 2 : 4;
+    for (let i = 0; i <= ticks; i++) {
+      const x = xmin + (xmax - xmin) * i / ticks;
       body += text(X(x), 345, compact(x), 'text-anchor="middle"');
     }
-    body += text(405, 367, "Continuous noisy value y = s + ε", 'text-anchor="middle" class="nr-axis-label"');
-    body += text(60, 393, "Orange line: clean s · Orange bar: q(s) · Gray lines: bin boundaries", 'class="nr-legend"');
-    svgFrame("nr-q-chart", 790, 410, "Gaussian noise density and output-bin probabilities", body);
+    body += text(canvasWidth / 2, 367, "Continuous noisy value y = s + ε", 'text-anchor="middle" class="nr-axis-label"');
+    body += text(narrow ? 20 : 50, 393, narrow ? "Orange line: clean s · Orange bar: q(s)" : "Orange line: clean s · Orange bar: q(s) · Gray lines: bin boundaries", 'class="nr-legend"');
+    if (narrow) body += text(20, 413, "Gray lines: bin boundaries", 'class="nr-legend"');
+    svgFrame("nr-q-chart", canvasWidth, narrow ? 431 : 410, "Gaussian noise density and output-bin probabilities", body);
     byId("nr-q-sigma-value").textContent = compact(sigma);
     byId("nr-phase-value").textContent = fixed(phase, 2);
     byId("nr-q-readout").textContent = `Δ = ${compact(spacing)}; Δ/σ = ${compact(spacing / sigma)}; rounding scale Δ/√12 = ${compact(spacing / Math.sqrt(12))}. Clean s = ${fixed(signal, 6)}. Probability of retaining its noiseless bin: ${(100 * probabilities[targetBin]).toFixed(3)}%. ${levels === 256 && range === 3 ? "Working scalar codec." : "Counterfactual codec: the training vocabulary still uses 256 levels on [−3, 3]."}`;
@@ -348,6 +355,11 @@
   });
   byId("nr-new-task").addEventListener("click", () => { geometryTask = taskDraw(++geometrySeed, 128); setRuleControls(geometryTask.w); updateGeometry(); });
   byId("nr-prompt-format").addEventListener("change", updatePrompts);
+  let resizeFrame;
+  window.addEventListener("resize", () => {
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => { updatePopulation(); updateQuantization(); });
+  });
 
   const data = document.createElement("script");
   data.id = "nr-example-data"; data.type = "application/json"; data.textContent = JSON.stringify(example);
