@@ -3,6 +3,7 @@ project:
   output-dir: ../docs
   resources:
     - assets/**
+    - noisy-regression/**
 
 website:
   title: "MaxRL Statistics"
@@ -16,6 +17,8 @@ website:
         text: Bag of Words
       - href: corpus-regression.qmd
         text: Corpus Regression (WIP)
+      - href: noisy-regression.qmd
+        text: Noisy Regression
       - href: scalar-pretrain.qmd
         text: Scalar Pretrain (WIP)
       - href: code_regression.qmd
