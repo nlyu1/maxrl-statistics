@@ -1,0 +1,15 @@
+```{=html}
+<div class="nr-widget" id="nr-population">
+  <div class="nr-controls">
+    <label>Sampling view
+      <select id="nr-pop-mode"><option value="population">Across tasks: redraw w and x</option><option value="conditional">Within a task: fixed ‖w‖ = 1</option></select>
+    </label>
+    <label>Dimension d
+      <select id="nr-dimension"><option>1</option><option selected>2</option><option>4</option><option>16</option><option>64</option></select>
+    </label>
+  </div>
+  <div id="nr-pop-chart" class="nr-plot"></div>
+  <p class="nr-readout" id="nr-pop-readout" aria-live="polite"></p>
+  <noscript>Enable JavaScript to explore the distribution. At d = 2, the clean across-task signal is Laplace with variance one; conditional on a unit-norm rule it is standard Gaussian.</noscript>
+</div>
+```

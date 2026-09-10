@@ -1,0 +1,30 @@
+```{=html}
+<div class="nr-widget" id="nr-geometry">
+  <div class="nr-controls">
+    <label>Observations n <output id="nr-n-value" for="nr-n"></output>
+      <input id="nr-n" type="range" min="1" max="128" step="1" value="64">
+    </label>
+    <label>Noise σ <output id="nr-g-sigma-value" for="nr-g-sigma"></output>
+      <input id="nr-g-sigma" type="range" min="-4" max="0" step="0.05" value="-3" aria-label="Task noise, log10 standard deviation">
+    </label>
+    <label>Rule angle <output id="nr-angle-value" for="nr-angle"></output>
+      <input id="nr-angle" type="range" min="-180" max="180" step="0.1" value="-53.1">
+    </label>
+    <label>Rule norm ‖w‖ <output id="nr-norm-value" for="nr-norm"></output>
+      <input id="nr-norm" type="range" min="0.05" max="3" step="0.001" value="1">
+    </label>
+  </div>
+  <div class="nr-actions">
+    <button type="button" id="nr-g-default">Reset working setting</button>
+    <button type="button" id="nr-new-task">Draw a new task</button>
+    <label class="nr-check"><input type="checkbox" id="nr-show-quantized"> Show decoded token centers</label>
+  </div>
+  <div class="nr-panels">
+    <section><h4>The input plane</h4><div id="nr-input-chart" class="nr-plot"></div></section>
+    <section><h4>Inferring the hidden coefficients</h4><div id="nr-coefficient-chart" class="nr-plot"></div></section>
+  </div>
+  <p class="nr-readout" id="nr-g-readout" aria-live="polite"></p>
+  <p class="nr-small" id="nr-g-detail"></p>
+  <noscript>At d = 2 the rule is a plane, and its level sets in the input plane are parallel lines. More observations in independent directions reduce uncertainty about its two coefficients.</noscript>
+</div>
+```

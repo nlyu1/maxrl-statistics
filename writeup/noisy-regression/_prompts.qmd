@@ -1,0 +1,25 @@
+```{=html}
+<div class="nr-widget" id="nr-prompts">
+  <div class="nr-controls">
+    <label>Prompt format
+      <select id="nr-prompt-format"><option value="new">New: SEP / EOO / QUERY / EOS</option><option value="legacy">Legacy: X / Y</option></select>
+    </label>
+  </div>
+  <p id="nr-prompt-summary" class="nr-readout" aria-live="polite"></p>
+  <details>
+    <summary>Inspect all 64 observations and the query</summary>
+    <p class="nr-small">The first block is the prompt. The second block is the supervised continuation.</p>
+    <pre class="nr-token-block" id="nr-prompt-text" tabindex="0" aria-label="Complete 64-observation prompt"></pre>
+    <p><strong>Supervised continuation</strong></p>
+    <pre class="nr-token-block" id="nr-answer-text"></pre>
+  </details>
+  <details>
+    <summary>Inspect the underlying continuous values</summary>
+    <p class="nr-small" id="nr-latent-description"></p>
+    <div class="nr-table-scroll" tabindex="0" role="region" aria-label="Continuous values for the complete example">
+      <table class="nr-data-table"><thead><tr><th>Row</th><th>x₁</th><th>x₂</th><th>Clean s</th><th>Noise ε</th><th>Observed y</th></tr></thead><tbody id="nr-example-rows"></tbody></table>
+    </div>
+  </details>
+  <noscript>Enable JavaScript to inspect the complete example. The static three-observation example above shows both formats without JavaScript.</noscript>
+</div>
+```
