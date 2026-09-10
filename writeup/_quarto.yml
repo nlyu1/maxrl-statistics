@@ -3,7 +3,8 @@ project:
   output-dir: ../docs
   resources:
     - assets/**
-    - noisy-regression/**
+    - noisy-regression/*.css
+    - noisy-regression/*.js
 
 website:
   title: "MaxRL Statistics"
