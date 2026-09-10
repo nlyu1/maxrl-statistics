@@ -79,7 +79,7 @@
     return `<polygon points="${points}" fill="${color}" stroke="white" stroke-width="1"><title>${title}</title></polygon>`;
   }
   function squareAxes(xmin, xmax, ymin, ymax, xLabel, yLabel) {
-    const left = 70, top = 22, size = 350;
+    const left = 88, top = 22, size = 314;
     const X = (x) => left + (x - xmin) / (xmax - xmin) * size;
     const Y = (y) => top + (ymax - y) / (ymax - ymin) * size;
     let axes = "";
@@ -87,12 +87,13 @@
       const x = xmin + (xmax - xmin) * i / 4, y = ymin + (ymax - ymin) * i / 4;
       axes += line(X(x), top, X(x), top + size, 'stroke="#e3eaf0"');
       axes += line(left, Y(y), left + size, Y(y), 'stroke="#e3eaf0"');
-      axes += text(X(x), 390, compact(x), 'text-anchor="middle"');
-      axes += text(left - 8, Y(y) + 4, compact(y), 'text-anchor="end"');
+      const tick = (v, range) => Number(v.toFixed(Math.min(8, Math.max(0, Math.ceil(-Math.log10(range / 4)) + 1)))).toString();
+      axes += text(X(x), 356, tick(x, xmax - xmin), 'text-anchor="middle" style="font-size:11px"');
+      axes += text(left - 8, Y(y) + 4, tick(y, ymax - ymin), 'text-anchor="end" style="font-size:11px"');
     }
     axes += `<rect x="${left}" y="${top}" width="${size}" height="${size}" fill="none" stroke="#a5b7c2"/>`;
-    axes += text(left + size / 2, 412, xLabel, 'text-anchor="middle" class="nr-axis-label"');
-    axes += text(16, top + size / 2, yLabel, `text-anchor="middle" class="nr-axis-label" transform="rotate(-90 16 ${top + size / 2})"`);
+    axes += text(left + size / 2, 378, xLabel, 'text-anchor="middle" class="nr-axis-label"');
+    axes += text(14, top + size / 2, yLabel, `text-anchor="middle" class="nr-axis-label" transform="rotate(-90 14 ${top + size / 2})"`);
     return { X, Y, axes, left, top, size };
   }
   function signalColor(s) {
@@ -271,9 +272,9 @@
     body += text(plane.X(end[0]) + 8, plane.Y(end[1]) - 8, "w direction");
     body += marker(plane.X(query.x[0]), plane.Y(query.x[1]), "star", ink, `Query x = (${fixed(query.x[0], 5)}, ${fixed(query.x[1], 5)}); clean s = ${fixed(querySignal, 5)}`, 9);
     if (showDecoded) body += marker(plane.X(decode(query.x[0])), plane.Y(decode(query.x[1])), "diamond", orange, "Decoded query input", 4);
-    body += text(70, 434, "Circles: noisy observations · Star: query", 'class="nr-legend"');
-    body += text(70, 453, showDecoded ? "Squares: decoded x and y · Color scale: −3 blue to +3 orange" : "Background: clean s · Color scale: −3 blue to +3 orange", 'class="nr-legend"');
-    svgFrame("nr-input-chart", 440, 470, "Two-dimensional input plane, observations, query and hidden rule", body);
+    body += text(48, 402, "Circles: noisy observations · Star: query", 'class="nr-legend"');
+    body += text(48, 422, showDecoded ? "Squares: decoded x and y · Blue −3 → orange +3" : "Background: clean s · Blue −3 → orange +3", 'class="nr-legend"');
+    svgFrame("nr-input-chart", 440, 440, "Two-dimensional input plane, observations, query and hidden rule", body);
 
     const [a, b, c] = continuous.covariance;
     const disc = Math.hypot(a - c, 2 * b), eig1 = (a + c + disc) / 2;
@@ -294,9 +295,9 @@
     posteriorBody += `<circle cx="${coefficients.X(continuous.mean[0])}" cy="${coefficients.Y(continuous.mean[1])}" r="4" fill="${teal}"><title>Continuous posterior mean (${fixed(continuous.mean[0], 7)}, ${fixed(continuous.mean[1], 7)})</title></circle>`;
     posteriorBody += marker(coefficients.X(w[0]), coefficients.Y(w[1]), "star", ink, `Hidden w = (${fixed(w[0], 7)}, ${fixed(w[1], 7)})`, 8);
     if (showDecoded) posteriorBody += marker(coefficients.X(decoded.mean[0]), coefficients.Y(decoded.mean[1]), "diamond", orange, `Decoded-input ridge mean (${fixed(decoded.mean[0], 7)}, ${fixed(decoded.mean[1], 7)})`, 6);
-    posteriorBody += text(70, 434, "Teal: continuous posterior (95%) · Star: true w", 'class="nr-legend"');
-    posteriorBody += text(70, 453, showDecoded ? "Orange diamond: decoded-input ridge mean" : `Ellipse semi-axes: ${compact(r1)}, ${compact(r2)}`, 'class="nr-legend"');
-    svgFrame("nr-coefficient-chart", 440, 470, "Continuous Bayesian posterior over the two coefficients", posteriorBody);
+    posteriorBody += text(48, 402, "Teal: continuous posterior (95%) · Star: true w", 'class="nr-legend"');
+    posteriorBody += text(48, 422, showDecoded ? "Orange diamond: decoded-input ridge mean" : `Ellipse semi-axes: ${compact(r1)}, ${compact(r2)}`, 'class="nr-legend"');
+    svgFrame("nr-coefficient-chart", 440, 440, "Continuous Bayesian posterior over the two coefficients", posteriorBody);
 
     const predictiveVariance = a * query.x[0] ** 2 + 2 * b * query.x[0] * query.x[1] + c * query.x[1] ** 2;
     byId("nr-n-value").textContent = n;

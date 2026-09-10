@@ -85,11 +85,20 @@
 .nr-data-table th, .nr-data-table td { padding: 0.3rem 0.45rem; text-align: right; white-space: nowrap; }
 .nr-data-table th { position: sticky; top: 0; background: #eaf1f4; }
 .nr-data-table tbody tr:nth-child(even) { background: #edf4f6; }
+main.content mjx-container[display="true"] {
+  min-width: 0 !important;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+}
+main.content table { display: block; max-width: 100%; overflow-x: auto; }
 @media (max-width: 650px) {
   .nr-widget { padding: 0.8rem; }
   .nr-panels { grid-template-columns: 1fr; }
   .nr-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #nr-population .nr-controls, #nr-prompts .nr-controls { grid-template-columns: 1fr; }
+  main.content mjx-container[display="true"] { text-align: left !important; }
 }
 @media print {
   .nr-actions, .nr-controls { display: none; }
