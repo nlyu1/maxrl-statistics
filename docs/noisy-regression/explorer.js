@@ -7,7 +7,8 @@
   const compact = (x) => Math.abs(x) !== 0 && (Math.abs(x) < 0.001 || Math.abs(x) >= 10000)
     ? x.toExponential(2) : Number(x.toPrecision(4)).toString();
   const ink = "#18334c", teal = "#087f8c", orange = "#ba5511";
-  const delta = 6 / 255;
+  const canonical = Object.freeze({ sigma: 0.25, range: 4, levels: 256 });
+  const delta = 2 * canonical.range / (canonical.levels - 1);
 
   function randomSource(seed) {
     let state = seed >>> 0;
@@ -30,7 +31,7 @@
   }
 
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
-  function quantize(z, range = 3, levels = 256) {
+  function quantize(z, range = canonical.range, levels = canonical.levels) {
     if (!Number.isFinite(z)) throw new Error("Cannot quantize a nonfinite scalar");
     const spacing = 2 * range / (levels - 1);
     let lo = 0, hi = levels - 1;
@@ -41,7 +42,7 @@
     }
     return lo;
   }
-  const decode = (z) => -3 + quantize(z) * delta;
+  const decode = (z) => -canonical.range + quantize(z) * delta;
   function digits(z) {
     const q = quantize(z);
     return [Math.floor(q / 16).toString(16).toUpperCase(), (q % 16).toString(16).toUpperCase()];
@@ -201,7 +202,7 @@
     svgFrame("nr-q-chart", canvasWidth, narrow ? 431 : 410, "Gaussian noise density and output-bin probabilities", body);
     byId("nr-q-sigma-value").textContent = compact(sigma);
     byId("nr-phase-value").textContent = fixed(phase, 2);
-    byId("nr-q-readout").textContent = `Δ = ${compact(spacing)}; Δ/σ = ${compact(spacing / sigma)}; rounding scale Δ/√12 = ${compact(spacing / Math.sqrt(12))}. Clean s = ${fixed(signal, 6)}. Probability of retaining its noiseless bin: ${(100 * probabilities[targetBin]).toFixed(3)}%. ${levels === 256 && range === 3 ? "Working scalar codec." : "Counterfactual codec: the training vocabulary still uses 256 levels on [−3, 3]."}`;
+    byId("nr-q-readout").textContent = `Δ = ${compact(spacing)}; Δ/σ = ${compact(spacing / sigma)}; rounding scale Δ/√12 = ${compact(spacing / Math.sqrt(12))}. Clean s = ${fixed(signal, 6)}. Probability of retaining its noiseless bin: ${(100 * probabilities[targetBin]).toFixed(3)}%. ${levels === canonical.levels && range === canonical.range ? "Canonical scalar codec." : "Counterfactual codec: the training vocabulary uses 256 levels on [−4, 4]."}`;
     byId("nr-q-range-note").textContent = `Population tails outside ±${range}: input coordinate ${(200 * normalSurvival(range)).toFixed(3)}%; d = 2 clean signal ${(100 * Math.exp(-Math.sqrt(2) * range)).toFixed(3)}%. These are range exceedances, not endpoint-bin probabilities. Probability calculations use the Gaussian CDF formula (numerical approximation); tallies can round to 100%.`;
     byId("nr-quantization").dataset.sameBinProbability = probabilities[targetBin];
     byId("nr-quantization").dataset.probabilitySum = probabilities.reduce((a, b) => a + b, 0);
@@ -313,8 +314,8 @@
     byId("nr-norm-value").textContent = compact(norm);
     byId("nr-g-readout").textContent = `w = (${fixed(w[0])}, ${fixed(w[1])}); this rule's signal variance = ${compact(norm * norm)}; population signal variance = 1. Query clean s = ${fixed(querySignal, 5)}, noisy y = ${fixed(queryY, 5)}. Continuous posterior mean prediction = ${fixed(dot(continuous.mean, query.x), 5)}; clean predictive SD = ${compact(Math.sqrt(predictiveVariance))}, noisy predictive SD = ${compact(Math.sqrt(predictiveVariance + sigma * sigma))}.`;
     const scalars = [...rows.flatMap((r) => [...r.x, r.y]), ...query.x, queryY];
-    const clipped = scalars.filter((z) => Math.abs(z) > 3).length;
-    byId("nr-g-detail").textContent = `Population SNR = ${compact(1 / (sigma * sigma))}; this task's SNR = ${compact(norm * norm / (sigma * sigma))}. ${clipped}/${scalars.length} displayed raw scalars exceed the codec range ±3. ${showDecoded ? `Decoded-input ridge query prediction = ${fixed(dot(decoded.mean, query.x.map(decode)), 5)}. The posterior panel expands to include it; no calibrated uncertainty for quantized data is implied.` : "Enable decoded centers to reveal input rounding and clipping; most movements are small on the input-plane scale."}`;
+    const clipped = scalars.filter((z) => Math.abs(z) > canonical.range).length;
+    byId("nr-g-detail").textContent = `Population SNR = ${compact(1 / (sigma * sigma))}; this task's SNR = ${compact(norm * norm / (sigma * sigma))}. ${clipped}/${scalars.length} displayed raw scalars exceed the codec range ±${canonical.range}. ${showDecoded ? `Decoded-input ridge query prediction = ${fixed(dot(decoded.mean, query.x.map(decode)), 5)}. The posterior panel expands to include it; no calibrated uncertainty for quantized data is implied.` : "Enable decoded centers to reveal input rounding and clipping; most movements are small on the input-plane scale."}`;
     byId("nr-geometry").dataset.posteriorTrace = a + c;
     byId("nr-geometry").dataset.observations = n;
   }
@@ -322,9 +323,9 @@
   const promptTask = taskDraw(93271, 64);
   const example = {
     w: promptTask.w,
-    sigma: 0.001,
-    rows: promptTask.rows.map((r) => ({ x: r.x, signal: dot(promptTask.w, r.x), noise: 0.001 * r.z, y: dot(promptTask.w, r.x) + 0.001 * r.z })),
-    query: { x: promptTask.query.x, signal: dot(promptTask.w, promptTask.query.x), noise: 0.001 * promptTask.query.z, y: dot(promptTask.w, promptTask.query.x) + 0.001 * promptTask.query.z },
+    sigma: canonical.sigma,
+    rows: promptTask.rows.map((r) => ({ x: r.x, signal: dot(promptTask.w, r.x), noise: canonical.sigma * r.z, y: dot(promptTask.w, r.x) + canonical.sigma * r.z })),
+    query: { x: promptTask.query.x, signal: dot(promptTask.w, promptTask.query.x), noise: canonical.sigma * promptTask.query.z, y: dot(promptTask.w, promptTask.query.x) + canonical.sigma * promptTask.query.z },
   };
   function updatePrompts() {
     const modern = byId("nr-prompt-format").value === "new";
@@ -335,7 +336,7 @@
     const promptLength = prompt.split(/\s+/).length, answerLength = answer.split(/\s+/).length;
     byId("nr-prompt-text").textContent = prompt;
     byId("nr-answer-text").textContent = answer;
-    byId("nr-prompt-summary").textContent = `64 observations · d = 2 · σ = 0.001 · ${promptLength} prompt tokens + ${answerLength} supervised tokens = ${promptLength + answerLength} total. Same continuous example in both formats.`;
+    byId("nr-prompt-summary").textContent = `64 observations · d = 2 · σ = ${example.sigma} · ${promptLength} prompt tokens + ${answerLength} supervised tokens = ${promptLength + answerLength} total. Same continuous example in both formats.`;
     byId("nr-latent-description").textContent = `Hidden w = (${fixed(example.w[0], 8)}, ${fixed(example.w[1], 8)}). Values below are rounded for display only; tokens are computed from the full-precision draw. The hidden w, clean signals and noises are shown here for explanation, never supplied to the model.`;
     byId("nr-example-rows").innerHTML = [...example.rows, example.query].map((r, i) => `<tr><td>${i < 64 ? i + 1 : "Query"}</td>${[...r.x, r.signal, r.noise, r.y].map((v) => `<td>${fixed(v, 7)}</td>`).join("")}</tr>`).join("");
     byId("nr-prompts").dataset.promptLength = promptLength;
@@ -345,13 +346,13 @@
   for (const id of ["nr-q-sigma", "nr-phase", "nr-range", "nr-levels"]) byId(id).addEventListener("input", updateQuantization);
   for (const id of ["nr-n", "nr-g-sigma", "nr-angle", "nr-norm", "nr-show-quantized"]) byId(id).addEventListener("input", updateGeometry);
   byId("nr-q-default").addEventListener("click", () => {
-    byId("nr-q-sigma").value = -3; byId("nr-phase").value = 0; byId("nr-range").value = 3; byId("nr-levels").value = 256; updateQuantization();
+    byId("nr-q-sigma").value = Math.log10(canonical.sigma); byId("nr-phase").value = 0; byId("nr-range").value = canonical.range; byId("nr-levels").value = canonical.levels; updateQuantization();
   });
   byId("nr-q-boundary").addEventListener("click", () => { byId("nr-phase").value = 0.5; updateQuantization(); });
-  byId("nr-q-resolved").addEventListener("click", () => { byId("nr-q-sigma").value = -1; updateQuantization(); });
+  byId("nr-q-hidden").addEventListener("click", () => { byId("nr-q-sigma").value = -3; updateQuantization(); });
   byId("nr-g-default").addEventListener("click", () => {
     geometrySeed = 61739; geometryTask = taskDraw(geometrySeed, 128); setRuleControls(geometryTask.w);
-    byId("nr-n").value = 64; byId("nr-g-sigma").value = -3; byId("nr-show-quantized").checked = false; updateGeometry();
+    byId("nr-n").value = 64; byId("nr-g-sigma").value = Math.log10(canonical.sigma); byId("nr-show-quantized").checked = false; updateGeometry();
   });
   byId("nr-new-task").addEventListener("click", () => { geometryTask = taskDraw(++geometrySeed, 128); setRuleControls(geometryTask.w); updateGeometry(); });
   byId("nr-prompt-format").addEventListener("change", updatePrompts);

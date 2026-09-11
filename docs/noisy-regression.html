@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-09-11">
+<meta name="dcterms.date" content="2026-09-12">
 <meta name="description" content="The noisy-regression problem, the behavior of its variables, quantization and autoregressive prediction, followed by the current experiment and prompt formats.">
 
 <title>Noisy regression – MaxRL Statistics</title>
@@ -202,7 +202,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">September 11, 2026</p>
+      <p class="date">September 12, 2026</p>
     </div>
   </div>
   
@@ -228,7 +228,7 @@ window.Quarto = {
 y_i=w^\top x_i+\epsilon_i,\qquad
 s_*=w^\top x_*,\qquad y_*=s_*+\epsilon_*.
 \tag{1}\]</span></span></p>
-<p>The context is <span class="math inline">\(D=\{(x_i,y_i)\}_{i=1}^n\)</span>; the query input is <span class="math inline">\(x_*\)</span>. The model receives their <strong>quantized</strong> representations and learns a distribution over the quantized noisy answer <span class="math inline">\(y_*\)</span>. We also evaluate against the clean signal <span class="math inline">\(s_*\)</span>. Neither <span class="math inline">\(w\)</span>, the noise values, nor the unrounded numbers are exposed to the model. Noise affects outputs, not the underlying input coordinates. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/data.py">Data generator</a>.</p>
+<p>The context is <span class="math inline">\(D=\{(x_i,y_i)\}_{i=1}^n\)</span>; the query input is <span class="math inline">\(x_*\)</span>. The model receives their <strong>quantized</strong> representations and learns a distribution over the quantized noisy answer <span class="math inline">\(y_*\)</span>. We also evaluate against the clean signal <span class="math inline">\(s_*\)</span>. Neither <span class="math inline">\(w\)</span>, the noise values, nor the unrounded numbers are exposed to the model. Noise affects outputs, not the underlying input coordinates. <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/data.py">Data generator</a>.</p>
 <p>There are two different sample counts: <span class="math inline">\(n\)</span> observations help infer the rule <strong>within one prompt</strong>, whereas <span class="math inline">\(M\)</span> training examples teach the transformer across <strong>many independently drawn rules</strong>. Increasing <span class="math inline">\(M\)</span> does not give a held-out prompt more observations. The context and query share <span class="math inline">\(w\)</span> within a prompt, so their outputs are not independent after marginalizing over that shared vector.</p>
 <section id="from-the-latent-rule-to-the-observed-output" class="level3" data-number="1.1">
 <h3 data-number="1.1" class="anchored" data-anchor-id="from-the-latent-rule-to-the-observed-output"><span class="header-section-number">1.1</span> From the latent rule to the observed output</h3>
@@ -281,7 +281,7 @@ s_*\mid D,x_*\sim\mathcal N(x_*^\top\mu,\;x_*^\top\Sigma x_*),\qquad
 y_*\mid D,x_*\sim\mathcal N(x_*^\top\mu,\;x_*^\top\Sigma x_*+\sigma^2).
 \tag{5}\]</span></span></p>
 <p>The first variance describes uncertainty about the hidden rule; the extra <span class="math inline">\(\sigma^2\)</span> is fresh query noise. When <span class="math inline">\(X^\top X\approx nI_d\)</span>, the average clean predictive variance is approximately <span class="math inline">\(d\sigma^2/(n+d\sigma^2)\)</span>. This is an intuition for a well-covered design, not an exact finite-sample identity. Increasing <span class="math inline">\(d\)</span> at fixed <span class="math inline">\(n\)</span> makes inference harder even though signal variance stays one. For <span class="math inline">\(n&lt;d\)</span>, noiseless observations cannot determine all directions of <span class="math inline">\(w\)</span>.</p>
-<p>The implementation uses this continuous-data posterior as an optimistic reference. Applying the same formula to decoded token centers gives a <strong>plug-in ridge approximation</strong>, not the exact Bayesian answer to the quantized-input problem: rounding and clipping change the observation model. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/references.py">Reference implementations</a>.</p>
+<p>The implementation uses this continuous-data posterior as an optimistic reference. Applying the same formula to decoded token centers gives a <strong>plug-in ridge approximation</strong>, not the exact Bayesian answer to the quantized-input problem: rounding and clipping change the observation model. <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/references.py">Reference implementations</a>.</p>
 </section>
 </section>
 <section id="sec-quantization" class="level2" data-number="2">
@@ -381,13 +381,13 @@ p_\theta(a_{1:m}\mid P)
 </section>
 <section id="sec-defaults" class="level2" data-number="4">
 <h2 data-number="4" class="anchored" data-anchor-id="sec-defaults"><span class="header-section-number">4</span> The current experiment</h2>
-<p>The working configuration below uses the newer delimited prompt; <a href="#sec-prompts" class="quarto-xref">Section&nbsp;5</a> compares it with the legacy format. The interactive figures in this section illustrate the specified data-generating process. They are not measurements from a trained model or records extracted from the training pool.</p>
+<p>The canonical specification below uses a 10M-example training pool, batch size 1,024, 20K optimizer updates, learning rate <span class="math inline">\(10^{-4}\)</span> with 200 warmup updates, and <span class="math inline">\(d=2\)</span>, <span class="math inline">\(\sigma=0.25\)</span>, <span class="math inline">\(n=64\)</span>. It uses the delimited prompt; <a href="#sec-prompts" class="quarto-xref">Section&nbsp;5</a> compares it with the legacy format. The interactive figures in this section illustrate the specified data-generating process. They are not measurements from a trained model or records extracted from the training pool.</p>
 <section id="configuration" class="level3" data-number="4.1">
 <h3 data-number="4.1" class="anchored" data-anchor-id="configuration"><span class="header-section-number">4.1</span> Configuration</h3>
 <div id="tbl-configuration" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-tbl figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-configuration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Table&nbsp;1: The 10M configuration discussed on this page. Data, architecture, and budget follow the delimited-format revision; the warmup starting rate is the requested working convention.
+Table&nbsp;1: The canonical configuration discussed on this page. The requested noise level is <span class="math inline">\(\sigma=0.25\)</span>; the provenance note below records the inspected launcher’s differing noise default.
 </figcaption>
 <div aria-describedby="tbl-configuration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
@@ -399,7 +399,7 @@ Table&nbsp;1: The 10M configuration discussed on this page. Data, architecture, 
 <thead>
 <tr class="header">
 <th>Component</th>
-<th>Working setting</th>
+<th>Canonical setting</th>
 <th>Meaning</th>
 </tr>
 </thead>
@@ -426,12 +426,12 @@ Table&nbsp;1: The 10M configuration discussed on this page. Data, architecture, 
 </tr>
 <tr class="odd">
 <td>Output noise</td>
-<td><span class="math inline">\(\sigma=0.001\)</span></td>
-<td>Independent context and query draws; variance <span class="math inline">\(10^{-6}\)</span></td>
+<td><span class="math inline">\(\sigma=0.25\)</span></td>
+<td>Independent context and query draws; variance <span class="math inline">\(0.0625\)</span></td>
 </tr>
 <tr class="even">
 <td>Scalar representation</td>
-<td>256 centers on <span class="math inline">\([-3,3]\)</span>; two base-16 digits</td>
+<td>256 centers on <span class="math inline">\([-4,4]\)</span>; two base-16 digits</td>
 <td>Shared across inputs and outputs</td>
 </tr>
 <tr class="odd">
@@ -451,18 +451,18 @@ Table&nbsp;1: The 10M configuration discussed on this page. Data, architecture, 
 </tr>
 <tr class="even">
 <td>Training budget</td>
-<td>80,000 optimizer updates</td>
-<td>Batch 128, microbatch 128</td>
+<td>20,000 optimizer updates</td>
+<td>Batch 1,024, microbatch 1,024</td>
 </tr>
 <tr class="odd">
 <td>Learning rate</td>
 <td><span class="math inline">\(10^{-4}\)</span></td>
-<td>Linear warmup over the first 2% of updates, then constant</td>
+<td>Linear warmup over the first 1% of updates, then constant</td>
 </tr>
 <tr class="even">
 <td>Warmup start</td>
 <td><span class="math inline">\(10^{-5}\)</span></td>
-<td>One-tenth of the target rate; 1,600 warmup updates</td>
+<td>One-tenth of the target rate; 200 warmup updates</td>
 </tr>
 <tr class="odd">
 <td>Optimizer</td>
@@ -487,7 +487,7 @@ Table&nbsp;1: The 10M configuration discussed on this page. Data, architecture, 
 s\sim\operatorname{Laplace}\!\left(0,\frac{1}{\sqrt 2}\right),\qquad
 p(s)=\frac{1}{\sqrt 2}\exp(-\sqrt 2|s|).
 \tag{8}\]</span></span></p>
-<p>The clean population signal still has variance one, while the individual task variance <span class="math inline">\(\|w\|^2\)</span> varies considerably: at <span class="math inline">\(d=2\)</span>, its variance is also one. With <span class="math inline">\(\sigma=0.001\)</span>, the population SNR is <span class="math inline">\(10^6\)</span>, the signal-to-noise standard-deviation ratio is <span class="math inline">\(10^3\)</span>, and the decibel value is <span class="math inline">\(60\)</span> dB. The noisy marginal is a convolution of the Laplace law above with a Gaussian of variance <span class="math inline">\(10^{-6}\)</span>.</p>
+<p>The clean population signal still has variance one, while the individual task variance <span class="math inline">\(\|w\|^2\)</span> varies considerably: at <span class="math inline">\(d=2\)</span>, its variance is also one. With <span class="math inline">\(\sigma=0.25\)</span>, the population SNR is <span class="math inline">\(16\)</span>, the signal-to-noise standard-deviation ratio is <span class="math inline">\(4\)</span>, and the decibel value is approximately <span class="math inline">\(12.04\)</span> dB. The noisy marginal is a convolution of the Laplace law above with a Gaussian of variance <span class="math inline">\(0.0625\)</span>, giving total output variance <span class="math inline">\(1.0625\)</span>.</p>
 <div id="fig-population" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-population-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -513,45 +513,45 @@ Figure&nbsp;1: Across-task signal distributions versus the conditional distribut
 </section>
 <section id="numerical-resolution-and-clipping" class="level3" data-number="4.3">
 <h3 data-number="4.3" class="anchored" data-anchor-id="numerical-resolution-and-clipping"><span class="header-section-number">4.3</span> Numerical resolution and clipping</h3>
-<p>Every input coordinate and output uses <strong>256 centers on <span class="math inline">\([-3,3]\)</span></strong>, so <span class="math inline">\(\Delta=6/255\approx0.0235294\)</span>. An index is represented by two base-16 digit tokens, <span class="math inline">\(q=16a+b\)</span>. Their visible names are <code>0</code>–<code>9</code>, <code>A</code>–<code>F</code>; these are vocabulary entries, not characters passed through a text tokenizer. This gives 256 possible scalar answers with a small digit vocabulary, a short autoregressive answer, and a distribution small enough to enumerate. The range and resolution are experimental design choices, not a claim of optimal quantization.</p>
-<p>The codec searches stored midpoints to handle floating-point ties consistently and rejects nonfinite values. For example, <span class="math inline">\(1\mapsto170\mapsto\texttt{A A}\)</span> and decodes to <span class="math inline">\(1\)</span> exactly. Zero lies between centers 127 and 128, so <span class="math inline">\(0\mapsto\texttt{8 0}\)</span> and decodes to <span class="math inline">\(3/255\approx0.011765\)</span>. There is no exact zero center, and the maximum interior rounding error is <span class="math inline">\(\Delta/2\approx0.011765\)</span>. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/codec.py">Scalar codec</a>.</p>
-<p>At <span class="math inline">\(\sigma=0.001\)</span>, <span class="math inline">\(\Delta/\sigma\approx23.53\)</span>: the injected noise is mostly hidden by the grid, except near boundaries. The uniform-rounding scale is <span class="math inline">\(\Delta/\sqrt{12}\approx0.006792\)</span>, with variance <span class="math inline">\(\Delta^2/12\approx4.61\times10^{-5}\)</span>, about 46 times the injected noise variance. The caveats in <a href="#sec-quantization" class="quarto-xref">Section&nbsp;2</a> apply: this is a scale comparison, not a calibrated error floor.</p>
-<p>At <span class="math inline">\(A=3\)</span>, a standard-Gaussian input coordinate lies outside the range with probability about <strong>0.270%</strong>. For the <span class="math inline">\(d=2\)</span> clean signal, <a href="#eq-laplace" class="quarto-xref">Equation&nbsp;8</a> instead gives</p>
+<p>Every input coordinate and output uses <strong>256 centers on <span class="math inline">\([-4,4]\)</span></strong>, so <span class="math inline">\(\Delta=8/255\approx0.0313725\)</span>. An index is represented by two base-16 digit tokens, <span class="math inline">\(q=16a+b\)</span>. Their visible names are <code>0</code>–<code>9</code>, <code>A</code>–<code>F</code>; these are vocabulary entries, not characters passed through a text tokenizer. This gives 256 possible scalar answers with a small digit vocabulary, a short autoregressive answer, and a distribution small enough to enumerate. The range and resolution are experimental design choices, not a claim of optimal quantization.</p>
+<p>The codec searches stored midpoints to handle floating-point ties consistently and rejects nonfinite values. For example, <span class="math inline">\(1\mapsto159\mapsto\texttt{9 F}\)</span> and decodes to <span class="math inline">\(252/255\approx0.988235\)</span>. Zero lies between centers 127 and 128, so <span class="math inline">\(0\mapsto\texttt{8 0}\)</span> and decodes to <span class="math inline">\(4/255\approx0.015686\)</span>. There is no exact zero center, and the maximum interior rounding error is <span class="math inline">\(\Delta/2\approx0.015686\)</span>. <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/codec.py">Scalar codec</a>.</p>
+<p>At <span class="math inline">\(\sigma=0.25\)</span>, <span class="math inline">\(\Delta/\sigma\approx0.1255\)</span>: one noise standard deviation spans about eight bins, so the grid resolves the injected noise. The uniform-rounding scale is <span class="math inline">\(\Delta/\sqrt{12}\approx0.009056\)</span>, with variance <span class="math inline">\(\Delta^2/12\approx8.20\times10^{-5}\)</span>, about <span class="math inline">\(0.131\%\)</span> of the injected noise variance. The caveats in <a href="#sec-quantization" class="quarto-xref">Section&nbsp;2</a> apply: this is a scale comparison, not a calibrated error floor.</p>
+<p>At <span class="math inline">\(A=4\)</span>, a standard-Gaussian input coordinate lies outside the range with probability about <strong>0.00633%</strong>. For the <span class="math inline">\(d=2\)</span> clean signal, <a href="#eq-laplace" class="quarto-xref">Equation&nbsp;8</a> instead gives</p>
 <p><span class="math display">\[
-\Pr(|s|&gt;3)=e^{-3\sqrt2}\approx1.437\%.
+\Pr(|s|&gt;4)=e^{-4\sqrt2}\approx0.3493\%.
 \]</span></p>
-<p>A standard-Gaussian tail calculation would therefore understate output clipping. Noisy-output clipping is a different probability, though close at <span class="math inline">\(\sigma=0.001\)</span>. Actual saved-pool clipping fractions are recorded in dataset metadata; these count raw range exceedances, not all endpoint-bin assignments.</p>
+<p>A standard-Gaussian tail calculation would therefore understate output clipping. Noisy-output clipping must use the Laplace–Gaussian convolution at <span class="math inline">\(\sigma=0.25\)</span>, rather than the clean-signal tail above. Actual saved-pool clipping fractions are recorded in dataset metadata; these count raw range exceedances, not all endpoint-bin assignments.</p>
 <div id="fig-quantization" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-quantization-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="nr-widget" id="nr-quantization">
   <div class="nr-controls">
     <label>Noise σ <output id="nr-q-sigma-value" for="nr-q-sigma"></output>
-      <input id="nr-q-sigma" type="range" min="-4" max="0" step="0.05" value="-3" aria-label="Quantization noise, log10 standard deviation">
+      <input id="nr-q-sigma" type="range" min="-4" max="0" step="any" value="-0.6020599913279624" aria-label="Quantization noise, log10 standard deviation">
     </label>
     <label>Position between centers <output id="nr-phase-value" for="nr-phase"></output>
       <input id="nr-phase" type="range" min="0" max="1" step="0.01" value="0" aria-label="Clean signal phase from one bin center to the next">
     </label>
     <label>Range ±A
-      <select id="nr-range"><option>1</option><option selected="">3</option><option>5</option><option>8</option></select>
+      <select id="nr-range"><option>1</option><option>3</option><option selected="">4</option><option>5</option><option>8</option></select>
     </label>
     <label>Scalar levels K
       <select id="nr-levels"><option>16</option><option>64</option><option selected="">256</option><option>1024</option></select>
     </label>
   </div>
   <div class="nr-actions">
-    <button type="button" id="nr-q-default">Working setting</button>
+    <button type="button" id="nr-q-default">Canonical setting</button>
     <button type="button" id="nr-q-boundary">At a bin boundary</button>
-    <button type="button" id="nr-q-resolved">Resolve the noise</button>
+    <button type="button" id="nr-q-hidden">Noise below grid spacing</button>
   </div>
   <div id="nr-q-chart" class="nr-plot"></div>
   <p class="nr-readout" id="nr-q-readout" aria-live="polite"></p>
   <p class="nr-small" id="nr-q-range-note"></p>
-  <noscript>The working spacing is 0.0235294, about 23.53 times σ. At a bin center almost all noise stays in that bin; at a midpoint it splits approximately equally between neighboring bins.</noscript>
+  <noscript>The canonical spacing is 0.0313725 on [−4, 4], about 0.1255 times σ = 0.25. One noise standard deviation spans about eight bins, so several neighboring answers have appreciable probability.</noscript>
 </div>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-quantization-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: A magnified scalar view: move the clean signal from one center to the next and compare Gaussian noise with bin probabilities. The phase 0.5 is a midpoint. The initial view uses the working setting; other ranges and level counts are explanatory counterfactuals.
+Figure&nbsp;2: A magnified scalar view: move the clean signal from one center to the next and compare Gaussian noise with bin probabilities. The phase 0.5 is a midpoint. The initial view uses the canonical setting; other ranges and level counts are explanatory counterfactuals.
 </figcaption>
 </figure>
 </div>
@@ -576,20 +576,20 @@ H_{\mathrm{next}}&amp;=U+\operatorname{MLP}(\operatorname{RMSNorm}(U)).
 \right].
 \]</span></p>
 <p>After the four blocks, a final RMSNorm precedes the vocabulary projection. The output projection shares the input embedding matrix, so a normalized hidden vector <span class="math inline">\(h_t\)</span> produces logits <span class="math inline">\(Eh_t\)</span> for <span class="math inline">\(E\in\mathbb R^{24\times128}\)</span>. The hidden state at the query’s final <code>[Y]</code> predicts the first answer digit; the state after that digit predicts the second. The following state predicts <code>[EOS]</code> in the new format. The digit and termination losses use the output restrictions described in <a href="#sec-prompts" class="quarto-xref">Section&nbsp;5</a>.</p>
-<p>The 24-token model has <strong>988,288 trainable parameters</strong>. All embeddings and transformer weights are learned from these synthetic problems; using the Qwen2 architecture does not imply using pretrained Qwen2 weights. The legacy 20-token version has <strong>987,776 parameters</strong> because its tied embedding matrix has four fewer rows. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/model.py">Model configuration and construction</a>, <a href="https://github.com/huggingface/transformers/blob/v4.57.6/src/transformers/models/qwen2/modeling_qwen2.py">Qwen2 block implementation</a>.</p>
+<p>The 24-token model has <strong>988,288 trainable parameters</strong>. All embeddings and transformer weights are learned from these synthetic problems; using the Qwen2 architecture does not imply using pretrained Qwen2 weights. The legacy 20-token version has <strong>987,776 parameters</strong> because its tied embedding matrix has four fewer rows. <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/model.py">Model configuration and construction</a>, <a href="https://github.com/huggingface/transformers/blob/v4.57.6/src/transformers/models/qwen2/modeling_qwen2.py">Qwen2 block implementation</a>.</p>
 </section>
 <section id="optimization-and-frozen-data" class="level3" data-number="4.5">
 <h3 data-number="4.5" class="anchored" data-anchor-id="optimization-and-frozen-data"><span class="header-section-number">4.5</span> Optimization and frozen data</h3>
-<p>There are <span class="math inline">\(80{,}000\times128=10{,}240{,}000\)</span> training <strong>presentations</strong>, equivalent to <strong>1.024 passes</strong> through the 10M pool: one full pass, then 240,000 examples from a new shuffle. Reshuffling does not redraw <span class="math inline">\(w\)</span>, inputs, noises, or targets. The experiment does not set fixed generation or training seeds; saving a pool freezes its actual draws, and checkpoints retain RNG state for resumption.</p>
-<p>To make “warmup from one-tenth” precise on this page, number updates from <span class="math inline">\(s=1\)</span> and let <span class="math inline">\(W=1{,}600\)</span>. The intended schedule is</p>
+<p>There are <span class="math inline">\(20{,}000\times1{,}024=20{,}480{,}000\)</span> training <strong>presentations</strong>, equivalent to <strong>2.048 passes</strong> through the 10M pool: two full passes, then 480,000 examples from a third shuffle. Reshuffling does not redraw <span class="math inline">\(w\)</span>, inputs, noises, or targets. The experiment does not set fixed generation or training seeds; saving a pool freezes its actual draws, and checkpoints retain RNG state for resumption.</p>
+<p>Number updates from <span class="math inline">\(s=1\)</span> and let <span class="math inline">\(W=200\)</span>. The canonical scheduler uses</p>
 <p><span id="eq-warmup"><span class="math display">\[
 \eta_s=
 \begin{cases}
 10^{-5}+(10^{-4}-10^{-5})\dfrac{s-1}{W-1}, &amp; 1\leq s\leq W,\\[6pt]
-10^{-4}, &amp; W&lt;s\leq80{,}000.
+10^{-4}, &amp; W&lt;s\leq20{,}000.
 \end{cases}
 \tag{10}\]</span></span></p>
-<p>“Constant after warmup” refers to the learning rate; AdamW’s weight decay remains active. The effective batch and microbatch are both 128, so each update uses one forward/backward pass. BF16 is used for the forward computation, with FP32 master weights, optimizer states and loss computation.</p>
+<p>Update 1 uses exactly <span class="math inline">\(10^{-5}\)</span>, update 200 reaches <span class="math inline">\(10^{-4}\)</span>, and updates 201 through 20,000 retain that rate. “Constant after warmup” refers to the learning rate; AdamW’s weight decay remains active. The effective batch and microbatch are both 1,024, so each update uses one forward/backward pass. BF16 is used for the forward computation, with FP32 master weights, optimizer states and loss computation.</p>
 <div class="callout callout-style-default callout-note callout-titled" title="Configuration provenance and launcher differences">
 <div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-1-contents" aria-controls="callout-1" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
@@ -602,8 +602,8 @@ H_{\mathrm{next}}&amp;=U+\operatorname{MLP}(\operatorname{RMSNorm}(U)).
 </div>
 <div id="callout-1" class="callout-1-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
-<p>The <a href="https://github.com/VincentWangzt/maxrl/tree/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression">delimited-format revision <code>c576954</code></a> supplies the 10M pool, 24-token codec and 988,288-parameter model. Its checked-in launcher warms from zero. The later <a href="https://github.com/VincentWangzt/maxrl/tree/22fbb14dd3cb9bd5fcaf469cf01ba885728a1397/noisy-regression">legacy comparison revision <code>22fbb14</code></a>, checked out when this writeup was prepared, uses a 1M pool, the legacy 20-token codec and warmup from zero. Therefore the 10M / <span class="math inline">\(10^{-5}\)</span> warmup-start combination above is the <strong>requested working specification</strong>, not a claim that either unmodified launcher reproduces it.</p>
-<p>In the inspected constant-LR scheduler, setting the minimum rate to <span class="math inline">\(10^{-5}\)</span> gives <span class="math inline">\(10^{-5}+9\times10^{-5}s/W\)</span> during warmup: its first applied rate is <span class="math inline">\(1.005625\times10^{-5}\)</span> rather than exactly <span class="math inline">\(10^{-5}\)</span>. <a href="#eq-warmup" class="quarto-xref">Equation&nbsp;10</a> states the desired endpoint convention explicitly. This page changes documentation, not experiment code or saved run manifests. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/model.py">Scheduler implementation</a>.</p>
+<p>The inspected <a href="https://github.com/VincentWangzt/maxrl/tree/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression">experiment revision <code>9526f2d</code></a> supplies the 10M pool size, <span class="math inline">\([-4,4]\)</span> codec, delimited prompt and model configuration. Its <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/sft.sh">training launcher</a> uses batch/microbatch 1,024, 20K updates, peak learning rate <span class="math inline">\(10^{-4}\)</span> and 200 warmup updates starting at one-tenth of the peak. The <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/model.py">scheduler implementation</a> implements <a href="#eq-warmup" class="quarto-xref">Equation&nbsp;10</a>, including both endpoints.</p>
+<p>The <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/prepare.sh">preparation launcher at that revision</a> still sets <span class="math inline">\(\sigma=0.1\)</span>. This page adopts the requested canonical value <strong><span class="math inline">\(\sigma=0.25\)</span></strong> throughout its calculations and demonstrations. Reproducing this specification requires a pool generated at <span class="math inline">\(\sigma=0.25\)</span>; the unmodified preparation launcher does not produce it. This documentation update does not change experiment code or relabel saved pools and run manifests.</p>
 </div>
 </div>
 </div>
@@ -612,7 +612,7 @@ H_{\mathrm{next}}&amp;=U+\operatorname{MLP}(\operatorname{RMSNorm}(U)).
 <h3 data-number="4.6" class="anchored" data-anchor-id="explore-a-two-dimensional-task"><span class="header-section-number">4.6</span> Explore a two-dimensional task</h3>
 <p>Here <span class="math inline">\(w=(w_1,w_2)\)</span> gives the two slopes of the plane <span class="math inline">\(s=w_1x_1+w_2x_2\)</span>. Equal-output points lie on parallel lines in the input plane, perpendicular to <span class="math inline">\(w\)</span>. Observations in different directions constrain both slopes.</p>
 <p>In <a href="#fig-geometry" class="quarto-xref">Figure&nbsp;3</a>, the left panel keeps both input coordinates visible. The colored background is the hidden clean rule, circles are noisy observations, and the star is the query. The right panel shows the posterior over the <strong>two coefficients</strong>, so you can see how the context identifies the plane. At low noise its uncertainty region becomes very small; its axes automatically zoom.</p>
-<p>Try increasing noise to <span class="math inline">\(0.1\)</span>, reducing the context to one or two observations, rotating the hidden rule, and showing quantized inputs. Changing <span class="math inline">\(n\)</span> reuses a prefix of the same observations; changing noise rescales the same noise draws. This makes the effect of each control easier to compare. Drawing a new task samples a fresh <span class="math inline">\(w\)</span> from the stated prior; manually changing its angle or norm explores a chosen rule conditional on that <span class="math inline">\(w\)</span>.</p>
+<p>Try reducing noise to <span class="math inline">\(0.001\)</span>, reducing the context to one or two observations, rotating the hidden rule, and showing quantized inputs. Changing <span class="math inline">\(n\)</span> reuses a prefix of the same observations; changing noise rescales the same noise draws. This makes the effect of each control easier to compare. Drawing a new task samples a fresh <span class="math inline">\(w\)</span> from the stated prior; manually changing its angle or norm explores a chosen rule conditional on that <span class="math inline">\(w\)</span>.</p>
 <div id="fig-geometry" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-geometry-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -622,7 +622,7 @@ H_{\mathrm{next}}&amp;=U+\operatorname{MLP}(\operatorname{RMSNorm}(U)).
       <input id="nr-n" type="range" min="1" max="128" step="1" value="64">
     </label>
     <label>Noise σ <output id="nr-g-sigma-value" for="nr-g-sigma"></output>
-      <input id="nr-g-sigma" type="range" min="-4" max="0" step="0.05" value="-3" aria-label="Task noise, log10 standard deviation">
+      <input id="nr-g-sigma" type="range" min="-4" max="0" step="any" value="-0.6020599913279624" aria-label="Task noise, log10 standard deviation">
     </label>
     <label>Rule angle <output id="nr-angle-value" for="nr-angle"></output>
       <input id="nr-angle" type="range" min="-180" max="180" step="0.1" value="-53.1">
@@ -632,7 +632,7 @@ H_{\mathrm{next}}&amp;=U+\operatorname{MLP}(\operatorname{RMSNorm}(U)).
     </label>
   </div>
   <div class="nr-actions">
-    <button type="button" id="nr-g-default">Reset working setting</button>
+    <button type="button" id="nr-g-default">Reset canonical setting</button>
     <button type="button" id="nr-new-task">Draw a new task</button>
     <label class="nr-check"><input type="checkbox" id="nr-show-quantized"> Show decoded token centers</label>
   </div>
@@ -650,7 +650,7 @@ Figure&nbsp;3: One illustrative <span class="math inline">\(d=2\)</span> task. T
 </figcaption>
 </figure>
 </div>
-<p>The geometric controls are explanatory counterfactuals. The production dataset schemas validate their configured dimension and context length; they are not arbitrary-dimension launchers. The full 64-observation prompt below always uses a separate fixed illustrative draw with the working codec.</p>
+<p>The geometric controls are explanatory counterfactuals. The canonical launchers use <span class="math inline">\(d=2\)</span> and <span class="math inline">\(n=64\)</span>; other dimensions require matching dataset layouts and sufficient model sequence capacity. The full 64-observation prompt below always uses a separate fixed illustrative draw with the canonical codec.</p>
 </section>
 </section>
 <section id="sec-prompts" class="level2" data-number="5">
@@ -658,7 +658,7 @@ Figure&nbsp;3: One illustrative <span class="math inline">\(d=2\)</span> task. T
 <p>There is no English instruction in the actual training input. The displayed spaces and line breaks below make tokens readable; they are not extra tokens. Each digit and each bracketed marker is one vocabulary entry. The hidden coefficient vector is shared by all observations in a prompt and omitted from the sequence.</p>
 <section id="a-concrete-miniature-example" class="level3" data-number="5.1">
 <h3 data-number="5.1" class="anchored" data-anchor-id="a-concrete-miniature-example"><span class="header-section-number">5.1</span> A concrete miniature example</h3>
-<p>For readability, first use just three observations, with the illustrative hidden rule <span class="math inline">\(w=(0.6,-0.8)\)</span>:</p>
+<p>For readability, first use just three observations, with the illustrative hidden rule <span class="math inline">\(w=(0.6,-0.8)\)</span> and hand-chosen noises at the <span class="math inline">\(\sigma=0.25\)</span> scale. Both prompt formats below use the current <span class="math inline">\([-4,4]\)</span> scalar grid:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 16%">
@@ -683,61 +683,61 @@ Figure&nbsp;3: One illustrative <span class="math inline">\(d=2\)</span> task. T
 <td>Context 1</td>
 <td><span class="math inline">\((1,0)\)</span></td>
 <td><span class="math inline">\(0.6\)</span></td>
-<td><span class="math inline">\(0.001\)</span></td>
-<td><span class="math inline">\(0.601\)</span></td>
-<td><code>A A 8 0</code>; <code>9 9</code></td>
+<td><span class="math inline">\(0.25\)</span></td>
+<td><span class="math inline">\(0.85\)</span></td>
+<td><code>9 F 8 0</code>; <code>9 B</code></td>
 </tr>
 <tr class="even">
 <td>Context 2</td>
 <td><span class="math inline">\((0,1)\)</span></td>
 <td><span class="math inline">\(-0.8\)</span></td>
-<td><span class="math inline">\(-0.001\)</span></td>
-<td><span class="math inline">\(-0.801\)</span></td>
-<td><code>8 0 A A</code>; <code>5 D</code></td>
+<td><span class="math inline">\(-0.25\)</span></td>
+<td><span class="math inline">\(-1.05\)</span></td>
+<td><code>8 0 9 F</code>; <code>5 E</code></td>
 </tr>
 <tr class="odd">
 <td>Context 3</td>
 <td><span class="math inline">\((-1,1)\)</span></td>
 <td><span class="math inline">\(-1.4\)</span></td>
-<td><span class="math inline">\(0.0005\)</span></td>
-<td><span class="math inline">\(-1.3995\)</span></td>
-<td><code>5 5 A A</code>; <code>4 4</code></td>
+<td><span class="math inline">\(0.125\)</span></td>
+<td><span class="math inline">\(-1.275\)</span></td>
+<td><code>6 0 9 F</code>; <code>5 7</code></td>
 </tr>
 <tr class="even">
 <td>Query</td>
 <td><span class="math inline">\((0.5,-0.5)\)</span></td>
 <td><span class="math inline">\(0.7\)</span></td>
-<td><span class="math inline">\(0.001\)</span></td>
-<td><span class="math inline">\(0.701\)</span></td>
-<td><code>9 5 6 A</code>; <code>9 D</code></td>
+<td><span class="math inline">\(0.25\)</span></td>
+<td><span class="math inline">\(0.95\)</span></td>
+<td><code>8 F 7 0</code>; <code>9 E</code></td>
 </tr>
 </tbody>
 </table>
-<p>The answer <code>9 D</code> is index <span class="math inline">\(16\times9+13=157\)</span>, which decodes to <span class="math inline">\(0.694117647\ldots\)</span>, not the unrounded target <span class="math inline">\(0.701\)</span>. The table’s latent values explain how the example was made; they are not included in either prompt.</p>
+<p>The answer <code>9 E</code> is index <span class="math inline">\(16\times9+14=158\)</span>, which decodes to <span class="math inline">\(0.956862745\ldots\)</span>, not the unrounded target <span class="math inline">\(0.95\)</span>. The table’s latent values explain how the example was made; they are not included in either prompt.</p>
 <section id="legacy-shared-observation-and-query-markers" class="level4" data-number="5.1.1">
 <h4 data-number="5.1.1" class="anchored" data-anchor-id="legacy-shared-observation-and-query-markers"><span class="header-section-number">5.1.1</span> Legacy: shared observation and query markers</h4>
 <p><strong>Prompt supplied to the model:</strong></p>
 <pre class="text"><code>[BOS]
-[X] A A 8 0 [Y] 9 9
-[X] 8 0 A A [Y] 5 D
-[X] 5 5 A A [Y] 4 4
-[X] 9 5 6 A [Y]</code></pre>
+[X] 9 F 8 0 [Y] 9 B
+[X] 8 0 9 F [Y] 5 E
+[X] 6 0 9 F [Y] 5 7
+[X] 8 F 7 0 [Y]</code></pre>
 <p><strong>Supervised continuation:</strong></p>
-<pre class="text"><code>9 D</code></pre>
+<pre class="text"><code>9 E</code></pre>
 <p>Adjacent coordinate digit pairs are separated by their fixed positions, with no explicit coordinate separator. Every observation is eight tokens at <span class="math inline">\(d=2\)</span>. The final <code>[X] ... [Y]</code> is the query; there is no distinct query marker, observation terminator or EOS. The vocabulary is 16 digits plus <code>[X]</code>, <code>[Y]</code>, <code>[PAD]</code>, <code>[BOS]</code>, totaling <strong>20 tokens</strong>. The four-layer model has <strong>987,776 parameters</strong>. <a href="https://github.com/VincentWangzt/maxrl/blob/22fbb14dd3cb9bd5fcaf469cf01ba885728a1397/noisy-regression/noisy_regression/codec.py">Legacy codec</a>.</p>
 </section>
 <section id="new-explicit-coordinate-and-observation-boundaries" class="level4" data-number="5.1.2">
 <h4 data-number="5.1.2" class="anchored" data-anchor-id="new-explicit-coordinate-and-observation-boundaries"><span class="header-section-number">5.1.2</span> New: explicit coordinate and observation boundaries</h4>
 <p><strong>The same numerical example as a new-format prompt:</strong></p>
 <pre class="text"><code>[BOS]
-[X] A A [SEP] 8 0 [Y] 9 9 [EOO]
-[X] 8 0 [SEP] A A [Y] 5 D [EOO]
-[X] 5 5 [SEP] A A [Y] 4 4 [EOO]
-[QUERY] [X] 9 5 [SEP] 6 A [Y]</code></pre>
+[X] 9 F [SEP] 8 0 [Y] 9 B [EOO]
+[X] 8 0 [SEP] 9 F [Y] 5 E [EOO]
+[X] 6 0 [SEP] 9 F [Y] 5 7 [EOO]
+[QUERY] [X] 8 F [SEP] 7 0 [Y]</code></pre>
 <p><strong>Supervised continuation:</strong></p>
-<pre class="text"><code>9 D [EOS]</code></pre>
-<p><code>[SEP]</code> separates coordinates within <span class="math inline">\(x\)</span>; <code>[EOO]</code> ends a complete observed <span class="math inline">\((x,y)\)</span> pair. <code>[QUERY]</code> announces the held-out input, and <code>[EOS]</code> terminates its answer. Each observation now takes ten tokens. The vocabulary is 16 digits plus <code>[X]</code>, <code>[SEP]</code>, <code>[Y]</code>, <code>[EOO]</code>, <code>[QUERY]</code>, <code>[PAD]</code>, <code>[BOS]</code>, <code>[EOS]</code>, totaling <strong>24 tokens</strong>. These extra four embeddings account for the parameter increase of <span class="math inline">\(4\times128=512\)</span>. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/codec.py">Delimited codec</a>.</p>
-<p>Explicit boundaries make the structure available through dedicated tokens instead of only fixed positions. That is an architectural motivation, <strong>not evidence that the new format learns better</strong>. It also lengthens the sequence and adds a termination loss, so a comparison should account for both effects. The 1M legacy pool and 10M new pool are an additional confound if comparing those particular runs.</p>
+<pre class="text"><code>9 E [EOS]</code></pre>
+<p><code>[SEP]</code> separates coordinates within <span class="math inline">\(x\)</span>; <code>[EOO]</code> ends a complete observed <span class="math inline">\((x,y)\)</span> pair. <code>[QUERY]</code> announces the held-out input, and <code>[EOS]</code> terminates its answer. Each observation now takes ten tokens. The vocabulary is 16 digits plus <code>[X]</code>, <code>[SEP]</code>, <code>[Y]</code>, <code>[EOO]</code>, <code>[QUERY]</code>, <code>[PAD]</code>, <code>[BOS]</code>, <code>[EOS]</code>, totaling <strong>24 tokens</strong>. These extra four embeddings account for the parameter increase of <span class="math inline">\(4\times128=512\)</span>. <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/codec.py">Delimited codec</a>.</p>
+<p>Explicit boundaries make the structure available through dedicated tokens instead of only fixed positions. That is an architectural motivation, <strong>not evidence that the new format learns better</strong>. It also lengthens the sequence and adds a termination loss, so a comparison should account for both effects. The examples here hold the numerical grid and observations fixed to isolate syntax; comparing trained models additionally requires controlling pool size, noise and optimization budget.</p>
 </section>
 </section>
 <section id="lengths-and-the-training-objective" class="level3" data-number="5.2">
@@ -789,11 +789,11 @@ Figure&nbsp;3: One illustrative <span class="math inline">\(d=2\)</span> task. T
 =-\log p_\theta(a\mid\text{prompt})
 -\log p_\theta(b\mid\text{prompt},a).
 \]</span></p>
-<p>Both answer softmaxes are restricted to the 16 digit IDs. The new format additionally trains <span class="math inline">\(-\log p_\theta(\texttt{[EOS]}\mid\text{prompt},a,b)\)</span> using the full 24-token vocabulary. The optimization loss sums the applicable token terms, then averages over examples. Reported <strong>answer NLL</strong> remains the two-digit quantity for comparability. No loss is applied to <code>[SEP]</code>, <code>[EOO]</code> or the other prompt markers. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/model.py">Loss implementation</a>.</p>
+<p>Both answer softmaxes are restricted to the 16 digit IDs. The new format additionally trains <span class="math inline">\(-\log p_\theta(\texttt{[EOS]}\mid\text{prompt},a,b)\)</span> using the full 24-token vocabulary. The optimization loss sums the applicable token terms, then averages over examples. Reported <strong>answer NLL</strong> remains the two-digit quantity for comparability. No loss is applied to <code>[SEP]</code>, <code>[EOO]</code> or the other prompt markers. <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/model.py">Loss implementation</a>.</p>
 </section>
 <section id="a-complete-64-observation-example" class="level3" data-number="5.3">
 <h3 data-number="5.3" class="anchored" data-anchor-id="a-complete-64-observation-example"><span class="header-section-number">5.3</span> A complete 64-observation example</h3>
-<p>The expandable example below contains all 64 rows, generated once for this demonstration with <span class="math inline">\(d=2\)</span>, <span class="math inline">\(\sigma=0.001\)</span> and the working codec. Switch the format to compare the <strong>same underlying observations and query</strong>. The continuous values are provided separately for inspection.</p>
+<p>The expandable example below contains all 64 rows, generated once for this demonstration with <span class="math inline">\(d=2\)</span>, <span class="math inline">\(\sigma=0.25\)</span> and the canonical codec. Switch the format to compare the <strong>same underlying observations and query</strong>. The continuous values are provided separately for inspection.</p>
 <div class="nr-widget" id="nr-prompts">
   <div class="nr-controls">
     <label>Prompt format
@@ -832,7 +832,7 @@ Figure&nbsp;3: One illustrative <span class="math inline">\(d=2\)</span> task. T
   </details>
   <noscript>Enable JavaScript to inspect the complete example. The static three-observation example above shows both formats without JavaScript.</noscript>
 </div>
-<p>For these two-digit answers, the evaluator enumerates all 256 probabilities <span class="math inline">\(p(k)=p(a)p(b\mid a)\)</span>. The EOS loss is separate from this numeric answer distribution. It reports the clean/noisy MSE and NLL defined in <a href="#sec-evaluation" class="quarto-xref">Section&nbsp;3.2</a>, together with exact pass@<span class="math inline">\(k\)</span> for the configured sample counts. <a href="https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/METRICS.md">Evaluation definitions</a>.</p>
+<p>For these two-digit answers, the evaluator enumerates all 256 probabilities <span class="math inline">\(p(k)=p(a)p(b\mid a)\)</span>. The EOS loss is separate from this numeric answer distribution. It reports the clean/noisy MSE and NLL defined in <a href="#sec-evaluation" class="quarto-xref">Section&nbsp;3.2</a>, together with exact pass@<span class="math inline">\(k\)</span> for the configured sample counts. <a href="https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/METRICS.md">Evaluation definitions</a>.</p>
 <div class="callout callout-style-default callout-note callout-titled" title="Reproducing and editing this page">
 <div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
