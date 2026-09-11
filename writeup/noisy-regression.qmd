@@ -2,7 +2,7 @@
 title: "Noisy regression"
 subtitle: "A small linear problem, presented as a sequence of numerical tokens"
 description: "The noisy-regression problem, the behavior of its variables, quantization and autoregressive prediction, followed by the current experiment and prompt formats."
-date: 2026-09-11
+date: 2026-09-12
 number-sections: true
 format:
   html:
@@ -29,7 +29,7 @@ y_i=w^\top x_i+\epsilon_i,\qquad
 s_*=w^\top x_*,\qquad y_*=s_*+\epsilon_*.
 $$ {#eq-generation}
 
-The context is $D=\{(x_i,y_i)\}_{i=1}^n$; the query input is $x_*$. The model receives their **quantized** representations and learns a distribution over the quantized noisy answer $y_*$. We also evaluate against the clean signal $s_*$. Neither $w$, the noise values, nor the unrounded numbers are exposed to the model. Noise affects outputs, not the underlying input coordinates. [Data generator](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/data.py).
+The context is $D=\{(x_i,y_i)\}_{i=1}^n$; the query input is $x_*$. The model receives their **quantized** representations and learns a distribution over the quantized noisy answer $y_*$. We also evaluate against the clean signal $s_*$. Neither $w$, the noise values, nor the unrounded numbers are exposed to the model. Noise affects outputs, not the underlying input coordinates. [Data generator](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/data.py).
 
 There are two different sample counts: $n$ observations help infer the rule **within one prompt**, whereas $M$ training examples teach the transformer across **many independently drawn rules**. Increasing $M$ does not give a held-out prompt more observations. The context and query share $w$ within a prompt, so their outputs are not independent after marginalizing over that shared vector.
 
@@ -104,7 +104,7 @@ $$ {#eq-posterior}
 
 The first variance describes uncertainty about the hidden rule; the extra $\sigma^2$ is fresh query noise. When $X^\top X\approx nI_d$, the average clean predictive variance is approximately $d\sigma^2/(n+d\sigma^2)$. This is an intuition for a well-covered design, not an exact finite-sample identity. Increasing $d$ at fixed $n$ makes inference harder even though signal variance stays one. For $n<d$, noiseless observations cannot determine all directions of $w$.
 
-The implementation uses this continuous-data posterior as an optimistic reference. Applying the same formula to decoded token centers gives a **plug-in ridge approximation**, not the exact Bayesian answer to the quantized-input problem: rounding and clipping change the observation model. [Reference implementations](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/references.py).
+The implementation uses this continuous-data posterior as an optimistic reference. Applying the same formula to decoded token centers gives a **plug-in ridge approximation**, not the exact Bayesian answer to the quantized-input problem: rounding and clipping change the observation model. [Reference implementations](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/references.py).
 
 ## Turning numbers into tokens {#sec-quantization}
 
@@ -192,30 +192,30 @@ The continuous Bayesian reference has access to more precise information than th
 
 ## The current experiment {#sec-defaults}
 
-The working configuration below uses the newer delimited prompt; @sec-prompts compares it with the legacy format. The interactive figures in this section illustrate the specified data-generating process. They are not measurements from a trained model or records extracted from the training pool.
+The canonical specification below uses a 10M-example training pool, batch size 1,024, 20K optimizer updates, learning rate $10^{-4}$ with 200 warmup updates, and $d=2$, $\sigma=0.25$, $n=64$. It uses the delimited prompt; @sec-prompts compares it with the legacy format. The interactive figures in this section illustrate the specified data-generating process. They are not measurements from a trained model or records extracted from the training pool.
 
 ### Configuration
 
 ::: {#tbl-configuration}
 
-| Component | Working setting | Meaning |
+| Component | Canonical setting | Meaning |
 | --- | --- | --- |
 | Frozen training pool | $M=10{,}000{,}000$ examples | Independently generated regression problems, saved once |
 | Held-out evaluation pool | 1,024 examples | Separate draws; no additional test split in these launchers |
 | Input dimension / context | $d=2$, $n=64$ | Two slopes to infer from 64 noisy observations |
 | Prior / input law | $w\sim\mathcal N(0,I_2/2)$; $x\sim\mathcal N(0,I_2)$ | Population clean-signal variance $1$ |
-| Output noise | $\sigma=0.001$ | Independent context and query draws; variance $10^{-6}$ |
-| Scalar representation | 256 centers on $[-3,3]$; two base-16 digits | Shared across inputs and outputs |
+| Output noise | $\sigma=0.25$ | Independent context and query draws; variance $0.0625$ |
+| Scalar representation | 256 centers on $[-4,4]$; two base-16 digits | Shared across inputs and outputs |
 | Model | Scratch Qwen2; **988,288 parameters** | Approximately 1M; 24-token delimited vocabulary |
 | Architecture | 4 layers, hidden width 128, MLP width 512 | 4 query heads / 2 KV heads; tied input/output embeddings |
 | Sequence capacity | 1,024 tokens | New format: 649 prompt tokens, 652 including answer and EOS |
-| Training budget | 80,000 optimizer updates | Batch 128, microbatch 128 |
-| Learning rate | $10^{-4}$ | Linear warmup over the first 2% of updates, then constant |
-| Warmup start | $10^{-5}$ | One-tenth of the target rate; 1,600 warmup updates |
+| Training budget | 20,000 optimizer updates | Batch 1,024, microbatch 1,024 |
+| Learning rate | $10^{-4}$ | Linear warmup over the first 1% of updates, then constant |
+| Warmup start | $10^{-5}$ | One-tenth of the target rate; 200 warmup updates |
 | Optimizer | AdamW; betas $(0.9,0.95)$, epsilon $10^{-8}$ | Weight decay 0.01; no gradient clipping |
 | Precision | BF16 forward; FP32 master weights and optimizer | Loss computed in FP32 |
 
-The 10M configuration discussed on this page. Data, architecture, and budget follow the delimited-format revision; the warmup starting rate is the requested working convention.
+The canonical configuration discussed on this page. The requested noise level is $\sigma=0.25$; the provenance note below records the inspected launcher's differing noise default.
 :::
 
 ### Signal distribution at two dimensions
@@ -227,7 +227,7 @@ s\sim\operatorname{Laplace}\!\left(0,\frac{1}{\sqrt 2}\right),\qquad
 p(s)=\frac{1}{\sqrt 2}\exp(-\sqrt 2|s|).
 $$ {#eq-laplace}
 
-The clean population signal still has variance one, while the individual task variance $\|w\|^2$ varies considerably: at $d=2$, its variance is also one. With $\sigma=0.001$, the population SNR is $10^6$, the signal-to-noise standard-deviation ratio is $10^3$, and the decibel value is $60$ dB. The noisy marginal is a convolution of the Laplace law above with a Gaussian of variance $10^{-6}$.
+The clean population signal still has variance one, while the individual task variance $\|w\|^2$ varies considerably: at $d=2$, its variance is also one. With $\sigma=0.25$, the population SNR is $16$, the signal-to-noise standard-deviation ratio is $4$, and the decibel value is approximately $12.04$ dB. The noisy marginal is a convolution of the Laplace law above with a Gaussian of variance $0.0625$, giving total output variance $1.0625$.
 
 ::: {#fig-population}
 
@@ -238,25 +238,25 @@ Across-task signal distributions versus the conditional distribution for a unit-
 
 ### Numerical resolution and clipping
 
-Every input coordinate and output uses **256 centers on $[-3,3]$**, so $\Delta=6/255\approx0.0235294$. An index is represented by two base-16 digit tokens, $q=16a+b$. Their visible names are `0`–`9`, `A`–`F`; these are vocabulary entries, not characters passed through a text tokenizer. This gives 256 possible scalar answers with a small digit vocabulary, a short autoregressive answer, and a distribution small enough to enumerate. The range and resolution are experimental design choices, not a claim of optimal quantization.
+Every input coordinate and output uses **256 centers on $[-4,4]$**, so $\Delta=8/255\approx0.0313725$. An index is represented by two base-16 digit tokens, $q=16a+b$. Their visible names are `0`–`9`, `A`–`F`; these are vocabulary entries, not characters passed through a text tokenizer. This gives 256 possible scalar answers with a small digit vocabulary, a short autoregressive answer, and a distribution small enough to enumerate. The range and resolution are experimental design choices, not a claim of optimal quantization.
 
-The codec searches stored midpoints to handle floating-point ties consistently and rejects nonfinite values. For example, $1\mapsto170\mapsto\texttt{A A}$ and decodes to $1$ exactly. Zero lies between centers 127 and 128, so $0\mapsto\texttt{8 0}$ and decodes to $3/255\approx0.011765$. There is no exact zero center, and the maximum interior rounding error is $\Delta/2\approx0.011765$. [Scalar codec](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/codec.py).
+The codec searches stored midpoints to handle floating-point ties consistently and rejects nonfinite values. For example, $1\mapsto159\mapsto\texttt{9 F}$ and decodes to $252/255\approx0.988235$. Zero lies between centers 127 and 128, so $0\mapsto\texttt{8 0}$ and decodes to $4/255\approx0.015686$. There is no exact zero center, and the maximum interior rounding error is $\Delta/2\approx0.015686$. [Scalar codec](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/codec.py).
 
-At $\sigma=0.001$, $\Delta/\sigma\approx23.53$: the injected noise is mostly hidden by the grid, except near boundaries. The uniform-rounding scale is $\Delta/\sqrt{12}\approx0.006792$, with variance $\Delta^2/12\approx4.61\times10^{-5}$, about 46 times the injected noise variance. The caveats in @sec-quantization apply: this is a scale comparison, not a calibrated error floor.
+At $\sigma=0.25$, $\Delta/\sigma\approx0.1255$: one noise standard deviation spans about eight bins, so the grid resolves the injected noise. The uniform-rounding scale is $\Delta/\sqrt{12}\approx0.009056$, with variance $\Delta^2/12\approx8.20\times10^{-5}$, about $0.131\%$ of the injected noise variance. The caveats in @sec-quantization apply: this is a scale comparison, not a calibrated error floor.
 
-At $A=3$, a standard-Gaussian input coordinate lies outside the range with probability about **0.270%**. For the $d=2$ clean signal, @eq-laplace instead gives
+At $A=4$, a standard-Gaussian input coordinate lies outside the range with probability about **0.00633%**. For the $d=2$ clean signal, @eq-laplace instead gives
 
 $$
-\Pr(|s|>3)=e^{-3\sqrt2}\approx1.437\%.
+\Pr(|s|>4)=e^{-4\sqrt2}\approx0.3493\%.
 $$
 
-A standard-Gaussian tail calculation would therefore understate output clipping. Noisy-output clipping is a different probability, though close at $\sigma=0.001$. Actual saved-pool clipping fractions are recorded in dataset metadata; these count raw range exceedances, not all endpoint-bin assignments.
+A standard-Gaussian tail calculation would therefore understate output clipping. Noisy-output clipping must use the Laplace–Gaussian convolution at $\sigma=0.25$, rather than the clean-signal tail above. Actual saved-pool clipping fractions are recorded in dataset metadata; these count raw range exceedances, not all endpoint-bin assignments.
 
 ::: {#fig-quantization}
 
 {{< include noisy-regression/_quantization.qmd >}}
 
-A magnified scalar view: move the clean signal from one center to the next and compare Gaussian noise with bin probabilities. The phase 0.5 is a midpoint. The initial view uses the working setting; other ranges and level counts are explanatory counterfactuals.
+A magnified scalar view: move the clean signal from one center to the next and compare Gaussian noise with bin probabilities. The phase 0.5 is a midpoint. The initial view uses the canonical setting; other ranges and level counts are explanatory counterfactuals.
 :::
 
 ### Transformer architecture {#sec-architecture}
@@ -287,28 +287,28 @@ $$
 
 After the four blocks, a final RMSNorm precedes the vocabulary projection. The output projection shares the input embedding matrix, so a normalized hidden vector $h_t$ produces logits $Eh_t$ for $E\in\mathbb R^{24\times128}$. The hidden state at the query's final `[Y]` predicts the first answer digit; the state after that digit predicts the second. The following state predicts `[EOS]` in the new format. The digit and termination losses use the output restrictions described in @sec-prompts.
 
-The 24-token model has **988,288 trainable parameters**. All embeddings and transformer weights are learned from these synthetic problems; using the Qwen2 architecture does not imply using pretrained Qwen2 weights. The legacy 20-token version has **987,776 parameters** because its tied embedding matrix has four fewer rows. [Model configuration and construction](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/model.py), [Qwen2 block implementation](https://github.com/huggingface/transformers/blob/v4.57.6/src/transformers/models/qwen2/modeling_qwen2.py).
+The 24-token model has **988,288 trainable parameters**. All embeddings and transformer weights are learned from these synthetic problems; using the Qwen2 architecture does not imply using pretrained Qwen2 weights. The legacy 20-token version has **987,776 parameters** because its tied embedding matrix has four fewer rows. [Model configuration and construction](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/model.py), [Qwen2 block implementation](https://github.com/huggingface/transformers/blob/v4.57.6/src/transformers/models/qwen2/modeling_qwen2.py).
 
 ### Optimization and frozen data
 
-There are $80{,}000\times128=10{,}240{,}000$ training **presentations**, equivalent to **1.024 passes** through the 10M pool: one full pass, then 240,000 examples from a new shuffle. Reshuffling does not redraw $w$, inputs, noises, or targets. The experiment does not set fixed generation or training seeds; saving a pool freezes its actual draws, and checkpoints retain RNG state for resumption.
+There are $20{,}000\times1{,}024=20{,}480{,}000$ training **presentations**, equivalent to **2.048 passes** through the 10M pool: two full passes, then 480,000 examples from a third shuffle. Reshuffling does not redraw $w$, inputs, noises, or targets. The experiment does not set fixed generation or training seeds; saving a pool freezes its actual draws, and checkpoints retain RNG state for resumption.
 
-To make “warmup from one-tenth” precise on this page, number updates from $s=1$ and let $W=1{,}600$. The intended schedule is
+Number updates from $s=1$ and let $W=200$. The canonical scheduler uses
 
 $$
 \eta_s=
 \begin{cases}
 10^{-5}+(10^{-4}-10^{-5})\dfrac{s-1}{W-1}, & 1\leq s\leq W,\\[6pt]
-10^{-4}, & W<s\leq80{,}000.
+10^{-4}, & W<s\leq20{,}000.
 \end{cases}
 $$ {#eq-warmup}
 
-“Constant after warmup” refers to the learning rate; AdamW's weight decay remains active. The effective batch and microbatch are both 128, so each update uses one forward/backward pass. BF16 is used for the forward computation, with FP32 master weights, optimizer states and loss computation.
+Update 1 uses exactly $10^{-5}$, update 200 reaches $10^{-4}$, and updates 201 through 20,000 retain that rate. “Constant after warmup” refers to the learning rate; AdamW's weight decay remains active. The effective batch and microbatch are both 1,024, so each update uses one forward/backward pass. BF16 is used for the forward computation, with FP32 master weights, optimizer states and loss computation.
 
 ::: {.callout-note collapse="true" title="Configuration provenance and launcher differences"}
-The [delimited-format revision `c576954`](https://github.com/VincentWangzt/maxrl/tree/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression) supplies the 10M pool, 24-token codec and 988,288-parameter model. Its checked-in launcher warms from zero. The later [legacy comparison revision `22fbb14`](https://github.com/VincentWangzt/maxrl/tree/22fbb14dd3cb9bd5fcaf469cf01ba885728a1397/noisy-regression), checked out when this writeup was prepared, uses a 1M pool, the legacy 20-token codec and warmup from zero. Therefore the 10M / $10^{-5}$ warmup-start combination above is the **requested working specification**, not a claim that either unmodified launcher reproduces it.
+The inspected [experiment revision `9526f2d`](https://github.com/VincentWangzt/maxrl/tree/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression) supplies the 10M pool size, $[-4,4]$ codec, delimited prompt and model configuration. Its [training launcher](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/sft.sh) uses batch/microbatch 1,024, 20K updates, peak learning rate $10^{-4}$ and 200 warmup updates starting at one-tenth of the peak. The [scheduler implementation](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/model.py) implements @eq-warmup, including both endpoints.
 
-In the inspected constant-LR scheduler, setting the minimum rate to $10^{-5}$ gives $10^{-5}+9\times10^{-5}s/W$ during warmup: its first applied rate is $1.005625\times10^{-5}$ rather than exactly $10^{-5}$. @eq-warmup states the desired endpoint convention explicitly. This page changes documentation, not experiment code or saved run manifests. [Scheduler implementation](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/model.py).
+The [preparation launcher at that revision](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/prepare.sh) still sets $\sigma=0.1$. This page adopts the requested canonical value **$\sigma=0.25$** throughout its calculations and demonstrations. Reproducing this specification requires a pool generated at $\sigma=0.25$; the unmodified preparation launcher does not produce it. This documentation update does not change experiment code or relabel saved pools and run manifests.
 :::
 
 ### Explore a two-dimensional task
@@ -317,7 +317,7 @@ Here $w=(w_1,w_2)$ gives the two slopes of the plane $s=w_1x_1+w_2x_2$. Equal-ou
 
 In @fig-geometry, the left panel keeps both input coordinates visible. The colored background is the hidden clean rule, circles are noisy observations, and the star is the query. The right panel shows the posterior over the **two coefficients**, so you can see how the context identifies the plane. At low noise its uncertainty region becomes very small; its axes automatically zoom.
 
-Try increasing noise to $0.1$, reducing the context to one or two observations, rotating the hidden rule, and showing quantized inputs. Changing $n$ reuses a prefix of the same observations; changing noise rescales the same noise draws. This makes the effect of each control easier to compare. Drawing a new task samples a fresh $w$ from the stated prior; manually changing its angle or norm explores a chosen rule conditional on that $w$.
+Try reducing noise to $0.001$, reducing the context to one or two observations, rotating the hidden rule, and showing quantized inputs. Changing $n$ reuses a prefix of the same observations; changing noise rescales the same noise draws. This makes the effect of each control easier to compare. Drawing a new task samples a fresh $w$ from the stated prior; manually changing its angle or norm explores a chosen rule conditional on that $w$.
 
 ::: {#fig-geometry}
 
@@ -326,7 +326,7 @@ Try increasing noise to $0.1$, reducing the context to one or two observations, 
 One illustrative $d=2$ task. The coefficient ellipse is the exact 95% joint Gaussian posterior region given **continuous** context values. The orange diamond is the decoded-input ridge mean; it has no exact token-conditioned uncertainty region here. Hover over points for numerical values. These are analytic references, not transformer predictions.
 :::
 
-The geometric controls are explanatory counterfactuals. The production dataset schemas validate their configured dimension and context length; they are not arbitrary-dimension launchers. The full 64-observation prompt below always uses a separate fixed illustrative draw with the working codec.
+The geometric controls are explanatory counterfactuals. The canonical launchers use $d=2$ and $n=64$; other dimensions require matching dataset layouts and sufficient model sequence capacity. The full 64-observation prompt below always uses a separate fixed illustrative draw with the canonical codec.
 
 ## Concrete prompt formats {#sec-prompts}
 
@@ -334,16 +334,16 @@ There is no English instruction in the actual training input. The displayed spac
 
 ### A concrete miniature example
 
-For readability, first use just three observations, with the illustrative hidden rule $w=(0.6,-0.8)$:
+For readability, first use just three observations, with the illustrative hidden rule $w=(0.6,-0.8)$ and hand-chosen noises at the $\sigma=0.25$ scale. Both prompt formats below use the current $[-4,4]$ scalar grid:
 
 | Role | Continuous input $x$ | Clean output $s$ | Noise $\epsilon$ | Observed output $y$ | Encoded $x$; encoded $y$ |
 | --- | --- | --- | --- | --- | --- |
-| Context 1 | $(1,0)$ | $0.6$ | $0.001$ | $0.601$ | `A A 8 0`; `9 9` |
-| Context 2 | $(0,1)$ | $-0.8$ | $-0.001$ | $-0.801$ | `8 0 A A`; `5 D` |
-| Context 3 | $(-1,1)$ | $-1.4$ | $0.0005$ | $-1.3995$ | `5 5 A A`; `4 4` |
-| Query | $(0.5,-0.5)$ | $0.7$ | $0.001$ | $0.701$ | `9 5 6 A`; `9 D` |
+| Context 1 | $(1,0)$ | $0.6$ | $0.25$ | $0.85$ | `9 F 8 0`; `9 B` |
+| Context 2 | $(0,1)$ | $-0.8$ | $-0.25$ | $-1.05$ | `8 0 9 F`; `5 E` |
+| Context 3 | $(-1,1)$ | $-1.4$ | $0.125$ | $-1.275$ | `6 0 9 F`; `5 7` |
+| Query | $(0.5,-0.5)$ | $0.7$ | $0.25$ | $0.95$ | `8 F 7 0`; `9 E` |
 
-The answer `9 D` is index $16\times9+13=157$, which decodes to $0.694117647\ldots$, not the unrounded target $0.701$. The table's latent values explain how the example was made; they are not included in either prompt.
+The answer `9 E` is index $16\times9+14=158$, which decodes to $0.956862745\ldots$, not the unrounded target $0.95$. The table's latent values explain how the example was made; they are not included in either prompt.
 
 #### Legacy: shared observation and query markers
 
@@ -351,16 +351,16 @@ The answer `9 D` is index $16\times9+13=157$, which decodes to $0.694117647\ldot
 
 ```text
 [BOS]
-[X] A A 8 0 [Y] 9 9
-[X] 8 0 A A [Y] 5 D
-[X] 5 5 A A [Y] 4 4
-[X] 9 5 6 A [Y]
+[X] 9 F 8 0 [Y] 9 B
+[X] 8 0 9 F [Y] 5 E
+[X] 6 0 9 F [Y] 5 7
+[X] 8 F 7 0 [Y]
 ```
 
 **Supervised continuation:**
 
 ```text
-9 D
+9 E
 ```
 
 Adjacent coordinate digit pairs are separated by their fixed positions, with no explicit coordinate separator. Every observation is eight tokens at $d=2$. The final `[X] ... [Y]` is the query; there is no distinct query marker, observation terminator or EOS. The vocabulary is 16 digits plus `[X]`, `[Y]`, `[PAD]`, `[BOS]`, totaling **20 tokens**. The four-layer model has **987,776 parameters**. [Legacy codec](https://github.com/VincentWangzt/maxrl/blob/22fbb14dd3cb9bd5fcaf469cf01ba885728a1397/noisy-regression/noisy_regression/codec.py).
@@ -371,21 +371,21 @@ Adjacent coordinate digit pairs are separated by their fixed positions, with no 
 
 ```text
 [BOS]
-[X] A A [SEP] 8 0 [Y] 9 9 [EOO]
-[X] 8 0 [SEP] A A [Y] 5 D [EOO]
-[X] 5 5 [SEP] A A [Y] 4 4 [EOO]
-[QUERY] [X] 9 5 [SEP] 6 A [Y]
+[X] 9 F [SEP] 8 0 [Y] 9 B [EOO]
+[X] 8 0 [SEP] 9 F [Y] 5 E [EOO]
+[X] 6 0 [SEP] 9 F [Y] 5 7 [EOO]
+[QUERY] [X] 8 F [SEP] 7 0 [Y]
 ```
 
 **Supervised continuation:**
 
 ```text
-9 D [EOS]
+9 E [EOS]
 ```
 
-`[SEP]` separates coordinates within $x$; `[EOO]` ends a complete observed $(x,y)$ pair. `[QUERY]` announces the held-out input, and `[EOS]` terminates its answer. Each observation now takes ten tokens. The vocabulary is 16 digits plus `[X]`, `[SEP]`, `[Y]`, `[EOO]`, `[QUERY]`, `[PAD]`, `[BOS]`, `[EOS]`, totaling **24 tokens**. These extra four embeddings account for the parameter increase of $4\times128=512$. [Delimited codec](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/codec.py).
+`[SEP]` separates coordinates within $x$; `[EOO]` ends a complete observed $(x,y)$ pair. `[QUERY]` announces the held-out input, and `[EOS]` terminates its answer. Each observation now takes ten tokens. The vocabulary is 16 digits plus `[X]`, `[SEP]`, `[Y]`, `[EOO]`, `[QUERY]`, `[PAD]`, `[BOS]`, `[EOS]`, totaling **24 tokens**. These extra four embeddings account for the parameter increase of $4\times128=512$. [Delimited codec](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/codec.py).
 
-Explicit boundaries make the structure available through dedicated tokens instead of only fixed positions. That is an architectural motivation, **not evidence that the new format learns better**. It also lengthens the sequence and adds a termination loss, so a comparison should account for both effects. The 1M legacy pool and 10M new pool are an additional confound if comparing those particular runs.
+Explicit boundaries make the structure available through dedicated tokens instead of only fixed positions. That is an architectural motivation, **not evidence that the new format learns better**. It also lengthens the sequence and adds a termination loss, so a comparison should account for both effects. The examples here hold the numerical grid and observations fixed to isolate syntax; comparing trained models additionally requires controlling pool size, noise and optimization budget.
 
 ### Lengths and the training objective
 
@@ -405,15 +405,15 @@ $$
 -\log p_\theta(b\mid\text{prompt},a).
 $$
 
-Both answer softmaxes are restricted to the 16 digit IDs. The new format additionally trains $-\log p_\theta(\texttt{[EOS]}\mid\text{prompt},a,b)$ using the full 24-token vocabulary. The optimization loss sums the applicable token terms, then averages over examples. Reported **answer NLL** remains the two-digit quantity for comparability. No loss is applied to `[SEP]`, `[EOO]` or the other prompt markers. [Loss implementation](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/noisy_regression/model.py).
+Both answer softmaxes are restricted to the 16 digit IDs. The new format additionally trains $-\log p_\theta(\texttt{[EOS]}\mid\text{prompt},a,b)$ using the full 24-token vocabulary. The optimization loss sums the applicable token terms, then averages over examples. Reported **answer NLL** remains the two-digit quantity for comparability. No loss is applied to `[SEP]`, `[EOO]` or the other prompt markers. [Loss implementation](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/noisy_regression/model.py).
 
 ### A complete 64-observation example
 
-The expandable example below contains all 64 rows, generated once for this demonstration with $d=2$, $\sigma=0.001$ and the working codec. Switch the format to compare the **same underlying observations and query**. The continuous values are provided separately for inspection.
+The expandable example below contains all 64 rows, generated once for this demonstration with $d=2$, $\sigma=0.25$ and the canonical codec. Switch the format to compare the **same underlying observations and query**. The continuous values are provided separately for inspection.
 
 {{< include noisy-regression/_prompts.qmd >}}
 
-For these two-digit answers, the evaluator enumerates all 256 probabilities $p(k)=p(a)p(b\mid a)$. The EOS loss is separate from this numeric answer distribution. It reports the clean/noisy MSE and NLL defined in @sec-evaluation, together with exact pass@$k$ for the configured sample counts. [Evaluation definitions](https://github.com/VincentWangzt/maxrl/blob/c576954f9c9cd9ced1b6522bcea33057f529ae68/noisy-regression/METRICS.md).
+For these two-digit answers, the evaluator enumerates all 256 probabilities $p(k)=p(a)p(b\mid a)$. The EOS loss is separate from this numeric answer distribution. It reports the clean/noisy MSE and NLL defined in @sec-evaluation, together with exact pass@$k$ for the configured sample counts. [Evaluation definitions](https://github.com/VincentWangzt/maxrl/blob/9526f2d11df9662d241586a8c9a4af0b79841e1b/noisy-regression/METRICS.md).
 
 ::: {.callout-note collapse="true" title="Reproducing and editing this page"}
 The source is `writeup/noisy-regression.qmd`; the adjacent `writeup/noisy-regression/` directory contains the included markup and dependency-free browser visualizations. Render from the repository root with `quarto render writeup/noisy-regression.qmd`. The site output goes to `docs/`. The demonstrations use a fixed browser PRNG seed for repeatable illustrations; the actual experiment does not fix its generation or training seeds. No training pool or checkpoint is needed to render the page. Figure embedding follows [Quarto's figure-div conventions](https://quarto.org/docs/authoring/figures.html#figure-divs).

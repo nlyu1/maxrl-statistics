@@ -2,26 +2,26 @@
 <div class="nr-widget" id="nr-quantization">
   <div class="nr-controls">
     <label>Noise σ <output id="nr-q-sigma-value" for="nr-q-sigma"></output>
-      <input id="nr-q-sigma" type="range" min="-4" max="0" step="0.05" value="-3" aria-label="Quantization noise, log10 standard deviation">
+      <input id="nr-q-sigma" type="range" min="-4" max="0" step="any" value="-0.6020599913279624" aria-label="Quantization noise, log10 standard deviation">
     </label>
     <label>Position between centers <output id="nr-phase-value" for="nr-phase"></output>
       <input id="nr-phase" type="range" min="0" max="1" step="0.01" value="0" aria-label="Clean signal phase from one bin center to the next">
     </label>
     <label>Range ±A
-      <select id="nr-range"><option>1</option><option selected>3</option><option>5</option><option>8</option></select>
+      <select id="nr-range"><option>1</option><option>3</option><option selected>4</option><option>5</option><option>8</option></select>
     </label>
     <label>Scalar levels K
       <select id="nr-levels"><option>16</option><option>64</option><option selected>256</option><option>1024</option></select>
     </label>
   </div>
   <div class="nr-actions">
-    <button type="button" id="nr-q-default">Working setting</button>
+    <button type="button" id="nr-q-default">Canonical setting</button>
     <button type="button" id="nr-q-boundary">At a bin boundary</button>
-    <button type="button" id="nr-q-resolved">Resolve the noise</button>
+    <button type="button" id="nr-q-hidden">Noise below grid spacing</button>
   </div>
   <div id="nr-q-chart" class="nr-plot"></div>
   <p class="nr-readout" id="nr-q-readout" aria-live="polite"></p>
   <p class="nr-small" id="nr-q-range-note"></p>
-  <noscript>The working spacing is 0.0235294, about 23.53 times σ. At a bin center almost all noise stays in that bin; at a midpoint it splits approximately equally between neighboring bins.</noscript>
+  <noscript>The canonical spacing is 0.0313725 on [−4, 4], about 0.1255 times σ = 0.25. One noise standard deviation spans about eight bins, so several neighboring answers have appreciable probability.</noscript>
 </div>
 ```

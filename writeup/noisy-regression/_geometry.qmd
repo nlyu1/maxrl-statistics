@@ -5,7 +5,7 @@
       <input id="nr-n" type="range" min="1" max="128" step="1" value="64">
     </label>
     <label>Noise σ <output id="nr-g-sigma-value" for="nr-g-sigma"></output>
-      <input id="nr-g-sigma" type="range" min="-4" max="0" step="0.05" value="-3" aria-label="Task noise, log10 standard deviation">
+      <input id="nr-g-sigma" type="range" min="-4" max="0" step="any" value="-0.6020599913279624" aria-label="Task noise, log10 standard deviation">
     </label>
     <label>Rule angle <output id="nr-angle-value" for="nr-angle"></output>
       <input id="nr-angle" type="range" min="-180" max="180" step="0.1" value="-53.1">
@@ -15,7 +15,7 @@
     </label>
   </div>
   <div class="nr-actions">
-    <button type="button" id="nr-g-default">Reset working setting</button>
+    <button type="button" id="nr-g-default">Reset canonical setting</button>
     <button type="button" id="nr-new-task">Draw a new task</button>
     <label class="nr-check"><input type="checkbox" id="nr-show-quantized"> Show decoded token centers</label>
   </div>
