@@ -9,7 +9,7 @@ from src.experiments.utkface.data import create_manifest
 
 DATASET_REVISION = "e80f21fb21fa3631380c3cb634b79be3ac2f4cba"
 DATASET_URL = f"https://huggingface.co/datasets/py97/UTKFace-Cropped/resolve/{DATASET_REVISION}/UTKFace.tar.gz"
-DATASET_SHA256 = "102c0655397b498e81b82d685ee74bee8c2e4364a5897caf3afec6ea48929024a7"
+DATASET_SHA256 = "2c0655397b498e81b82d685ee74bee8c2e4364a5897caf3afec6ea48929024a7"
 
 
 def prepare(*, destination: Path, split_seed: int) -> dict:
