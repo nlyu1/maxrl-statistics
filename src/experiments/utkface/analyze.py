@@ -21,13 +21,26 @@ TEST_METRICS = (
     "tailrl",
     "oracle_best_of_64_mae",
 )
-REPORT_METRICS = (*TEST_METRICS, "singleton_mae_mean", "singleton_rmse_mean")
+REPORT_METRICS = (
+    *TEST_METRICS,
+    "singleton_mae_mean",
+    "singleton_rmse_mean",
+    "macro_decade_mae",
+)
 
 
 def method_label(*, method: str) -> str:
     if "_n" in method:
         base, count = method.rsplit("_n", 1)
-        return f"{base.replace('_', ' ').replace('grpo', 'GRPO').replace('rloo', 'RLOO').replace('mae', 'MAE').replace('mse', 'MSE').replace('tailrl', 'TailRL').replace('maxrl', 'MaxRL')}, {count} samples"
+        sampled_names = {
+            "grpo_mae": "GRPO, MAE",
+            "grpo_mse": "GRPO, MSE",
+            "rloo_mae": "RLOO, MAE",
+            "rloo_mse": "RLOO, MSE",
+            "tailrl": "TailRL",
+            "binary_maxrl": "Binary MaxRL",
+        }
+        return f"{sampled_names[base]}, {count} samples"
     labels = {
         "mse": "MSE of policy mean",
         "ce": "CE / population binary MaxRL",
@@ -37,8 +50,6 @@ def method_label(*, method: str) -> str:
         "rloo_mae_population": "Population RLOO, MAE",
         "rloo_mse_population": "Population RLOO, MSE",
         "tailrl_population": "Population TailRL",
-        "tailrl": "TailRL, 64 samples",
-        "binary_maxrl": "Binary MaxRL, 64 samples",
     }
     if method.startswith("stat_maxrl"):
         kind = "MAE" if "_mae_" in method else "MSE"
@@ -87,6 +98,10 @@ def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
         record.update({
             "singleton_mae_mean": run["test_singletons"]["mae_mean"],
             "singleton_rmse_mean": run["test_singletons"]["rmse_mean"],
+            "macro_decade_mae": sum(
+                metrics["mae_mean"] for metrics in run["test"]["decades"].values()
+            )
+            / len(run["test"]["decades"]),
         })
         records.append(record)
         for split in ("test", "test_singletons"):
