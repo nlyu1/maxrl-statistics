@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import platform
 import subprocess
 import time
@@ -322,6 +323,8 @@ def main() -> None:
         **{key: overrides.pop(key) for key in list(overrides) if key in loss_keys},
     }
     config = RunConfig.model_validate({**base, **overrides})
+    if config.deterministic:
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     with distributed_context(device=config.device) as context:
         cuda_context = (
             torch.cuda.device(context.device)

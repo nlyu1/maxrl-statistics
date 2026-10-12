@@ -208,6 +208,24 @@ def test_sampled_rloo_expectation_is_unbiased_by_enumeration() -> None:
     torch.testing.assert_close(expectation, probs * (rewards - (probs * rewards).sum()))
 
 
+def test_finite_binary_maxrl_has_known_attenuation() -> None:
+    probs = torch.tensor([0.2, 0.3, 0.5], dtype=torch.float64)
+    expectation = torch.zeros(3, dtype=torch.float64)
+    for combination in itertools.product(range(3), repeat=3):
+        actions = torch.tensor(combination)
+        rewards = (actions == 2).double()
+        advantages = batched_advantages(
+            rewards=rewards,
+            estimator="binary_maxrl",
+            survival_floor=0.0,
+            std_floor=1e-4,
+        )
+        scores = F.one_hot(actions, num_classes=3).double() - probs
+        expectation += probs[actions].prod() * (advantages[:, None] * scores).mean(0)
+    population = F.one_hot(torch.tensor(2), num_classes=3).double() - probs
+    torch.testing.assert_close(expectation, (1 - (1 - probs[2]) ** 2) * population)
+
+
 def test_tail_binary_matches_binary_maxrl_and_hand_computed_gaps() -> None:
     reward = torch.tensor(
         [[0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]], dtype=torch.float64

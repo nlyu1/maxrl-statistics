@@ -64,6 +64,10 @@ def estimator_diagnostics(
                 .sqrt()
                 .item(),
                 "exact_gradient_norm": exact.norm().item(),
+                "binary_expected_attenuation": 1
+                - (1 - probabilities[target.item()].item()) ** (count - 1)
+                if estimator == "binary_maxrl"
+                else 1.0,
             })
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(path=output_dir / "estimators.json", payload=rows)
