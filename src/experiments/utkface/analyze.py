@@ -132,6 +132,8 @@ def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
     records = []
     histories = []
     decades = []
+    protocols: dict[str, set[str]] = {}
+    observed_seeds: dict[str, set[int]] = {}
     for run in runs:
         config = run["config"]
         score = json.loads(
@@ -149,6 +151,19 @@ def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
             method += f"_s{config['loss']['kernel_scale_years']:g}"
         elif method not in {"mse", "ce"} and not method.endswith("_population"):
             method += f"_n{config['loss']['num_rollouts']}"
+        protocol = {
+            key: value
+            for key, value in config.items()
+            if key not in {"seed", "device", "output_dir", "manifest"}
+        }
+        protocol["world_size"] = run["world_size"]
+        protocols.setdefault(method, set()).add(json.dumps(protocol, sort_keys=True))
+        seeds = observed_seeds.setdefault(method, set())
+        if len(protocols[method]) != 1 or seed in seeds:
+            raise ValueError(
+                f"{method}: aggregation requires distinct seeds with one shared training configuration"
+            )
+        seeds.add(seed)
         record = {
             "method": method,
             "seed": seed,
