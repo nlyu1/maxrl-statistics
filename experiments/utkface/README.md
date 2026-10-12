@@ -20,6 +20,8 @@ For probabilities p(a), target y and D=99:
 
 Kernel scales are in years. Gaussian normalization constants are omitted because they have no parameter gradient. Population GRPO is a semi-gradient, so its logged scalar is not a comparable objective value. RLOO's baseline changes sampled variance but disappears from the exact population gradient. Binary MaxRL uses exact age equality, with zero update for a sampled group containing no successes. Its finite-rollout estimate is biased; it must not be conflated with population CE.
 
+For N draws and target probability p(y), the expected sampled binary MaxRL update equals the population CE update multiplied by `1 − (1 − p(y))**(N − 1)`. This weighting varies across images; a single learning-rate adjustment cannot remove it. `diagnostics.py` measures estimator convergence at N=8,64,512,4096 against exact gradients.
+
 Use `--survival-floor` to clamp population TailRL log-survival and mask matching sampled increments. The default zero preserves the ordinal objective. Rollouts for each image stay together on their rank; DDP distributes images, not action groups. NCCL, SyncBatchNorm and distributed training samplers are enabled under torchrun. Evaluation uses unpadded shards and sums counts and metrics across ranks. FSDP is not implemented.
 
 Follow `server.md`: edit and commit locally, push to GitHub, pull on `cmu-L40-live:~/maxrl-statistics`, then execute there. All commands below run on that server.
@@ -50,3 +52,19 @@ uv run --python 3.12 python -m src.experiments.utkface.sweep --stage main \
   --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-main --gpu-ids 1 5 7 9 \
   --selection /tmp/utkface-selection.json --epochs 20 --seeds 42 43 44
 ```
+
+The archive contains exact duplicate images, including inconsistent age labels and overlaps across the original splits. `audit.py` records byte and decoded-pixel duplicate counts and produces a singleton test slice. That slice excludes every test image whose pixels occur elsewhere in the dataset; it does not establish person-level independence or remove near-duplicates. `score.py` reconstructs saved checkpoints, checks their original test MAE, and evaluates the slice without selecting new checkpoints.
+
+```bash
+uv run --python 3.12 python -m src.experiments.utkface.audit \
+  --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-audit
+uv run --python 3.12 python -m src.experiments.utkface.score \
+  --runs-dir /tmp/utkface-main --manifest /tmp/utkface-data/manifest.json \
+  --subset /tmp/utkface-audit/test_singletons.json --output-dir /tmp/utkface-scores --gpu-ids 1 5 7 9
+uv run --python 3.12 python -m src.experiments.utkface.analyze \
+  --runs-dir /tmp/utkface-main --scores-dir /tmp/utkface-scores --output-dir /tmp/utkface-report
+CUDA_VISIBLE_DEVICES=1,5 uv run --python 3.12 torchrun --standalone --nproc-per-node=2 tests/utkface_ddp_probe.py
+CUDA_VISIBLE_DEVICES=1,5 uv run --python 3.12 torchrun --standalone --nproc-per-node=2 tests/utkface_ddp_resnet_probe.py
+```
+
+The distributed probes compare exact global-batch gradients in float64, including the full ResNet and SyncBatchNorm for every distinct population objective. Actual training uses bf16 by default. The comparison figures show sample standard deviations across seeds, not confidence intervals.

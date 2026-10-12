@@ -25,9 +25,13 @@ REPORT_METRICS = (*TEST_METRICS, "singleton_mae_mean", "singleton_rmse_mean")
 
 
 def method_label(*, method: str) -> str:
+    if "_n" in method:
+        base, count = method.rsplit("_n", 1)
+        return f"{base.replace('_', ' ').replace('grpo', 'GRPO').replace('rloo', 'RLOO').replace('mae', 'MAE').replace('mse', 'MSE').replace('tailrl', 'TailRL').replace('maxrl', 'MaxRL')}, {count} samples"
     labels = {
         "mse": "MSE of policy mean",
         "ce": "CE / population binary MaxRL",
+        "binary_maxrl_population": "Population binary MaxRL / CE",
         "grpo_mae_population": "Population GRPO, MAE",
         "grpo_mse_population": "Population GRPO, MSE",
         "rloo_mae_population": "Population RLOO, MAE",
@@ -68,6 +72,8 @@ def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
         method, seed = config["loss"]["method"], config["seed"]
         if method.startswith("stat_maxrl"):
             method += f"_s{config['loss']['kernel_scale_years']:g}"
+        elif method not in {"mse", "ce"} and not method.endswith("_population"):
+            method += f"_n{config['loss']['num_rollouts']}"
         record = {
             "method": method,
             "seed": seed,
