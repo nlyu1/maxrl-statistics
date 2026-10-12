@@ -1,0 +1,107 @@
+[
+  {
+    "method": "mse",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 5.746549912748378,
+    "pilot_output": "/tmp/utkface-pilot/mse_s5_lr0.0003"
+  },
+  {
+    "method": "ce",
+    "learning_rate": 0.001,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 6.423727672736277,
+    "pilot_output": "/tmp/utkface-pilot/ce_s5_lr0.001"
+  },
+  {
+    "method": "grpo_mae_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 7.407444410942226,
+    "pilot_output": "/tmp/utkface-pilot/grpo_mae_population_s5_lr0.0003"
+  },
+  {
+    "method": "grpo_mse_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 7.626501825616174,
+    "pilot_output": "/tmp/utkface-pilot/grpo_mse_population_s5_lr0.0003"
+  },
+  {
+    "method": "rloo_mae_population",
+    "learning_rate": 0.001,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 7.520986026805076,
+    "pilot_output": "/tmp/utkface-pilot/rloo_mae_population_s5_lr0.001"
+  },
+  {
+    "method": "rloo_mse_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 7.6414999765909215,
+    "pilot_output": "/tmp/utkface-pilot/rloo_mse_population_s5_lr0.0003"
+  },
+  {
+    "method": "tailrl_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 5.687108557569445,
+    "pilot_output": "/tmp/utkface-pilot/tailrl_population_s5_lr0.0003"
+  },
+  {
+    "method": "stat_maxrl_mae_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 2.0,
+    "pilot_val_mae": 5.657094239644721,
+    "pilot_output": "/tmp/utkface-pilot/stat_maxrl_mae_population_s2_lr0.0003"
+  },
+  {
+    "method": "stat_maxrl_mae_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 5.732254034242942,
+    "pilot_output": "/tmp/utkface-pilot/stat_maxrl_mae_population_s5_lr0.0003"
+  },
+  {
+    "method": "stat_maxrl_mae_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 10.0,
+    "pilot_val_mae": 6.0423351336694395,
+    "pilot_output": "/tmp/utkface-pilot/stat_maxrl_mae_population_s10_lr0.0003"
+  },
+  {
+    "method": "stat_maxrl_mse_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 2.0,
+    "pilot_val_mae": 5.937551336344768,
+    "pilot_output": "/tmp/utkface-pilot/stat_maxrl_mse_population_s2_lr0.0003"
+  },
+  {
+    "method": "stat_maxrl_mse_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 5.914751126547344,
+    "pilot_output": "/tmp/utkface-pilot/stat_maxrl_mse_population_s5_lr0.0003"
+  },
+  {
+    "method": "stat_maxrl_mse_population",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 10.0,
+    "pilot_val_mae": 5.969727866834546,
+    "pilot_output": "/tmp/utkface-pilot/stat_maxrl_mse_population_s10_lr0.0003"
+  },
+  {
+    "method": "binary_maxrl",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 7.5626089253564714,
+    "pilot_output": "/tmp/utkface-pilot/binary_maxrl_s5_lr0.0003"
+  },
+  {
+    "method": "tailrl",
+    "learning_rate": 0.0003,
+    "kernel_scale_years": 5.0,
+    "pilot_val_mae": 5.797780749198864,
+    "pilot_output": "/tmp/utkface-pilot/tailrl_s5_lr0.0003"
+  }
+]

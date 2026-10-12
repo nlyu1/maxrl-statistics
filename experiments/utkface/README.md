@@ -2,9 +2,11 @@
 
 ImageNet-pretrained ResNet-18 has eight residual blocks, global average pooling and a 512-to-100 linear head. Softmax gives a categorical policy on integer ages 0–99. All methods fine-tune the entire network with AdamW, bf16 CNN execution, float32 probability math, warmup/cosine scheduling and gradient clipping. Ages outside this range are excluded. The original 224px augmentation and decade-stratified split seed 42 are retained. [Provenance](SOURCES.md).
 
+[Measured results](RESULTS.md): 45 validation-only pilot runs, 45 full-data runs across three seeds, and two full DDP checks. [All objective/scale tables](results/metrics.md) and PNG/PDF figures are included.
+
 The reusable implementation is in `src/experiments/utkface/`: `prepare.py` verifies the pinned archive and writes a hashed split manifest; `data.py` implements transforms and sharding; `model.py` builds the common policy; `advantages.py` contains sampled estimators; `losses.py` contains exact objectives; `distributed.py` initializes torchrun; `run.py` trains, selects the best validation checkpoint, and optionally evaluates test data; `sweep.py` runs independent comparisons through the existing GPU pool.
 
-For probabilities p(a), target y and D=99:
+Population means the exact 100-action expectation for each image, averaged across training images. For probabilities p(a), target y and D=99:
 
 | CLI method | Loss / update |
 |---|---|
@@ -50,7 +52,7 @@ uv run --python 3.12 python -m src.experiments.utkface.sweep --stage select \
   --selection /tmp/utkface-selection.json
 uv run --python 3.12 python -m src.experiments.utkface.sweep --stage main \
   --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-main --gpu-ids 1 5 7 9 \
-  --selection /tmp/utkface-selection.json --epochs 20 --seeds 42 43 44
+  --selection /tmp/utkface-selection.json --epochs 12 --seeds 42 43 44
 ```
 
 The archive contains exact duplicate images, including inconsistent age labels and overlaps across the original splits. `audit.py` records byte and decoded-pixel duplicate counts and produces a singleton test slice. That slice excludes every test image whose pixels occur elsewhere in the dataset; it does not establish person-level independence or remove near-duplicates. `score.py` reconstructs saved checkpoints, checks their original test MAE, and evaluates the slice without selecting new checkpoints.

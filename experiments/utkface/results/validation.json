@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-13",
+  "timezone": "Asia/Shanghai",
+  "training_core_commit": "3dfeb42",
+  "execution": "Remote Linux server; uv with Python 3.12; CUDA L40 GPUs",
+  "pytest": {
+    "command": "OMP_NUM_THREADS=4 uv run --python 3.12 pytest tests/test_utkface_losses.py tests/test_utkface_data.py tests/test_maxrl_estimator.py -q",
+    "passed": 45,
+    "utkface_tests": 33,
+    "existing_maxrl_tests": 12
+  },
+  "distributed_linear_probe": {
+    "world_size": 2,
+    "precision": "float64",
+    "maximum_absolute_gradient_difference": 5.551115123125783e-17,
+    "unpadded_evaluation_count": 65
+  },
+  "distributed_resnet_probe": {
+    "world_size": 2,
+    "global_batch_size": 4,
+    "precision": "float64",
+    "population_objectives_checked": 9,
+    "maximum_relative_gradient_error": 5.584837268348175e-15,
+    "measurements": "ddp_gradients.json"
+  },
+  "real_image_ddp_smoke": {
+    "method": "tailrl_population",
+    "world_size": 2,
+    "precision": "bf16",
+    "epochs": 1,
+    "global_batch_size": 64,
+    "train_examples": 256,
+    "validation_examples": 65,
+    "test_examples": 65,
+    "result_path": "/tmp/utkface-smoke-ddp/result.json"
+  },
+  "deterministic_cuda_smoke": {
+    "method": "stat_maxrl_mse_population",
+    "precision": "bf16",
+    "train_examples": 128,
+    "validation_examples": 65,
+    "num_workers": 0,
+    "completed": true
+  },
+  "uneven_rank_evaluation_smoke": {
+    "method": "stat_maxrl_mae_population",
+    "world_size": 2,
+    "precision": "bf16",
+    "evaluation_batch_size": 32,
+    "evaluation_examples": 65,
+    "forward_batches_per_rank": [2, 1],
+    "result_path": "/tmp/utkface-smoke-ddp-uneven/result.json",
+    "completed": true
+  },
+  "checkpoint_scoring": {
+    "saved_evaluation_limit_preserved": true,
+    "limited_test_examples": 65,
+    "limited_checkpoint_restoration_mae_difference": 0.0,
+    "deferred_test_evaluation_completed": true,
+    "deferred_test_examples": 65,
+    "primary_checkpoints_restored": 45,
+    "primary_test_examples": 2368,
+    "singleton_test_examples": 2288,
+    "maximum_primary_restoration_mae_difference": 0.00022049665611945102
+  },
+  "changed_file_lint": {
+    "command": "uv run --python 3.12 ruff check src/experiments/utkface tests/test_utkface_losses.py tests/test_utkface_data.py tests/utkface_ddp_probe.py tests/utkface_ddp_resnet_probe.py",
+    "passed": true
+  },
+  "full_data_ddp": {
+    "methods": ["ce", "tailrl_population"],
+    "world_size": 2,
+    "precision": "bf16",
+    "seed": 42,
+    "epochs_per_run": 12,
+    "global_batch_size": 64,
+    "training_examples_per_epoch": 18880,
+    "validation_examples": 2367,
+    "test_examples": 2368,
+    "singleton_test_examples": 2288,
+    "maximum_restoration_mae_difference": 0.00001677300315350294,
+    "measurements": "ddp_full_runs.json"
+  },
+  "repository_wide_checks": {
+    "ruff_check_dot_existing_errors": 19,
+    "legacy_corpus_orchestrator_test_failures": 9,
+    "cause": "Existing notebook/import lint errors and corpus tests referencing an older orchestrator API; those modules and tests are unchanged by this feature."
+  }
+}

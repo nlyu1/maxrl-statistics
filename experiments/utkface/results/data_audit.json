@@ -1,0 +1,343 @@
+{
+  "fingerprint": "86ba8726adccc64bbbf2cbf70a8d36002dc23b4a4956e15e8b37d4483502aa68",
+  "source": {
+    "url": "https://huggingface.co/datasets/py97/UTKFace-Cropped/resolve/e80f21fb21fa3631380c3cb634b79be3ac2f4cba/UTKFace.tar.gz",
+    "sha256": "2c0655397b498e81b82d685ee74bee8c2e4364a5897caf3afec6ea48929024a7",
+    "revision": "e80f21fb21fa3631380c3cb634b79be3ac2f4cba"
+  },
+  "excluded": {
+    "outside_age_range": 32,
+    "malformed_filename": 5
+  },
+  "counts": {
+    "train": 18936,
+    "val": 2367,
+    "test": 2368
+  },
+  "decades": {
+    "train": {
+      "0": 2449,
+      "10": 1225,
+      "20": 5874,
+      "30": 3629,
+      "40": 1796,
+      "50": 1838,
+      "60": 1053,
+      "70": 559,
+      "80": 403,
+      "90": 110
+    },
+    "val": {
+      "0": 306,
+      "10": 153,
+      "20": 734,
+      "30": 453,
+      "40": 224,
+      "50": 230,
+      "60": 132,
+      "70": 70,
+      "80": 51,
+      "90": 14
+    },
+    "test": {
+      "0": 307,
+      "10": 153,
+      "20": 735,
+      "30": 454,
+      "40": 225,
+      "50": 230,
+      "60": 131,
+      "70": 70,
+      "80": 50,
+      "90": 13
+    }
+  },
+  "constant_mean_age": 33.20495352767216,
+  "constant_median_age": 29.0,
+  "constant_baselines": {
+    "train": {
+      "mean_mae": 15.26631360628798,
+      "mean_rmse": 19.729916945982,
+      "median_mae": 14.9047845373891
+    },
+    "val": {
+      "mean_mae": 15.228008171611883,
+      "mean_rmse": 19.675870311793076,
+      "median_mae": 14.82636248415716
+    },
+    "test": {
+      "mean_mae": 15.183539290240812,
+      "mean_rmse": 19.643002083746858,
+      "median_mae": 14.807010135135135
+    }
+  },
+  "identical_bytes": {
+    "duplicate_groups": 374,
+    "duplicate_images": 763,
+    "cross_split_groups": 134,
+    "cross_split_images": 277,
+    "cross_split_images_by_split": {
+      "test": 68,
+      "train": 133,
+      "val": 76
+    },
+    "conflicting_age_groups": 204,
+    "cross_split_examples": [
+      [
+        {
+          "relative_path": "UTKFace/10_0_0_20170110220644705.jpg.chip.jpg",
+          "age": 10,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/13_0_0_20170110232519225.jpg.chip.jpg",
+          "age": 13,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_0_0_20170117143048181.jpg.chip.jpg",
+          "age": 10,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/31_0_0_20170116195723154.jpg.chip.jpg",
+          "age": 31,
+          "split": "val"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_1_0_20170109201728056.jpg.chip.jpg",
+          "age": 10,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/13_1_0_20170109213526011.jpg.chip.jpg",
+          "age": 13,
+          "split": "val"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_1_0_20170109204931156.jpg.chip.jpg",
+          "age": 10,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/6_1_0_20170109202302115.jpg.chip.jpg",
+          "age": 6,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_1_1_20170109203522559.jpg.chip.jpg",
+          "age": 10,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/14_1_0_20170109204620092.jpg.chip.jpg",
+          "age": 14,
+          "split": "test"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/11_1_0_20170109204927071.jpg.chip.jpg",
+          "age": 11,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/7_1_0_20170109202312260.jpg.chip.jpg",
+          "age": 7,
+          "split": "test"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/14_0_4_20170117192737955.jpg.chip.jpg",
+          "age": 14,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/22_0_4_20170103234615652.jpg.chip.jpg",
+          "age": 22,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/15_0_0_20170110225440579.jpg.chip.jpg",
+          "age": 15,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/16_0_0_20170110232429214.jpg.chip.jpg",
+          "age": 16,
+          "split": "val"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/15_1_0_20170109203414090.jpg.chip.jpg",
+          "age": 15,
+          "split": "val"
+        },
+        {
+          "relative_path": "UTKFace/15_1_0_20170109204210842.jpg.chip.jpg",
+          "age": 15,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/15_1_0_20170109213613605.jpg.chip.jpg",
+          "age": 15,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/17_1_0_20170109201930035.jpg.chip.jpg",
+          "age": 17,
+          "split": "val"
+        }
+      ]
+    ]
+  },
+  "identical_rgb_pixels": {
+    "duplicate_groups": 374,
+    "duplicate_images": 763,
+    "cross_split_groups": 134,
+    "cross_split_images": 277,
+    "cross_split_images_by_split": {
+      "test": 68,
+      "train": 133,
+      "val": 76
+    },
+    "conflicting_age_groups": 204,
+    "cross_split_examples": [
+      [
+        {
+          "relative_path": "UTKFace/10_0_0_20170110220644705.jpg.chip.jpg",
+          "age": 10,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/13_0_0_20170110232519225.jpg.chip.jpg",
+          "age": 13,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_0_0_20170117143048181.jpg.chip.jpg",
+          "age": 10,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/31_0_0_20170116195723154.jpg.chip.jpg",
+          "age": 31,
+          "split": "val"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_1_0_20170109201728056.jpg.chip.jpg",
+          "age": 10,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/13_1_0_20170109213526011.jpg.chip.jpg",
+          "age": 13,
+          "split": "val"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_1_0_20170109204931156.jpg.chip.jpg",
+          "age": 10,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/6_1_0_20170109202302115.jpg.chip.jpg",
+          "age": 6,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/10_1_1_20170109203522559.jpg.chip.jpg",
+          "age": 10,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/14_1_0_20170109204620092.jpg.chip.jpg",
+          "age": 14,
+          "split": "test"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/11_1_0_20170109204927071.jpg.chip.jpg",
+          "age": 11,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/7_1_0_20170109202312260.jpg.chip.jpg",
+          "age": 7,
+          "split": "test"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/14_0_4_20170117192737955.jpg.chip.jpg",
+          "age": 14,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/22_0_4_20170103234615652.jpg.chip.jpg",
+          "age": 22,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/15_0_0_20170110225440579.jpg.chip.jpg",
+          "age": 15,
+          "split": "test"
+        },
+        {
+          "relative_path": "UTKFace/16_0_0_20170110232429214.jpg.chip.jpg",
+          "age": 16,
+          "split": "val"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/15_1_0_20170109203414090.jpg.chip.jpg",
+          "age": 15,
+          "split": "val"
+        },
+        {
+          "relative_path": "UTKFace/15_1_0_20170109204210842.jpg.chip.jpg",
+          "age": 15,
+          "split": "train"
+        }
+      ],
+      [
+        {
+          "relative_path": "UTKFace/15_1_0_20170109213613605.jpg.chip.jpg",
+          "age": 15,
+          "split": "train"
+        },
+        {
+          "relative_path": "UTKFace/17_1_0_20170109201930035.jpg.chip.jpg",
+          "age": 17,
+          "split": "val"
+        }
+      ]
+    ]
+  },
+  "singleton_test_count": 2288
+}

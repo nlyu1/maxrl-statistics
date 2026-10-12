@@ -1,0 +1,52 @@
+{
+  "precision": "float64",
+  "world_size": 2,
+  "global_batch_size": 4,
+  "gradients": [
+    {
+      "method": "mse",
+      "relative_gradient_error": 5.15229939796844e-15,
+      "max_absolute_gradient_error": 4.7704895589362195e-17
+    },
+    {
+      "method": "ce",
+      "relative_gradient_error": 5.274879998895491e-15,
+      "max_absolute_gradient_error": 2.6645352591003757e-15
+    },
+    {
+      "method": "grpo_mae_population",
+      "relative_gradient_error": 5.384610147543971e-15,
+      "max_absolute_gradient_error": 3.191891195797325e-16
+    },
+    {
+      "method": "grpo_mse_population",
+      "relative_gradient_error": 5.584837268348175e-15,
+      "max_absolute_gradient_error": 3.209238430557093e-16
+    },
+    {
+      "method": "rloo_mae_population",
+      "relative_gradient_error": 5.285528352248729e-15,
+      "max_absolute_gradient_error": 6.461844948013606e-17
+    },
+    {
+      "method": "rloo_mse_population",
+      "relative_gradient_error": 5.3626808884876555e-15,
+      "max_absolute_gradient_error": 5.2475385148298415e-17
+    },
+    {
+      "method": "tailrl_population",
+      "relative_gradient_error": 5.2239725141958824e-15,
+      "max_absolute_gradient_error": 1.6653345369377348e-16
+    },
+    {
+      "method": "stat_maxrl_mae_population",
+      "relative_gradient_error": 5.28599227840283e-15,
+      "max_absolute_gradient_error": 5.342948306008566e-16
+    },
+    {
+      "method": "stat_maxrl_mse_population",
+      "relative_gradient_error": 5.267376793520134e-15,
+      "max_absolute_gradient_error": 6.38378239159465e-16
+    }
+  ]
+}
