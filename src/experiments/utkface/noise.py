@@ -12,7 +12,10 @@ def noisy_labels(*, ages: list[int], config: NoiseConfig, epoch: int) -> Tensor:
     if config.mode == "none":
         return torch.from_numpy(clean.astype(np.int64))
     generator = np.random.default_rng(
-        np.random.SeedSequence([config.seed, epoch if config.mode == "fresh" else 0])
+        np.random.SeedSequence([
+            config.seed,
+            epoch - 1 if config.mode == "fresh" else 0,
+        ])
     )
     noisy = clean + generator.normal(0, config.std_years, len(clean))
     return torch.from_numpy(np.rint(noisy).clip(0, 99).astype(np.int64))

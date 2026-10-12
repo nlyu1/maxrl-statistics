@@ -1,3 +1,4 @@
+import torch
 from torch import Tensor, nn
 from torchvision.models import ResNet18_Weights, resnet18
 
@@ -12,11 +13,7 @@ class ScalarHead(nn.Module):
 
     def forward(self, features: Tensor) -> Tensor:
         values = self.linear(features)
-        values = (
-            values.double()
-            if values.dtype.is_floating_point and values.element_size() == 8
-            else values.float()
-        )
+        values = values.double() if values.dtype == torch.float64 else values.float()
         return values.sigmoid() * MAX_AGE
 
 

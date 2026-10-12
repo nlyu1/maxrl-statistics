@@ -112,7 +112,12 @@ def normalized_kernel_advantages(*, log_kernel: Tensor) -> Tensor:
 
 
 def scalar_loss(*, predictions: Tensor, targets: Tensor, config: LossConfig) -> Tensor:
-    error = (predictions.flatten().float() - targets) / MAX_AGE
+    values = (
+        predictions.double()
+        if predictions.dtype == torch.float64
+        else predictions.float()
+    )
+    error = (values.flatten() - targets) / MAX_AGE
     if config.method == "mse":
         return error.square().mean()
     if config.method == "mae":
