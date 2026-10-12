@@ -44,6 +44,7 @@ def distributed_context(*, device: str):
         dist.init_process_group(
             backend="nccl" if selected.type == "cuda" else "gloo",
             timeout=timedelta(minutes=10),
+            device_id=selected if selected.type == "cuda" else None,
         )
     try:
         yield DistributedContext(rank=rank, world_size=world_size, device=selected)

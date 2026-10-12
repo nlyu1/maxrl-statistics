@@ -265,3 +265,18 @@ def test_architecture_and_uniform_policy_metrics() -> None:
         < values["oracle_best_of_8_mae"]
         < values["expected_mae"]
     )
+
+
+@pytest.mark.parametrize(
+    "method", ["grpo_mae", "grpo_mse", "rloo_mae", "rloo_mse", "binary_maxrl", "tailrl"]
+)
+def test_sampled_losses_have_finite_gradients(method: str) -> None:
+    torch.manual_seed(77)
+    logits = torch.randn(3, 100, requires_grad=True)
+    loss = policy_loss(
+        logits=logits,
+        targets=torch.tensor([0, 50, 99]),
+        config=loss_config(method=method),
+    )
+    assert torch.isfinite(loss)
+    assert torch.isfinite(torch.autograd.grad(loss, logits)[0]).all()

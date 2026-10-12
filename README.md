@@ -7,6 +7,7 @@ See [project page](https://nlyu1.github.io/maxrl-statistics/) for more details.
 
 - `src/`: shared library code — see [`src/README.md`](src/README.md).
 - `experiments/`: runnable experiment scripts, sweeps, and notebooks.
+  The [UTKFace experiment](experiments/utkface/README.md) compares supervised and population policy objectives with a ResNet-18 categorical age policy and DDP support.
 - `artifacts/`: local cache of sweep outputs, checkpoints, and figures.
 - `theory/`: markdown notes backing the writeup.
 - `writeup/`: Quarto source (`quarto preview` from inside).
