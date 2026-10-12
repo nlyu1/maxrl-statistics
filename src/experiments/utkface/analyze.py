@@ -125,8 +125,8 @@ def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
     runs = [
         json.loads(path.read_text()) for path in sorted(runs_dir.glob("*/result.json"))
     ]
-    if not runs or any("test" not in run for run in runs):
-        raise ValueError("Analysis requires completed runs with test evaluation")
+    if not runs:
+        raise ValueError("Analysis requires completed training runs")
     if len({run["data_fingerprint"] for run in runs}) != 1:
         raise ValueError("Cannot compare runs with different data splits")
     records = []
@@ -145,6 +145,8 @@ def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
         ):
             raise ValueError("Scored checkpoint does not match the training result")
         run["test_singletons"] = score["test_singletons"]
+        if "test" not in run:
+            run["test"] = score["test"]
         run["restoration_mae_difference"] = score["restoration_mae_difference"]
         method, seed = config["loss"]["method"], config["seed"]
         if method.startswith("stat_maxrl"):

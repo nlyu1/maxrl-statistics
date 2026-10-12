@@ -27,7 +27,6 @@ def score(
         "manifest": manifest,
         "output_dir": output_dir,
         "device": device,
-        "eval_limit": 0,
     })
     payload = read_manifest(path=manifest)
     descriptor = json.loads(subset.read_text())
@@ -83,11 +82,15 @@ def score(
         )
         filtered = evaluate(model=model, loader=loader, config=config, context=context)
     original = json.loads((checkpoint_path.parent / "result.json").read_text())
-    difference = abs(full["mae_mean"] - original["test"]["mae_mean"])
-    if difference > 0.05 or saved["epoch"] != original["best_epoch"]:
-        raise AssertionError(
-            f"Checkpoint reconstruction mismatch: MAE difference={difference}"
-        )
+    if saved["epoch"] != original["best_epoch"]:
+        raise AssertionError("Checkpoint epoch does not match the selected epoch")
+    difference = None
+    if "test" in original:
+        difference = abs(full["mae_mean"] - original["test"]["mae_mean"])
+        if difference > 0.05 or full["count"] != original["test"]["count"]:
+            raise AssertionError(
+                f"Checkpoint reconstruction mismatch: MAE difference={difference}"
+            )
     result = {
         "config": config.model_dump(mode="json"),
         "checkpoint": str(checkpoint_path),
@@ -97,6 +100,7 @@ def score(
         "test": full,
         "test_singletons": filtered,
         "restoration_mae_difference": difference,
+        "original_test_verified": "test" in original,
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(path=output_dir / "result.json", payload=result)
