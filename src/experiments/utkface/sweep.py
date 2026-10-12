@@ -2,6 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
+import polars as pl
+
 from src.experiments.gpu_pool import GPUPool, Job
 from src.experiments.utkface.config import RunConfig, canonical_config
 from src.experiments.utkface.run import write_json
@@ -95,6 +97,19 @@ def select_pilot(*, pilot_dir: Path, destination: Path) -> list[dict]:
                 "pilot_output": best["config"]["output_dir"],
             })
     write_json(path=destination, payload=selected)
+    write_json(path=pilot_dir / "pilot_results.json", payload=candidates)
+    pl.DataFrame([
+        {
+            "method": run["config"]["loss"]["method"],
+            "kernel_scale_years": run["config"]["loss"]["kernel_scale_years"],
+            "learning_rate": run["config"]["learning_rate"],
+            "best_epoch": run["best_epoch"],
+            "validation_mae": run["validation"]["mae_mean"],
+            "validation_rmse": run["validation"]["rmse_mean"],
+            "seconds": run["seconds"],
+        }
+        for run in candidates
+    ]).write_csv(pilot_dir / "pilot.csv")
     return selected
 
 
