@@ -1,0 +1,8 @@
+This experiment adapts the original UTKFace task and TailRL algorithms to this repository's immutable configs and experiment runner.
+
+- [cont-maxrl, pinned b29aeaa](https://github.com/stablegradients/cont-maxrl/tree/b29aeaad894f42b1ddd26f09784a9cf3e0f29449/experiment5_ordinal): filename filtering, decade-stratified 80/10/10 split, ImageNet transforms, ResNet-18, ordinal population objective.
+- [TailRL, pinned 5682c6a](https://github.com/Zanette-Labs/TailRL/tree/5682c6ac03387355e017ce966693266bb148fa10/experiments/imagenet_localization): batched last-dimension gap/survivor, binary MaxRL, GRPO and RLOO estimators; torchrun, NCCL, SyncBatchNorm and DistributedSampler training pattern.
+- [Official UTKFace dataset](https://susanqq.github.io/UTKFace/): aligned cropped images, filename labels, and dataset usage terms. The dataset is for noncommercial research; the mirror's metadata does not replace these terms.
+- [Pinned archive mirror](https://huggingface.co/datasets/py97/UTKFace-Cropped/tree/e80f21fb21fa3631380c3cb634b79be3ac2f4cba): SHA256 `102c0655397b498e81b82d685ee74bee8c2e4364a5897caf3afec6ea48929024a7`.
+
+Differences from the originals: every method, including supervised MSE, uses the same 100-logit head; exact population sums are used wherever requested; log-space probability windows replace subtraction of cumulative probabilities; evaluation shards have no duplicated padding; the survival floor is explicitly zero by default. Statistical MaxRL uses the agreed Gaussian/Laplace log-mixture kernels and reuses neither the unrelated localization architecture nor this repo's finite-degree Gaussian estimator.
