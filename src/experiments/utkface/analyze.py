@@ -57,6 +57,70 @@ def method_label(*, method: str) -> str:
     return labels[method]
 
 
+def formatted_statistic(*, row: dict, metric: str) -> str:
+    mean, sd = row[metric + "_mean"], row[metric + "_sd"]
+    return f"{mean:.2f}" if sd is None else f"{mean:.2f} ± {sd:.2f}"
+
+
+def write_metric_tables(
+    *, summary: pl.DataFrame, runs: list[dict], output_dir: Path
+) -> None:
+    lines = [
+        "# UTKFace measured results",
+        "",
+        f"{len(runs)} runs, {len(summary)} configurations. Epoch budgets: {sorted({run['config']['epochs'] for run in runs})}. Seeds: {sorted({run['config']['seed'] for run in runs})}.",
+        "",
+        "Values are means ± sample standard deviations across seeds. Single-seed rows show the measured value alone. These are not confidence intervals. Checkpoints minimize validation MAE of the policy mean.",
+        "",
+        f"Test examples: {sorted({run['test']['count'] for run in runs})}; singleton-image test examples: {sorted({run['test_singletons']['count'] for run in runs})}.",
+        "",
+        "| Objective | Seeds | Mean age MAE, years | Mean age RMSE, years | Singleton test MAE, years | Macro decade MAE, years |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for row in summary.to_dicts():
+        values = [
+            formatted_statistic(row=row, metric=metric)
+            for metric in (
+                "mae_mean",
+                "rmse_mean",
+                "singleton_mae_mean",
+                "macro_decade_mae",
+            )
+        ]
+        lines.append(
+            f"| {method_label(method=row['method'])} | {row['seeds']} | "
+            + " | ".join(values)
+            + " |"
+        )
+    lines += [
+        "",
+        "Macro decade MAE gives equal weight to each observed age decade. The original test split is imbalanced. The singleton slice retains only images with unique decoded pixels in the entire dataset; training and checkpoint selection use the original split.",
+        "",
+        "| Objective | Expected policy draw MAE, years | Entropy, nats | Categorical NLL, nats | Oracle best-of-64 MAE, years |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for row in summary.to_dicts():
+        values = [
+            formatted_statistic(row=row, metric=metric)
+            for metric in ("expected_mae", "entropy", "ce", "oracle_best_of_64_mae")
+        ]
+        lines.append(
+            f"| {method_label(method=row['method'])} | " + " | ".join(values) + " |"
+        )
+    lines += [
+        "",
+        "Policy draw errors and oracle errors are evaluated exactly over all 100 actions. Oracle best-of-64 uses the target to select the closest draw; it is a distribution diagnostic.",
+        "",
+        "![Point and policy errors](comparison.png)",
+        "",
+        "![Validation learning curves](learning_curves.png)",
+        "",
+        "Per-seed values: [runs.csv](runs.csv). Aggregates: [summary.csv](summary.csv). Full metrics, configs and provenance: [results.json](results.json). Age-decade metrics: [decade_metrics.csv](decade_metrics.csv).",
+        "",
+    ]
+    (output_dir / "metrics.md").write_text("\n".join(lines))
+
+
 def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
     runs = [
         json.loads(path.read_text()) for path in sorted(runs_dir.glob("*/result.json"))
@@ -229,6 +293,7 @@ def analyze(*, runs_dir: Path, scores_dir: Path, output_dir: Path) -> None:
     figure.savefig(output_dir / "learning_curves.png", dpi=180)
     figure.savefig(output_dir / "learning_curves.pdf")
     plt.close(figure)
+    write_metric_tables(summary=summary, runs=runs, output_dir=output_dir)
     print(summary)
 
 
