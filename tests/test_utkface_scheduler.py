@@ -1,4 +1,6 @@
 import json
+import os
+import time
 from pathlib import Path
 
 import pytest
@@ -213,3 +215,141 @@ def test_scheduler_does_not_start_a_job_exceeding_remaining_budget(
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["status"] == "budget_exhausted"
     assert state["jobs"]["cannot_fit"]["attempts"] == []
+
+
+def test_scheduler_adopts_completed_attempt_without_charging_offline_gap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.experiments.utkface import scheduler
+
+    item = job(root=tmp_path, identifier="adopted", lr=1e-4)
+    plan = StudyPlan(
+        output_dir=tmp_path,
+        data_fingerprint="test",
+        training_source_sha256={},
+        budget_gpu_hours=10,
+        max_concurrent=6,
+        jobs=(item,),
+    )
+    output = tmp_path / "run"
+    output.mkdir()
+    result_path = output / "result.json"
+    result_path.write_text("{}")
+    now = time.time()
+    os.utime(result_path, (now - 600, now - 600))
+    (tmp_path / "state.json").write_text(
+        json.dumps({
+            "status": "running",
+            "jobs": {
+                "adopted": {
+                    "status": "running",
+                    "attempts": [
+                        {
+                            "pid": 123456,
+                            "started_at": now - 1200,
+                            "output_dir": str(output),
+                            "config_path": "unused",
+                        }
+                    ],
+                }
+            },
+        })
+    )
+    monkeypatch.setattr(scheduler, "gpu_inventory", fake_inventory)
+    monkeypatch.setattr(scheduler, "owned_process", lambda **kwargs: False)
+    run(plan=plan, poll_seconds=0)
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["status"] == "completed"
+    assert charged_seconds(state=state, now=now) == pytest.approx(600)
+
+
+def test_report_excludes_tuning_from_seed_aggregation_and_preserves_scalar_nll(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.experiments.utkface import study_report
+
+    jobs, states = [], {}
+    for identifier, stage, head, seed, mae in (
+        ("first", "main", "categorical", 42, 1.0),
+        ("second", "main", "categorical", 43, 3.0),
+        ("pilot", "wide", "categorical", 42, 99.0),
+        ("scalar", "scalar", "scalar", 42, 5.0),
+    ):
+        item = job(root=tmp_path, identifier=identifier, lr=1e-4)
+        config = type(item.config).model_validate({
+            **item.config.model_dump(),
+            "head": head,
+            "seed": seed,
+            "loss": {**item.config.loss.model_dump(), "method": "mse"},
+        })
+        item = StudyJob.model_validate({
+            **item.model_dump(),
+            "config": config,
+            "stage": stage,
+            "variant": "mse_scalar" if head == "scalar" else "mse",
+        })
+        output = config.output_dir
+        output.mkdir(parents=True)
+        validation = {"mae_mean": mae, "median_spearman": 0.5, "label_nll": 2.0}
+        (output / "history.json").write_text(
+            json.dumps([
+                {
+                    "epoch": 1,
+                    "learning_rate": 1e-4,
+                    "train_loss": 0.1,
+                    "grad_norm": 1.0,
+                    "train_count": 64,
+                    "validation": validation,
+                    "label_noise": {
+                        "signal_variance_years2": 10,
+                        "noise_mse_years2": 0,
+                    },
+                }
+            ])
+        )
+        result_path = output / "result.json"
+        result_path.write_text(
+            json.dumps({
+                "config": config.model_dump(mode="json"),
+                "data_fingerprint": "test",
+                "training_fingerprint": "same-subset",
+                "train_unique_images": 18462,
+                "best_epoch": 1,
+                "validation": validation,
+                "test": {
+                    metric: None if head == "scalar" and metric == "label_nll" else mae
+                    for metric in study_report.METRICS
+                },
+            })
+        )
+        jobs.append(item)
+        states[identifier] = {
+            "status": "completed",
+            "result_path": str(result_path),
+            "attempts": [{"started_at": 0, "seconds": 10}],
+        }
+    plan = StudyPlan(
+        output_dir=tmp_path,
+        data_fingerprint="test",
+        training_source_sha256={},
+        budget_gpu_hours=64,
+        max_concurrent=6,
+        jobs=tuple(jobs),
+    )
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(plan.model_dump_json())
+    (tmp_path / "state.json").write_text(
+        json.dumps({"status": "completed", "jobs": states})
+    )
+    monkeypatch.setattr(study_report, "describe_noise", lambda **kwargs: [])
+    study_report.report(
+        plan_path=plan_path, output_dir=tmp_path / "report", figures=True
+    )
+    summary = json.loads((tmp_path / "report" / "summary.json").read_text())
+    categorical = next(row for row in summary if row["stage"] == "main")
+    scalar = next(row for row in summary if row["stage"] == "scalar")
+    assert len(summary) == 2 and categorical["seeds"] == 2
+    assert categorical["mae_mean_mean"] == 2
+    assert categorical["mae_mean_sd"] == pytest.approx(2**0.5)
+    assert scalar["label_nll_mean"] is None
+    assert (tmp_path / "report" / "main.png").exists()

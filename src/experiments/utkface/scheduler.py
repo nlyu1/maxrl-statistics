@@ -60,9 +60,10 @@ def gpu_is_free(*, gpu: dict) -> bool:
 
 def owned_process(*, attempt: dict) -> bool:
     path = Path(f"/proc/{attempt['pid']}/cmdline")
-    if not path.exists():
+    try:
+        command = path.read_bytes().replace(b"\0", b" ").decode()
+    except FileNotFoundError:
         return False
-    command = path.read_bytes().replace(b"\0", b" ").decode()
     return (
         "src.experiments.utkface.run" in command and attempt["config_path"] in command
     )
@@ -73,6 +74,8 @@ def process_group(*, pid: int) -> int:
         return os.getpgid(pid)
     except ProcessLookupError:
         return -1
+    except PermissionError:
+        return -2
 
 
 def terminate_attempt(*, attempt: dict) -> None:
@@ -81,7 +84,10 @@ def terminate_attempt(*, attempt: dict) -> None:
             raise RuntimeError(
                 "Refusing to signal a process outside its dedicated group"
             )
-        os.killpg(attempt["pid"], signal.SIGTERM)
+        try:
+            os.killpg(attempt["pid"], signal.SIGTERM)
+        except ProcessLookupError:
+            return
         attempt["termination_requested_at"] = time.time()
 
 
@@ -191,6 +197,8 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                 },
             }
         )
+        if set(state["jobs"]) != {job.identifier for job in plan.jobs}:
+            raise ValueError("Saved queue state does not match the study plan")
         children = {}
         logs = {}
         streaks = {}
@@ -215,14 +223,21 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                         else 1
                     )
                 if returncode is not None:
+                    result_path = Path(attempt["output_dir"]) / "result.json"
+                    ended_at = (
+                        min(
+                            now, max(attempt["started_at"], result_path.stat().st_mtime)
+                        )
+                        if child is None and result_path.exists()
+                        else now
+                    )
                     attempt.update({
-                        "seconds": now - attempt["started_at"],
+                        "seconds": ended_at - attempt["started_at"],
                         "returncode": returncode,
-                        "ended_at": now,
+                        "ended_at": ended_at,
                     })
                     if job.identifier in logs:
                         logs.pop(job.identifier).close()
-                    result_path = Path(attempt["output_dir"]) / "result.json"
                     if returncode == 0 and result_path.exists():
                         record.update({
                             "status": "completed",
@@ -257,7 +272,10 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                     and now - attempt["termination_requested_at"] > 30
                     and owned_process(attempt=attempt)
                 ):
-                    os.killpg(attempt["pid"], signal.SIGKILL)
+                    try:
+                        os.killpg(attempt["pid"], signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
             active = [
                 record

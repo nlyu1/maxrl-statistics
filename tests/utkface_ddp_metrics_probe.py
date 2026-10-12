@@ -49,6 +49,41 @@ def main() -> None:
                     "label_nll": result["label_nll"],
                 })
             )
+        scalar_config = RunConfig.model_validate({
+            **config.model_dump(),
+            "head": "scalar",
+            "loss": {**config.loss.model_dump(), "method": "mae"},
+        })
+        scalar_predictions = targets.float() + torch.arange(65) % 3 - 1
+        scalar_loader = DataLoader(
+            TensorDataset(scalar_predictions[indices, None], targets[indices], indices),
+            batch_size=8,
+        )
+        scalar_result = evaluate(
+            model=nn.Identity(),
+            loader=scalar_loader,
+            config=scalar_config,
+            context=context,
+        )
+        assert scalar_result["count"] == 65
+        assert scalar_result["label_nll"] is None
+        assert scalar_result["label_nll_reason"]
+        assert (
+            abs(
+                scalar_result["median_spearman"]
+                - spearmanr(scalar_predictions.tolist(), targets.tolist()).statistic
+            )
+            < 1e-12
+        )
+        assert (
+            abs(
+                scalar_result["mae_mean"]
+                - (scalar_predictions - targets).abs().mean().item()
+            )
+            < 1e-7
+        )
+        if context.primary:
+            print(json.dumps({"scalar": scalar_result}))
 
 
 if __name__ == "__main__":

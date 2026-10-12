@@ -8,7 +8,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import polars as pl
+import torch
 
+from src.experiments.utkface.config import NoiseConfig
+from src.experiments.utkface.data import read_manifest, training_indices
+from src.experiments.utkface.noise import noise_summary, noisy_labels
 from src.experiments.utkface.run import write_json
 from src.experiments.utkface.scheduler import status_summary
 from src.experiments.utkface.study import StudyPlan
@@ -41,12 +45,63 @@ def value(*, row: dict, metric: str) -> str:
     return f"{mean:.3f}" if sd is None else f"{mean:.3f} ± {sd:.3f}"
 
 
+def describe_noise(*, plan: StudyPlan, output_dir: Path) -> list[dict]:
+    path = output_dir / "noise_design.json"
+    if path.exists():
+        saved = json.loads(path.read_text())
+        if saved["data_fingerprint"] != plan.data_fingerprint:
+            raise ValueError("Noise design uses a different split")
+        return saved["rows"]
+    payload = read_manifest(path=plan.jobs[0].config.manifest)
+    ages = [record["age"] for record in payload["records"]]
+    indices = training_indices(payload=payload, limit=4096, subset_seed=2026)
+    clean = torch.tensor(ages)[indices]
+    rows = []
+    for mode in ("fixed", "fresh"):
+        for std in (1, 3, 5, 10):
+            config = NoiseConfig(mode=mode, std_years=std, seed=2026)
+            measurements = [
+                noise_summary(
+                    clean=clean,
+                    noisy=noisy_labels(ages=ages, config=config, epoch=epoch)[indices],
+                )
+                for epoch in (range(1, 51) if mode == "fresh" else (1,))
+            ]
+            mse = sum(item["noise_mse_years2"] for item in measurements) / len(
+                measurements
+            )
+            signal = measurements[0]["signal_variance_years2"]
+            rows.append({
+                "mode": mode,
+                "std_years": std,
+                "effective_rmse_years": math.sqrt(mse),
+                "effective_bias_years": sum(
+                    item["noise_bias_years"] for item in measurements
+                )
+                / len(measurements),
+                "snr_db": 10 * math.log10(signal / mse),
+                "signal_variance_years2": signal,
+            })
+    write_json(
+        path=path,
+        payload={
+            "data_fingerprint": plan.data_fingerprint,
+            "train_images": 4096,
+            "noise_seed": 2026,
+            "fresh_epochs": 50,
+            "rows": rows,
+        },
+    )
+    return rows
+
+
 def report(*, plan_path: Path, output_dir: Path, figures: bool) -> None:
     plan = StudyPlan.model_validate_json(plan_path.read_text())
     state = json.loads((plan.output_dir / "state.json").read_text())
     output_dir.mkdir(parents=True, exist_ok=True)
     progress = status_summary(plan=plan, state=state)
     write_json(path=output_dir / "progress.json", payload=progress)
+    noise_design = describe_noise(plan=plan, output_dir=output_dir)
     records, results, curves = [], [], []
     for job in plan.jobs:
         record = state["jobs"][job.identifier]
@@ -110,6 +165,19 @@ def report(*, plan_path: Path, output_dir: Path, figures: bool) -> None:
         f"State: **{progress['status']}**. GPU time: **{progress['gpu_hours']:.2f} / {plan.budget_gpu_hours:g} hours**. Completed primary runs: **{sum(job.stage == 'main' and state['jobs'][job.identifier]['status'] == 'completed' for job in plan.jobs)} / 66**.",
         "",
         "Metrics use clean held-out labels. All tuning and scalar-head gates use validation data. Values are means ± sample SD across distinct training seeds; single-seed values have no SD. Label NLL is unavailable for scalar heads. Population zero-one MaxRL equals CE. Training subsets are fixed and nested.",
+        "",
+    ]
+    lines += [
+        "| Noise mode | Requested SD, years | Realized RMSE, years | Realized SNR, dB |",
+        "|---|---:|---:|---:|",
+    ]
+    lines += [
+        f"| {row['mode']} | {row['std_years']} | {row['effective_rmse_years']:.3f} | {row['snr_db']:.2f} |"
+        for row in noise_design
+    ]
+    lines += [
+        "",
+        "These are precomputed perturbation statistics for the fixed 4,096-image subset; fresh-noise values combine all 50 epochs. They are independent of model outcomes. [Noise design data](noise_design.json).",
         "",
     ]
     if records:
@@ -234,6 +302,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--figures", action="store_true")
     args = parser.parse_args()
+    torch.set_num_threads(4)
     report(plan_path=args.plan, output_dir=args.output_dir, figures=args.figures)
 
 
