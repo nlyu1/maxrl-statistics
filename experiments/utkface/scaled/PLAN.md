@@ -2,6 +2,8 @@
 
 This study uses a new split created after image deduplication. The earlier [12-epoch report](../RESULTS.md) describes the original split and is a separate experiment. Code is on `codex/utkface-scaled-study`.
 
+[Launch status](STATUS.md), [interim report and noise SNR](REPORT.md), [data audit](data_audit.json), [fixed subset indices](training_subsets.json), [frozen execution metadata](execution.json), and [validation record](validation.json).
+
 The pinned archive has 23,671 valid images aged 0–99. Preprocessing drops all 417 images from 204 conflicting-label duplicate groups and removes 176 redundant copies from consistently labeled groups. It retains 23,078 unique decoded RGB images, then applies the original decade-stratified 80/10/10 split with seed 42: **18,462 train / 2,308 validation / 2,308 test**. An independent audit finds zero duplicate groups and zero cross-split image overlap. This checks exact pixels; it does not establish person-level independence or remove near-duplicates.
 
 The cleaned manifest fingerprint is `873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2`. The 4,096-example subset is stratified by age decade, and the 1,024-example subset is stratified within it, using subset seed 2026. Both subsets remain fixed across epochs and methods. Validation/test use every held-out image. Full-data training drops its final incomplete batch, presenting 18,432 images per epoch; the smaller sizes are exact multiples of batch 64.

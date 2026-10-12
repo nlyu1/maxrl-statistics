@@ -1,0 +1,51 @@
+{
+  "status": "running",
+  "gpu_hours": 0.0,
+  "budget_gpu_hours": 64.0,
+  "counts": {
+    "pending": 530
+  },
+  "stages": {
+    "digits": {
+      "pending": 16
+    },
+    "digits_tuning": {
+      "pending": 24
+    },
+    "flat": {
+      "pending": 10
+    },
+    "flat_tuning": {
+      "pending": 40
+    },
+    "main": {
+      "pending": 66
+    },
+    "noise": {
+      "pending": 80
+    },
+    "noise_replication": {
+      "pending": 40
+    },
+    "refine": {
+      "pending": 48
+    },
+    "scalar": {
+      "pending": 6
+    },
+    "smoke": {
+      "pending": 4
+    },
+    "subset": {
+      "pending": 20
+    },
+    "subset_tuning": {
+      "pending": 80
+    },
+    "wide": {
+      "pending": 96
+    }
+  },
+  "active": [],
+  "updated_at": 1791836858.3276432
+}

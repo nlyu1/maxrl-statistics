@@ -1,0 +1,45 @@
+{
+  "output_dir": "/tmp/utkface-study-20261013",
+  "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+  "training_source_sha256": {
+    "src/experiments/utkface/config.py": "94ba0069c4970982614599f11f5a2b5baa5f0d6c56b690c9c4ae860dc38be94b",
+    "src/experiments/utkface/data.py": "93c4ddbb40a048c98ab92f72a805d872507d59f6b5b8551f90bed538026e1977",
+    "src/experiments/utkface/model.py": "6b3a1fbf80c828dc13b05d4c5fe4e541f26cf0196e603ae6da09b95e0b1c7356",
+    "src/experiments/utkface/losses.py": "b96f511c66d56f0c3f7b1543081f80cfe39cd01ca9a030dc8017dea37b833eee",
+    "src/experiments/utkface/advantages.py": "db0c5c6345088bf716427e2e3e254b824d3ca9b1be07f9f749670e2c1758a29c",
+    "src/experiments/utkface/metrics.py": "62385abd77ac3d583435f8ee4d261bf120dfc18e112298eebfd918b68c694ad2",
+    "src/experiments/utkface/noise.py": "b03ff0ee0c62ecd63c42f736b4a6e8d3169497d8c5986c1de45ac1a558430e09",
+    "src/experiments/utkface/distributed.py": "b91b5715ab762c9f5c25783da8dfcea4bae20e2588ead5e489188219fdb27c24",
+    "src/experiments/utkface/run.py": "764ebad17ec97dc8bfc802f86bcdb98360fdfe8408df2d0ee61bee2804ab72ce",
+    "src/model/optimizer.py": "492bd8bb1102db24c7247f4bd821da9ea7d0bf80875e003a44c04d545e13ede0",
+    "src/experiments/utils.py": "3f0973b3c5311acdad0b668495cf13e8fe9bc6764dc7cb0448ff83234a379893"
+  },
+  "budget_gpu_hours": 64.0,
+  "max_concurrent": 6,
+  "plan_sha256": "1ecd0d0a6a1cae81ad1c8e2567ce226dbc47d5d7577ab027f97cb4ba08345fb6",
+  "job_count": 530,
+  "stages": {
+    "smoke": 4,
+    "wide": 96,
+    "refine": 48,
+    "main": 66,
+    "scalar": 6,
+    "subset_tuning": 80,
+    "subset": 20,
+    "flat_tuning": 40,
+    "flat": 10,
+    "noise": 80,
+    "noise_replication": 40,
+    "digits_tuning": 24,
+    "digits": 16
+  },
+  "preprocessing": {
+    "deduplicated_before_split": true,
+    "valid_before_deduplication": 23671,
+    "conflicting_groups_dropped": 204,
+    "conflicting_images_dropped": 417,
+    "consistent_duplicate_copies_dropped": 176
+  },
+  "plan_created_from_commit": "1694467",
+  "supervisor_started_from_commit": "406f1d5"
+}

@@ -1,0 +1,93 @@
+{
+  "fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+  "source": {
+    "url": "https://huggingface.co/datasets/py97/UTKFace-Cropped/resolve/e80f21fb21fa3631380c3cb634b79be3ac2f4cba/UTKFace.tar.gz",
+    "sha256": "2c0655397b498e81b82d685ee74bee8c2e4364a5897caf3afec6ea48929024a7",
+    "revision": "e80f21fb21fa3631380c3cb634b79be3ac2f4cba"
+  },
+  "excluded": {
+    "outside_age_range": 32,
+    "malformed_filename": 5
+  },
+  "counts": {
+    "train": 18462,
+    "val": 2308,
+    "test": 2308
+  },
+  "decades": {
+    "train": {
+      "0": 2418,
+      "10": 1186,
+      "20": 5700,
+      "30": 3554,
+      "40": 1751,
+      "50": 1791,
+      "60": 1022,
+      "70": 538,
+      "80": 395,
+      "90": 107
+    },
+    "val": {
+      "0": 302,
+      "10": 148,
+      "20": 713,
+      "30": 445,
+      "40": 219,
+      "50": 224,
+      "60": 127,
+      "70": 67,
+      "80": 50,
+      "90": 13
+    },
+    "test": {
+      "0": 302,
+      "10": 149,
+      "20": 712,
+      "30": 444,
+      "40": 219,
+      "50": 224,
+      "60": 128,
+      "70": 68,
+      "80": 49,
+      "90": 13
+    }
+  },
+  "constant_mean_age": 33.135142454771966,
+  "constant_median_age": 29.0,
+  "constant_baselines": {
+    "train": {
+      "mean_mae": 15.257604123938355,
+      "mean_rmse": 19.731152372183338,
+      "median_mae": 14.90580652150363
+    },
+    "val": {
+      "mean_mae": 15.220761010437476,
+      "mean_rmse": 19.74870978707326,
+      "median_mae": 14.864818024263432
+    },
+    "test": {
+      "mean_mae": 15.214179924964617,
+      "mean_rmse": 19.68417595586725,
+      "median_mae": 14.84315424610052
+    }
+  },
+  "identical_bytes": {
+    "duplicate_groups": 0,
+    "duplicate_images": 0,
+    "cross_split_groups": 0,
+    "cross_split_images": 0,
+    "cross_split_images_by_split": {},
+    "conflicting_age_groups": 0,
+    "cross_split_examples": []
+  },
+  "identical_rgb_pixels": {
+    "duplicate_groups": 0,
+    "duplicate_images": 0,
+    "cross_split_groups": 0,
+    "cross_split_images": 0,
+    "cross_split_images_by_split": {},
+    "conflicting_age_groups": 0,
+    "cross_split_examples": []
+  },
+  "singleton_test_count": 2308
+}

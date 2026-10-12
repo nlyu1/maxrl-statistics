@@ -1,0 +1,72 @@
+{
+  "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+  "train_images": 4096,
+  "noise_seed": 2026,
+  "fresh_epochs": 50,
+  "rows": [
+    {
+      "mode": "fixed",
+      "std_years": 1,
+      "effective_rmse_years": 1.0267420409966663,
+      "effective_bias_years": 0.015625,
+      "snr_db": 25.66403567581563,
+      "signal_variance_years2": 388.44206804037094
+    },
+    {
+      "mode": "fixed",
+      "std_years": 3,
+      "effective_rmse_years": 2.9572557089512905,
+      "effective_bias_years": 0.092041015625,
+      "snr_db": 16.475484998786037,
+      "signal_variance_years2": 388.44206804037094
+    },
+    {
+      "mode": "fixed",
+      "std_years": 5,
+      "effective_rmse_years": 4.874899838714637,
+      "effective_bias_years": 0.16845703125,
+      "snr_db": 12.133948636722874,
+      "signal_variance_years2": 388.44206804037094
+    },
+    {
+      "mode": "fixed",
+      "std_years": 10,
+      "effective_rmse_years": 9.63247984522937,
+      "effective_bias_years": 0.4609375,
+      "snr_db": 6.218500396548126,
+      "signal_variance_years2": 388.44206804037094
+    },
+    {
+      "mode": "fresh",
+      "std_years": 1,
+      "effective_rmse_years": 1.0329815009234193,
+      "effective_bias_years": 0.004482421875,
+      "snr_db": 25.611411694978656,
+      "signal_variance_years2": 388.44206804037094
+    },
+    {
+      "mode": "fresh",
+      "std_years": 3,
+      "effective_rmse_years": 2.955839526206979,
+      "effective_bias_years": 0.0542431640625,
+      "snr_db": 16.47964552953023,
+      "signal_variance_years2": 388.44206804037094
+    },
+    {
+      "mode": "fresh",
+      "std_years": 5,
+      "effective_rmse_years": 4.882731749332283,
+      "effective_bias_years": 0.1265478515625,
+      "snr_db": 12.120005268339924,
+      "signal_variance_years2": 388.44206804037094
+    },
+    {
+      "mode": "fresh",
+      "std_years": 10,
+      "effective_rmse_years": 9.616590532853236,
+      "effective_bias_years": 0.3710009765625,
+      "snr_db": 6.232840085931511,
+      "signal_variance_years2": 388.44206804037094
+    }
+  ]
+}

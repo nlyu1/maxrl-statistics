@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-13",
+  "code_commit": "406f1d5",
+  "execution_host": "cmu-L40-live",
+  "python_execution": "remote_only_via_uv_python_3.12",
+  "focused_tests": {
+    "command": "OMP_NUM_THREADS=4 uv run --python 3.12 pytest tests/test_utkface_losses.py tests/test_utkface_data.py tests/test_utkface_scaled.py tests/test_utkface_scheduler.py tests/test_maxrl_estimator.py -q",
+    "passed": 64,
+    "seconds": 12.20,
+    "coverage": [
+      "population objectives and finite-sample estimators",
+      "deduplication before splitting and conflicting-label removal",
+      "fixed nested stratified subsets",
+      "reproducible fixed and fresh rounded clipped noise",
+      "scalar and conditional digit head shapes and probabilities",
+      "tie-aware median Spearman and label NLL",
+      "six-GPU concurrency and validation-only LR selection",
+      "budget admission, failed attempts and adopted-process accounting",
+      "report aggregation excluding LR tuning and scalar NLL handling"
+    ]
+  },
+  "ruff_changed_scope": "passed",
+  "ddp_metrics": {
+    "command": "OMP_NUM_THREADS=4 uv run --python 3.12 torchrun --standalone --nproc-per-node=2 tests/utkface_ddp_metrics_probe.py",
+    "backend": "gloo",
+    "device": "cpu",
+    "world_size": 2,
+    "uneven_shard_sizes": [33, 32],
+    "total_count": 65,
+    "categorical_median_spearman": 0.9983062544913628,
+    "categorical_label_nll": 33.84615384615385,
+    "scalar_spearman": 0.9994317341105422,
+    "scalar_mae": 0.6615384615384615,
+    "scalar_label_nll": null,
+    "whole_split_reference_checks": "passed"
+  },
+  "cleaned_dataset": {
+    "fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+    "train": 18462,
+    "val": 2308,
+    "test": 2308,
+    "duplicate_rgb_groups": 0,
+    "cross_split_rgb_groups": 0
+  },
+  "real_image_gpu_preflight": {
+    "status": "pending_idle_gpus",
+    "jobs": 4,
+    "larger_jobs_depend_on_all_preflights": true
+  },
+  "new_training_results_available": false
+}
