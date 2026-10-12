@@ -27,6 +27,15 @@ class DistributedContext:
             dist.all_reduce(values, op=dist.ReduceOp.SUM)
         return values
 
+    def gather_pairs(
+        self, *, pairs: list[tuple[float, int]]
+    ) -> list[tuple[float, int]]:
+        if self.world_size == 1:
+            return pairs
+        outputs = [None for _ in range(self.world_size)]
+        dist.all_gather_object(outputs, pairs)
+        return [pair for output in outputs for pair in output]
+
 
 @contextmanager
 def distributed_context(*, device: str):

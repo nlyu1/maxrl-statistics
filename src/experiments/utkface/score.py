@@ -54,7 +54,7 @@ def score(
             raise ValueError("Checkpoint scoring uses one CUDA GPU per process")
         torch.set_num_threads(config.cpu_threads)
         torch.backends.cudnn.benchmark = True
-        model = build_model(pretrained=False).to(context.device)
+        model = build_model(pretrained=False, head=config.head).to(context.device)
         model.load_state_dict(saved["model"])
         full_loader = make_loader(
             config=config, context=context, payload=payload, split="test"
@@ -67,6 +67,7 @@ def score(
             limit=0,
             rank=0,
             world_size=1,
+            subset_seed=config.subset_seed,
         )
         indices = [
             index

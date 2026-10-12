@@ -12,7 +12,7 @@ DATASET_URL = f"https://huggingface.co/datasets/py97/UTKFace-Cropped/resolve/{DA
 DATASET_SHA256 = "2c0655397b498e81b82d685ee74bee8c2e4364a5897caf3afec6ea48929024a7"
 
 
-def prepare(*, destination: Path, split_seed: int) -> dict:
+def prepare(*, destination: Path, split_seed: int, deduplicate: bool) -> dict:
     destination.mkdir(parents=True, exist_ok=True)
     archive = destination / "UTKFace.tar.gz"
     if not archive.exists():
@@ -27,6 +27,7 @@ def prepare(*, destination: Path, split_seed: int) -> dict:
         image_dir=destination / "UTKFace",
         destination=destination / "manifest.json",
         split_seed=split_seed,
+        deduplicate=deduplicate,
     )
     payload["source"] = {
         "url": DATASET_URL,
@@ -46,10 +47,18 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--destination", type=Path, required=True)
     parser.add_argument("--split-seed", type=int, default=42)
+    parser.add_argument(
+        "--deduplicate", action=argparse.BooleanOptionalAction, default=True
+    )
     args = parser.parse_args()
     print(
         json.dumps(
-            prepare(destination=args.destination, split_seed=args.split_seed), indent=2
+            prepare(
+                destination=args.destination,
+                split_seed=args.split_seed,
+                deduplicate=args.deduplicate,
+            ),
+            indent=2,
         )
     )
 

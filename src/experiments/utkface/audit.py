@@ -5,9 +5,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 
-from src.experiments.utkface.data import read_manifest
+from src.experiments.utkface.data import read_manifest, rgb_fingerprint
 from src.experiments.utkface.run import write_json
 
 
@@ -46,9 +45,7 @@ def audit(*, manifest: Path, output_dir: Path) -> dict:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         entry = {**record, "split": membership[index]}
         byte_groups[digest].append(entry)
-        with Image.open(path) as image:
-            rgb = image.convert("RGB")
-            pixels = hashlib.sha256(str(rgb.size).encode() + rgb.tobytes()).hexdigest()
+        pixels = rgb_fingerprint(path=path)
         pixel_groups[pixels].append(entry)
     age_arrays = {
         split: np.array([payload["records"][i]["age"] for i in indices])

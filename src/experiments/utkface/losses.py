@@ -49,8 +49,9 @@ def policy_loss(
     probs = log_probs.exp()
     errors = age_errors(log_probs=log_probs, targets=targets)
     method = config.method
-    if method == "mse":
-        return (errors.mul(probs).sum(dim=-1) / MAX_AGE).square().mean()
+    if method in {"mse", "mae"}:
+        mean_error = errors.mul(probs).sum(dim=-1) / MAX_AGE
+        return (mean_error.square() if method == "mse" else mean_error.abs()).mean()
     if method in {"ce", "binary_maxrl_population"}:
         return F.nll_loss(log_probs, targets)
     if method == "tailrl_population":
@@ -60,8 +61,15 @@ def policy_loss(
         return -log_windows.mean()
     if method.startswith("stat_maxrl_"):
         scaled = errors / config.kernel_scale_years
-        log_kernel = -0.5 * scaled.square() if "_mse_" in method else -scaled.abs()
-        return -torch.logsumexp(log_probs + log_kernel, dim=-1).mean()
+        log_kernel = -0.5 * scaled.square() if "_mse" in method else -scaled.abs()
+        if method.endswith("_population"):
+            return -torch.logsumexp(log_probs + log_kernel, dim=-1).mean()
+        with torch.no_grad():
+            actions = torch.multinomial(probs, config.num_rollouts, replacement=True)
+            advantages = normalized_kernel_advantages(
+                log_kernel=log_kernel.gather(-1, actions)
+            )
+        return -(advantages * log_probs.gather(-1, actions)).mean()
     reward = 1 - (
         (errors / MAX_AGE).square() if "_mse" in method else errors.abs() / MAX_AGE
     )
@@ -95,3 +103,18 @@ def policy_loss(
             std_floor=config.std_floor,
         )
     return -(advantages * log_probs.gather(-1, actions)).mean()
+
+
+def normalized_kernel_advantages(*, log_kernel: Tensor) -> Tensor:
+    if log_kernel.shape[-1] < 2:
+        raise ValueError("At least two rollouts are required")
+    return log_kernel.softmax(-1) * log_kernel.shape[-1] - 1
+
+
+def scalar_loss(*, predictions: Tensor, targets: Tensor, config: LossConfig) -> Tensor:
+    error = (predictions.flatten().float() - targets) / MAX_AGE
+    if config.method == "mse":
+        return error.square().mean()
+    if config.method == "mae":
+        return error.abs().mean()
+    raise ValueError("Scalar regression supports MAE and MSE only")

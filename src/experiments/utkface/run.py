@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -19,9 +20,18 @@ from src.experiments.utils import set_seeds
 from src.experiments.utkface.config import Method, RunConfig, canonical_config
 from src.experiments.utkface.data import FaceDataset, read_manifest, seed_worker
 from src.experiments.utkface.distributed import DistributedContext, distributed_context
-from src.experiments.utkface.losses import policy_loss
-from src.experiments.utkface.metrics import METRIC_NAMES, batch_metrics, metric_summary
+from src.experiments.utkface.losses import policy_loss, scalar_loss
+from src.experiments.utkface.metrics import (
+    METRIC_NAMES,
+    POINT_METRIC_NAMES,
+    batch_metrics,
+    median_predictions,
+    median_spearman,
+    metric_summary,
+    scalar_metrics,
+)
 from src.experiments.utkface.model import build_model
+from src.experiments.utkface.noise import noise_summary, noisy_labels
 from src.model.optimizer import build_lr_scheduler
 
 
@@ -50,6 +60,7 @@ def make_loader(
         limit=config.train_limit if training else config.eval_limit,
         rank=context.rank,
         world_size=context.world_size,
+        subset_seed=config.subset_seed,
     )
     sampler = (
         DistributedSampler(
@@ -87,11 +98,11 @@ def evaluate(
     context: DistributedContext,
 ) -> dict:
     model.eval()
-    totals = torch.zeros(
-        len(METRIC_NAMES) + 1, device=context.device, dtype=torch.float64
-    )
+    names = POINT_METRIC_NAMES if config.head == "scalar" else METRIC_NAMES
+    totals = torch.zeros(len(names) + 1, device=context.device, dtype=torch.float64)
+    pairs = []
     decade_totals = torch.zeros(10, 3, device=context.device, dtype=torch.float64)
-    for images, targets in loader:
+    for images, targets, _ in loader:
         with (
             torch.device(context.device),
             autocast_context(config=config, context=context),
@@ -99,7 +110,13 @@ def evaluate(
             images = images.to(context.device, non_blocking=True)
             targets = targets.to(context.device, non_blocking=True)
             logits = model(images)
-            metrics = batch_metrics(logits=logits, targets=targets)
+            metrics = (
+                scalar_metrics(predictions=logits, targets=targets)
+                if config.head == "scalar"
+                else batch_metrics(logits=logits, targets=targets)
+            )
+            medians = median_predictions(logits=logits, scalar=config.head == "scalar")
+        pairs.extend(zip(medians.cpu().tolist(), targets.cpu().tolist(), strict=True))
         totals[:-1] += metrics.double().sum(0)
         totals[-1] += len(targets)
         decade = targets // 10
@@ -110,7 +127,13 @@ def evaluate(
         )
     context.sum(values=totals)
     context.sum(values=decade_totals)
-    result = metric_summary(totals=totals)
+    result = metric_summary(totals=totals, names=names)
+    result.update(median_spearman(pairs=context.gather_pairs(pairs=pairs)))
+    if config.head == "scalar":
+        result["label_nll"] = None
+        result["label_nll_reason"] = (
+            "Scalar regression defines no categorical label distribution"
+        )
     result["decades"] = {
         str(i * 10): {
             "count": int(row[2]),
@@ -148,7 +171,9 @@ def train(*, config: RunConfig, context: DistributedContext) -> dict:
         raise ValueError(
             "Training subset must contain at least one full batch per rank"
         )
-    model = build_model(pretrained=config.pretrained).to(context.device)
+    model = build_model(pretrained=config.pretrained, head=config.head).to(
+        context.device
+    )
     if context.world_size > 1:
         if context.device.type == "cuda":
             model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -173,22 +198,38 @@ def train(*, config: RunConfig, context: DistributedContext) -> dict:
     best_mae = float("inf")
     best_epoch = 0
     best_state = {}
+    clean_ages = torch.tensor([record["age"] for record in payload["records"]])
+    subset_indices = torch.tensor(train_loader.dataset.indices)
+    training_fingerprint = hashlib.sha256(
+        json.dumps(train_loader.dataset.indices).encode()
+    ).hexdigest()
     started = time.monotonic()
     for epoch in range(1, config.epochs + 1):
         train_loader.sampler.set_epoch(epoch - 1)
         wrapped.train()
         totals = torch.zeros(3, device=context.device, dtype=torch.float64)
         epoch_start = time.monotonic()
-        for images, targets in train_loader:
+        labels = noisy_labels(
+            ages=clean_ages.tolist(), config=config.noise, epoch=epoch
+        )
+        label_statistics = noise_summary(
+            clean=clean_ages[subset_indices], noisy=labels[subset_indices]
+        )
+        labels = labels.to(context.device)
+        for images, _, indices in train_loader:
             optimizer.zero_grad(set_to_none=True)
             with (
                 torch.device(context.device),
                 autocast_context(config=config, context=context),
             ):
                 images = images.to(context.device, non_blocking=True)
-                targets = targets.to(context.device, non_blocking=True)
+                targets = labels[indices.to(context.device, non_blocking=True)]
                 logits = wrapped(images)
-                loss = policy_loss(logits=logits, targets=targets, config=config.loss)
+                loss = (
+                    scalar_loss(predictions=logits, targets=targets, config=config.loss)
+                    if config.head == "scalar"
+                    else policy_loss(logits=logits, targets=targets, config=config.loss)
+                )
             loss.backward()
             norm = nn.utils.clip_grad_norm_(
                 model.parameters(), config.clip_grad_norm, error_if_nonfinite=True
@@ -211,6 +252,7 @@ def train(*, config: RunConfig, context: DistributedContext) -> dict:
             "learning_rate": optimizer.param_groups[0]["lr"],
             "validation": validation,
             "seconds": time.monotonic() - epoch_start,
+            "label_noise": label_statistics,
         }
         history.append(row)
         if validation["mae_mean"] < best_mae:
@@ -249,6 +291,8 @@ def train(*, config: RunConfig, context: DistributedContext) -> dict:
         "validation": history[best_epoch - 1]["validation"],
         "seconds": time.monotonic() - started,
         "data_fingerprint": payload["fingerprint"],
+        "training_fingerprint": training_fingerprint,
+        "train_unique_images": len(train_loader.dataset),
         "world_size": context.world_size,
         "global_batch_size": config.batch_size * context.world_size,
         "environment": {
@@ -304,6 +348,8 @@ def main() -> None:
         parser.add_argument("--" + name.replace("_", "-"), type=float)
     parser.add_argument("--device")
     parser.add_argument("--precision", choices=("bf16", "fp32"))
+    parser.add_argument("--head", choices=("categorical", "scalar", "digits"))
+    parser.add_argument("--lr-schedule", choices=("cosine", "flat"))
     for name in ("pretrained", "evaluate_test", "save_checkpoint", "deterministic"):
         parser.add_argument(
             "--" + name.replace("_", "-"), action=argparse.BooleanOptionalAction
@@ -322,6 +368,11 @@ def main() -> None:
         **base["loss"],
         **{key: overrides.pop(key) for key in list(overrides) if key in loss_keys},
     }
+    if "lr_schedule" in overrides:
+        base["schedule"] = {
+            **base["schedule"],
+            "lr_schedule": overrides.pop("lr_schedule"),
+        }
     config = RunConfig.model_validate({**base, **overrides})
     if config.deterministic:
         os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")

@@ -17,7 +17,7 @@ TEST_METRICS = (
     "mae_mode",
     "expected_mae",
     "entropy",
-    "ce",
+    "label_nll",
     "tailrl",
     "oracle_best_of_64_mae",
 )
@@ -102,7 +102,12 @@ def write_metric_tables(
     for row in summary.to_dicts():
         values = [
             formatted_statistic(row=row, metric=metric)
-            for metric in ("expected_mae", "entropy", "ce", "oracle_best_of_64_mae")
+            for metric in (
+                "expected_mae",
+                "entropy",
+                "label_nll",
+                "oracle_best_of_64_mae",
+            )
         ]
         lines.append(
             f"| {method_label(method=row['method'])} | " + " | ".join(values) + " |"

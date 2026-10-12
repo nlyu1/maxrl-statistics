@@ -1,4 +1,5 @@
 import torch
+from scipy.stats import spearmanr
 from torch import Tensor
 
 from src.experiments.utkface.losses import (
@@ -14,7 +15,7 @@ METRIC_NAMES = (
     "mae_mode",
     "expected_mae",
     "expected_mse",
-    "ce",
+    "label_nll",
     "tailrl",
     "entropy",
     "mode_accuracy",
@@ -22,6 +23,31 @@ METRIC_NAMES = (
     "oracle_best_of_8_mae",
     "oracle_best_of_64_mae",
 )
+POINT_METRIC_NAMES = ("mae_mean", "mse_mean", "mae_median", "mae_mode")
+
+
+def median_predictions(*, logits: Tensor, scalar: bool) -> Tensor:
+    if scalar:
+        return logits.flatten().float()
+    return (log_policy(logits=logits).exp().cumsum(-1) < 0.5).sum(-1).clamp_max(99)
+
+
+def scalar_metrics(*, predictions: Tensor, targets: Tensor) -> Tensor:
+    errors = predictions.flatten().float() - targets
+    return torch.stack(
+        (errors.abs(), errors.square(), errors.abs(), errors.abs()), dim=-1
+    )
+
+
+def median_spearman(*, pairs: list[tuple[float, int]]) -> dict:
+    predictions, targets = zip(*pairs, strict=True)
+    defined = len(set(predictions)) > 1 and len(set(targets)) > 1
+    return {
+        "median_spearman": float(spearmanr(predictions, targets).statistic)
+        if defined
+        else None,
+        "median_spearman_defined": defined,
+    }
 
 
 def batch_metrics(*, logits: Tensor, targets: Tensor) -> Tensor:
@@ -53,12 +79,12 @@ def batch_metrics(*, logits: Tensor, targets: Tensor) -> Tensor:
     )
 
 
-def metric_summary(*, totals: Tensor) -> dict:
+def metric_summary(*, totals: Tensor, names: tuple[str, ...]) -> dict:
     count = int(totals[-1].item())
     if count == 0:
         raise ValueError("Cannot evaluate an empty split")
     means = (totals[:-1] / count).cpu().tolist()
-    result = dict(zip(METRIC_NAMES, means, strict=True))
+    result = dict(zip(names, means, strict=True))
     result["rmse_mean"] = result["mse_mean"] ** 0.5
     result["count"] = count
     return result

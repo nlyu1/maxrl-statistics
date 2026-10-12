@@ -265,7 +265,7 @@ def test_single_rollout_is_rejected_and_bf16_is_promoted() -> None:
 
 
 def test_architecture_and_uniform_policy_metrics() -> None:
-    model = build_model(pretrained=False)
+    model = build_model(pretrained=False, head="categorical")
     assert model.fc.in_features == 512 and model.fc.out_features == 100
     assert (
         len(model.layer1)

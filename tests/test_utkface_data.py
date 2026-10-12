@@ -19,8 +19,12 @@ def test_original_split_is_reproducible_disjoint_and_evaluation_is_unpadded(
             )
     Image.new("RGB", (12, 12)).save(image_dir / "105_0_0_9999.jpg.chip.jpg")
     manifest = tmp_path / "manifest.json"
-    first = create_manifest(image_dir=image_dir, destination=manifest, split_seed=42)
-    second = create_manifest(image_dir=image_dir, destination=manifest, split_seed=42)
+    first = create_manifest(
+        image_dir=image_dir, destination=manifest, split_seed=42, deduplicate=False
+    )
+    second = create_manifest(
+        image_dir=image_dir, destination=manifest, split_seed=42, deduplicate=False
+    )
     assert first == second
     assert {name: len(indices) for name, indices in first["splits"].items()} == {
         "train": 200,
@@ -37,6 +41,7 @@ def test_original_split_is_reproducible_disjoint_and_evaluation_is_unpadded(
             limit=0,
             rank=rank,
             world_size=2,
+            subset_seed=2026,
         )
         for rank in range(2)
     ]

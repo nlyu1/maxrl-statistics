@@ -8,6 +8,7 @@ from src.model.optimizer import LRScheduleConfig
 
 Method = Literal[
     "mse",
+    "mae",
     "ce",
     "grpo_mae_population",
     "grpo_mse_population",
@@ -23,7 +24,22 @@ Method = Literal[
     "rloo_mse",
     "binary_maxrl",
     "tailrl",
+    "stat_maxrl_mae",
+    "stat_maxrl_mse",
 ]
+Head = Literal["categorical", "scalar", "digits"]
+
+
+class NoiseConfig(BaseConfig):
+    mode: Literal["none", "fixed", "fresh"]
+    std_years: float = Field(ge=0)
+    seed: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_noise(self) -> "NoiseConfig":
+        if (self.mode == "none") != (self.std_years == 0):
+            raise ValueError("Clean labels require mode=none and std_years=0")
+        return self
 
 
 class LossConfig(BaseConfig):
@@ -38,6 +54,9 @@ class RunConfig(BaseConfig):
     manifest: Path
     output_dir: Path
     loss: LossConfig
+    head: Head
+    noise: NoiseConfig
+    subset_seed: int = Field(ge=0)
     seed: int = Field(ge=0)
     epochs: int = Field(ge=1)
     batch_size: int = Field(ge=2)
@@ -63,6 +82,8 @@ class RunConfig(BaseConfig):
             raise ValueError("device must be cpu or cuda[:index]")
         if self.device == "cpu" and self.precision != "fp32":
             raise ValueError("CPU verification requires precision=fp32")
+        if self.head == "scalar" and self.loss.method not in {"mae", "mse"}:
+            raise ValueError("A scalar head supports direct MAE or MSE only")
         return self
 
 
@@ -70,6 +91,9 @@ def canonical_config(*, manifest: Path, output_dir: Path) -> RunConfig:
     return RunConfig(
         manifest=manifest,
         output_dir=output_dir,
+        head="categorical",
+        noise=NoiseConfig(mode="none", std_years=0, seed=2026),
+        subset_seed=2026,
         loss=LossConfig(
             method="ce",
             kernel_scale_years=5.0,

@@ -1,7 +1,9 @@
 import hashlib
 import json
+import os
 import random
 import re
+from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +31,15 @@ def manifest_fingerprint(*, records: list[dict], splits: dict[str, list[int]]) -
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def create_manifest(*, image_dir: Path, destination: Path, split_seed: int) -> dict:
+def rgb_fingerprint(*, path: Path) -> str:
+    with Image.open(path) as image:
+        rgb = image.convert("RGB")
+        return hashlib.sha256(str(rgb.size).encode() + rgb.tobytes()).hexdigest()
+
+
+def create_manifest(
+    *, image_dir: Path, destination: Path, split_seed: int, deduplicate: bool
+) -> dict:
     pattern = re.compile(r"^(\d+)_\d+_\d+_\d+\.jpg(?:\.chip\.jpg)?$")
     records = []
     excluded = {"outside_age_range": 0, "malformed_filename": 0}
@@ -45,11 +55,36 @@ def create_manifest(*, image_dir: Path, destination: Path, split_seed: int) -> d
         with Image.open(path) as image:
             image.verify()
         records.append({
-            "relative_path": path.relative_to(destination.parent).as_posix(),
+            "relative_path": Path(os.path.relpath(path, destination.parent)).as_posix(),
             "age": age,
         })
     if not records:
         raise ValueError(f"No valid UTKFace images in {image_dir}")
+    preprocessing = {"deduplicated_before_split": deduplicate}
+    if deduplicate:
+        groups = defaultdict(list)
+        for record in records:
+            groups[
+                rgb_fingerprint(path=destination.parent / record["relative_path"])
+            ].append(record)
+        conflicts = [
+            group for group in groups.values() if len({r["age"] for r in group}) > 1
+        ]
+        consistent = [
+            group for group in groups.values() if len({r["age"] for r in group}) == 1
+        ]
+        preprocessing.update({
+            "valid_before_deduplication": len(records),
+            "conflicting_groups_dropped": len(conflicts),
+            "conflicting_images_dropped": sum(map(len, conflicts)),
+            "consistent_duplicate_copies_dropped": sum(
+                len(group) - 1 for group in consistent
+            ),
+            "conflicting_groups": conflicts,
+        })
+        records = sorted(
+            (group[0] for group in consistent), key=lambda r: r["relative_path"]
+        )
     indices = list(range(len(records)))
     decades = [record["age"] // 10 for record in records]
     train, temporary = train_test_split(
@@ -67,10 +102,34 @@ def create_manifest(*, image_dir: Path, destination: Path, split_seed: int) -> d
         "splits": splits,
         "split_seed": split_seed,
         "excluded": excluded,
+        "preprocessing": preprocessing,
         "fingerprint": manifest_fingerprint(records=records, splits=splits),
     }
     destination.write_text(json.dumps(payload, indent=2) + "\n")
     return payload
+
+
+def training_indices(*, payload: dict, limit: int, subset_seed: int) -> list[int]:
+    indices = sorted(payload["splits"]["train"])
+    if limit > len(indices):
+        raise ValueError(f"Requested {limit} training images from {len(indices)}")
+    if not limit or limit == len(indices):
+        return indices
+    if limit <= 4096 < len(indices):
+        indices, _ = train_test_split(
+            indices,
+            train_size=4096,
+            random_state=subset_seed,
+            stratify=[payload["records"][i]["age"] // 10 for i in indices],
+        )
+    if limit < len(indices):
+        indices, _ = train_test_split(
+            indices,
+            train_size=limit,
+            random_state=subset_seed,
+            stratify=[payload["records"][i]["age"] // 10 for i in indices],
+        )
+    return sorted(indices)
 
 
 def read_manifest(*, path: Path) -> dict:
@@ -113,27 +172,35 @@ class FaceDataset(Dataset):
         limit: int,
         rank: int,
         world_size: int,
+        subset_seed: int,
     ) -> None:
         indices = payload["splits"][split]
         if limit > len(indices):
             raise ValueError(
                 f"Requested {limit} examples from {len(indices)} in {split}"
             )
-        indices = indices[:limit] if limit else indices
+        indices = (
+            training_indices(payload=payload, limit=limit, subset_seed=subset_seed)
+            if split == "train"
+            else indices[:limit]
+            if limit
+            else indices
+        )
         if split != "train":
             indices = indices[rank::world_size]
         self.records = [FaceRecord(**payload["records"][i]) for i in indices]
+        self.indices = indices
         self.root = manifest_path.parent
         self.transform = image_transform(training=split == "train")
 
     def __len__(self) -> int:
         return len(self.records)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, int, int]:
         record = self.records[index]
         with Image.open(self.root / record.relative_path) as image:
             tensor = self.transform(image.convert("RGB"))
-        return tensor, record.age
+        return tensor, record.age, self.indices[index]
 
 
 def seed_worker(worker_id: int) -> None:

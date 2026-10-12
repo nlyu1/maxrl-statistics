@@ -26,9 +26,9 @@ def main() -> None:
         torch.backends.cudnn.allow_tf32 = False
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.manual_seed(97)
-        reference = build_model(pretrained=False).double()
+        reference = build_model(pretrained=False, head="categorical").double()
         model = nn.SyncBatchNorm.convert_sync_batchnorm(
-            build_model(pretrained=False).double()
+            build_model(pretrained=False, head="categorical").double()
         )
         model.load_state_dict(reference.state_dict())
         wrapped = DistributedDataParallel(model, device_ids=[context.device.index])
