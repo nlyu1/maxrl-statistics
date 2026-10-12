@@ -21,6 +21,9 @@ def duplicate_summary(*, groups: dict[str, list[dict]]) -> dict:
         "duplicate_images": sum(len(group) for group in duplicates),
         "cross_split_groups": len(crossed),
         "cross_split_images": sum(len(group) for group in crossed),
+        "cross_split_images_by_split": dict(
+            Counter(record["split"] for group in crossed for record in group)
+        ),
         "conflicting_age_groups": sum(
             len({record["age"] for record in group}) > 1 for group in duplicates
         ),
@@ -52,6 +55,11 @@ def audit(*, manifest: Path, output_dir: Path) -> dict:
         for split, indices in payload["splits"].items()
     }
     mean_age, median_age = age_arrays["train"].mean(), np.median(age_arrays["train"])
+    singleton_test = [
+        group[0]["relative_path"]
+        for group in pixel_groups.values()
+        if len(group) == 1 and group[0]["split"] == "test"
+    ]
     result = {
         "fingerprint": payload["fingerprint"],
         "source": payload.get("source", {}),
@@ -73,9 +81,18 @@ def audit(*, manifest: Path, output_dir: Path) -> dict:
         },
         "identical_bytes": duplicate_summary(groups=byte_groups),
         "identical_rgb_pixels": duplicate_summary(groups=pixel_groups),
+        "singleton_test_count": len(singleton_test),
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(path=output_dir / "data_audit.json", payload=result)
+    write_json(
+        path=output_dir / "test_singletons.json",
+        payload={
+            "data_fingerprint": payload["fingerprint"],
+            "rule": "Test images with a unique decoded RGB pixel hash across the entire dataset",
+            "relative_paths": singleton_test,
+        },
+    )
     return result
 
 
