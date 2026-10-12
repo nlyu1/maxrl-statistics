@@ -99,6 +99,51 @@ def charged_seconds(*, state: dict, now: float) -> float:
     )
 
 
+def retryable_preemption(*, attempt: dict) -> bool:
+    return bool(
+        attempt.get("yielded_to_foreign_process")
+        and not attempt.get("timed_out")
+        and attempt.get("returncode") in {-15, -9, 143, 137}
+    )
+
+
+def register_preemption(*, state: dict, attempt: dict, now: float) -> None:
+    entry = state["gpu_interruptions"].setdefault(
+        attempt["gpu_uuid"], {"count": 0, "cooldown_until": 0}
+    )
+    entry["count"] += 1
+    entry["cooldown_until"] = now + min(3600, 900 * entry["count"])
+
+
+def restore_preempted_queue(*, state: dict, now: float) -> list[str]:
+    if state["status"] != "failed":
+        return []
+    failed = [
+        identifier
+        for identifier, record in state["jobs"].items()
+        if record["status"] == "failed"
+    ]
+    if not failed or any(
+        not retryable_preemption(attempt=state["jobs"][identifier]["attempts"][-1])
+        for identifier in failed
+    ):
+        return []
+    for identifier in failed:
+        state["jobs"][identifier]["status"] = "pending"
+    for record in state["jobs"].values():
+        if record["status"] == "skipped" and record.get("reason") == "failed":
+            record["status"] = "pending"
+            del record["reason"]
+    state["status"] = "running"
+    state.setdefault("recoveries", []).append({
+        "time": now,
+        "reason": "external_gpu_preemption",
+        "retried_jobs": failed,
+        "gpu_hours_preserved": charged_seconds(state=state, now=now) / 3600,
+    })
+    return failed
+
+
 def runtime_limit(*, job: StudyJob, state: dict, plan: StudyPlan) -> float:
     exposures = job.config.train_limit or 18432
     normalized = []
@@ -199,6 +244,29 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
         )
         if set(state["jobs"]) != {job.identifier for job in plan.jobs}:
             raise ValueError("Saved queue state does not match the study plan")
+        previous_state = json.loads(json.dumps(state))
+        state.setdefault("gpu_interruptions", {})
+        historical_interruptions = {}
+        for record in state["jobs"].values():
+            for attempt in record["attempts"]:
+                if attempt.get("yielded_to_foreign_process"):
+                    historical_interruptions.setdefault(attempt["gpu_uuid"], []).append(
+                        attempt
+                    )
+        for uuid, attempts in historical_interruptions.items():
+            if uuid not in state["gpu_interruptions"]:
+                last = max(attempt["termination_requested_at"] for attempt in attempts)
+                state["gpu_interruptions"][uuid] = {
+                    "count": len(attempts),
+                    "cooldown_until": last + min(3600, 900 * len(attempts)),
+                }
+        recovered = restore_preempted_queue(state=state, now=time.time())
+        if recovered:
+            write_json(
+                path=root / f"state_before_preemption_recovery_{int(time.time())}.json",
+                payload=previous_state,
+            )
+            print(json.dumps({"recovered_preempted_jobs": recovered}), flush=True)
         children = {}
         logs = {}
         streaks = {}
@@ -243,10 +311,7 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                             "status": "completed",
                             "result_path": str(result_path),
                         })
-                    elif (
-                        attempt.get("yielded_to_foreign_process")
-                        and len(record["attempts"]) < 3
-                    ):
+                    elif retryable_preemption(attempt=attempt):
                         record["status"] = "pending"
                     else:
                         record["status"] = "failed"
@@ -260,7 +325,20 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                 ]
                 if foreign and "termination_requested_at" not in attempt:
                     attempt["yielded_to_foreign_process"] = True
+                    attempt["foreign_gpu_pids"] = foreign
+                    register_preemption(state=state, attempt=attempt, now=now)
                     terminate_attempt(attempt=attempt)
+                    print(
+                        json.dumps({
+                            "yielded": job.identifier,
+                            "gpu": attempt["gpu_index"],
+                            "foreign_gpu_pids": foreign,
+                            "cooldown_until": state["gpu_interruptions"][
+                                attempt["gpu_uuid"]
+                            ]["cooldown_until"],
+                        }),
+                        flush=True,
+                    )
                 elif (
                     now - attempt["started_at"] >= attempt["runtime_limit_seconds"]
                     and "termination_requested_at" not in attempt
@@ -304,7 +382,12 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                 for gpu in inventory:
                     streaks[gpu["uuid"]] = (
                         streaks.get(gpu["uuid"], 0) + 1
-                        if gpu_is_free(gpu=gpu) and gpu["uuid"] not in leased
+                        if gpu_is_free(gpu=gpu)
+                        and gpu["uuid"] not in leased
+                        and now
+                        >= state["gpu_interruptions"]
+                        .get(gpu["uuid"], {})
+                        .get("cooldown_until", 0)
                         else 0
                     )
                 free = [gpu for gpu in inventory if streaks[gpu["uuid"]] >= 3]

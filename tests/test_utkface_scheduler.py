@@ -353,3 +353,114 @@ def test_report_excludes_tuning_from_seed_aggregation_and_preserves_scalar_nll(
     assert categorical["mae_mean_sd"] == pytest.approx(2**0.5)
     assert scalar["label_nll_mean"] is None
     assert (tmp_path / "report" / "main.png").exists()
+
+
+@pytest.mark.parametrize("returncode,expected", [(143, True), (-9, True), (1, False)])
+def test_preemption_recovery_preserves_attempts_budget_and_unrelated_skips(
+    returncode: int, expected: bool
+) -> None:
+    from src.experiments.utkface.scheduler import restore_preempted_queue
+
+    attempts = [
+        {
+            "started_at": 10,
+            "seconds": 30,
+            "yielded_to_foreign_process": True,
+            "returncode": returncode,
+        }
+        for _ in range(3)
+    ]
+    state = {
+        "status": "failed",
+        "jobs": {
+            "interrupted": {"status": "failed", "attempts": attempts},
+            "dependent": {"status": "skipped", "reason": "failed", "attempts": []},
+            "scalar": {
+                "status": "skipped",
+                "reason": "scalar_head_not_competitive",
+                "attempts": [],
+            },
+        },
+    }
+    restored = restore_preempted_queue(state=state, now=100)
+    assert bool(restored) == expected
+    assert charged_seconds(state=state, now=100) == 90
+    assert state["jobs"]["interrupted"]["attempts"] == attempts
+    assert state["jobs"]["scalar"]["status"] == "skipped"
+    assert state["status"] == ("running" if expected else "failed")
+    assert state["jobs"]["dependent"]["status"] == (
+        "pending" if expected else "skipped"
+    )
+
+
+def test_repeated_external_gpu_preemptions_back_off_without_aborting_study(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.experiments.utkface import scheduler
+
+    item = job(root=tmp_path, identifier="preempted", lr=1e-4)
+    plan = StudyPlan(
+        output_dir=tmp_path,
+        data_fingerprint="test",
+        training_source_sha256={},
+        budget_gpu_hours=10,
+        max_concurrent=6,
+        jobs=(item,),
+    )
+    children = []
+
+    class Child:
+        def __init__(self, command, **kwargs):
+            self.pid = 10000 + len(children)
+            self.terminated = False
+            self.uuid = kwargs["env"]["CUDA_VISIBLE_DEVICES"]
+            config = json.loads(
+                Path(command[command.index("--config") + 1]).read_text()
+            )
+            output = Path(config["output_dir"])
+            output.mkdir(parents=True)
+            if len(children) == 4:
+                (output / "result.json").write_text(
+                    json.dumps({
+                        "config": config,
+                        "validation": {"mae_mean": 5},
+                        "train_unique_images": 18462,
+                    })
+                )
+            children.append(self)
+
+        def poll(self):
+            if self is children[-1] and len(children) == 5:
+                return 0
+            return 143 if self.terminated else None
+
+    def inventory():
+        gpus = fake_inventory()
+        for child in children:
+            if not child.terminated:
+                gpu = next(gpu for gpu in gpus if gpu["uuid"] == child.uuid)
+                gpu["pids"] = [child.pid, 99999]
+        return gpus
+
+    def terminate(*, attempt):
+        child = next(child for child in children if child.pid == attempt["pid"])
+        child.terminated = True
+        attempt["termination_requested_at"] = time.time()
+
+    monkeypatch.setattr(scheduler, "gpu_inventory", inventory)
+    monkeypatch.setattr(scheduler.subprocess, "Popen", Child)
+    monkeypatch.setattr(scheduler, "owned_process", lambda **kwargs: True)
+    monkeypatch.setattr(scheduler, "process_group", lambda *, pid: pid)
+    monkeypatch.setattr(scheduler, "terminate_attempt", terminate)
+    monkeypatch.setattr(scheduler.time, "sleep", lambda seconds: None)
+    run(plan=plan, poll_seconds=0)
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["status"] == "completed"
+    assert len(state["jobs"]["preempted"]["attempts"]) == 5
+    assert len({child.uuid for child in children}) == 5
+    assert len(state["gpu_interruptions"]) == 4
+    assert all(
+        entry["cooldown_until"] > time.time()
+        for entry in state["gpu_interruptions"].values()
+    )
+    assert charged_seconds(state=state, now=time.time()) > 0
