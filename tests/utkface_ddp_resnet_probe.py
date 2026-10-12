@@ -26,11 +26,13 @@ def main() -> None:
         torch.backends.cudnn.allow_tf32 = False
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.manual_seed(97)
-        reference = build_model(pretrained=False)
-        model = nn.SyncBatchNorm.convert_sync_batchnorm(build_model(pretrained=False))
+        reference = build_model(pretrained=False).double()
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(
+            build_model(pretrained=False).double()
+        )
         model.load_state_dict(reference.state_dict())
         wrapped = DistributedDataParallel(model, device_ids=[context.device.index])
-        inputs = torch.randn(4, 3, 224, 224)
+        inputs = torch.randn(4, 3, 224, 224, dtype=torch.float64)
         targets = torch.tensor([10, 35, 60, 90])
         base = canonical_config(manifest=Path("unused"), output_dir=Path("unused")).loss
         rows = []
@@ -68,7 +70,7 @@ def main() -> None:
                 (torch.stack(errors).sum() / torch.stack(scales).sum()).sqrt().item()
             )
             maximum = torch.stack(maxima).max().item()
-            if relative > 1e-3:
+            if relative > 1e-7:
                 raise AssertionError(f"{method}: relative gradient error {relative}")
             rows.append({
                 "method": method,
