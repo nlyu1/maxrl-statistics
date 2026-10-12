@@ -36,6 +36,8 @@ def analyze(*, runs_dir: Path, output_dir: Path) -> None:
     for run in runs:
         config = run["config"]
         method, seed = config["loss"]["method"], config["seed"]
+        if method.startswith("stat_maxrl"):
+            method += f"_s{config['loss']['kernel_scale_years']:g}"
         record = {
             "method": method,
             "seed": seed,

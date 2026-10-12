@@ -38,7 +38,7 @@ CUDA_VISIBLE_DEVICES=1,5 uv run --python 3.12 torchrun --standalone --nproc-per-
 
 Batch size is per rank, so the DDP example keeps global batch 64. Use a fresh output directory for every run. `config.json`, `history.json`, `result.json` and optionally `best.pt` record configs, split fingerprint, environment, commit, counts, validation curves and test metrics. Test evaluation is disabled unless requested. The selected checkpoint minimizes validation MAE of the policy mean for every method. Mean, median and mode age errors, RMSE, policy entropy, expected action errors, CE, TailRL and age-decade errors are reported. Oracle best-of-K errors use the true target to select the closest of K draws; they are distribution diagnostics, not deployable predictions.
 
-The pilot compares learning rates 1e−4, 3e−4, 1e−3 and kernel scales 2, 5, 10 on 4096 training / 512 validation examples for three epochs, without accessing test data. The main sweep uses the selected configurations on the full split and independent seeds. CE also represents population binary MaxRL; a separate sampled binary arm tests the finite-rollout behavior.
+The pilot compares learning rates 1e−4, 3e−4, 1e−3 and kernel scales 2, 5, 10 on 4096 training / 512 validation examples for three epochs, without accessing test data. The main sweep selects a learning rate per objective and scale, then retains all three kernel scales on the full split and independent seeds: 45 pilot runs and 45 full runs with three seeds. CE also represents population binary MaxRL; a separate sampled binary arm tests the finite-rollout behavior.
 
 ```bash
 uv run --python 3.12 python -m src.experiments.utkface.sweep --stage pilot \

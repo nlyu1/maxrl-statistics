@@ -19,6 +19,12 @@ CORE_METHODS = (
     "binary_maxrl",
     "tailrl",
 )
+KERNEL_SCALES = (2.0, 5.0, 10.0)
+LEARNING_RATES = (1e-4, 3e-4, 1e-3)
+
+
+def method_scales(*, method: str) -> tuple[float, ...]:
+    return KERNEL_SCALES if method.startswith("stat_maxrl") else (5.0,)
 
 
 def run_sweep(
@@ -69,17 +75,25 @@ def select_pilot(*, pilot_dir: Path, destination: Path) -> list[dict]:
     ]
     selected = []
     for method in CORE_METHODS:
-        runs = [run for run in candidates if run["config"]["loss"]["method"] == method]
-        if not runs:
-            raise ValueError(f"No completed pilot runs for {method}")
-        best = min(runs, key=lambda run: run["validation"]["mae_mean"])
-        selected.append({
-            "method": method,
-            "learning_rate": best["config"]["learning_rate"],
-            "kernel_scale_years": best["config"]["loss"]["kernel_scale_years"],
-            "pilot_val_mae": best["validation"]["mae_mean"],
-            "pilot_output": best["config"]["output_dir"],
-        })
+        for scale in method_scales(method=method):
+            runs = [
+                run
+                for run in candidates
+                if run["config"]["loss"]["method"] == method
+                and run["config"]["loss"]["kernel_scale_years"] == scale
+            ]
+            if sorted(run["config"]["learning_rate"] for run in runs) != sorted(
+                LEARNING_RATES
+            ):
+                raise ValueError(f"Incomplete pilot grid for {method}, scale={scale}")
+            best = min(runs, key=lambda run: run["validation"]["mae_mean"])
+            selected.append({
+                "method": method,
+                "learning_rate": best["config"]["learning_rate"],
+                "kernel_scale_years": scale,
+                "pilot_val_mae": best["validation"]["mae_mean"],
+                "pilot_output": best["config"]["output_dir"],
+            })
     write_json(path=destination, payload=selected)
     return selected
 
@@ -109,10 +123,8 @@ def main() -> None:
     configs = []
     if args.stage == "pilot":
         for method in CORE_METHODS:
-            for scale in (
-                (2.0, 5.0, 10.0) if method.startswith("stat_maxrl") else (5.0,)
-            ):
-                for lr in (1e-4, 3e-4, 1e-3):
+            for scale in method_scales(method=method):
+                for lr in LEARNING_RATES:
                     label = f"{method}_s{scale:g}_lr{lr:g}"
                     payload = {
                         **base.model_dump(),
@@ -137,7 +149,12 @@ def main() -> None:
             raise ValueError("Selection must contain every comparison method")
         for choice in choices:
             for seed in args.seeds:
-                label = f"{choice['method']}_seed{seed}"
+                suffix = (
+                    f"_s{choice['kernel_scale_years']:g}"
+                    if choice["method"].startswith("stat_maxrl")
+                    else ""
+                )
+                label = f"{choice['method']}{suffix}_seed{seed}"
                 payload = {
                     **base.model_dump(),
                     "epochs": args.epochs,
