@@ -43,9 +43,26 @@
     "cross_split_rgb_groups": 0
   },
   "real_image_gpu_preflight": {
-    "status": "pending_idle_gpus",
+    "status": "passed",
     "jobs": 4,
-    "larger_jobs_depend_on_all_preflights": true
+    "larger_jobs_depend_on_all_preflights": true,
+    "precision": "bf16",
+    "train_count_per_job": 256,
+    "validation_count_per_job": 65,
+    "test_count_per_job": 65,
+    "record": "preflight_validation.json"
+  },
+  "scheduler_recovery_checks": {
+    "code_commit": "50ac82d",
+    "command": "OMP_NUM_THREADS=4 uv run --python 3.12 pytest tests/test_utkface_scheduler.py -q",
+    "passed": 14,
+    "seconds": 9.52,
+    "ruff_changed_scope": "passed",
+    "repeated_external_preemptions": "retries_with_cooldown",
+    "genuine_errors": "remain_failed",
+    "previous_attempts_and_charges": "preserved",
+    "frozen_training_sources_and_plan": "unchanged",
+    "uv_launcher_python_process_group_probe": "passed_on_server_cpu"
   },
   "new_training_results_available": false
 }

@@ -1,0 +1,964 @@
+[
+  {
+    "study_job": {
+      "identifier": "smoke_categorical_stat_maxrl_mse",
+      "stage": "smoke",
+      "variant": "stat_maxrl_mse_s2",
+      "priority": 0,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_categorical_stat_maxrl_mse",
+        "loss": {
+          "method": "stat_maxrl_mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_categorical_stat_maxrl_mse/attempt_0",
+        "loss": {
+          "method": "stat_maxrl_mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 1,
+      "validation": {
+        "mae_mean": 20.448009117750022,
+        "mse_mean": 561.028807094464,
+        "mae_median": 18.584615384615386,
+        "mae_mode": 16.23076923076923,
+        "expected_mae": 29.807240266066334,
+        "expected_mse": 1382.288985501803,
+        "label_nll": 4.486204213362474,
+        "tailrl": 0.5497003271029546,
+        "entropy": 4.431208955324613,
+        "mode_accuracy": 0.03076923076923077,
+        "mass_within_5": 0.12962104540604813,
+        "oracle_best_of_8_mae": 5.143972114416269,
+        "oracle_best_of_64_mae": 0.6385028189191452,
+        "rmse_mean": 23.686046675088352,
+        "count": 65,
+        "median_spearman": 0.2888036024159,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 11,
+            "mae_mean": 41.06577474420721,
+            "mae_median": 37.63636363636363
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 27.732796669006348,
+            "mae_median": 23.0
+          },
+          "20": {
+            "count": 21,
+            "mae_mean": 19.883699689592635,
+            "mae_median": 15.80952380952381
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 12.355352592468261,
+            "mae_median": 9.0
+          },
+          "40": {
+            "count": 7,
+            "mae_mean": 3.215221209185464,
+            "mae_median": 2.5714285714285716
+          },
+          "50": {
+            "count": 5,
+            "mae_mean": 6.9375410079956055,
+            "mae_median": 10.4
+          },
+          "60": {
+            "count": 4,
+            "mae_mean": 18.630468130111694,
+            "mae_median": 22.25
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 28.103732585906982,
+            "mae_median": 31.5
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 36.68920135498047,
+            "mae_median": 41.0
+          }
+        }
+      },
+      "seconds": 5.655998677015305,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "bd9bc15b98e96aa3153a17856cee0130e2a5212b42167be77ed99ae5faced22a",
+      "train_unique_images": 256,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393",
+        "gpu": "NVIDIA L40"
+      },
+      "test": {
+        "mae_mean": 20.21092843275804,
+        "mse_mean": 563.2346402755151,
+        "mae_median": 17.784615384615385,
+        "mae_mode": 15.461538461538462,
+        "expected_mae": 29.80185940082257,
+        "expected_mse": 1393.0087233323318,
+        "label_nll": 4.506885844010573,
+        "tailrl": 0.5464636316666237,
+        "entropy": 4.42563395866981,
+        "mode_accuracy": 0.015384615384615385,
+        "mass_within_5": 0.1343406183215288,
+        "oracle_best_of_8_mae": 5.020035729041466,
+        "oracle_best_of_64_mae": 0.6533629165102657,
+        "rmse_mean": 23.73256497464012,
+        "count": 65,
+        "median_spearman": 0.5220938320400526,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 12,
+            "mae_mean": 39.92803827921549,
+            "mae_median": 35.666666666666664
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 31.023962020874023,
+            "mae_median": 26.5
+          },
+          "20": {
+            "count": 22,
+            "mae_mean": 20.148345080288973,
+            "mae_median": 16.545454545454547
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 11.068322992324829,
+            "mae_median": 7.3
+          },
+          "40": {
+            "count": 9,
+            "mae_mean": 2.857136699888441,
+            "mae_median": 1.8888888888888888
+          },
+          "50": {
+            "count": 4,
+            "mae_mean": 6.422355830669403,
+            "mae_median": 9.5
+          },
+          "60": {
+            "count": 1,
+            "mae_mean": 20.143611907958984,
+            "mae_median": 23.0
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 28.153584003448486,
+            "mae_median": 31.0
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 34.41754150390625,
+            "mae_median": 36.0
+          }
+        }
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "smoke_categorical_stat_maxrl_mae",
+      "stage": "smoke",
+      "variant": "stat_maxrl_mae_s2",
+      "priority": 0,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_categorical_stat_maxrl_mae",
+        "loss": {
+          "method": "stat_maxrl_mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_categorical_stat_maxrl_mae/attempt_0",
+        "loss": {
+          "method": "stat_maxrl_mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 1,
+      "validation": {
+        "mae_mean": 20.419691984470074,
+        "mse_mean": 559.4282244242155,
+        "mae_median": 18.400000000000002,
+        "mae_mode": 17.076923076923077,
+        "expected_mae": 29.710636138916016,
+        "expected_mse": 1377.5180166391226,
+        "label_nll": 4.460268141673161,
+        "tailrl": 0.5470986375441919,
+        "entropy": 4.430566420921913,
+        "mode_accuracy": 0.03076923076923077,
+        "mass_within_5": 0.1308855760556001,
+        "oracle_best_of_8_mae": 5.111171384958121,
+        "oracle_best_of_64_mae": 0.6293373797948544,
+        "rmse_mean": 23.652235083057487,
+        "count": 65,
+        "median_spearman": 0.3298317003899026,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 11,
+            "mae_mean": 41.05675575949929,
+            "mae_median": 37.36363636363637
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 27.761381149291992,
+            "mae_median": 23.0
+          },
+          "20": {
+            "count": 21,
+            "mae_mean": 19.77636055719285,
+            "mae_median": 15.476190476190476
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 12.340774822235108,
+            "mae_median": 8.6
+          },
+          "40": {
+            "count": 7,
+            "mae_mean": 3.327362298965454,
+            "mae_median": 2.7142857142857144
+          },
+          "50": {
+            "count": 5,
+            "mae_mean": 6.955002117156982,
+            "mae_median": 10.4
+          },
+          "60": {
+            "count": 4,
+            "mae_mean": 18.62761950492859,
+            "mae_median": 22.5
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 28.184178352355957,
+            "mae_median": 32.0
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 36.107845306396484,
+            "mae_median": 39.0
+          }
+        }
+      },
+      "seconds": 5.650062958942726,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "bd9bc15b98e96aa3153a17856cee0130e2a5212b42167be77ed99ae5faced22a",
+      "train_unique_images": 256,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393",
+        "gpu": "NVIDIA L40"
+      },
+      "test": {
+        "mae_mean": 20.220897582861095,
+        "mse_mean": 563.0532173991204,
+        "mae_median": 17.692307692307693,
+        "mae_mode": 13.123076923076924,
+        "expected_mae": 29.719324610783506,
+        "expected_mse": 1388.948239370493,
+        "label_nll": 4.50506564287039,
+        "tailrl": 0.5444320531991812,
+        "entropy": 4.425713788546049,
+        "mode_accuracy": 0.015384615384615385,
+        "mass_within_5": 0.13472739125673588,
+        "oracle_best_of_8_mae": 4.9971929880288934,
+        "oracle_best_of_64_mae": 0.6507017238782002,
+        "rmse_mean": 23.72874243189302,
+        "count": 65,
+        "median_spearman": 0.49681205287405483,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 12,
+            "mae_mean": 39.910740534464516,
+            "mae_median": 35.666666666666664
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 30.867960929870605,
+            "mae_median": 26.5
+          },
+          "20": {
+            "count": 22,
+            "mae_mean": 20.18536966497248,
+            "mae_median": 16.227272727272727
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 11.08629493713379,
+            "mae_median": 7.1
+          },
+          "40": {
+            "count": 9,
+            "mae_mean": 2.8408986462487116,
+            "mae_median": 1.7777777777777777
+          },
+          "50": {
+            "count": 4,
+            "mae_mean": 6.5000540018081665,
+            "mae_median": 10.0
+          },
+          "60": {
+            "count": 1,
+            "mae_mean": 20.416650772094727,
+            "mae_median": 23.0
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 28.215824127197266,
+            "mae_median": 31.75
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 33.90420150756836,
+            "mae_median": 35.0
+          }
+        }
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "smoke_scalar_mae",
+      "stage": "smoke",
+      "variant": "mae_scalar",
+      "priority": 0,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_scalar_mae",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_scalar_mae/attempt_0",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 1,
+      "validation": {
+        "mae_mean": 15.852616852980395,
+        "mse_mean": 417.50461707481975,
+        "mae_median": 15.852616852980395,
+        "mae_mode": 15.852616852980395,
+        "rmse_mean": 20.4329297232389,
+        "count": 65,
+        "median_spearman": 0.46599968394231606,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 11,
+            "mae_mean": 11.46081256866455,
+            "mae_median": 11.46081256866455
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 3.2336630821228027,
+            "mae_median": 3.2336630821228027
+          },
+          "20": {
+            "count": 21,
+            "mae_mean": 9.169201532999674,
+            "mae_median": 9.169201532999674
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 14.530822372436523,
+            "mae_median": 14.530822372436523
+          },
+          "40": {
+            "count": 7,
+            "mae_mean": 15.892259052821569,
+            "mae_median": 15.892259052821569
+          },
+          "50": {
+            "count": 5,
+            "mae_mean": 15.370795440673827,
+            "mae_median": 15.370795440673827
+          },
+          "60": {
+            "count": 4,
+            "mae_mean": 39.44707679748535,
+            "mae_median": 39.44707679748535
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 39.78533935546875,
+            "mae_median": 39.78533935546875
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 54.992919921875,
+            "mae_median": 54.992919921875
+          }
+        }
+      },
+      "seconds": 5.481285334913991,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "bd9bc15b98e96aa3153a17856cee0130e2a5212b42167be77ed99ae5faced22a",
+      "train_unique_images": 256,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393",
+        "gpu": "NVIDIA L40"
+      },
+      "test": {
+        "mae_mean": 14.858541363936205,
+        "mse_mean": 343.6470140773517,
+        "mae_median": 14.858541363936205,
+        "mae_mode": 14.858541363936205,
+        "rmse_mean": 18.53771868589422,
+        "count": 65,
+        "median_spearman": 0.6322103367358003,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 12,
+            "mae_mean": 9.963504036267599,
+            "mae_median": 9.963504036267599
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 4.708802223205566,
+            "mae_median": 4.708802223205566
+          },
+          "20": {
+            "count": 22,
+            "mae_mean": 8.088893066753041,
+            "mae_median": 8.088893066753041
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 15.53311824798584,
+            "mae_median": 15.53311824798584
+          },
+          "40": {
+            "count": 9,
+            "mae_mean": 21.90561909145779,
+            "mae_median": 21.90561909145779
+          },
+          "50": {
+            "count": 4,
+            "mae_mean": 23.425902366638184,
+            "mae_median": 23.425902366638184
+          },
+          "60": {
+            "count": 1,
+            "mae_mean": 43.412506103515625,
+            "mae_median": 43.412506103515625
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 39.14872741699219,
+            "mae_median": 39.14872741699219
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 12.677108764648438,
+            "mae_median": 12.677108764648438
+          }
+        }
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "smoke_digits_ce",
+      "stage": "smoke",
+      "variant": "ce_digits",
+      "priority": 0,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_digits_ce",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "digits",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/smoke_digits_ce/attempt_0",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "digits",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 3.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 1,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 256,
+        "eval_limit": 65,
+        "evaluate_test": true,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 1,
+      "validation": {
+        "mae_mean": 20.38054294723731,
+        "mse_mean": 534.390080562807,
+        "mae_median": 17.261538461538464,
+        "mae_mode": 17.646153846153847,
+        "expected_mae": 28.277554966853216,
+        "expected_mse": 1302.1626652644231,
+        "label_nll": 4.4812584913693945,
+        "tailrl": 0.5131119984846849,
+        "entropy": 4.34010826257559,
+        "mode_accuracy": 0.046153846153846156,
+        "mass_within_5": 0.15776644658583863,
+        "oracle_best_of_8_mae": 4.552808607541598,
+        "oracle_best_of_64_mae": 0.687413768699536,
+        "rmse_mean": 23.116878694209714,
+        "count": 65,
+        "median_spearman": 0.603639544791696,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 11,
+            "mae_mean": 37.96445499766957,
+            "mae_median": 31.545454545454547
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 25.635501861572266,
+            "mae_median": 17.0
+          },
+          "20": {
+            "count": 21,
+            "mae_mean": 22.06401252746582,
+            "mae_median": 16.61904761904762
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 15.40570125579834,
+            "mae_median": 12.6
+          },
+          "40": {
+            "count": 7,
+            "mae_mean": 6.883157559803554,
+            "mae_median": 5.857142857142857
+          },
+          "50": {
+            "count": 5,
+            "mae_mean": 2.116581600904465,
+            "mae_median": 3.2
+          },
+          "60": {
+            "count": 4,
+            "mae_mean": 15.151489019393921,
+            "mae_median": 20.25
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 23.210325717926025,
+            "mae_median": 26.5
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 26.241737365722656,
+            "mae_median": 22.0
+          }
+        }
+      },
+      "seconds": 5.614005936076865,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "bd9bc15b98e96aa3153a17856cee0130e2a5212b42167be77ed99ae5faced22a",
+      "train_unique_images": 256,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393",
+        "gpu": "NVIDIA L40"
+      },
+      "test": {
+        "mae_mean": 20.001674798818737,
+        "mse_mean": 530.3471180494015,
+        "mae_median": 15.292307692307693,
+        "mae_mode": 13.984615384615385,
+        "expected_mae": 28.319212106557995,
+        "expected_mse": 1341.9514239971454,
+        "label_nll": 4.403897953033447,
+        "tailrl": 0.5022948012902186,
+        "entropy": 4.342077798109789,
+        "mode_accuracy": 0.0,
+        "mass_within_5": 0.17184561766110934,
+        "oracle_best_of_8_mae": 4.246657290825477,
+        "oracle_best_of_64_mae": 0.5872678593947338,
+        "rmse_mean": 23.029266554742936,
+        "count": 65,
+        "median_spearman": 0.6395360047044023,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 12,
+            "mae_mean": 37.03615427017212,
+            "mae_median": 27.416666666666668
+          },
+          "10": {
+            "count": 2,
+            "mae_mean": 25.583983421325684,
+            "mae_median": 21.0
+          },
+          "20": {
+            "count": 22,
+            "mae_mean": 21.723552920601584,
+            "mae_median": 15.363636363636363
+          },
+          "30": {
+            "count": 10,
+            "mae_mean": 13.789620447158814,
+            "mae_median": 8.7
+          },
+          "40": {
+            "count": 9,
+            "mae_mean": 5.279841237597996,
+            "mae_median": 4.444444444444445
+          },
+          "50": {
+            "count": 4,
+            "mae_mean": 1.8093464970588684,
+            "mae_median": 3.5
+          },
+          "60": {
+            "count": 1,
+            "mae_mean": 20.0117244720459,
+            "mae_median": 24.0
+          },
+          "70": {
+            "count": 4,
+            "mae_mean": 22.789225101470947,
+            "mae_median": 24.75
+          },
+          "80": {
+            "count": 1,
+            "mae_mean": 22.76809310913086,
+            "mae_median": 21.0
+          }
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,67 @@
+{
+  "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+  "training_sources_verified": true,
+  "all_passed": true,
+  "rows": [
+    {
+      "job": "smoke_categorical_stat_maxrl_mse",
+      "head": "categorical",
+      "method": "stat_maxrl_mse",
+      "precision": "bf16",
+      "train_count": 256,
+      "validation_count": 65,
+      "test_count": 65,
+      "test_mae": 20.21092843275804,
+      "test_median_spearman": 0.5220938320400526,
+      "test_label_nll": 4.506885844010573,
+      "grad_norm": 4.2669373750686646,
+      "train_loss": -0.08050442487001419,
+      "training_source_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393"
+    },
+    {
+      "job": "smoke_categorical_stat_maxrl_mae",
+      "head": "categorical",
+      "method": "stat_maxrl_mae",
+      "precision": "bf16",
+      "train_count": 256,
+      "validation_count": 65,
+      "test_count": 65,
+      "test_mae": 20.220897582861095,
+      "test_median_spearman": 0.49681205287405483,
+      "test_label_nll": 4.50506564287039,
+      "grad_norm": 4.0365583300590515,
+      "train_loss": -0.10690731927752495,
+      "training_source_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393"
+    },
+    {
+      "job": "smoke_scalar_mae",
+      "head": "scalar",
+      "method": "mae",
+      "precision": "bf16",
+      "train_count": 256,
+      "validation_count": 65,
+      "test_count": 65,
+      "test_mae": 14.858541363936205,
+      "test_median_spearman": 0.6322103367358003,
+      "test_label_nll": null,
+      "grad_norm": 2.741672098636627,
+      "train_loss": 0.1744246482849121,
+      "training_source_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393"
+    },
+    {
+      "job": "smoke_digits_ce",
+      "head": "digits",
+      "method": "ce",
+      "precision": "bf16",
+      "train_count": 256,
+      "validation_count": 65,
+      "test_count": 65,
+      "test_mae": 20.001674798818737,
+      "test_median_spearman": 0.6395360047044023,
+      "test_label_nll": 4.403897953033447,
+      "grad_norm": 9.181041717529297,
+      "train_loss": 4.625459432601929,
+      "training_source_commit": "7ca07622bdd659791e6d663c3e327efc9f19f393"
+    }
+  ]
+}

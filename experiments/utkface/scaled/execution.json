@@ -41,5 +41,14 @@
     "consistent_duplicate_copies_dropped": 176
   },
   "plan_created_from_commit": "1694467",
-  "supervisor_started_from_commit": "406f1d5"
+  "supervisor_started_from_commit": "406f1d5",
+  "scheduler_revisions": [
+    {
+      "commit": "50ac82d",
+      "reason": "Retry external GPU preemptions with per-GPU cooldowns",
+      "training_sources_changed": false,
+      "plan_changed": false,
+      "previous_attempts_and_budget_preserved": true
+    }
+  ]
 }

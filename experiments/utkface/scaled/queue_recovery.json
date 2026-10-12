@@ -1,0 +1,25 @@
+{
+  "scheduler_revision": "50ac82d",
+  "plan_sha256": "1ecd0d0a6a1cae81ad1c8e2567ce226dbc47d5d7577ab027f97cb4ba08345fb6",
+  "original_state_backup": "/tmp/utkface-study-20261013/state_before_preemption_recovery_1791848631.json",
+  "original_state_sha256": "cb0512d0ee62c13dccb798a7c00c37a1bfbce7e4bf64c8350203f3615b6cc5f5",
+  "all_previous_attempts_preserved": true,
+  "frozen_training_sources_unchanged": true,
+  "recoveries": [
+    {
+      "time": 1791848631.3013089,
+      "reason": "external_gpu_preemption",
+      "retried_jobs": [
+        "wide_binary_maxrl_lr0.0001"
+      ],
+      "gpu_hours_preserved": 0.1121230239338345
+    }
+  ],
+  "gpu_interruptions": {
+    "GPU-5b529257-7f8a-7898-d2df-40ef36a21116": {
+      "count": 3,
+      "cooldown_until": 1791849832.3094254
+    }
+  },
+  "completed_preflights": 4
+}
