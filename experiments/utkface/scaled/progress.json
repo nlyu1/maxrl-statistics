@@ -1,10 +1,10 @@
 {
   "status": "running",
-  "gpu_hours": 0.1121230239338345,
+  "gpu_hours": 0.4774537704388301,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 4,
-    "pending": 526
+    "completed": 8,
+    "pending": 522
   },
   "stages": {
     "digits": {
@@ -44,9 +44,10 @@
       "pending": 80
     },
     "wide": {
-      "pending": 96
+      "pending": 92,
+      "completed": 4
     }
   },
   "active": [],
-  "updated_at": 1791848652.0541286
+  "updated_at": 1791855649.1800284
 }

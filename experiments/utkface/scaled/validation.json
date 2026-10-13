@@ -64,5 +64,21 @@
     "frozen_training_sources_and_plan": "unchanged",
     "uv_launcher_python_process_group_probe": "passed_on_server_cpu"
   },
-  "new_training_results_available": false
+  "full_data_pilot_integrity": {
+    "completed": 4,
+    "method": "binary_maxrl",
+    "rollouts": 64,
+    "epochs_per_run": 10,
+    "train_unique_images": 18462,
+    "train_presentations_per_epoch": 18432,
+    "validation_images": 2308,
+    "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+    "test_evaluation": false,
+    "checkpoint_matches_best_validation_mae": true,
+    "finite_losses_and_gradient_norms": true,
+    "frozen_plan_sources_and_data_verified": true,
+    "max_observed_study_gpu_concurrency": 1,
+    "main_runs_completed": 0
+  },
+  "new_training_results_available": true
 }
