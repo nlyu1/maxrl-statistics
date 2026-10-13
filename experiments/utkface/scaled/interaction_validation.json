@@ -1,0 +1,20 @@
+{
+  "snapshot": "2026-10-14T04:06:33.247889+08:00",
+  "data_runs": 586,
+  "main_methods": 22,
+  "checks": [
+    "script evaluation",
+    "six sections",
+    "hide/show/baseline controls",
+    "sort toggle",
+    "per-run evidence",
+    "CSV export",
+    "subset and noise filters",
+    "unfinished curves",
+    "additional metric",
+    "finite SVG geometry"
+  ],
+  "passed": true,
+  "environment": "isolated QuickJS DOM harness; no browser rendering",
+  "browser_preview_limitation": "In-app browser rejects file URLs; visual rendering not browser-verified"
+}

@@ -1,0 +1,3549 @@
+{
+  "output_dir": "/tmp/utkface-extension-20261014",
+  "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+  "training_source_sha256": {
+    "src/experiments/utkface/config.py": "94ba0069c4970982614599f11f5a2b5baa5f0d6c56b690c9c4ae860dc38be94b",
+    "src/experiments/utkface/data.py": "93c4ddbb40a048c98ab92f72a805d872507d59f6b5b8551f90bed538026e1977",
+    "src/experiments/utkface/model.py": "6b3a1fbf80c828dc13b05d4c5fe4e541f26cf0196e603ae6da09b95e0b1c7356",
+    "src/experiments/utkface/losses.py": "b96f511c66d56f0c3f7b1543081f80cfe39cd01ca9a030dc8017dea37b833eee",
+    "src/experiments/utkface/advantages.py": "db0c5c6345088bf716427e2e3e254b824d3ca9b1be07f9f749670e2c1758a29c",
+    "src/experiments/utkface/metrics.py": "62385abd77ac3d583435f8ee4d261bf120dfc18e112298eebfd918b68c694ad2",
+    "src/experiments/utkface/noise.py": "b03ff0ee0c62ecd63c42f736b4a6e8d3169497d8c5986c1de45ac1a558430e09",
+    "src/experiments/utkface/distributed.py": "b91b5715ab762c9f5c25783da8dfcea4bae20e2588ead5e489188219fdb27c24",
+    "src/experiments/utkface/run.py": "764ebad17ec97dc8bfc802f86bcdb98360fdfe8408df2d0ee61bee2804ab72ce",
+    "src/model/optimizer.py": "492bd8bb1102db24c7247f4bd821da9ea7d0bf80875e003a44c04d545e13ede0",
+    "src/experiments/utils.py": "3f0973b3c5311acdad0b668495cf13e8fe9bc6764dc7cb0448ff83234a379893"
+  },
+  "budget_gpu_hours": 24.0,
+  "max_concurrent": 6,
+  "jobs": [
+    {
+      "identifier": "extra_subset4096_tailrl_population_seed43",
+      "stage": "subset_replication",
+      "variant": "tailrl_population",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_tailrl_population_seed43",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_tailrl_population_seed44",
+      "stage": "subset_replication",
+      "variant": "tailrl_population",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_tailrl_population_seed44",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_tailrl_population_seed42",
+      "stage": "matched_steps",
+      "variant": "tailrl_population",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_tailrl_population_seed42",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_tailrl_population_lr0.0001",
+        "subset_tune_1024_tailrl_population_lr0.0003",
+        "subset_tune_1024_tailrl_population_lr0.001",
+        "subset_tune_1024_tailrl_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_tailrl_population_lr0.0001",
+        "subset_tune_1024_tailrl_population_lr0.0003",
+        "subset_tune_1024_tailrl_population_lr0.001",
+        "subset_tune_1024_tailrl_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_tailrl_population_noise2027",
+      "stage": "noise_realization",
+      "variant": "tailrl_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_tailrl_population_noise2027",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_tailrl_population_noise2028",
+      "stage": "noise_realization",
+      "variant": "tailrl_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_tailrl_population_noise2028",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_tailrl_population_noise2027",
+      "stage": "noise_realization",
+      "variant": "tailrl_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_tailrl_population_noise2027",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_tailrl_population_noise2028",
+      "stage": "noise_realization",
+      "variant": "tailrl_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_tailrl_population_noise2028",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_tailrl_population_lr0.0001",
+        "subset_tune_4096_tailrl_population_lr0.0003",
+        "subset_tune_4096_tailrl_population_lr0.001",
+        "subset_tune_4096_tailrl_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_mse_seed43",
+      "stage": "subset_replication",
+      "variant": "mse",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_mse_seed43",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_mse_seed44",
+      "stage": "subset_replication",
+      "variant": "mse",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_mse_seed44",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_mse_seed42",
+      "stage": "matched_steps",
+      "variant": "mse",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_mse_seed42",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_mse_lr0.0001",
+        "subset_tune_1024_mse_lr0.0003",
+        "subset_tune_1024_mse_lr0.001",
+        "subset_tune_1024_mse_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_mse_lr0.0001",
+        "subset_tune_1024_mse_lr0.0003",
+        "subset_tune_1024_mse_lr0.001",
+        "subset_tune_1024_mse_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_mse_noise2027",
+      "stage": "noise_realization",
+      "variant": "mse",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_mse_noise2027",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_mse_noise2028",
+      "stage": "noise_realization",
+      "variant": "mse",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_mse_noise2028",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_mse_noise2027",
+      "stage": "noise_realization",
+      "variant": "mse",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_mse_noise2027",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_mse_noise2028",
+      "stage": "noise_realization",
+      "variant": "mse",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_mse_noise2028",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mse_lr0.0001",
+        "subset_tune_4096_mse_lr0.0003",
+        "subset_tune_4096_mse_lr0.001",
+        "subset_tune_4096_mse_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_mae_seed43",
+      "stage": "subset_replication",
+      "variant": "mae",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_mae_seed43",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_mae_seed44",
+      "stage": "subset_replication",
+      "variant": "mae",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_mae_seed44",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_mae_seed42",
+      "stage": "matched_steps",
+      "variant": "mae",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_mae_seed42",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_mae_lr0.0001",
+        "subset_tune_1024_mae_lr0.0003",
+        "subset_tune_1024_mae_lr0.001",
+        "subset_tune_1024_mae_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_mae_lr0.0001",
+        "subset_tune_1024_mae_lr0.0003",
+        "subset_tune_1024_mae_lr0.001",
+        "subset_tune_1024_mae_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_mae_noise2027",
+      "stage": "noise_realization",
+      "variant": "mae",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_mae_noise2027",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_mae_noise2028",
+      "stage": "noise_realization",
+      "variant": "mae",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_mae_noise2028",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_mae_noise2027",
+      "stage": "noise_realization",
+      "variant": "mae",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_mae_noise2027",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_mae_noise2028",
+      "stage": "noise_realization",
+      "variant": "mae",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_mae_noise2028",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_mae_lr0.0001",
+        "subset_tune_4096_mae_lr0.0003",
+        "subset_tune_4096_mae_lr0.001",
+        "subset_tune_4096_mae_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_ce_seed43",
+      "stage": "subset_replication",
+      "variant": "ce",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_ce_seed43",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_ce_seed44",
+      "stage": "subset_replication",
+      "variant": "ce",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_ce_seed44",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_ce_seed42",
+      "stage": "matched_steps",
+      "variant": "ce",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_ce_seed42",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_ce_lr0.0001",
+        "subset_tune_1024_ce_lr0.0003",
+        "subset_tune_1024_ce_lr0.001",
+        "subset_tune_1024_ce_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_ce_lr0.0001",
+        "subset_tune_1024_ce_lr0.0003",
+        "subset_tune_1024_ce_lr0.001",
+        "subset_tune_1024_ce_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_ce_noise2027",
+      "stage": "noise_realization",
+      "variant": "ce",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_ce_noise2027",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_ce_noise2028",
+      "stage": "noise_realization",
+      "variant": "ce",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_ce_noise2028",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_ce_noise2027",
+      "stage": "noise_realization",
+      "variant": "ce",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_ce_noise2027",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_ce_noise2028",
+      "stage": "noise_realization",
+      "variant": "ce",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_ce_noise2028",
+        "loss": {
+          "method": "ce",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_ce_lr0.0001",
+        "subset_tune_4096_ce_lr0.0003",
+        "subset_tune_4096_ce_lr0.001",
+        "subset_tune_4096_ce_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_stat_maxrl_mae_population_s2_seed43",
+      "stage": "subset_replication",
+      "variant": "stat_maxrl_mae_population_s2",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_stat_maxrl_mae_population_s2_seed43",
+        "loss": {
+          "method": "stat_maxrl_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_stat_maxrl_mae_population_s2_seed44",
+      "stage": "subset_replication",
+      "variant": "stat_maxrl_mae_population_s2",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_stat_maxrl_mae_population_s2_seed44",
+        "loss": {
+          "method": "stat_maxrl_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_stat_maxrl_mae_population_s2_seed42",
+      "stage": "matched_steps",
+      "variant": "stat_maxrl_mae_population_s2",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_stat_maxrl_mae_population_s2_seed42",
+        "loss": {
+          "method": "stat_maxrl_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_1024_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_stat_maxrl_mae_population_s2_noise2027",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mae_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_stat_maxrl_mae_population_s2_noise2027",
+        "loss": {
+          "method": "stat_maxrl_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_stat_maxrl_mae_population_s2_noise2028",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mae_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_stat_maxrl_mae_population_s2_noise2028",
+        "loss": {
+          "method": "stat_maxrl_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_stat_maxrl_mae_population_s2_noise2027",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mae_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_stat_maxrl_mae_population_s2_noise2027",
+        "loss": {
+          "method": "stat_maxrl_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_stat_maxrl_mae_population_s2_noise2028",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mae_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_stat_maxrl_mae_population_s2_noise2028",
+        "loss": {
+          "method": "stat_maxrl_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mae_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_stat_maxrl_mse_population_s2_seed43",
+      "stage": "subset_replication",
+      "variant": "stat_maxrl_mse_population_s2",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_stat_maxrl_mse_population_s2_seed43",
+        "loss": {
+          "method": "stat_maxrl_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_stat_maxrl_mse_population_s2_seed44",
+      "stage": "subset_replication",
+      "variant": "stat_maxrl_mse_population_s2",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_stat_maxrl_mse_population_s2_seed44",
+        "loss": {
+          "method": "stat_maxrl_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_stat_maxrl_mse_population_s2_seed42",
+      "stage": "matched_steps",
+      "variant": "stat_maxrl_mse_population_s2",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_stat_maxrl_mse_population_s2_seed42",
+        "loss": {
+          "method": "stat_maxrl_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_1024_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_stat_maxrl_mse_population_s2_noise2027",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mse_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_stat_maxrl_mse_population_s2_noise2027",
+        "loss": {
+          "method": "stat_maxrl_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_stat_maxrl_mse_population_s2_noise2028",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mse_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_stat_maxrl_mse_population_s2_noise2028",
+        "loss": {
+          "method": "stat_maxrl_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_stat_maxrl_mse_population_s2_noise2027",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mse_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_stat_maxrl_mse_population_s2_noise2027",
+        "loss": {
+          "method": "stat_maxrl_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_stat_maxrl_mse_population_s2_noise2028",
+      "stage": "noise_realization",
+      "variant": "stat_maxrl_mse_population_s2",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_stat_maxrl_mse_population_s2_noise2028",
+        "loss": {
+          "method": "stat_maxrl_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.0003",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.001",
+        "subset_tune_4096_stat_maxrl_mse_population_s2_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_grpo_mae_population_seed43",
+      "stage": "subset_replication",
+      "variant": "grpo_mae_population",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_grpo_mae_population_seed43",
+        "loss": {
+          "method": "grpo_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_grpo_mae_population_seed44",
+      "stage": "subset_replication",
+      "variant": "grpo_mae_population",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_grpo_mae_population_seed44",
+        "loss": {
+          "method": "grpo_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_grpo_mae_population_seed42",
+      "stage": "matched_steps",
+      "variant": "grpo_mae_population",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_grpo_mae_population_seed42",
+        "loss": {
+          "method": "grpo_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_grpo_mae_population_lr0.0001",
+        "subset_tune_1024_grpo_mae_population_lr0.0003",
+        "subset_tune_1024_grpo_mae_population_lr0.001",
+        "subset_tune_1024_grpo_mae_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_grpo_mae_population_lr0.0001",
+        "subset_tune_1024_grpo_mae_population_lr0.0003",
+        "subset_tune_1024_grpo_mae_population_lr0.001",
+        "subset_tune_1024_grpo_mae_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_grpo_mae_population_noise2027",
+      "stage": "noise_realization",
+      "variant": "grpo_mae_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_grpo_mae_population_noise2027",
+        "loss": {
+          "method": "grpo_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_grpo_mae_population_noise2028",
+      "stage": "noise_realization",
+      "variant": "grpo_mae_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_grpo_mae_population_noise2028",
+        "loss": {
+          "method": "grpo_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_grpo_mae_population_noise2027",
+      "stage": "noise_realization",
+      "variant": "grpo_mae_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_grpo_mae_population_noise2027",
+        "loss": {
+          "method": "grpo_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_grpo_mae_population_noise2028",
+      "stage": "noise_realization",
+      "variant": "grpo_mae_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_grpo_mae_population_noise2028",
+        "loss": {
+          "method": "grpo_mae_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mae_population_lr0.0001",
+        "subset_tune_4096_grpo_mae_population_lr0.0003",
+        "subset_tune_4096_grpo_mae_population_lr0.001",
+        "subset_tune_4096_grpo_mae_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_grpo_mse_population_seed43",
+      "stage": "subset_replication",
+      "variant": "grpo_mse_population",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_grpo_mse_population_seed43",
+        "loss": {
+          "method": "grpo_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_subset4096_grpo_mse_population_seed44",
+      "stage": "subset_replication",
+      "variant": "grpo_mse_population",
+      "priority": 25,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_subset4096_grpo_mse_population_seed44",
+        "loss": {
+          "method": "grpo_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 44,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_steps1024_grpo_mse_population_seed42",
+      "stage": "matched_steps",
+      "variant": "grpo_mse_population",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_steps1024_grpo_mse_population_seed42",
+        "loss": {
+          "method": "grpo_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 200,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 1024,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_1024_grpo_mse_population_lr0.0001",
+        "subset_tune_1024_grpo_mse_population_lr0.0003",
+        "subset_tune_1024_grpo_mse_population_lr0.001",
+        "subset_tune_1024_grpo_mse_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_1024_grpo_mse_population_lr0.0001",
+        "subset_tune_1024_grpo_mse_population_lr0.0003",
+        "subset_tune_1024_grpo_mse_population_lr0.001",
+        "subset_tune_1024_grpo_mse_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_grpo_mse_population_noise2027",
+      "stage": "noise_realization",
+      "variant": "grpo_mse_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_grpo_mse_population_noise2027",
+        "loss": {
+          "method": "grpo_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fixed_s5_grpo_mse_population_noise2028",
+      "stage": "noise_realization",
+      "variant": "grpo_mse_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fixed_s5_grpo_mse_population_noise2028",
+        "loss": {
+          "method": "grpo_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fixed",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_grpo_mse_population_noise2027",
+      "stage": "noise_realization",
+      "variant": "grpo_mse_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_grpo_mse_population_noise2027",
+        "loss": {
+          "method": "grpo_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2027
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    {
+      "identifier": "extra_noise_fresh_s5_grpo_mse_population_noise2028",
+      "stage": "noise_realization",
+      "variant": "grpo_mse_population",
+      "priority": 15,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-extension-20261014/runs/extra_noise_fresh_s5_grpo_mse_population_noise2028",
+        "loss": {
+          "method": "grpo_mse_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "fresh",
+          "std_years": 5.0,
+          "seed": 2028
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 4096,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tune_from": [
+        "subset_tune_4096_grpo_mse_population_lr0.0001",
+        "subset_tune_4096_grpo_mse_population_lr0.0003",
+        "subset_tune_4096_grpo_mse_population_lr0.001",
+        "subset_tune_4096_grpo_mse_population_lr0.003"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    }
+  ]
+}

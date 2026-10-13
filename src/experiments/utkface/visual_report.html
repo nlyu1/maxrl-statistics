@@ -21,7 +21,7 @@ label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:
 </head>
 <body><main>
 <header><p class="secondary">ResNet-18 · deduplicated UTKFace · clean validation and test labels</p><h1>Learning objectives, data size, and label noise</h1>
-<p id="timestamp" class="secondary"></p><div class="status numbers" id="status"></div></header>
+<p id="timestamp" class="secondary"></p><p class="secondary"><a href="ANALYSIS.md">Read the interpretation and limitations</a> · <a href="main.pdf">Scientific comparison figure</a> · <a href="STATUS.md">Queue and report status</a></p><div class="status numbers" id="status"></div></header>
 <nav aria-label="Report sections" id="navigation">
 <button type="button" data-view="main" aria-pressed="true">Main matrix</button>
 <button type="button" data-view="subset" aria-pressed="false">Smaller datasets</button>
@@ -137,7 +137,7 @@ function plot(container,series,title,xTitle){
  if(xmin===xmax){xmin-=1;xmax+=1;}if(ymin===ymax){ymin-=0.1;ymax+=0.1;}
  const pad=(ymax-ymin)*0.08;ymin-=pad;ymax+=pad;
  const X=x=>box.left+(x-xmin)/(xmax-xmin)*(width-box.left-box.right),Y=y=>height-box.bottom-(y-ymin)/(ymax-ymin)*(height-box.top-box.bottom);
- const chart=svg("svg",{viewBox:"0 0 "+width+" "+height,role:"img","aria-label":title+"; validation mean and sample SD across available seeds"});
+ const chart=svg("svg",{viewBox:"0 0 "+width+" "+height,role:"img","aria-label":title+"; mean and sample SD across available optimization seeds"});
  for(let i=0;i<5;i++){const y=ymin+(ymax-ymin)*i/4,x=xmin+(xmax-xmin)*i/4;chart.append(svg("line",{x1:box.left,x2:width-box.right,y1:Y(y),y2:Y(y),stroke:"var(--line)","stroke-width":1}));chart.append(svg("text",{x:box.left-8,y:Y(y)+4,"text-anchor":"end"},numberTick(y)));chart.append(svg("text",{x:X(x),y:height-box.bottom+20,"text-anchor":i===0?"start":i===4?"end":"middle"},numberTick(x)));}
  chart.append(svg("text",{x:(width+box.left-box.right)/2,y:height-4,"text-anchor":"middle"},xTitle));
  const path=values=>values.map((p,i)=>(i?"L":"M")+X(p.x)+","+Y(p.y)).join(" ");

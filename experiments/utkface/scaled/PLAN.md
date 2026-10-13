@@ -2,7 +2,7 @@
 
 This study uses a new split created after image deduplication. The earlier [12-epoch report](../RESULTS.md) describes the original split and is a separate experiment. Code is on `codex/utkface-scaled-study`.
 
-[Launch status](STATUS.md), [interim report and noise SNR](REPORT.md), [data audit](data_audit.json), [fixed subset indices](training_subsets.json), [frozen execution metadata](execution.json), and [validation record](validation.json).
+[Interactive report](dashboard.html), [interpretation](ANALYSIS.md), [launch status](STATUS.md), [generated tables and noise SNR](REPORT.md), [deadline extension](EXTENSION.md), [data audit](data_audit.json), [fixed subset indices](training_subsets.json), [frozen execution metadata](execution.json), and [validation record](validation.json).
 
 The pinned archive has 23,671 valid images aged 0–99. Preprocessing drops all 417 images from 204 conflicting-label duplicate groups and removes 176 redundant copies from consistently labeled groups. It retains 23,078 unique decoded RGB images, then applies the original decade-stratified 80/10/10 split with seed 42: **18,462 train / 2,308 validation / 2,308 test**. An independent audit finds zero duplicate groups and zero cross-split image overlap. This checks exact pixels; it does not establish person-level independence or remove near-duplicates.
 

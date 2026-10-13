@@ -1,0 +1,78 @@
+[
+  {
+    "first": "stat_maxrl_mae_population_s2",
+    "second": "mae",
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "test_mae_differences": [
+      -0.05575857259812711,
+      -0.22000179282835752,
+      0.14289811142479447
+    ],
+    "mean": -0.044287418000563385,
+    "sd": 0.1817216983950668
+  },
+  {
+    "first": "stat_maxrl_mae_population_s2",
+    "second": "stat_maxrl_mae_population_s5",
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "test_mae_differences": [
+      -0.12434416644116286,
+      -0.1315652473291653,
+      -0.20358752518386858
+    ],
+    "mean": -0.1531656463180656,
+    "sd": 0.04381564108359082
+  },
+  {
+    "first": "stat_maxrl_mae_population_s2",
+    "second": "stat_maxrl_mse_population_s2",
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "test_mae_differences": [
+      -0.24194355171587034,
+      -0.12930416983872117,
+      -0.15065137405903872
+    ],
+    "mean": -0.17396636520454342,
+    "sd": 0.05982975176701623
+  },
+  {
+    "first": "tailrl_population",
+    "second": "mae",
+    "seeds": [
+      42,
+      44
+    ],
+    "test_mae_differences": [
+      0.04385004237280654,
+      0.11716240482955165
+    ],
+    "mean": 0.0805062236011791,
+    "sd": 0.05183966863797052
+  },
+  {
+    "first": "tailrl_population",
+    "second": "binary_maxrl_population",
+    "seeds": [
+      42,
+      44
+    ],
+    "test_mae_differences": [
+      -0.20721015618304683,
+      -0.21983653032942474
+    ],
+    "mean": -0.2135233432562358,
+    "sd": 0.008928194780702323
+  }
+]

@@ -265,7 +265,9 @@ def main() -> None:
             )
             if not deadline or time.time() >= deadline.timestamp():
                 break
-            time.sleep(min(args.refresh_seconds, deadline.timestamp() - time.time()))
+            time.sleep(
+                max(0, min(args.refresh_seconds, deadline.timestamp() - time.time()))
+            )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 {
-  "snapshot_time": "2026-10-14T00:44:59.208019+08:00",
+  "snapshot_time": "2026-10-14T04:05:39.156256+08:00",
   "frozen_plan_sources_data_verified": true,
   "completed_pilots": 96,
   "completed_confirmations": 48,
@@ -7,7 +7,7 @@
     "smoke": 4,
     "wide": 96,
     "refine": 48,
-    "main": 25
+    "main": 63
   },
   "all_epochs_counts_finite_checks_passed": true,
   "no_pilot_or_confirmation_test_evaluation": true,
@@ -16,10 +16,11 @@
   "training_fingerprints": [
     "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92"
   ],
-  "main_runs_completed": 25,
+  "main_runs_completed": 63,
   "clean_heldout_labels_preserved_by_frozen_evaluation_path": true,
   "training_source_commits": [
     "04b43011ba7291e3b085047ca4004f221fcf9185",
+    "31f94f2f3660dec6608698310acc17c05759f531",
     "4df6bb62a42d92a68947e3efd197e3744742e389",
     "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
     "7ca07622bdd659791e6d663c3e327efc9f19f393",
@@ -43,8 +44,8 @@
     "src/experiments/utils.py": "3f0973b3c5311acdad0b668495cf13e8fe9bc6764dc7cb0448ff83234a379893"
   },
   "max_observed_concurrent": 5,
-  "gpu_hours_at_check": 27.63121290054586,
-  "report_gpu_hours": 27.617373540798823,
+  "gpu_hours_at_check": 39.53358334687021,
+  "report_gpu_hours": 39.53358334687021,
   "complete_grid_top_two": {
     "binary_maxrl": [
       {

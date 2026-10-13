@@ -68,7 +68,7 @@
     "uv_launcher_python_process_group_probe": "passed_on_server_cpu"
   },
   "full_data_pilot_integrity": {
-    "snapshot_time": "2026-10-14T00:44:59.208019+08:00",
+    "snapshot_time": "2026-10-14T04:05:39.156256+08:00",
     "completed": 96,
     "completed_grids": 24,
     "variants": [
@@ -110,12 +110,12 @@
     "frozen_plan_sources_and_data_verified": true,
     "max_observed_study_gpu_concurrency": 5,
     "scalar_nll_unavailable_as_intended": true,
-    "main_runs_completed": 25,
+    "main_runs_completed": 63,
     "record": "pilot_integrity.json"
   },
   "new_training_results_available": true,
   "full_data_confirmation_integrity": {
-    "snapshot_time": "2026-10-14T00:44:59.208019+08:00",
+    "snapshot_time": "2026-10-14T04:05:39.156256+08:00",
     "completed": 48,
     "completed_grids": 24,
     "epochs_per_run": 30,
@@ -134,15 +134,15 @@
     "scalar_mse_gate_ratio": 0.978123434417621,
     "scalar_mse_gate_passed": true,
     "scalar_mse_gate": "passed",
-    "main_runs_completed": 25,
+    "main_runs_completed": 63,
     "record": "pilot_integrity.json"
   },
-  "last_updated": "2026-10-14T00:46:30.185285+08:00",
+  "last_updated": "2026-10-14T04:06:15.128317+08:00",
   "main_run_integrity": {
-    "snapshot_time": "2026-10-14T00:46:30.185285+08:00",
-    "completed": 25,
+    "snapshot_time": "2026-10-14T04:06:15.128317+08:00",
+    "completed": 63,
     "planned": 66,
-    "complete_three_seed_configurations": 8,
+    "complete_three_seed_configurations": 20,
     "epochs_per_run": 50,
     "train_unique_images": 18462,
     "train_presentations_per_epoch": 18432,
@@ -156,5 +156,23 @@
     "frozen_training_sources_and_plan_verified": true,
     "distinct_seeds_common_lr_and_subset_verified": true,
     "record": "main_integrity.json"
+  },
+  "deadline_extension_validation": {
+    "code_commit": "6302a28",
+    "scheduler_checks_passed": 18,
+    "frozen_training_sources_unchanged": true,
+    "shared_gpu_cap": 6,
+    "original_budget_gpu_hours": 64,
+    "extension_budget_gpu_hours": 24,
+    "deadline": "2026-10-14T07:30:00+08:00",
+    "coordination_audit": "coordination_integrity.json"
+  },
+  "interactive_report_validation": {
+    "code_commit": "3848a94",
+    "metric_and_checkpoint_tests_passed": 2,
+    "interaction_record": "interaction_validation.json",
+    "browser_rendering_verified": false,
+    "scientific_figure_visually_inspected": true,
+    "first_available_gmt8": "2026-10-14T04:01:53+08:00"
   }
 }

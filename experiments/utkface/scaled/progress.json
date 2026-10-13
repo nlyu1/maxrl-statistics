@@ -1,11 +1,10 @@
 {
   "status": "running",
-  "gpu_hours": 27.617373540798823,
+  "gpu_hours": 39.53358334687021,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 173,
-    "pending": 352,
-    "running": 5
+    "completed": 211,
+    "pending": 319
   },
   "stages": {
     "digits": {
@@ -21,9 +20,8 @@
       "pending": 40
     },
     "main": {
-      "pending": 36,
-      "completed": 25,
-      "running": 5
+      "completed": 63,
+      "pending": 3
     },
     "noise": {
       "pending": 80
@@ -50,32 +48,6 @@
       "completed": 96
     }
   },
-  "active": [
-    {
-      "job": "main_rloo_mae_population_seed43",
-      "gpu": 8,
-      "minutes": 13.942597436904908
-    },
-    {
-      "job": "main_rloo_mae_population_seed44",
-      "gpu": 5,
-      "minutes": 11.90858295361201
-    },
-    {
-      "job": "main_rloo_mae_seed42",
-      "gpu": 7,
-      "minutes": 8.860414008299509
-    },
-    {
-      "job": "main_rloo_mae_seed43",
-      "gpu": 6,
-      "minutes": 7.165778048833212
-    },
-    {
-      "job": "main_rloo_mae_seed44",
-      "gpu": 1,
-      "minutes": 3.440794603029887
-    }
-  ],
-  "updated_at": 1791909885.6974394
+  "active": [],
+  "updated_at": 1791921856.4621487
 }
