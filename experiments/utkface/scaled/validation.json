@@ -65,12 +65,14 @@
     "uv_launcher_python_process_group_probe": "passed_on_server_cpu"
   },
   "full_data_pilot_integrity": {
-    "snapshot_time": "2026-10-13T15:47:53.217098+08:00",
-    "completed": 42,
-    "completed_grids": 10,
+    "snapshot_time": "2026-10-13T16:44:21.874814+08:00",
+    "completed": 65,
+    "completed_grids": 16,
     "variants": [
       "binary_maxrl", "binary_maxrl_population", "grpo_mae", "grpo_mae_population",
-      "grpo_mse", "grpo_mse_population", "mae", "mae_scalar", "mse", "mse_scalar", "rloo_mae"
+      "grpo_mse", "grpo_mse_population", "mae", "mae_scalar", "mse", "mse_scalar",
+      "rloo_mae", "rloo_mae_population", "rloo_mse", "rloo_mse_population",
+      "stat_maxrl_mae_population_s2", "stat_maxrl_mae_population_s5", "stat_maxrl_mae_s2"
     ],
     "sampled_rollouts": 64,
     "population_actions": 100,
@@ -83,7 +85,7 @@
     "checkpoint_matches_best_validation_mae": true,
     "finite_losses_and_gradient_norms": true,
     "frozen_plan_sources_and_data_verified": true,
-    "max_observed_study_gpu_concurrency": 2,
+    "max_observed_study_gpu_concurrency": 3,
     "scalar_nll_unavailable_as_intended": true,
     "main_runs_completed": 0,
     "record": "pilot_integrity.json"
