@@ -1,0 +1,71 @@
+{
+  "metric": "test mean-prediction MAE",
+  "difference": "first minus second; negative favors first",
+  "uncertainty": "descriptive sample SD across matched training seeds, not a confidence interval",
+  "contrasts": [
+    {
+      "first": "mae",
+      "second": "mse",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mae_difference_first_minus_second_years": [
+        -0.03383923373406894,
+        -0.05455831545626655,
+        -0.07593436045254176
+      ],
+      "mean_difference_years": -0.05477730321429242,
+      "sample_sd_difference_years": 0.021048417757392003
+    },
+    {
+      "first": "binary_maxrl_population",
+      "second": "binary_maxrl",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mae_difference_first_minus_second_years": [
+        -0.10759126603961189,
+        -0.0005557675008409646,
+        0.02268514120817766
+      ],
+      "mean_difference_years": -0.02848729744409173,
+      "sample_sd_difference_years": 0.06948462668156183
+    },
+    {
+      "first": "grpo_mae_population",
+      "second": "grpo_mae",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mae_difference_first_minus_second_years": [
+        0.32234699677807654,
+        0.1443252398824173,
+        0.08608773295006067
+      ],
+      "mean_difference_years": 0.18425332320351817,
+      "sample_sd_difference_years": 0.12308655009549818
+    },
+    {
+      "first": "grpo_mse_population",
+      "second": "grpo_mse",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mae_difference_first_minus_second_years": [
+        -0.011427436943150404,
+        -0.06246159459939005,
+        0.6564297370617851
+      ],
+      "mean_difference_years": 0.19418023517308156,
+      "sample_sd_difference_years": 0.40113223855629754
+    }
+  ]
+}

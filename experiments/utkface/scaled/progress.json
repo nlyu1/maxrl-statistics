@@ -1,11 +1,11 @@
 {
   "status": "running",
-  "gpu_hours": 13.336794688900312,
+  "gpu_hours": 27.617373540798823,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 120,
-    "pending": 408,
-    "running": 2
+    "completed": 173,
+    "pending": 352,
+    "running": 5
   },
   "stages": {
     "digits": {
@@ -21,7 +21,9 @@
       "pending": 40
     },
     "main": {
-      "pending": 66
+      "pending": 36,
+      "completed": 25,
+      "running": 5
     },
     "noise": {
       "pending": 80
@@ -30,9 +32,7 @@
       "pending": 40
     },
     "refine": {
-      "pending": 26,
-      "completed": 20,
-      "running": 2
+      "completed": 48
     },
     "scalar": {
       "pending": 6
@@ -52,15 +52,30 @@
   },
   "active": [
     {
-      "job": "refine_rloo_mae_population_rank0",
-      "gpu": 1,
-      "minutes": 6.929399128754934
+      "job": "main_rloo_mae_population_seed43",
+      "gpu": 8,
+      "minutes": 13.942597436904908
     },
     {
-      "job": "refine_rloo_mae_population_rank1",
-      "gpu": 8,
-      "minutes": 5.234646753470103
+      "job": "main_rloo_mae_population_seed44",
+      "gpu": 5,
+      "minutes": 11.90858295361201
+    },
+    {
+      "job": "main_rloo_mae_seed42",
+      "gpu": 7,
+      "minutes": 8.860414008299509
+    },
+    {
+      "job": "main_rloo_mae_seed43",
+      "gpu": 6,
+      "minutes": 7.165778048833212
+    },
+    {
+      "job": "main_rloo_mae_seed44",
+      "gpu": 1,
+      "minutes": 3.440794603029887
     }
   ],
-  "updated_at": 1791896966.9807208
+  "updated_at": 1791909885.6974394
 }
