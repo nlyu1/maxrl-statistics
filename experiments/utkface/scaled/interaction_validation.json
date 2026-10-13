@@ -1,18 +1,19 @@
 {
-  "snapshot": "2026-10-14T04:06:33.247889+08:00",
+  "snapshot": "2026-10-14T04:21:47.947490+08:00",
   "data_runs": 586,
   "main_methods": 22,
   "checks": [
     "script evaluation",
     "six sections",
     "hide/show/baseline controls",
-    "sort toggle",
+    "descending first-row order",
     "per-run evidence",
-    "CSV export",
+    "CSV export and quoting",
     "subset and noise filters",
     "unfinished curves",
     "additional metric",
-    "finite SVG geometry"
+    "finite SVG geometry",
+    "curve hover and dismissal"
   ],
   "passed": true,
   "environment": "isolated QuickJS DOM harness; no browser rendering",

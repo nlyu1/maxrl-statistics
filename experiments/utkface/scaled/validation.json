@@ -137,7 +137,7 @@
     "main_runs_completed": 63,
     "record": "pilot_integrity.json"
   },
-  "last_updated": "2026-10-14T04:06:15.128317+08:00",
+  "last_updated": "2026-10-14T04:21:47.94749+08:00",
   "main_run_integrity": {
     "snapshot_time": "2026-10-14T04:06:15.128317+08:00",
     "completed": 63,
@@ -168,11 +168,13 @@
     "coordination_audit": "coordination_integrity.json"
   },
   "interactive_report_validation": {
-    "code_commit": "3848a94",
+    "code_commit": "c86aa32",
     "metric_and_checkpoint_tests_passed": 2,
     "interaction_record": "interaction_validation.json",
     "browser_rendering_verified": false,
     "scientific_figure_visually_inspected": true,
-    "first_available_gmt8": "2026-10-14T04:01:53+08:00"
+    "first_available_gmt8": "2026-10-14T04:01:53+08:00",
+    "metric_test_revision": "fbbdf1e",
+    "snapshot": "2026-10-14T04:21:47.94749+08:00"
   }
 }
