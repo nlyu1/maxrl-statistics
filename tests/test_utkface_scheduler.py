@@ -12,6 +12,22 @@ from src.experiments.utkface.scheduler import charged_seconds, gpu_is_free, run
 from src.experiments.utkface.study import StudyJob, StudyPlan, make_plan
 
 
+def test_adopted_external_preemption_preserves_unknown_exit_status() -> None:
+    from src.experiments.utkface.scheduler import retryable_preemption
+
+    attempt = {
+        "returncode": 1,
+        "yielded_to_foreign_process": True,
+        "adopted_preemption": True,
+        "exit_status_inferred": True,
+    }
+    assert retryable_preemption(attempt=attempt)
+    assert not retryable_preemption(attempt={**attempt, "timed_out": True})
+    assert not retryable_preemption(
+        attempt={**attempt, "yielded_to_foreign_process": False}
+    )
+
+
 @pytest.mark.parametrize("running", [False, True])
 def test_deadline_preserves_attempts_and_only_stops_owned_queue(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, running: bool

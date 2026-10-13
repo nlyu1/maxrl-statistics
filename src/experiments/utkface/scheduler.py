@@ -107,7 +107,10 @@ def retryable_preemption(*, attempt: dict) -> bool:
     return bool(
         attempt.get("yielded_to_foreign_process")
         and not attempt.get("timed_out")
-        and attempt.get("returncode") in {-15, -9, 143, 137}
+        and (
+            attempt.get("returncode") in {-15, -9, 143, 137}
+            or attempt.get("adopted_preemption")
+        )
     )
 
 
@@ -303,6 +306,14 @@ def run(
                 child = children.get(job.identifier)
                 returncode = child.poll() if child else None
                 if returncode is None and not owned_process(attempt=attempt):
+                    if (
+                        attempt.get("yielded_to_foreign_process")
+                        and attempt.get("termination_requested_at")
+                        and not attempt.get("timed_out")
+                        and not (Path(attempt["output_dir"]) / "result.json").exists()
+                    ):
+                        attempt["adopted_preemption"] = True
+                        attempt["exit_status_inferred"] = True
                     returncode = (
                         0
                         if (Path(attempt["output_dir"]) / "result.json").exists()
