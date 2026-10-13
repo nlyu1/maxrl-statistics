@@ -1,11 +1,11 @@
 {
-  "time_gmt8": "2026-10-14T06:52:21.870542+08:00",
+  "time_gmt8": "2026-10-14T07:07:52.310125+08:00",
   "frozen_sources": true,
   "base_plan_unchanged": true,
   "before_handoff_attempts_preserved": 224,
   "global_historical_peak_gpu_leases": 5,
   "combined_gpu_cap": 6,
-  "original_gpu_hours": 41.01245489809248,
+  "original_gpu_hours": 41.230569843186274,
   "extension_gpu_hours": 0.0,
   "budgets": [
     64,

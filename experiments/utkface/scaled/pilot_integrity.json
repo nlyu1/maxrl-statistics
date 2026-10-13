@@ -1,5 +1,5 @@
 {
-  "snapshot_time": "2026-10-14T06:52:23.197351+08:00",
+  "snapshot_time": "2026-10-14T07:07:53.834476+08:00",
   "frozen_plan_sources_data_verified": true,
   "completed_pilots": 96,
   "completed_confirmations": 48,
@@ -8,7 +8,7 @@
     "wide": 96,
     "refine": 48,
     "main": 66,
-    "scalar": 1
+    "scalar": 2
   },
   "all_epochs_counts_finite_checks_passed": true,
   "no_pilot_or_confirmation_test_evaluation": true,
@@ -21,6 +21,7 @@
   "clean_heldout_labels_preserved_by_frozen_evaluation_path": true,
   "training_source_commits": [
     "04b43011ba7291e3b085047ca4004f221fcf9185",
+    "0dfb0c284db216ed2b170dd873a1f66d2e116296",
     "31f94f2f3660dec6608698310acc17c05759f531",
     "4df6bb62a42d92a68947e3efd197e3744742e389",
     "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
@@ -48,8 +49,8 @@
     "src/experiments/utils.py": "3f0973b3c5311acdad0b668495cf13e8fe9bc6764dc7cb0448ff83234a379893"
   },
   "max_observed_concurrent": 5,
-  "gpu_hours_at_check": 41.01282332261403,
-  "report_gpu_hours": 40.98850512160195,
+  "gpu_hours_at_check": 41.230569843186274,
+  "report_gpu_hours": 41.230569843186274,
   "complete_grid_top_two": {
     "binary_maxrl": [
       {

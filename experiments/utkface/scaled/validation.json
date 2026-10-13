@@ -68,7 +68,7 @@
     "uv_launcher_python_process_group_probe": "passed_on_server_cpu"
   },
   "full_data_pilot_integrity": {
-    "snapshot_time": "2026-10-14T06:52:23.197351+08:00",
+    "snapshot_time": "2026-10-14T07:07:53.834476+08:00",
     "completed": 96,
     "completed_grids": 24,
     "variants": [
@@ -115,7 +115,7 @@
   },
   "new_training_results_available": true,
   "full_data_confirmation_integrity": {
-    "snapshot_time": "2026-10-14T06:52:23.197351+08:00",
+    "snapshot_time": "2026-10-14T07:07:53.834476+08:00",
     "completed": 48,
     "completed_grids": 24,
     "epochs_per_run": 30,
@@ -137,9 +137,9 @@
     "main_runs_completed": 66,
     "record": "pilot_integrity.json"
   },
-  "last_updated": "2026-10-14T06:51:54.723907+08:00",
+  "last_updated": "2026-10-14T07:07:21.781072+08:00",
   "main_run_integrity": {
-    "snapshot_time": "2026-10-14T06:53:00.072748+08:00",
+    "snapshot_time": "2026-10-14T07:10:33.327962+08:00",
     "completed": 66,
     "planned": 66,
     "complete_three_seed_configurations": 22,
@@ -175,13 +175,13 @@
     "scientific_figure_visually_inspected": true,
     "first_available_gmt8": "2026-10-14T04:01:53+08:00",
     "metric_test_revision": "fbbdf1e",
-    "snapshot": "2026-10-14T06:51:54.723907+08:00",
+    "snapshot": "2026-10-14T07:07:21.781072+08:00",
     "common_seed_comparisons_preserve_coverage": true
   },
   "scalar_head_confirmation_integrity": {
-    "snapshot": "2026-10-14T06:51:54.723907+08:00",
+    "snapshot": "2026-10-14T07:07:21.781072+08:00",
     "record": "scalar-comparison.json",
-    "completed": 1,
+    "completed": 2,
     "planned": 6,
     "comparison_seeds": [
       42
@@ -194,5 +194,17 @@
     "figure_visually_inspected": true,
     "scientific_figure": "scalar.pdf",
     "replicated_head_advantage_established": false
+  },
+  "static_figure_generation": {
+    "code_commit": "e83c6f4",
+    "execution": "remote_uv_study_report_figures_on_actual_results",
+    "categorical_main_runs": 66,
+    "categorical_main_configurations": 22,
+    "actual_seed_counts_displayed": true,
+    "scalar_runs_excluded_from_main_figure": true,
+    "scalar_figure_uses_matched_seed_42": true,
+    "frozen_training_sources_unchanged": true,
+    "figure_visually_inspected": true,
+    "ruff_changed_scope": "passed"
   }
 }

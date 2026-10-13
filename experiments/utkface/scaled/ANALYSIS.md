@@ -1,8 +1,8 @@
 # UTKFace: interpretation of the available evidence
 
-Snapshot: **2026-10-14 06:52 GMT+8**. [Open the interactive report](dashboard.html), [full 22-method endpoint table](MAIN_MATRIX.md), [scalar comparison](SCALAR.md), [complete metrics](dashboard-runs.csv), [epoch curves](dashboard-curves.csv), [scientific figure](main.pdf), and [experiment protocol](PLAN.md).
+Snapshot: **2026-10-14 07:08 GMT+8**. [Open the interactive report](dashboard.html), [full 22-method endpoint table](MAIN_MATRIX.md), [scalar comparison](SCALAR.md), [complete metrics](dashboard-runs.csv), [epoch curves](dashboard-curves.csv), [scientific figure](main.pdf), and [experiment protocol](PLAN.md).
 
-The categorical main comparison remains **complete: 66/66 runs, 22 configurations, three training seeds each, and 50 full-data epochs per run**. The new result is the first 50-epoch scalar confirmation: MAE seed 42. Scalar MSE seed 42 is training. Smaller-set, constant-LR, noise and digit-policy comparisons have no completed final runs at this snapshot; their report sections show missing coverage instead of inferred results. The categorical main numbers below are unchanged from the completed-matrix publication.
+The categorical main comparison remains **complete: 66/66 runs, 22 configurations, three training seeds each, and 50 full-data epochs per run**. Scalar MAE and MSE now each complete one 50-epoch confirmation, seed 42. The new result is scalar MSE. Smaller-set, constant-LR, noise and digit-policy comparisons have no completed final runs at this snapshot; their report sections show missing coverage instead of inferred results. Both supervisors are healthy and waiting for free GPUs. The categorical main numbers below are unchanged from the completed-matrix publication.
 
 ## Main methods
 
@@ -45,7 +45,7 @@ Sampled TailRL selects later, at **41/26/22**, and ends at mean validation MAE *
 
 Both original smaller subsets are fixed, nested and stratified by age decade. At batch 64, **4096×50 gives 3,200 updates**, while **1024×50 gives 800**. The new **1024×200** arm matches updates and presentations, helping distinguish training-set size from optimization exposure. It also evaluates validation 200 times instead of 50 and reuses the LR selected by the original 20-epoch subset sweep; those differences limit interpretation of best-checkpoint comparisons.
 
-Two extra optimization seeds on the clean 4096 subset test whether single-seed method rankings persist. They inherit the same validation-selected subset LR and noise-free split. The [56-run extension](EXTENSION.md) is a candidate queue, not a promise that all jobs finish: it has a **24 GPU-hour cap**, a **07:30 GMT+8 cutoff**, and shares a **six-GPU cap** with the original queue. At this snapshot it has launched no attempts: GPU scarcity has delayed its original clean-subset tuning dependencies. One GPU has finished the main matrix and scalar MAE confirmation and is training scalar MSE. Required original work can continue within its existing 64 GPU-hour allocation.
+Two extra optimization seeds on the clean 4096 subset test whether single-seed method rankings persist. They inherit the same validation-selected subset LR and noise-free split. The [56-run extension](EXTENSION.md) is a candidate queue, not a promise that all jobs finish: it has a **24 GPU-hour cap**, a **07:30 GMT+8 cutoff**, and shares a **six-GPU cap** with the original queue. At this snapshot it has launched no attempts: GPU scarcity has delayed its original clean-subset tuning dependencies. The temporarily available GPU finished the main matrix and both scalar seed-42 confirmations; all GPUs are occupied by other workloads now. Required original work can continue within its existing 64 GPU-hour allocation.
 
 ## Learning-rate schedule
 
@@ -53,16 +53,20 @@ No completed schedule comparison is available yet. The dashboard will compare ma
 
 ## Scalar heads
 
-Both scalar candidates passed the predefined validation-only qualification gate: scalar/categorical validation-MAE ratios **0.9948 for MAE** and **0.9781 for MSE**. Those are 30-epoch tuning outcomes. The first 50-epoch confirmation, **MAE seed 42**, is now complete:
+Both scalar candidates passed the predefined validation-only qualification gate: scalar/categorical validation-MAE ratios **0.9948 for MAE** and **0.9781 for MSE**. Those are 30-epoch tuning outcomes. Both **seed-42** confirmations now finish 50 epochs:
 
-| Head, direct MAE | Best epoch | Best validation MAE | Final validation MAE | Selected-checkpoint test MAE |
-|---|---:|---:|---:|---:|
-| Categorical mean, seed 42 | 40 | 4.811 | 4.865 | 4.675 |
-| Scalar, seed 42 | 41 | 4.732 | 4.748 | 4.611 |
+| Objective | Head | Best epoch | Best validation MAE | Final validation MAE | Selected-checkpoint test MAE |
+|---|---|---:|---:|---:|---:|
+| MAE | Categorical mean | 40 | 4.811 | 4.865 | 4.675 |
+| MAE | Scalar | 41 | 4.732 | 4.748 | 4.611 |
+| MSE | Categorical mean | 47 | 4.821 | 4.893 | 4.709 |
+| MSE | Scalar | 39 | 4.751 | 4.792 | 4.680 |
 
-Both heads use LR **0.001**, selected independently using validation. Scalar-minus-categorical test MAE is **−0.064 years (−1.36%)**. Scalar MAE is also close to population Stat-MAE width 2 on this same seed, **4.611 versus 4.619 years**. This is a single matched optimization seed and does not establish a replicated head advantage or a new three-seed winner. Scalar MSE is still training; **1/6 scalar confirmations** are complete. [Exact comparison](scalar-comparison.json), [curves and endpoints](scalar.pdf).
+All four runs use LR **0.001**, selected independently using validation. Scalar-minus-categorical test MAE is **−0.064 years (−1.36%) for MAE** and **−0.029 years (−0.61%) for MSE**. Scalar MSE also lowers test RMSE slightly, **6.722 versus 6.747 years**. Scalar MAE is close to population Stat-MAE width 2 on this same seed, **4.611 versus 4.619 years**. This is a single matched optimization seed per objective and does not establish a replicated head advantage or a new three-seed winner. **2/6 scalar confirmations** are complete; seeds 43/44 remain pending. [Exact comparison](scalar-comparison.json), [curves and endpoints](scalar.pdf).
 
-The common-seed control preserves actual completion counts while restricting displayed summaries and completed curves to matching optimization seeds. The scalar section therefore compares seed 42 instead of contrasting one scalar seed with three-seed baseline means. Scalar heads have no categorical label NLL; their Spearman ranks continuous predictions, whereas the categorical metric ranks policy medians. The scalar seed-42 test Spearman is **0.9111**, but this head comparison also changes the prediction used for ranking.
+Within scalar seed 42, the MAE-trained head has lower test MAE, while the MSE-trained head has lower test RMSE, **6.722 versus 6.802 years**. This illustrates an objective-dependent tradeoff at validation-MAE-selected checkpoints; neither head was selected using test RMSE.
+
+The common-seed control preserves actual completion counts while restricting displayed summaries and completed curves to matching optimization seeds. The scalar section therefore compares seed 42 instead of contrasting one scalar seed with three-seed baseline means. Scalar heads have no categorical label NLL; their Spearman ranks continuous predictions, whereas the categorical metric ranks policy medians. Scalar seed-42 test Spearman is **0.9111 for MAE** and **0.9124 for MSE**, but these head comparisons also change the prediction used for ranking. The reproducible main-figure command now restricts that figure to categorical main runs and prints actual seed counts; scalar comparisons have their own matched-seed figure.
 
 ## Label noise and SNR
 
@@ -78,7 +82,7 @@ Prioritized pilots compare CE, direct MSE and population TailRL on 4096 images. 
 
 The real-image bf16 preflights passed for categorical statistical losses, scalar MAE and digit CE. Subsequent audits verify the frozen training-source hashes, original plan hash, complete epoch counts, common training fingerprint, validation-only LR selection and clean 2,308-image test labels. Exact RGB duplicates were removed before splitting; person-level and near-duplicate independence remain unverified.
 
-The coordination audit preserves all **224 attempts recorded before supervisor handoff**, with **230 original attempts** and **41.012/64 GPU-hours** charged at 06:52. The report's earlier 06:50 progress read records 40.989 hours; active training continues to accrue time. The extension has launched no attempts and has charged **0/24 GPU-hours**. Observed historical concurrency is five GPUs; the enforced combined cap is six. External preemptions remain charged, and no permanently failed job remains after the adoption-classification repair. [Coordination audit](coordination_integrity.json), [main integrity](main_integrity.json), [pilot integrity](pilot_integrity.json).
+The coordination audit preserves all **224 attempts recorded before supervisor handoff**, with **230 original attempts** and **41.231/64 GPU-hours** charged at 07:08. The report progress read agrees; waiting for an idle GPU consumes no additional GPU budget. The extension has launched no attempts and has charged **0/24 GPU-hours**. Observed historical concurrency is five GPUs; the enforced combined cap is six. External preemptions remain charged, and no permanently failed job remains after the adoption-classification repair. [Coordination audit](coordination_integrity.json), [main integrity](main_integrity.json), [pilot integrity](pilot_integrity.json).
 
 Report metric/selection tests pass, as do 18 scheduler checks. Interaction logic passed an isolated JavaScript DOM harness covering all six sections, sorting, hiding, filters, exports and finite chart geometry. The static scientific figure was visually inspected. Browser rendering of the HTML remains unverified because the in-app browser blocks file URLs. [Interaction validation](interaction_validation.json).
 

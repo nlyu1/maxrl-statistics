@@ -1,10 +1,9 @@
 {
   "status": "running",
-  "gpu_hours": 40.98850512160195,
+  "gpu_hours": 41.230569843186274,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 215,
-    "running": 1,
+    "completed": 216,
     "pending": 314
   },
   "stages": {
@@ -33,9 +32,8 @@
       "completed": 48
     },
     "scalar": {
-      "running": 1,
-      "pending": 4,
-      "completed": 1
+      "completed": 2,
+      "pending": 4
     },
     "smoke": {
       "completed": 4
@@ -50,12 +48,6 @@
       "completed": 96
     }
   },
-  "active": [
-    {
-      "job": "main_mse_scalar_seed42",
-      "gpu": 3,
-      "minutes": 5.357247205575307
-    }
-  ],
-  "updated_at": 1791931843.2601395
+  "active": [],
+  "updated_at": 1791932975.1207607
 }

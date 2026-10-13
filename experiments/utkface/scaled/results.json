@@ -44255,6 +44255,260 @@
   },
   {
     "study_job": {
+      "identifier": "main_mse_scalar_seed42",
+      "stage": "scalar",
+      "variant": "mse_scalar",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/main_mse_scalar_seed42",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "refine_mse_scalar_rank0",
+        "refine_mse_scalar_rank1",
+        "refine_mse_rank0",
+        "refine_mse_rank1"
+      ],
+      "tune_from": [
+        "refine_mse_scalar_rank0",
+        "refine_mse_scalar_rank1"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [
+        "refine_mse_scalar_rank0",
+        "refine_mse_scalar_rank1"
+      ],
+      "gate_reference": [
+        "refine_mse_rank0",
+        "refine_mse_rank1"
+      ],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/main_mse_scalar_seed42/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 39,
+      "validation": {
+        "mae_mean": 4.75110260230623,
+        "mse_mean": 44.272111258578924,
+        "mae_median": 4.75110260230623,
+        "mae_mode": 4.75110260230623,
+        "rmse_mean": 6.653729124226423,
+        "count": 2308,
+        "median_spearman": 0.9065955165319869,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.517331171114713,
+            "mae_median": 1.517331171114713
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 3.65322009614996,
+            "mae_median": 3.65322009614996
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.3975391628698746,
+            "mae_median": 3.3975391628698746
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.592212792728724,
+            "mae_median": 5.592212792728724
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.211590945448505,
+            "mae_median": 7.211590945448505
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 6.979900445256915,
+            "mae_median": 6.979900445256915
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 6.908067237673782,
+            "mae_median": 6.908067237673782
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 8.119766349223122,
+            "mae_median": 8.119766349223122
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.07853515625,
+            "mae_median": 8.07853515625
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 6.7340263953575725,
+            "mae_median": 6.7340263953575725
+          }
+        }
+      },
+      "seconds": 1166.2297153760446,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "0dfb0c284db216ed2b170dd873a1f66d2e116296",
+        "gpu": "NVIDIA L40"
+      },
+      "test": {
+        "mae_mean": 4.679772602804198,
+        "mse_mean": 45.18292376988772,
+        "mae_median": 4.679772602804198,
+        "mae_mode": 4.679772602804198,
+        "rmse_mean": 6.7218244375978555,
+        "count": 2308,
+        "median_spearman": 0.9123861219657718,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.449845637509365,
+            "mae_median": 1.449845637509365
+          },
+          "10": {
+            "count": 149,
+            "mae_mean": 3.7728777827832523,
+            "mae_median": 3.7728777827832523
+          },
+          "20": {
+            "count": 712,
+            "mae_mean": 3.432914973644728,
+            "mae_median": 3.432914973644728
+          },
+          "30": {
+            "count": 444,
+            "mae_mean": 5.420459291956446,
+            "mae_median": 5.420459291956446
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.075608762976241,
+            "mae_median": 7.075608762976241
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 6.213392768587385,
+            "mae_median": 6.213392768587385
+          },
+          "60": {
+            "count": 128,
+            "mae_mean": 6.722506910562515,
+            "mae_median": 6.722506910562515
+          },
+          "70": {
+            "count": 68,
+            "mae_mean": 9.27280184801887,
+            "mae_median": 9.27280184801887
+          },
+          "80": {
+            "count": 49,
+            "mae_mean": 8.656951515042053,
+            "mae_median": 8.656951515042053
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 7.184867272010217,
+            "mae_median": 7.184867272010217
+          }
+        }
+      }
+    }
+  },
+  {
+    "study_job": {
       "identifier": "wide_mae_scalar_lr0.0001",
       "stage": "wide",
       "variant": "mae_scalar",
