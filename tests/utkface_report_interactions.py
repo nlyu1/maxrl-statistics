@@ -61,6 +61,14 @@ const hit=created.find(n=>n.tagName==='rect'&&n.listeners.pointermove);
 hit.listeners.pointermove[0]({clientX:150,clientY:120});
 check(!document.getElementById('tooltip').hidden,'curve hover');
 hit.listeners.pointerleave[0]();check(document.getElementById('tooltip').hidden,'hover dismissal');
+const baseline=D.runs.filter(r=>r.stage==='main'&&r.method==='mae'&&r.status==='completed');
+const scalar={...baseline[0],id:'fixture-scalar',head:'scalar',seed:42};
+document.getElementById('matched').checked=true;
+const paired=groups([...baseline,scalar]);
+const categorical=paired.find(g=>g.r.head==='categorical');
+check(categorical.completedN===3&&categorical.n===1&&categorical.done[0].seed===42,'retain coverage while matching seeds');
+check(categorical.values['test.mae_mean']===baseline.find(r=>r.seed===42).test.mae_mean,'paired summary uses matched baseline');
+document.getElementById('matched').checked=false;
 """
 
 
@@ -80,7 +88,7 @@ def verify(*, html_path: Path) -> dict:
     context.eval(script)
     context.eval(ASSERTIONS)
     exported = list(csv.reader(context.eval("downloaded").splitlines()))
-    assert len(exported) == 23 and all(len(row) == 10 for row in exported)
+    assert len(exported) == 23 and all(len(row) == 12 for row in exported)
     payload = json.loads(data)
     return {
         "snapshot": payload["generated"],
@@ -98,6 +106,7 @@ def verify(*, html_path: Path) -> dict:
             "additional metric",
             "finite SVG geometry",
             "curve hover and dismissal",
+            "common-seed comparisons preserve actual coverage",
         ],
         "passed": True,
         "environment": "isolated QuickJS DOM harness; no browser rendering",
