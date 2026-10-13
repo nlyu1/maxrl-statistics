@@ -240,9 +240,9 @@ def report(*, plan_path: Path, output_dir: Path, figures: bool) -> None:
                     + " |"
                 )
             if figures:
-                primary = summary.filter(
-                    pl.col("stage").is_in(["main", "scalar"])
-                ).sort("mae_mean_mean")
+                primary = summary.filter(pl.col("stage") == "main").sort(
+                    "mae_mean_mean"
+                )
                 if len(primary):
                     figure, axes = plt.subplots(
                         1,
@@ -270,11 +270,18 @@ def report(*, plan_path: Path, output_dir: Path, figures: bool) -> None:
                         axis.set_xlabel(title)
                         axis.grid(axis="x", alpha=0.2)
                     axes[0].set_yticks(
-                        range(len(primary)), primary["variant"].to_list(), fontsize=8
+                        range(len(primary)),
+                        [
+                            f"{row['variant']} (n={row['seeds']})"
+                            for row in primary.iter_rows(named=True)
+                        ],
+                        fontsize=8,
                     )
                     axes[0].invert_yaxis()
                     figure.suptitle(
-                        "Cleaned UTKFace, 50 epochs; mean ± sample SD across available seeds"
+                        "Categorical UTKFace main matrix, 50 full-data epochs\n"
+                        "Clean test at validation-MAE-selected checkpoints; "
+                        "mean ± sample SD across the indicated training seeds"
                     )
                     figure.savefig(output_dir / "main.png", dpi=180)
                     figure.savefig(output_dir / "main.pdf")
