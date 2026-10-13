@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UTKFace experimental report</title>
+<style>
+:root{color-scheme:light dark;--bg:#fafbfc;--fg:#172331;--muted:#536172;--line:#d8dfe7;--panel:#fff;--blue:#2867a8;--green:#16815d;--orange:#b65f21;--purple:#8953b2;--red:#b84750;--teal:#177e8a;--gray:#68778a}
+@media(prefers-color-scheme:dark){:root{--bg:#121920;--fg:#e2eaf1;--muted:#a9b7c4;--line:#34424e;--panel:#19232d;--blue:#7eb6f0;--green:#73c8a2;--orange:#e9ae75;--purple:#c6a5ec;--red:#ed9ba3;--teal:#7dcbd5;--gray:#afbed0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1640px;margin:auto;padding:26px 28px 50px}h1{font-size:30px;line-height:1.2;margin:0 0 10px}h2{font-size:21px;margin:20px 0 8px}h3{font-size:16px;margin:6px 0}
+p{margin:8px 0}small,.secondary{color:var(--muted);font-size:13px}.numbers{font-variant-numeric:tabular-nums}
+header{border-bottom:1px solid var(--line);padding-bottom:20px}.status{display:flex;flex-wrap:wrap;gap:24px;margin-top:14px}.status strong{font-size:22px;font-weight:600}
+nav,.controls,.legend{display:flex;flex-wrap:wrap;align-items:center;gap:9px}nav{margin:22px 0 15px}button,select,input{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:7px 10px}button{cursor:pointer}button[aria-pressed=true]{background:var(--fg);color:var(--bg)}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:16px;height:16px;margin:0}input[type=number]{width:86px}.controls{margin:12px 0}.controls label{font-size:13px}.legend{margin:12px 0;gap:5px 13px}.legend label{font-size:12px;padding:3px 0}.swatch{width:18px;height:0;border-top:3px solid var(--series)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:18px}.plot{min-width:0}.plot svg{display:block;width:100%;height:300px;overflow:visible}.plot text{fill:var(--fg);font-size:12px}.empty{padding:32px 12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.table-wrap{overflow:auto;margin:16px 0}table{border-collapse:collapse;min-width:1040px;width:100%;font-size:12px;font-variant-numeric:tabular-nums}th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}th:first-child,td:first-child{text-align:left;white-space:normal;min-width:210px}th{background:var(--panel)}th button{border:0;background:transparent;font-size:12px;font-weight:600;padding:0}td button{font-size:12px;padding:2px 7px}.pending{color:var(--muted)}.setup{display:block;color:var(--muted);font-size:11px}.coverage{font-weight:600}.note{border-left:3px solid var(--blue);padding:5px 12px;margin:15px 0;color:var(--muted)}
+.tooltip{position:fixed;z-index:10;max-width:440px;max-height:65vh;overflow:auto;background:var(--panel);color:var(--fg);border:1px solid var(--line);box-shadow:0 4px 18px #0002;padding:10px 12px;font-size:12px;pointer-events:none}.tooltip div{display:flex;justify-content:space-between;gap:14px}.tooltip strong{display:block;margin-bottom:5px}.details{background:var(--panel);padding:14px 18px;margin-top:15px;border:1px solid var(--line);overflow-wrap:anywhere}.details table{min-width:780px}code{font-size:12px;overflow-wrap:anywhere}footer{border-top:1px solid var(--line);margin-top:30px;padding-top:18px}.schedule-note{max-width:900px}a{color:var(--blue)}[hidden]{display:none!important}
+@media(max-width:650px){main{padding:18px 14px}h1{font-size:25px}.controls{align-items:flex-start}.status{gap:14px}.status strong{font-size:19px}nav button{font-size:13px;padding:7px}.tooltip{max-width:90vw}}
+@media print{nav,.controls,.legend,button{display:none!important}.table-wrap{overflow:visible}main{max-width:none;padding:0}.charts{display:block}.plot{page-break-inside:avoid}.plot svg{height:250px}body{background:white;color:black}.details{page-break-inside:avoid}}
+</style>
+</head>
+<body><main>
+<header><p class="secondary">ResNet-18 · deduplicated UTKFace · clean validation and test labels</p><h1>Learning objectives, data size, and label noise</h1>
+<p id="timestamp" class="secondary"></p><div class="status numbers" id="status"></div></header>
+<nav aria-label="Report sections" id="navigation">
+<button type="button" data-view="main" aria-pressed="true">Main matrix</button>
+<button type="button" data-view="subset" aria-pressed="false">Smaller datasets</button>
+<button type="button" data-view="schedule" aria-pressed="false">Learning-rate decay</button>
+<button type="button" data-view="scalar" aria-pressed="false">Scalar heads</button>
+<button type="button" data-view="noise" aria-pressed="false">Noise and SNR</button>
+<button type="button" data-view="digits" aria-pressed="false">Two-digit policy</button></nav>
+<h2 id="section-title"></h2><p id="section-description" class="secondary"></p>
+<div class="controls">
+<label>Training size <select id="size"><option value="all">All sizes</option><option value="18462">Full · 18,462</option><option value="4096">4,096 fixed</option><option value="1024">1,024 fixed</option></select></label>
+<label id="mode-control" hidden>Noise <select id="noise-mode"><option value="fixed">Fixed</option><option value="fresh">Fresh</option><option value="all">Both modes</option></select></label>
+<label id="std-control" hidden>Requested SD <select id="noise-std"><option value="5">5 years</option><option value="3">3 years</option><option value="1">1 year</option><option value="10">10 years</option><option value="all">All levels</option></select></label>
+<label id="field-control" hidden>Noise realization <select id="noise-field"><option value="2026">2026 · original</option><option value="2027">2027 · independent</option><option value="2028">2028 · independent</option><option value="all">All realizations</option></select></label>
+<label id="x-control">Curve x axis <select id="x-axis"><option value="epoch">Epoch</option><option value="updates">Optimizer updates</option><option value="examples">Training presentations</option></select></label>
+<label id="partial-control"><input id="partial" type="checkbox">Include unfinished curves</label>
+<label id="sd-control"><input id="seed-sd" type="checkbox" checked>Seed SD bands</label>
+<label>Additional table metric <select id="extra-metric"><option value="rmse_mean">Mean-prediction RMSE ↓</option><option value="mse_mean">Mean-prediction MSE ↓</option><option value="mae_median">Median-prediction MAE ↓</option><option value="mae_mode">Mode-prediction MAE ↓</option><option value="expected_mae">Policy expected MAE ↓</option><option value="expected_mse">Policy expected MSE ↓</option><option value="tailrl">TailRL objective ↓</option><option value="entropy">Policy entropy</option><option value="mode_accuracy">Exact-age accuracy ↑</option><option value="mass_within_5">Mass within 5 years ↑</option><option value="oracle_best_of_8_mae">Oracle best-of-8 MAE ↓</option><option value="oracle_best_of_64_mae">Oracle best-of-64 MAE ↓</option></select></label>
+<label id="tolerance-control" hidden>Practical tie threshold <input id="tolerance" type="number" value="0.1" min="0" max="5" step="0.05"> years</label>
+<button type="button" id="show-all">Show all methods</button><button type="button" id="baselines">Baselines</button><button type="button" id="hide-all">Hide all</button><button type="button" id="export">Export visible CSV</button>
+</div>
+<div id="legend" class="legend" aria-label="Visible methods"></div>
+<p class="note" id="selection-note" aria-live="polite"></p>
+<div id="curves"><div class="charts"><div class="plot" id="mae-plot"></div><div class="plot" id="rho-plot"></div><div class="plot" id="nll-plot"></div></div></div>
+<section id="snr-section" hidden><h3>Performance across measured SNR</h3><p class="secondary">All noise levels for the chosen mode and realization. Clean baselines have infinite SNR and are omitted from this finite-SNR plot.</p><div class="plot" id="snr-plot"></div></section>
+<div class="table-wrap" id="results-table"></div><div id="run-details" class="details" hidden></div>
+<footer><h2>How to read this report</h2>
+<p><strong>Best checkpoint</strong> means the checkpoint selected by minimum validation mean-prediction MAE. The best columns show all metrics at that same checkpoint. Final columns show the last validation epoch of a completed run. Test columns use clean held-out labels at the selected checkpoint. Historical runs did not retain final-epoch test models; final-epoch test metrics are unavailable.</p>
+<p>Curves are validation metrics. Means and sample SDs describe completed training seeds, not confidence intervals or dataset uncertainty. Exact best epochs, metric-specific extrema, status and source commits are available through each row's “Runs” button. Scalar regression has no label NLL; scalar Spearman ranks its continuous prediction, while categorical Spearman ranks the distribution median.</p>
+<p>The 1024×200 extension matches the 3,200 training updates of 4096×50, while 1024×50 uses 800 updates. Validation is evaluated more frequently in the longer small-subset run. Noise is rounded and clipped to ages 0–99; SNR is 10 log10(clean-age variance / realized perturbation MSE). Optimization seeds and noise-realization seeds remain distinct dimensions.</p>
+<p>Rows are kept separate across training-source cohorts, data splits, subsets, horizons, learning-rate schedules and noise realizations. Exact RGB duplicates were removed before splitting; this is not a subject-disjoint or near-duplicate-disjoint benchmark.</p>
+<details><summary>Coverage, budgets and reproducibility</summary><div id="provenance"></div></details>
+<p><a href="dashboard-runs.csv">All run metrics</a> · <a href="dashboard-curves.csv">All epoch curves</a> · <a href="dashboard-data.json">Report snapshot</a> · <a href="EXTENSION.md">Extension protocol</a></p>
+</footer><div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+<script id="report-data" type="application/json">__REPORT_DATA__</script>
+<script>
+"use strict";
+const D=JSON.parse(document.getElementById("report-data").textContent);
+const el=id=>document.getElementById(id);
+const NS="http://www.w3.org/2000/svg";
+const state={view:"main",hidden:new Set(),sort:"test.mae_mean",ascending:true,groups:[]};
+const specs={main:["Full method matrix","Fifty full-data epochs; three planned optimization seeds per categorical method. All rows remain visible even when no run has finished."],subset:["Training-set size and optimization budget","Fixed stratified subsets. The 1024×200 extension matches training updates to 4096×50; keep horizons separate when comparing best epochs."],schedule:["Cosine decay versus constant learning rate","End-of-run selected-checkpoint test results only. Both schedules have independently validation-selected rates. Good/bad/tied denotes a practical threshold, not statistical significance."],scalar:["Direct scalar versus categorical-mean regression","The same ResNet-18 backbone, direct MAE/MSE objectives, and clean labels. Scalar label NLL is undefined. Compare matched seeds before interpreting small gaps."],noise:["Fixed and fresh training-label noise","Validation and test labels stay clean. Change the requested noise level, mode or realization; the SNR sweep spans all levels of the chosen mode and realization."],digits:["Autoregressive 10×10 policy versus 100 bins","The two-digit head models p(tens|image) × p(units|image,tens), with the same 100 joint ages. Prioritized pilots use CE, direct MSE and population TailRL on 4096 images."]};
+const finite=x=>typeof x==="number"&&Number.isFinite(x);
+const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
+const sd=a=>a.length>1?Math.sqrt(a.reduce((s,x)=>s+Math.pow(x-avg(a),2),0)/(a.length-1)):null;
+const fmt=(v,d=3)=>finite(v)?v.toFixed(d):"n/a";
+const est=(a,d=3)=>{a=a.filter(finite);return a.length?fmt(avg(a),d)+(a.length>1?" ± "+fmt(sd(a),d):""):"—";};
+const make=(tag,text,attrs={})=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));return n;};
+const svg=(tag,attrs,text)=>{const n=document.createElementNS(NS,tag);Object.entries(attrs||{}).forEach(([k,v])=>n.setAttribute(k,v));if(text!==undefined)n.textContent=text;return n;};
+function methodKey(r){return r.method+"|"+r.head+(r.method.startsWith("stat_maxrl")?"|"+r.width:"");}
+function label(r){
+ let m=r.method,pop=m.includes("_population"),base=m.replace("_population","");
+ let s=base==="ce"?"CE":base==="binary_maxrl"?"Binary MaxRL":base==="tailrl"?"TailRL":base==="mae"?"Direct MAE":base==="mse"?"Direct MSE":base.startsWith("stat_maxrl_")?"Stat MaxRL "+base.split("_").pop().toUpperCase()+" · width "+r.width:base.replace("_"," ").toUpperCase();
+ if(!["mae","mse","ce"].includes(base))s+=" · "+(pop?"population":"64 samples");
+ if(r.head==="scalar")s+=" · scalar";else if(r.head==="digits")s+=" · two digits";else if(["mae","mse"].includes(base))s+=" · categorical mean";
+ if(m==="binary_maxrl_population")s+=" / CE";
+ return s;
+}
+function role(r){return ["subset_replication","matched_steps"].includes(r.stage)?"subset":["noise_replication","noise_realization"].includes(r.stage)?"noise":r.stage;}
+function inView(r){
+ const p=role(r);
+ if(state.view==="main")return p==="main";
+ if(state.view==="subset")return p==="subset";
+ if(state.view==="schedule")return r.size===4096&&r.noise==="none"&&["subset","flat"].includes(p);
+ if(state.view==="scalar")return ["mae","mse"].includes(r.method)&&["main","scalar","subset"].includes(p);
+ if(state.view==="noise")return p==="noise"||(p==="subset"&&r.size===4096&&r.epochs===50&&r.noise==="none");
+ return ["digits","subset","main","scalar"].includes(p)&&["ce","binary_maxrl_population","mse","mae","tailrl_population"].includes(r.method);
+}
+function filtered(ignoreStd=false){
+ return D.runs.filter(r=>{
+  if(!inView(r))return false;
+  if(el("size").value!=="all"&&r.size!==+el("size").value)return false;
+  if(state.view==="noise"&&r.noise!=="none"){
+   if(el("noise-mode").value!=="all"&&r.noise!==el("noise-mode").value)return false;
+   if(!ignoreStd&&el("noise-std").value!=="all"&&r.std!==+el("noise-std").value)return false;
+   if(el("noise-field").value!=="all"&&r.noiseSeed!==+el("noise-field").value)return false;
+  }
+  return true;
+ });
+}
+function groupKey(r){return [methodKey(r),r.size,r.epochs,r.schedule,r.noise,r.std,r.noise==="none"?0:r.noiseSeed,r.subsetSeed,r.cohort,r.fingerprint].join("|");}
+function groups(rows){
+ const map=new Map();
+ rows.forEach(r=>{const key=groupKey(r);if(!map.has(key))map.set(key,{key,r,runs:[]});map.get(key).runs.push(r);});
+ return Array.from(map.values()).map(g=>{
+  g.done=g.runs.filter(r=>r.status==="completed");g.n=g.done.length;g.planned=g.runs.length;
+  const fingerprints=new Set(g.done.map(r=>r.trainingFingerprint).filter(Boolean));
+  const rates=new Set(g.done.map(r=>r.lr));
+  if(fingerprints.size>1||rates.size>1)throw Error("Incompatible subsets or selected learning rates in "+label(g.r));
+  g.values={};
+  ["best","final","test"].forEach(p=>Object.keys(g.r[p]).forEach(m=>g.values[p+"."+m]=avg(g.done.map(r=>r[p][m]).filter(finite))));
+  g.values.epoch=avg(g.done.map(r=>r.bestEpoch).filter(finite));
+  return g;
+ });
+}
+function setup(r){return (r.size===18462?"full":r.size.toLocaleString())+" · "+r.epochs+" ep · "+r.schedule+(r.noise!=="none"?" · "+r.noise+" σ"+r.std+" · field "+r.noiseSeed:" · clean");}
+const palette=Array.from(new Set(D.runs.map(methodKey))).sort();
+function color(r){const hue=(palette.indexOf(methodKey(r))*137.508)%360;return "hsl("+hue+" 62% "+(window.matchMedia("(prefers-color-scheme:dark)").matches?"68":"38")+"%)";}
+function dashed(r){return r.head==="scalar"?"2 3":r.head==="digits"?"9 3 2 3":r.method.includes("population")||["ce","mae"].includes(r.method)?"":"6 3";}
+function curve(g,index){
+ const source=el("partial").checked?g.runs.filter(r=>r.curves.length):g.done;
+ const points=new Map(),xi=el("x-axis").value==="epoch"?0:el("x-axis").value==="updates"?8:7;
+ source.forEach(r=>r.curves.forEach(p=>{if(finite(p[index])){if(!points.has(p[xi]))points.set(p[xi],[]);points.get(p[xi]).push(p[index]);}}));
+ return Array.from(points.entries()).sort((a,b)=>a[0]-b[0]).map(([x,v])=>({x,y:avg(v),sd:sd(v),n:v.length}));
+}
+function numberTick(x){return Math.abs(x)>=1000?(x/1000).toFixed(x%1000?1:0)+"k":Math.abs(x)<1?x.toFixed(3):Math.abs(x)<10?x.toFixed(2):Math.round(x).toString();}
+function plot(container,series,title,xTitle){
+ const node=el(container);node.replaceChildren(make("h3",title));
+ const active=series.filter(s=>s.points.length);
+ if(!active.length){node.append(make("div","No completed curves for this selection. Queued and missing runs remain in the table.",{class:"empty"}));return;}
+ const width=Math.max(280,node.getBoundingClientRect().width),height=300,box={left:54,right:16,top:18,bottom:45};
+ const all=active.flatMap(s=>s.points),bands=el("seed-sd").checked;
+ let xmin=Math.min(...all.map(p=>p.x)),xmax=Math.max(...all.map(p=>p.x)),ymin=Math.min(...all.map(p=>p.y-(bands&&finite(p.sd)?p.sd:0))),ymax=Math.max(...all.map(p=>p.y+(bands&&finite(p.sd)?p.sd:0)));
+ if(xmin===xmax){xmin-=1;xmax+=1;}if(ymin===ymax){ymin-=0.1;ymax+=0.1;}
+ const pad=(ymax-ymin)*0.08;ymin-=pad;ymax+=pad;
+ const X=x=>box.left+(x-xmin)/(xmax-xmin)*(width-box.left-box.right),Y=y=>height-box.bottom-(y-ymin)/(ymax-ymin)*(height-box.top-box.bottom);
+ const chart=svg("svg",{viewBox:"0 0 "+width+" "+height,role:"img","aria-label":title+"; validation mean and sample SD across available seeds"});
+ for(let i=0;i<5;i++){const y=ymin+(ymax-ymin)*i/4,x=xmin+(xmax-xmin)*i/4;chart.append(svg("line",{x1:box.left,x2:width-box.right,y1:Y(y),y2:Y(y),stroke:"var(--line)","stroke-width":1}));chart.append(svg("text",{x:box.left-8,y:Y(y)+4,"text-anchor":"end"},numberTick(y)));chart.append(svg("text",{x:X(x),y:height-box.bottom+20,"text-anchor":i===0?"start":i===4?"end":"middle"},numberTick(x)));}
+ chart.append(svg("text",{x:(width+box.left-box.right)/2,y:height-4,"text-anchor":"middle"},xTitle));
+ const path=values=>values.map((p,i)=>(i?"L":"M")+X(p.x)+","+Y(p.y)).join(" ");
+ active.forEach(s=>{
+  if(bands&&s.points.some(p=>finite(p.sd))){const top=s.points.map(p=>({x:p.x,y:p.y+(p.sd||0)})),bottom=s.points.slice().reverse().map(p=>({x:p.x,y:p.y-(p.sd||0)}));chart.append(svg("path",{d:path(top)+" "+path(bottom).replace(/^M/,"L")+" Z",fill:color(s.r),opacity:0.07}));}
+  chart.append(svg("path",{d:path(s.points),fill:"none",stroke:color(s.r),"stroke-width":1.7,"stroke-dasharray":dashed(s.r)}));
+ });
+ const guide=svg("line",{x1:0,x2:0,y1:box.top,y2:height-box.bottom,stroke:"var(--fg)",opacity:0.35,visibility:"hidden"});
+ chart.append(guide);
+ const hit=svg("rect",{x:box.left,y:box.top,width:width-box.left-box.right,height:height-box.top-box.bottom,fill:"transparent","pointer-events":"all"});
+ hit.addEventListener("pointermove",event=>{
+  const bounds=chart.getBoundingClientRect(),px=(event.clientX-bounds.left)*width/bounds.width,requested=xmin+(px-box.left)/(width-box.left-box.right)*(xmax-xmin);
+  const reference=active[0].points.reduce((a,b)=>Math.abs(a.x-requested)<Math.abs(b.x-requested)?a:b);
+  guide.setAttribute("x1",X(reference.x));guide.setAttribute("x2",X(reference.x));guide.setAttribute("visibility","visible");
+  const tip=el("tooltip");tip.replaceChildren(make("strong",xTitle+": "+numberTick(reference.x)+" · nearest recorded observations"));
+  active.forEach(s=>{const p=s.points.reduce((a,b)=>Math.abs(a.x-reference.x)<Math.abs(b.x-reference.x)?a:b);const line=make("div");line.append(make("span",s.name),make("span",fmt(p.y,title.includes("Spearman")?4:3)+" · n="+p.n));tip.append(line);});
+  tip.hidden=false;tip.style.left=Math.max(8,Math.min(event.clientX+14,window.innerWidth-450))+"px";tip.style.top=Math.max(8,Math.min(event.clientY+14,window.innerHeight-250))+"px";
+ });
+ hit.addEventListener("pointerleave",()=>{guide.setAttribute("visibility","hidden");el("tooltip").hidden=true;});
+ chart.append(hit);node.append(chart);
+}
+function showLegend(rows){
+ const unique=new Map();rows.forEach(r=>unique.set(methodKey(r),r));
+ const node=el("legend");node.replaceChildren();
+ Array.from(unique.entries()).sort((a,b)=>label(a[1]).localeCompare(label(b[1]))).forEach(([key,r])=>{
+  const wrap=make("label"),input=make("input",undefined,{type:"checkbox","aria-label":label(r)});
+  input.checked=!state.hidden.has(key);input.addEventListener("change",()=>{input.checked?state.hidden.delete(key):state.hidden.add(key);render();});
+  const swatch=make("span",undefined,{class:"swatch"});swatch.style.setProperty("--series",color(r));if(dashed(r))swatch.style.borderTopStyle="dashed";
+  wrap.append(input,swatch,make("span",label(r)));node.append(wrap);
+ });
+}
+function sorted(gs){return gs.slice().sort((a,b)=>{const x=state.sort==="method"?label(a.r):a.values[state.sort],y=state.sort==="method"?label(b.r):b.values[state.sort];if(x==null)return y==null?0:1;if(y==null)return -1;return (typeof x==="string"?x.localeCompare(y):x-y)*(state.ascending?1:-1);});}
+function table(gs){
+ const table=make("table"),head=make("thead"),tr=make("tr");
+ const columns=[["method","Method and setting"],["epoch","Best epoch · seed order"],["best.mae_mean","Best val MAE ↓"],["final.mae_mean","Final val MAE ↓"],["test.mae_mean","Test MAE ↓"],["best.median_spearman","Best-checkpoint ρ ↑"],["final.median_spearman","Final val ρ ↑"],["test.median_spearman","Test ρ ↑"],["best.label_nll","Best-checkpoint NLL ↓"],["final.label_nll","Final val NLL ↓"],["test.label_nll","Test NLL ↓"]];
+ const extra=el("extra-metric").value,extraLabel=el("extra-metric").selectedOptions[0].textContent;
+ ["best","final","test"].forEach(phase=>columns.push([phase+"."+extra,(phase==="best"?"Best val ":phase==="final"?"Final val ":"Test ")+extraLabel]));
+ columns.forEach(([key,title])=>{const th=make("th"),b=make("button",title+(state.sort===key?(state.ascending?" ↑":" ↓"):""),{type:"button"});b.addEventListener("click",()=>{state.ascending=state.sort===key?!state.ascending:true;state.sort=key;render();});th.append(b);tr.append(th);});head.append(tr);table.append(head);
+ const body=make("tbody");
+ sorted(gs).forEach(g=>{
+  const row=make("tr",undefined,{class:g.n?"":"pending"}),first=make("td");first.append(make("strong",label(g.r)),make("span",setup(g.r),{class:"setup"}),make("span","Complete seeds "+g.n+" / "+g.planned+" · LR "+(g.n?Array.from(new Set(g.done.map(r=>r.lr))).join(","):"pending"),{class:"setup"}));
+  if(state.view==="noise"){const values=g.done.map(r=>r.snr).filter(finite);first.append(make("span","Measured SNR "+(g.r.noise==="none"?"∞":est(values,2)+" dB")+" · realized RMSE "+est(g.done.map(r=>r.noiseRmse))+" years",{class:"setup"}));}
+  const inspect=make("button","Runs",{type:"button"});inspect.addEventListener("click",()=>details(g));first.append(inspect);row.append(first);
+  const epoch=make("td",g.done.slice().sort((a,b)=>a.seed-b.seed).map(r=>r.bestEpoch).join(", ")||"—");epoch.title=g.done.map(r=>"seed "+r.seed+": epoch "+r.bestEpoch).join("; ");row.append(epoch);
+  columns.slice(2).forEach(([key])=>{const [phase,metric]=key.split(".");row.append(make("td",est(g.done.map(r=>r[phase][metric]),metric==="median_spearman"?4:3)));});
+  body.append(row);
+ });table.append(body);el("results-table").replaceChildren(table);
+}
+function details(g){
+ const node=el("run-details");node.replaceChildren(make("h3",label(g.r)+" · per-run evidence"));node.hidden=false;
+ const t=make("table"),h=make("tr");["Seed / noise field","Status / epochs","Best epoch","Metric-specific validation extrema","Selected test MAE","Source"].forEach(s=>h.append(make("th",s)));t.append(h);
+ g.runs.slice().sort((a,b)=>a.seed-b.seed).forEach(r=>{const row=make("tr"),ext=Object.entries(r.optima).filter(([m])=>m!=="entropy").map(([m,v])=>m+": "+fmt(v.value,m==="median_spearman"?4:3)+" @ "+v.epoch).join("; ");[r.seed+" / "+r.noiseSeed,r.status+" · "+r.completedEpochs+"/"+r.epochs+(r.reason?" · "+r.reason:""),r.bestEpoch||"—",ext||"—",fmt(r.test.mae_mean),r.commit.slice(0,12)||"not run"].forEach(v=>row.append(make("td",String(v))));t.append(row);});node.append(t,make("p","Cohort "+g.r.cohort+" · data "+g.r.fingerprint,{class:"secondary"}));node.scrollIntoView({block:"nearest",behavior:"smooth"});
+}
+function scheduleTable(gs){
+ const map=new Map();gs.forEach(g=>{const key=[methodKey(g.r),g.r.size,g.r.cohort,g.r.fingerprint].join("|");if(!map.has(key))map.set(key,{});map.get(key)[g.r.schedule]=g;});
+ const t=make("table"),h=make("tr");["Method","Matched seeds","Cosine test MAE","Flat test MAE","Flat − cosine","Practical outcome","Selected LRs · cosine / flat"].forEach(v=>h.append(make("th",v)));t.append(h);
+ const tol=Math.max(0,+el("tolerance").value||0);
+ Array.from(map.values()).forEach(pair=>{
+  const a=pair.cosine,b=pair.flat,r=(a||b).r,seeds=(a?a.done:[]).filter(x=>b&&b.done.some(y=>y.seed===x.seed)).map(x=>x.seed);
+  const av=seeds.map(s=>a.done.find(x=>x.seed===s).test.mae_mean),bv=seeds.map(s=>b.done.find(x=>x.seed===s).test.mae_mean),diff=avg(bv.map((x,i)=>x-av[i])),outcome=diff==null?"Pending":diff < -tol?"Good":diff>tol?"Bad":"Practical tie";
+  const row=make("tr");[label(r),seeds.join(", ")||"—",est(av),est(bv),fmt(diff),outcome,(a&&a.n?a.done[0].lr:"pending")+" / "+(b&&b.n?b.done[0].lr:"pending")].forEach(v=>row.append(make("td",String(v))));t.append(row);
+ });el("results-table").replaceChildren(t);
+}
+function exportRows(){
+ const fields=["method","setting","completed_seeds","planned_seeds","best_epochs","best_validation_mae","final_validation_mae","selected_test_mae","test_spearman","test_nll"];
+ const quote=x=>'"'+String(x==null?"":x).replace(/"/g,'""')+'"';
+ const lines=[fields.map(quote).join(",")];
+ sorted(state.groups).forEach(g=>lines.push([label(g.r),setup(g.r),g.n,g.planned,g.done.map(r=>r.seed+":"+r.bestEpoch).join(";"),g.values["best.mae_mean"],g.values["final.mae_mean"],g.values["test.mae_mean"],g.values["test.median_spearman"],g.values["test.label_nll"]].map(quote).join(",")));
+ const url=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"})),a=make("a",undefined,{href:url,download:"utkface-"+state.view+".csv"});a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function render(){
+ const rows=filtered();showLegend(rows);
+ const gs=groups(rows).filter(g=>!state.hidden.has(methodKey(g.r)));state.groups=gs;
+ const n=gs.reduce((s,g)=>s+g.n,0),planned=gs.reduce((s,g)=>s+g.planned,0);
+ el("selection-note").textContent=n+" completed runs of "+planned+" planned in this selection. Gray rows have no completed result. Best/final columns are validation; test is at the MAE-selected checkpoint. "+(el("partial").checked?"Unfinished curves are included and may have varying seed counts by epoch.":"Curves use completed runs only.");
+ el("run-details").hidden=true;
+ if(state.view==="schedule"){scheduleTable(gs);return;}
+ table(gs);
+ const xt=el("x-axis").selectedOptions[0].textContent;
+ const series=index=>gs.map(g=>({r:g.r,name:label(g.r)+" · "+setup(g.r),points:curve(g,index)}));
+ plot("mae-plot",series(1),"Validation mean MAE · years",xt);
+ plot("rho-plot",series(3),"Validation median Spearman",xt);
+ plot("nll-plot",series(4),"Validation label NLL · nats",xt);
+ if(state.view==="noise"){
+  const sweep=groups(filtered(true)).filter(g=>g.r.noise!=="none"&&!state.hidden.has(methodKey(g.r))&&g.n);
+  const map=new Map();sweep.forEach(g=>{const key=methodKey(g.r)+"|"+g.r.noise+"|"+g.r.noiseSeed;if(!map.has(key))map.set(key,{r:g.r,name:label(g.r)+" · "+g.r.noise+" · field "+g.r.noiseSeed,points:[]});const x=avg(g.done.map(r=>r.snr).filter(finite)),y=g.values["test.mae_mean"];if(finite(x)&&finite(y))map.get(key).points.push({x,y,sd:sd(g.done.map(r=>r.test.mae_mean).filter(finite)),n:g.n});});
+  map.forEach(s=>s.points.sort((a,b)=>a.x-b.x));plot("snr-plot",Array.from(map.values()),"Selected-checkpoint test MAE versus measured SNR","Measured training-label SNR · dB");
+ }
+}
+function view(name){
+ state.view=name;el("section-title").textContent=specs[name][0];el("section-description").textContent=specs[name][1];
+ el("navigation").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.view===name)));
+ const noise=name==="noise",schedule=name==="schedule";
+ ["mode-control","std-control","field-control","snr-section"].forEach(id=>el(id).hidden=!noise);
+ ["x-control","partial-control","sd-control","curves"].forEach(id=>el(id).hidden=schedule);
+ el("tolerance-control").hidden=!schedule;
+ el("size").value=["main","scalar"].includes(name)?"18462":name==="subset"?"all":"4096";
+ el("x-axis").value=name==="subset"?"updates":"epoch";render();
+}
+el("navigation").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>view(b.dataset.view)));
+["size","noise-mode","noise-std","noise-field","x-axis","partial","seed-sd","tolerance","extra-metric"].forEach(id=>el(id).addEventListener("change",render));
+el("show-all").addEventListener("click",()=>{state.hidden.clear();render();});
+el("hide-all").addEventListener("click",()=>{filtered().forEach(r=>state.hidden.add(methodKey(r)));render();});
+el("baselines").addEventListener("click",()=>{state.hidden.clear();filtered().forEach(r=>{if(!["ce","binary_maxrl_population","mae","mse"].includes(r.method))state.hidden.add(methodKey(r));});render();});
+el("export").addEventListener("click",exportRows);
+el("timestamp").textContent="Snapshot "+new Date(D.generated).toLocaleString("en-GB",{timeZone:"Asia/Shanghai"})+" GMT+8 · extension cutoff 07:30 · report deadline 08:30";
+D.studies.forEach((s,i)=>{const p=s.progress,n=make("div");n.append(make("span",i?"Extension GPU-hours":"Original GPU-hours",{class:"secondary"}),make("br"),make("strong",fmt(p.gpu_hours,2)+" / "+p.budget_gpu_hours));el("status").append(n);});
+const mainStudy=D.studies[0].progress.stages.main||{},mainStatus=make("div");mainStatus.append(make("span","Categorical main runs",{class:"secondary"}),make("br"),make("strong",(mainStudy.completed||0)+" / 66"));el("status").append(mainStatus);
+D.studies.forEach(s=>{const p=make("section");p.append(make("h3",s.root),make("p","State: "+s.progress.status+" · "+JSON.stringify(s.progress.counts)),make("p","Plan SHA-256: "+s.planSha256),make("p","Training-source cohort: "+s.cohort),make("p","Data fingerprint: "+s.dataFingerprint));const t=make("table");Object.entries(s.progress.stages).forEach(([stage,counts])=>{const row=make("tr");row.append(make("td",stage),make("td",JSON.stringify(counts)));t.append(row);});p.append(t);el("provenance").append(p);});
+let timer;new ResizeObserver(()=>{clearTimeout(timer);timer=setTimeout(render,100);}).observe(el("curves"));
+window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",render);
+view("main");
+</script></main></body></html>
