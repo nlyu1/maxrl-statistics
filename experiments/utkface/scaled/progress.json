@@ -1,10 +1,10 @@
 {
   "status": "running",
-  "gpu_hours": 1.4098982163932587,
+  "gpu_hours": 2.2114173173242144,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 20,
-    "pending": 509,
+    "completed": 31,
+    "pending": 498,
     "running": 1
   },
   "stages": {
@@ -45,17 +45,17 @@
       "pending": 80
     },
     "wide": {
-      "pending": 79,
-      "completed": 16,
+      "pending": 68,
+      "completed": 27,
       "running": 1
     }
   },
   "active": [
     {
-      "job": "wide_grpo_mse_lr0.0001",
+      "job": "wide_mae_lr0.003",
       "gpu": 1,
-      "minutes": 1.6514044880867005
+      "minutes": 1.5159156918525696
     }
   ],
-  "updated_at": 1791870436.675973
+  "updated_at": 1791873781.153319
 }

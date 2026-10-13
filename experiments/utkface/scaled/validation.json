@@ -65,9 +65,13 @@
     "uv_launcher_python_process_group_probe": "passed_on_server_cpu"
   },
   "full_data_pilot_integrity": {
-    "snapshot_time": "2026-10-13T13:47:16.675973+08:00",
-    "completed": 16,
-    "variants": ["binary_maxrl", "binary_maxrl_population", "grpo_mae", "grpo_mae_population"],
+    "snapshot_time": "2026-10-13T14:43:01.153319+08:00",
+    "completed": 27,
+    "completed_grids": 6,
+    "variants": [
+      "binary_maxrl", "binary_maxrl_population", "grpo_mae", "grpo_mae_population",
+      "grpo_mse", "grpo_mse_population", "mae"
+    ],
     "sampled_rollouts": 64,
     "population_actions": 100,
     "epochs_per_run": 10,

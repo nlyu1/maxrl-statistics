@@ -1,6 +1,6 @@
 # Scaled UTKFace study
 
-State: **running**. GPU time: **1.41 / 64 hours**. Completed primary runs: **0 / 66**.
+State: **running**. GPU time: **2.21 / 64 hours**. Completed primary runs: **0 / 66**.
 
 Metrics use clean held-out labels. All tuning and scalar-head gates use validation data. Values are means ± sample SD across distinct training seeds; single-seed values have no SD. Label NLL is unavailable for scalar heads. Population zero-one MaxRL equals CE. Training subsets are fixed and nested.
 
