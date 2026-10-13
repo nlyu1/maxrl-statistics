@@ -57,6 +57,10 @@ view('main');document.getElementById('extra-metric').value='mode_accuracy';rende
 check(document.getElementById('results-table').textContent.includes('mode_accuracy'),'additional metric');
 check(created.filter(n=>n.tagName==='path').every(n=>!/(NaN|Infinity|undefined)/.test(n.attrs.d||'')),'nonfinite chart geometry');
 check(created.filter(n=>n.tagName==='svg').length>0,'charts missing');
+const hit=created.find(n=>n.tagName==='rect'&&n.listeners.pointermove);
+hit.listeners.pointermove[0]({clientX:150,clientY:120});
+check(!document.getElementById('tooltip').hidden,'curve hover');
+hit.listeners.pointerleave[0]();check(document.getElementById('tooltip').hidden,'hover dismissal');
 """
 
 
@@ -93,6 +97,7 @@ def verify(*, html_path: Path) -> dict:
             "unfinished curves",
             "additional metric",
             "finite SVG geometry",
+            "curve hover and dismissal",
         ],
         "passed": True,
         "environment": "isolated QuickJS DOM harness; no browser rendering",

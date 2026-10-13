@@ -19,6 +19,8 @@ These are clean **test metrics at the validation-MAE-selected checkpoint**. SD d
 
 Population Stat MaxRL with MAE width 2 has the lowest three-seed mean MAE, but its advantage over direct MAE is small and inconsistent: paired differences are **−0.056, −0.220, +0.143 years**, averaging **−0.044 ± 0.182**. This does not establish a reliable improvement over direct MAE. Its width-2 result improves on population MAE width 5 on all three seeds, by **0.153 ± 0.044 years**, and on population MSE width 2 by **0.174 ± 0.060 years**. These compare independently tuned methods; they do not isolate a kernel change at identical learning rates.
 
+Equal numeric kernel widths also do not imply equal spread: the Laplace MAE kernel with scale 2 has variance 8 years², while the Gaussian MSE kernel with standard deviation 2 has variance 4 years². Their comparison changes both shape and effective spread.
+
 Direct MAE improves on direct MSE on all three matched seeds, by **0.055 ± 0.021 years**. Direct MSE has higher median Spearman, illustrating that point error and rank correlation can prefer different objectives.
 
 **The incomplete TailRL averages are particularly easy to misread.** Population TailRL's available-seed mean is below the three-seed direct-MAE mean, yet it is **worse than direct MAE on both matched seeds 42/44**, by 0.044 and 0.117 years. Their paired difference is **+0.081 ± 0.052**. Its apparent pooled ranking benefits from the missing seed. Against CE on those same two seeds it improves MAE by **0.214 ± 0.009 years**. Wait for the missing seeds before ranking it against the complete matrix. [Additional paired comparisons](additional_paired_differences.json).

@@ -154,7 +154,7 @@ function plot(container,series,title,xTitle){
   guide.setAttribute("x1",X(reference.x));guide.setAttribute("x2",X(reference.x));guide.setAttribute("visibility","visible");
   const tip=el("tooltip");tip.replaceChildren(make("strong",xTitle+": "+numberTick(reference.x)+" · nearest recorded observations"));
   active.forEach(s=>{const p=s.points.reduce((a,b)=>Math.abs(a.x-reference.x)<Math.abs(b.x-reference.x)?a:b);const line=make("div");line.append(make("span",s.name),make("span",fmt(p.y,title.includes("Spearman")?4:3)+" · n="+p.n));tip.append(line);});
-  tip.hidden=false;tip.style.left=Math.max(8,Math.min(event.clientX+14,window.innerWidth-450))+"px";tip.style.top=Math.max(8,Math.min(event.clientY+14,window.innerHeight-250))+"px";
+  tip.hidden=false;const tipBounds=tip.getBoundingClientRect();tip.style.left=Math.max(8,Math.min(event.clientX+14,window.innerWidth-tipBounds.width-8))+"px";tip.style.top=Math.max(8,Math.min(event.clientY+14,window.innerHeight-tipBounds.height-8))+"px";
  });
  hit.addEventListener("pointerleave",()=>{guide.setAttribute("visibility","hidden");el("tooltip").hidden=true;});
  chart.append(hit);node.append(chart);
