@@ -472,13 +472,16 @@ def run(
                         for dependency in job.dependencies
                     ):
                         continue
-                    if any(
+                    dependency_skipped = any(
                         combined["jobs"][dependency]["status"] == "skipped"
                         for dependency in job.dependencies
-                    ) or not gate_passes(job=job, state=combined):
+                    )
+                    if dependency_skipped or not gate_passes(job=job, state=combined):
                         record.update({
                             "status": "skipped",
-                            "reason": "scalar_head_not_competitive",
+                            "reason": "dependency_skipped"
+                            if dependency_skipped
+                            else "scalar_head_not_competitive",
                         })
                         continue
                     ready.append(job)
