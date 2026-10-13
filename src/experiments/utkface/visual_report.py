@@ -242,12 +242,30 @@ def main() -> None:
     parser.add_argument("--plans", type=Path, nargs="+", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--coordination", default="")
+    parser.add_argument("--watch-until", default="")
+    parser.add_argument("--refresh-seconds", type=float, default=300)
     args = parser.parse_args()
-    build(
-        plans=tuple(args.plans),
-        output_dir=args.output_dir,
-        coordination_path=args.coordination,
+    if args.refresh_seconds < 60:
+        parser.error("Refresh interval must be at least 60 seconds")
+    deadline = datetime.fromisoformat(args.watch_until) if args.watch_until else None
+    if deadline and deadline.tzinfo is None:
+        parser.error("Watch deadline must include a timezone")
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    lock = (
+        (args.output_dir / "report-watch.lock").open("a") if deadline else nullcontext()
     )
+    with lock as handle:
+        if deadline:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        while True:
+            build(
+                plans=tuple(args.plans),
+                output_dir=args.output_dir,
+                coordination_path=args.coordination,
+            )
+            if not deadline or time.time() >= deadline.timestamp():
+                break
+            time.sleep(min(args.refresh_seconds, deadline.timestamp() - time.time()))
 
 
 if __name__ == "__main__":
