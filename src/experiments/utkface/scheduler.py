@@ -10,6 +10,10 @@ from collections import Counter
 from pathlib import Path
 
 from src.experiments.utkface.config import RunConfig
+from src.experiments.utkface.coordination import (
+    CoordinationConfig,
+    canonical_coordination,
+)
 from src.experiments.utkface.run import write_json
 from src.experiments.utkface.study import StudyJob, StudyPlan
 
@@ -224,10 +228,16 @@ def status_summary(*, plan: StudyPlan, state: dict) -> dict:
     }
 
 
-def run(*, plan: StudyPlan, poll_seconds: float) -> None:
+def run(
+    *, plan: StudyPlan, poll_seconds: float, coordination: CoordinationConfig
+) -> None:
     root = plan.output_dir
     root.mkdir(parents=True, exist_ok=True)
-    with (root / "supervisor.lock").open("a") as lock:
+    coordination.lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with (
+        (root / "supervisor.lock").open("a") as lock,
+        coordination.lock_path.open("a") as dispatch_lock,
+    ):
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         (root / "supervisor.pid").write_text(str(os.getpid()) + "\n")
         state_path = root / "state.json"
@@ -274,7 +284,15 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
         (root / "logs").mkdir(exist_ok=True)
         budget = plan.budget_gpu_hours * 3600
         while True:
+            fcntl.flock(dispatch_lock, fcntl.LOCK_EX)
             now = time.time()
+            peers = []
+            for peer_path in coordination.peer_plans:
+                peer = StudyPlan.model_validate_json(peer_path.read_text())
+                peer_state_path = peer.output_dir / "state.json"
+                if peer.output_dir == root or not peer_state_path.exists():
+                    continue
+                peers.append((peer, json.loads(peer_state_path.read_text())))
             inventory = gpu_inventory()
             by_uuid = {gpu["uuid"]: gpu for gpu in inventory}
             for job in plan.jobs:
@@ -310,6 +328,11 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                         record.update({
                             "status": "completed",
                             "result_path": str(result_path),
+                        })
+                    elif attempt.get("deadline_reached"):
+                        record.update({
+                            "status": "skipped",
+                            "reason": "deadline_reached",
                         })
                     elif retryable_preemption(attempt=attempt):
                         record["status"] = "pending"
@@ -361,11 +384,17 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                 if record["status"] == "running"
             ]
             spent = charged_seconds(state=state, now=now)
+            deadline = coordination.deadlines.get(str(root), 0)
+            if deadline and now >= deadline:
+                state["status"] = "deadline_reached"
+                for record in active:
+                    record["attempts"][-1]["deadline_reached"] = True
+                    terminate_attempt(attempt=record["attempts"][-1])
             if spent >= budget:
                 state["status"] = "budget_exhausted"
                 for record in active:
                     terminate_attempt(attempt=record["attempts"][-1])
-            if state["status"] in {"failed", "budget_exhausted"}:
+            if state["status"] in {"failed", "budget_exhausted", "deadline_reached"}:
                 for record in state["jobs"].values():
                     if record["status"] == "pending":
                         record.update({"status": "skipped", "reason": state["status"]})
@@ -378,7 +407,23 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                     )
                     break
             else:
-                leased = {record["attempts"][-1]["gpu_uuid"] for record in active}
+                peer_active = [
+                    record
+                    for _, peer_state in peers
+                    for record in peer_state["jobs"].values()
+                    if record["status"] == "running"
+                ]
+                combined = {"jobs": dict(state["jobs"])}
+                for _, peer_state in peers:
+                    if set(combined["jobs"]) & set(peer_state["jobs"]):
+                        raise ValueError(
+                            "Coordinated queues have duplicate job identifiers"
+                        )
+                    combined["jobs"].update(peer_state["jobs"])
+                leased = {
+                    record["attempts"][-1]["gpu_uuid"]
+                    for record in (*active, *peer_active)
+                }
                 for gpu in inventory:
                     streaks[gpu["uuid"]] = (
                         streaks.get(gpu["uuid"], 0) + 1
@@ -398,22 +443,28 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                 )
                 ready = []
                 for job in sorted(
-                    plan.jobs, key=lambda item: (item.priority, item.identifier)
+                    plan.jobs,
+                    key=lambda item: (
+                        coordination.priorities.get(item.identifier, item.priority),
+                        item.identifier,
+                    ),
                 ):
                     record = state["jobs"][job.identifier]
                     if record["status"] != "pending" or (
-                        job.optional and not mandatory_done
+                        job.optional
+                        and not mandatory_done
+                        and job.identifier not in coordination.promoted
                     ):
                         continue
                     if not all(
-                        state["jobs"][dependency]["status"] in TERMINAL
+                        combined["jobs"][dependency]["status"] in TERMINAL
                         for dependency in job.dependencies
                     ):
                         continue
                     if any(
-                        state["jobs"][dependency]["status"] == "skipped"
+                        combined["jobs"][dependency]["status"] == "skipped"
                         for dependency in job.dependencies
-                    ) or not gate_passes(job=job, state=state):
+                    ) or not gate_passes(job=job, state=combined):
                         record.update({
                             "status": "skipped",
                             "reason": "scalar_head_not_competitive",
@@ -429,10 +480,44 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                 reserved = sum(
                     record["attempts"][-1]["runtime_limit_seconds"] for record in active
                 )
+                peer_ready = any(
+                    peer_state["status"] == "running"
+                    and (
+                        not coordination.deadlines.get(str(peer.output_dir), 0)
+                        or now + 180 < coordination.deadlines[str(peer.output_dir)]
+                    )
+                    and record["status"] == "pending"
+                    and not item.optional
+                    and all(
+                        combined["jobs"][dependency]["status"] == "completed"
+                        for dependency in item.dependencies
+                    )
+                    for peer, peer_state in peers
+                    for item in peer.jobs
+                    for record in (peer_state["jobs"][item.identifier],)
+                )
+                turn_path = coordination.lock_path.with_suffix(".turn")
+                previous_owner = turn_path.read_text() if turn_path.exists() else ""
                 for job in ready:
-                    if not free or len(active) >= plan.max_concurrent:
+                    if (
+                        not free
+                        or len(active) >= plan.max_concurrent
+                        or len(active) + len(peer_active) >= coordination.max_concurrent
+                        or (
+                            peer_ready
+                            and (
+                                len(active) > len(peer_active)
+                                or (
+                                    len(active) == len(peer_active)
+                                    and previous_owner == str(root)
+                                )
+                            )
+                        )
+                    ):
                         break
                     limit = runtime_limit(job=job, state=state, plan=plan)
+                    if deadline and now + limit > deadline:
+                        continue
                     if closed + reserved + limit > budget:
                         continue
                     gpu = free.pop(0)
@@ -457,7 +542,9 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                     overrides = {"output_dir": output, "device": "cuda:0"}
                     if job.tune_from:
                         best = selected_result(
-                            identifiers=job.tune_from, state=state, rank=job.tuning_rank
+                            identifiers=job.tune_from,
+                            state=combined,
+                            rank=job.tuning_rank,
                         )
                         overrides["learning_rate"] = best["config"]["learning_rate"]
                     configuration = RunConfig.model_validate({
@@ -516,6 +603,8 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
                     children[job.identifier] = child
                     logs[job.identifier] = log
                     active.append(record)
+                    turn_path.write_text(str(root))
+                    previous_owner = str(root)
                     reserved += limit
                     streaks[gpu["uuid"]] = 0
                     print(
@@ -550,6 +639,7 @@ def run(*, plan: StudyPlan, poll_seconds: float) -> None:
             )
             if state["status"] == "completed":
                 break
+            fcntl.flock(dispatch_lock, fcntl.LOCK_UN)
             time.sleep(poll_seconds)
         print(json.dumps(status_summary(plan=plan, state=state), indent=2), flush=True)
 
@@ -559,6 +649,7 @@ def main() -> None:
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--poll-seconds", type=float, default=20)
     parser.add_argument("--status", action="store_true")
+    parser.add_argument("--coordination", type=Path)
     args = parser.parse_args()
     plan = StudyPlan.model_validate_json(args.plan.read_text())
     if args.status:
@@ -572,7 +663,15 @@ def main() -> None:
             else "Study has not started"
         )
     else:
-        run(plan=plan, poll_seconds=args.poll_seconds)
+        run(
+            plan=plan,
+            poll_seconds=args.poll_seconds,
+            coordination=CoordinationConfig.model_validate_json(
+                args.coordination.read_text()
+            )
+            if args.coordination
+            else canonical_coordination(root=plan.output_dir),
+        )
 
 
 if __name__ == "__main__":
