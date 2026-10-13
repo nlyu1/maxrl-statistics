@@ -6,7 +6,7 @@
   "focused_tests": {
     "command": "OMP_NUM_THREADS=4 uv run --python 3.12 pytest tests/test_utkface_losses.py tests/test_utkface_data.py tests/test_utkface_scaled.py tests/test_utkface_scheduler.py tests/test_maxrl_estimator.py -q",
     "passed": 64,
-    "seconds": 12.20,
+    "seconds": 12.2,
     "coverage": [
       "population objectives and finite-sample estimators",
       "deduplication before splitting and conflicting-label removal",
@@ -25,7 +25,10 @@
     "backend": "gloo",
     "device": "cpu",
     "world_size": 2,
-    "uneven_shard_sizes": [33, 32],
+    "uneven_shard_sizes": [
+      33,
+      32
+    ],
     "total_count": 65,
     "categorical_median_spearman": 0.9983062544913628,
     "categorical_label_nll": 33.84615384615385,
@@ -65,15 +68,34 @@
     "uv_launcher_python_process_group_probe": "passed_on_server_cpu"
   },
   "full_data_pilot_integrity": {
-    "snapshot_time": "2026-10-13T17:39:52.908558+08:00",
-    "completed": 84,
-    "completed_grids": 21,
+    "snapshot_time": "2026-10-13T21:09:46.273691+08:00",
+    "completed": 96,
+    "completed_grids": 24,
     "variants": [
-      "binary_maxrl", "binary_maxrl_population", "grpo_mae", "grpo_mae_population",
-      "grpo_mse", "grpo_mse_population", "mae", "mae_scalar", "mse", "mse_scalar",
-      "rloo_mae", "rloo_mae_population", "rloo_mse", "rloo_mse_population",
-      "stat_maxrl_mae_population_s2", "stat_maxrl_mae_population_s5", "stat_maxrl_mae_s2", "stat_maxrl_mae_s5",
-      "stat_maxrl_mse_population_s2", "stat_maxrl_mse_population_s5", "stat_maxrl_mse_s2"
+      "binary_maxrl",
+      "binary_maxrl_population",
+      "grpo_mae",
+      "grpo_mae_population",
+      "grpo_mse",
+      "grpo_mse_population",
+      "mae",
+      "mae_scalar",
+      "mse",
+      "mse_scalar",
+      "rloo_mae",
+      "rloo_mae_population",
+      "rloo_mse",
+      "rloo_mse_population",
+      "stat_maxrl_mae_population_s2",
+      "stat_maxrl_mae_population_s5",
+      "stat_maxrl_mae_s2",
+      "stat_maxrl_mae_s5",
+      "stat_maxrl_mse_population_s2",
+      "stat_maxrl_mse_population_s5",
+      "stat_maxrl_mse_s2",
+      "stat_maxrl_mse_s5",
+      "tailrl",
+      "tailrl_population"
     ],
     "sampled_rollouts": 64,
     "population_actions": 100,
@@ -91,5 +113,28 @@
     "main_runs_completed": 0,
     "record": "pilot_integrity.json"
   },
-  "new_training_results_available": true
+  "new_training_results_available": true,
+  "full_data_confirmation_integrity": {
+    "snapshot_time": "2026-10-13T21:09:46.273691+08:00",
+    "completed": 20,
+    "completed_grids": 10,
+    "epochs_per_run": 30,
+    "train_unique_images": 18462,
+    "train_presentations_per_epoch": 18432,
+    "validation_images": 2308,
+    "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+    "test_evaluation": false,
+    "checkpoint_matches_best_validation_mae": true,
+    "finite_losses_and_gradient_norms": true,
+    "learning_rates_match_validation_only_pilot_ranking": true,
+    "frozen_plan_sources_and_data_verified": true,
+    "scalar_nll_unavailable_as_intended": true,
+    "scalar_mae_gate_ratio": 0.994815792789745,
+    "scalar_mae_gate_passed": true,
+    "scalar_mse_gate_ratio": 0.978123434417621,
+    "scalar_mse_gate_passed": true,
+    "scalar_mse_gate": "passed",
+    "main_runs_completed": 0,
+    "record": "pilot_integrity.json"
+  }
 }

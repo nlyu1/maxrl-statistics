@@ -1,10 +1,10 @@
 {
   "status": "running",
-  "gpu_hours": 6.701749920580122,
+  "gpu_hours": 13.336794688900312,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 88,
-    "pending": 440,
+    "completed": 120,
+    "pending": 408,
     "running": 2
   },
   "stages": {
@@ -30,7 +30,9 @@
       "pending": 40
     },
     "refine": {
-      "pending": 48
+      "pending": 26,
+      "completed": 20,
+      "running": 2
     },
     "scalar": {
       "pending": 6
@@ -45,22 +47,20 @@
       "pending": 80
     },
     "wide": {
-      "pending": 10,
-      "completed": 84,
-      "running": 2
+      "completed": 96
     }
   },
   "active": [
     {
-      "job": "wide_stat_maxrl_mse_s5_lr0.0001",
+      "job": "refine_rloo_mae_population_rank0",
       "gpu": 1,
-      "minutes": 1.7379732767740885
+      "minutes": 6.929399128754934
     },
     {
-      "job": "wide_stat_maxrl_mse_s5_lr0.0003",
+      "job": "refine_rloo_mae_population_rank1",
       "gpu": 8,
-      "minutes": 0.38198960622151695
+      "minutes": 5.234646753470103
     }
   ],
-  "updated_at": 1791884392.908558
+  "updated_at": 1791896966.9807208
 }
