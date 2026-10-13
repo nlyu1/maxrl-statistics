@@ -1,11 +1,11 @@
 {
   "status": "running",
-  "gpu_hours": 39.94229292968909,
+  "gpu_hours": 40.610208968056575,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 212,
-    "running": 1,
-    "pending": 317
+    "completed": 214,
+    "pending": 315,
+    "running": 1
   },
   "stages": {
     "digits": {
@@ -21,9 +21,7 @@
       "pending": 40
     },
     "main": {
-      "completed": 64,
-      "running": 1,
-      "pending": 1
+      "completed": 66
     },
     "noise": {
       "pending": 80
@@ -35,7 +33,8 @@
       "completed": 48
     },
     "scalar": {
-      "pending": 6
+      "pending": 5,
+      "running": 1
     },
     "smoke": {
       "completed": 4
@@ -52,10 +51,10 @@
   },
   "active": [
     {
-      "job": "main_tailrl_seed43",
+      "job": "main_mae_scalar_seed42",
       "gpu": 3,
-      "minutes": 2.5457346359888713
+      "minutes": 2.8471477746963503
     }
   ],
-  "updated_at": 1791927953.7782545
+  "updated_at": 1791930446.3932467
 }

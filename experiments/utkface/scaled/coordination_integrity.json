@@ -1,11 +1,11 @@
 {
-  "time_gmt8": "2026-10-14T05:48:17.123865+08:00",
+  "time_gmt8": "2026-10-14T06:29:13.272593+08:00",
   "frozen_sources": true,
   "base_plan_unchanged": true,
   "before_handoff_attempts_preserved": 224,
   "global_historical_peak_gpu_leases": 5,
   "combined_gpu_cap": 6,
-  "original_gpu_hours": 39.97961419377062,
+  "original_gpu_hours": 40.63838405821058,
   "extension_gpu_hours": 0.0,
   "budgets": [
     64,
@@ -13,7 +13,7 @@
   ],
   "extension_deadline": "2026-10-14T07:30:00+08:00",
   "attempt_counts": [
-    227,
+    229,
     0
   ],
   "source_cohort": "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6"

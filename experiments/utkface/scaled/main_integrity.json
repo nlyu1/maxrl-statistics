@@ -1,9 +1,9 @@
 {
-  "snapshot_time": "2026-10-14T05:48:10.727058+08:00",
-  "report_gpu_hours": 39.94229292968909,
-  "completed_runs": 64,
+  "snapshot_time": "2026-10-14T06:29:06.952367+08:00",
+  "report_gpu_hours": 40.610208968056575,
+  "completed_runs": 66,
   "planned_runs": 66,
-  "complete_three_seed_configurations": 21,
+  "complete_three_seed_configurations": 22,
   "frozen_training_sources_verified": true,
   "all_epochs_and_validation_selection_verified": true,
   "planned_configuration_matches_execution_except_resolved_lr_and_attempt_directory": true,
@@ -542,6 +542,22 @@
         "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
         "best_epoch": 41,
         "test_count": 2308
+      },
+      {
+        "identifier": "main_tailrl_seed43",
+        "seed": 43,
+        "learning_rate": 0.001,
+        "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+        "best_epoch": 26,
+        "test_count": 2308
+      },
+      {
+        "identifier": "main_tailrl_seed44",
+        "seed": 44,
+        "learning_rate": 0.001,
+        "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+        "best_epoch": 22,
+        "test_count": 2308
       }
     ],
     "tailrl_population": [
@@ -592,10 +608,7 @@
     "stat_maxrl_mse_population_s5": [],
     "stat_maxrl_mse_s2": [],
     "stat_maxrl_mse_s5": [],
-    "tailrl": [
-      43,
-      44
-    ],
+    "tailrl": [],
     "tailrl_population": []
   }
 }

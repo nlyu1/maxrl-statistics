@@ -1,5 +1,5 @@
 {
-  "snapshot": "2026-10-14T05:51:47.165150+08:00",
+  "snapshot": "2026-10-14T06:41:53.577261+08:00",
   "data_runs": 586,
   "main_methods": 22,
   "checks": [
@@ -13,7 +13,9 @@
     "unfinished curves",
     "additional metric",
     "finite SVG geometry",
-    "curve hover and dismissal"
+    "curve hover and dismissal",
+    "common-seed comparisons preserve actual coverage",
+    "unfinished curves before the first completed seed"
   ],
   "passed": true,
   "environment": "isolated QuickJS DOM harness; no browser rendering",
