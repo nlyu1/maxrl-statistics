@@ -1,9 +1,9 @@
 {
-  "snapshot_time": "2026-10-14T04:06:15.128317+08:00",
-  "report_gpu_hours": 39.53358334687021,
-  "completed_runs": 63,
+  "snapshot_time": "2026-10-14T05:48:10.727058+08:00",
+  "report_gpu_hours": 39.94229292968909,
+  "completed_runs": 64,
   "planned_runs": 66,
-  "complete_three_seed_configurations": 20,
+  "complete_three_seed_configurations": 21,
   "frozen_training_sources_verified": true,
   "all_epochs_and_validation_selection_verified": true,
   "planned_configuration_matches_execution_except_resolved_lr_and_attempt_directory": true,
@@ -554,6 +554,14 @@
         "test_count": 2308
       },
       {
+        "identifier": "main_tailrl_population_seed43",
+        "seed": 43,
+        "learning_rate": 0.0001,
+        "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+        "best_epoch": 18,
+        "test_count": 2308
+      },
+      {
         "identifier": "main_tailrl_population_seed44",
         "seed": 44,
         "learning_rate": 0.0001,
@@ -588,8 +596,6 @@
       43,
       44
     ],
-    "tailrl_population": [
-      43
-    ]
+    "tailrl_population": []
   }
 }

@@ -1,8 +1,8 @@
 # UTKFace: interpretation of the available evidence
 
-Snapshot: **2026-10-14 04:06 GMT+8**. [Open the interactive report](dashboard.html), [complete metrics](dashboard-runs.csv), [epoch curves](dashboard-curves.csv), [scientific figure](main.pdf), and [experiment protocol](PLAN.md).
+Snapshot: **2026-10-14 05:46 GMT+8**. [Open the interactive report](dashboard.html), [complete metrics](dashboard-runs.csv), [epoch curves](dashboard-curves.csv), [scientific figure](main.pdf), and [experiment protocol](PLAN.md).
 
-The main comparison has **63/66 completed runs**. Twenty configurations have all three training seeds. Population TailRL has seeds 42/44; sampled TailRL has seed 42. All completed main runs finished 50 full-data epochs. The smaller-set, constant-LR, scalar confirmation, noise and digit-policy comparisons have no completed final runs at this snapshot. Their report sections show missing coverage instead of inferred results.
+The main comparison has **64/66 completed runs**. Twenty-one configurations, including population TailRL, have all three training seeds. Sampled TailRL has seed 42; its seeds 43/44 remain unfinished. All completed main runs finished 50 full-data epochs. The smaller-set, constant-LR, scalar confirmation, noise and digit-policy comparisons have no completed final runs at this snapshot. Their report sections show missing coverage instead of inferred results.
 
 ## Main methods
 
@@ -11,10 +11,10 @@ These are clean **test metrics at the validation-MAE-selected checkpoint**. SD d
 | Method | Seeds | Test MAE, years | Median Spearman | Label NLL, nats | Best epochs, seed order |
 |---|---:|---:|---:|---:|---|
 | Population Stat MaxRL, MAE width 2 | 3 | 4.718 ± 0.086 | 0.9015 | 7.439 | 14, 16, 16 |
+| Population TailRL | 3 | 4.752 ± 0.037 | 0.9028 | 3.214 | 13, 18, 7 |
 | Direct MAE, categorical mean | 3 | 4.762 ± 0.193 | 0.9052 | 9.451 | 40, 36, 32 |
 | Direct MSE, categorical mean | 3 | 4.817 ± 0.191 | 0.9084 | 8.099 | 47, 33, 32 |
 | Population binary MaxRL / CE | 3 | 4.933 ± 0.030 | 0.8974 | 3.195 | 24, 23, 18 |
-| Population TailRL, incomplete | 2 | 4.732 ± 0.019 | 0.9053 | 3.103 | 13, 7 |
 | Sampled TailRL, incomplete | 1 | 4.746 | 0.9022 | 7.369 | 41 |
 
 Population Stat MaxRL with MAE width 2 has the lowest three-seed mean MAE, but its advantage over direct MAE is small and inconsistent: paired differences are **−0.056, −0.220, +0.143 years**, averaging **−0.044 ± 0.182**. This does not establish a reliable improvement over direct MAE. Its width-2 result improves on population MAE width 5 on all three seeds, by **0.153 ± 0.044 years**, and on population MSE width 2 by **0.174 ± 0.060 years**. These compare independently tuned methods; they do not isolate a kernel change at identical learning rates.
@@ -23,7 +23,7 @@ Equal numeric kernel widths also do not imply equal spread: the Laplace MAE kern
 
 Direct MAE improves on direct MSE on all three matched seeds, by **0.055 ± 0.021 years**. Direct MSE has higher median Spearman, illustrating that point error and rank correlation can prefer different objectives.
 
-**The incomplete TailRL averages are particularly easy to misread.** Population TailRL's available-seed mean is below the three-seed direct-MAE mean, yet it is **worse than direct MAE on both matched seeds 42/44**, by 0.044 and 0.117 years. Their paired difference is **+0.081 ± 0.052**. Its apparent pooled ranking benefits from the missing seed. Against CE on those same two seeds it improves MAE by **0.214 ± 0.009 years**. Wait for the missing seeds before ranking it against the complete matrix. [Additional paired comparisons](additional_paired_differences.json).
+**Population TailRL now supports a complete three-seed comparison.** Its paired MAE differences against direct MAE are **+0.044, −0.191, +0.117 years**, averaging **−0.010 ± 0.161**. Its observed mean point error is similar to direct MAE, while its label NLL is much lower: **3.214 versus 9.451 nats**. Against CE it improves MAE on all three seeds by **0.181 ± 0.057 years**, with similar mean NLL, **3.214 versus 3.195**. Against population Stat-MAE width 2 its MAE difference is **+0.034 ± 0.063 years**, with lower NLL, **3.214 versus 7.439**. These are descriptive tradeoffs at independently validation-selected rates and checkpoints, not tests of equivalence or a clear point-error winner. Sampled TailRL still has one seed and should not be ranked against the complete configurations. [Additional paired comparisons](additional_paired_differences.json).
 
 Population binary MaxRL equals CE in this implementation. Its point error is close to the sampled zero-one estimator: paired population-minus-sampled difference **−0.028 ± 0.069 years**. Its label NLL is lower, 3.195 versus 4.387 nats. Direct losses on the categorical mean do not uniquely constrain the distribution, so good mean-age predictions need not imply good label probabilities.
 
@@ -33,11 +33,13 @@ The eight GRPO/RLOO configurations complete all three seeds with MAE **6.342–6
 
 Population Stat-MAE width 2 reaches its selected checkpoint at epochs 14/16/16, while the direct baselines peak much later. Its mean validation MAE moves from **4.852 at selection to 5.125 at epoch 50**; label NLL rises from **7.255 to 11.082** and entropy falls from **1.387 to 0.615**. CE similarly moves from validation MAE **4.926 to 5.314**, with NLL **3.226 to 6.600**. Direct MAE's validation MAE changes less, **4.860 to 4.921**. Thus a best-checkpoint ranking does not describe the final-epoch model. Curves and separate final-validation columns make this visible. Test evaluation remains at the selected checkpoint for every method.
 
+Population TailRL selects epochs **13/18/7**. Its mean validation MAE changes from **4.823 at selection to 5.031 at epoch 50**, and NLL from **3.218 to 4.386**. Its good selected-checkpoint performance therefore also depends on checkpoint selection.
+
 ## Smaller training sets and the extension
 
 Both original smaller subsets are fixed, nested and stratified by age decade. At batch 64, **4096×50 gives 3,200 updates**, while **1024×50 gives 800**. The new **1024×200** arm matches updates and presentations, helping distinguish training-set size from optimization exposure. It also evaluates validation 200 times instead of 50 and reuses the LR selected by the original 20-epoch subset sweep; those differences limit interpretation of best-checkpoint comparisons.
 
-Two extra optimization seeds on the clean 4096 subset test whether single-seed method rankings persist. They inherit the same validation-selected subset LR and noise-free split. The [56-run extension](EXTENSION.md) is a candidate queue, not a promise that all jobs finish: it has a **24 GPU-hour cap**, a **07:30 GMT+8 cutoff**, and shares a **six-GPU cap** with the original queue. At this snapshot it has launched no attempts because GPUs are occupied by other workloads. Required original work can continue within its existing 64 GPU-hour allocation.
+Two extra optimization seeds on the clean 4096 subset test whether single-seed method rankings persist. They inherit the same validation-selected subset LR and noise-free split. The [56-run extension](EXTENSION.md) is a candidate queue, not a promise that all jobs finish: it has a **24 GPU-hour cap**, a **07:30 GMT+8 cutoff**, and shares a **six-GPU cap** with the original queue. At this snapshot it has launched no attempts: GPU scarcity has delayed its original clean-subset tuning dependencies. One GPU is progressing through the remaining main runs. Required original work can continue within its existing 64 GPU-hour allocation.
 
 ## Learning-rate schedule
 
@@ -61,7 +63,7 @@ Prioritized pilots compare CE, direct MSE and population TailRL on 4096 images. 
 
 The real-image bf16 preflights passed for categorical statistical losses, scalar MAE and digit CE. Subsequent audits verify the frozen training-source hashes, original plan hash, complete epoch counts, common training fingerprint, validation-only LR selection and clean 2,308-image test labels. Exact RGB duplicates were removed before splitting; person-level and near-duplicate independence remain unverified.
 
-The coordination audit preserves all **224 attempts recorded before supervisor handoff**, with **225 original attempts / 39.534 GPU-hours** now charged. Observed historical concurrency is five GPUs; the enforced combined cap is six. External preemptions remain charged, and no permanently failed job remains after the adoption-classification repair. [Coordination audit](coordination_integrity.json), [main integrity](main_integrity.json), [pilot integrity](pilot_integrity.json).
+The coordination audit preserves all **224 attempts recorded before supervisor handoff**, with **227 original attempts** and approximately **40/64 GPU-hours** now charged. The 05:46 report records 39.942 hours; the later audit includes additional active training time. Observed historical concurrency is five GPUs; the enforced combined cap is six. External preemptions remain charged, and no permanently failed job remains after the adoption-classification repair. [Coordination audit](coordination_integrity.json), [main integrity](main_integrity.json), [pilot integrity](pilot_integrity.json).
 
 Report metric/selection tests pass, as do 18 scheduler checks. Interaction logic passed an isolated JavaScript DOM harness covering all six sections, sorting, hiding, filters, exports and finite chart geometry. The static scientific figure was visually inspected. Browser rendering of the HTML remains unverified because the in-app browser blocks file URLs. [Interaction validation](interaction_validation.json).
 

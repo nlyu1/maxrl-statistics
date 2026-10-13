@@ -2361,6 +2361,266 @@
   },
   {
     "study_job": {
+      "identifier": "main_tailrl_population_seed43",
+      "stage": "main",
+      "variant": "tailrl_population",
+      "priority": 30,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/main_tailrl_population_seed43",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "refine_tailrl_population_rank0",
+        "refine_tailrl_population_rank1"
+      ],
+      "tune_from": [
+        "refine_tailrl_population_rank0",
+        "refine_tailrl_population_rank1"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/main_tailrl_population_seed43/attempt_4",
+        "loss": {
+          "method": "tailrl_population",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 43,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 18,
+      "validation": {
+        "mae_mean": 4.865083319712849,
+        "mse_mean": 49.01291676787923,
+        "mae_median": 4.886915077989601,
+        "mae_mode": 5.087088388214904,
+        "expected_mae": 5.549316951963062,
+        "expected_mse": 64.94305626777174,
+        "label_nll": 3.4389435054364723,
+        "tailrl": 0.16060198245934515,
+        "entropy": 2.242211610821287,
+        "mode_accuracy": 0.17980935875216636,
+        "mass_within_5": 0.6252420266694713,
+        "oracle_best_of_8_mae": 2.2081873751374848,
+        "oracle_best_of_64_mae": 0.8611105860022548,
+        "rmse_mean": 7.0009225654822975,
+        "count": 2308,
+        "median_spearman": 0.8938443971187112,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.7299479674362879,
+            "mae_median": 1.6026490066225165
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 4.287475352376901,
+            "mae_median": 4.283783783783784
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.40961728746863,
+            "mae_median": 3.3071528751753156
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.084864376435119,
+            "mae_median": 5.244943820224719
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.287979911451471,
+            "mae_median": 7.579908675799087
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.435463975383235,
+            "mae_median": 7.522321428571429
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.963876197422583,
+            "mae_median": 8.086614173228346
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 8.368286655687575,
+            "mae_median": 8.507462686567164
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.272753234505654,
+            "mae_median": 7.96
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 10.035631867555471,
+            "mae_median": 9.923076923076923
+          }
+        }
+      },
+      "seconds": 1291.9604380150558,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "b7c28849018cf7017c7c07e3ef6d8f7e0cef6dea",
+        "gpu": "NVIDIA L40"
+      },
+      "test": {
+        "mae_mean": 4.791881003230649,
+        "mse_mean": 48.55338580186429,
+        "mae_median": 4.818890814558059,
+        "mae_mode": 5.0333622183708835,
+        "expected_mae": 5.473000340963483,
+        "expected_mse": 64.27213049736972,
+        "label_nll": 3.4345554716028013,
+        "tailrl": 0.16062651628502927,
+        "entropy": 2.246497105600464,
+        "mode_accuracy": 0.1802426343154246,
+        "mass_within_5": 0.6336171657783126,
+        "oracle_best_of_8_mae": 2.150422966659247,
+        "oracle_best_of_64_mae": 0.843060531088591,
+        "rmse_mean": 6.968025961623872,
+        "count": 2308,
+        "median_spearman": 0.8977719158269819,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.592113610153512,
+            "mae_median": 1.4735099337748345
+          },
+          "10": {
+            "count": 149,
+            "mae_mean": 4.411238535738631,
+            "mae_median": 4.429530201342282
+          },
+          "20": {
+            "count": 712,
+            "mae_mean": 3.3009776294838344,
+            "mae_median": 3.2008426966292136
+          },
+          "30": {
+            "count": 444,
+            "mae_mean": 4.918855571817304,
+            "mae_median": 5.074324324324325
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.072161646092047,
+            "mae_median": 7.287671232876712
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.899373758151861,
+            "mae_median": 8.040178571428571
+          },
+          "60": {
+            "count": 128,
+            "mae_mean": 7.277727554552257,
+            "mae_median": 7.3828125
+          },
+          "70": {
+            "count": 68,
+            "mae_mean": 8.681100220364684,
+            "mae_median": 8.779411764705882
+          },
+          "80": {
+            "count": 49,
+            "mae_mean": 8.637084904373909,
+            "mae_median": 8.571428571428571
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 9.535102514120249,
+            "mae_median": 9.692307692307692
+          }
+        }
+      }
+    }
+  },
+  {
+    "study_job": {
       "identifier": "main_tailrl_population_seed44",
       "stage": "main",
       "variant": "tailrl_population",

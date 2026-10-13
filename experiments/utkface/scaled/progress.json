@@ -1,10 +1,11 @@
 {
   "status": "running",
-  "gpu_hours": 39.53358334687021,
+  "gpu_hours": 39.94229292968909,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 211,
-    "pending": 319
+    "completed": 212,
+    "running": 1,
+    "pending": 317
   },
   "stages": {
     "digits": {
@@ -20,8 +21,9 @@
       "pending": 40
     },
     "main": {
-      "completed": 63,
-      "pending": 3
+      "completed": 64,
+      "running": 1,
+      "pending": 1
     },
     "noise": {
       "pending": 80
@@ -48,6 +50,12 @@
       "completed": 96
     }
   },
-  "active": [],
-  "updated_at": 1791921856.4621487
+  "active": [
+    {
+      "job": "main_tailrl_seed43",
+      "gpu": 3,
+      "minutes": 2.5457346359888713
+    }
+  ],
+  "updated_at": 1791927953.7782545
 }
