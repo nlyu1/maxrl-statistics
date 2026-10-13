@@ -113,7 +113,7 @@
     "main_runs_completed": 66,
     "record": "pilot_integrity.json"
   },
-  "new_training_results_available": true,
+  "new_training_results_available": false,
   "full_data_confirmation_integrity": {
     "snapshot_time": "2026-10-14T07:07:53.834476+08:00",
     "completed": 48,
@@ -137,7 +137,7 @@
     "main_runs_completed": 66,
     "record": "pilot_integrity.json"
   },
-  "last_updated": "2026-10-14T07:07:21.781072+08:00",
+  "last_updated": "2026-10-14T07:31:59.881152+08:00",
   "main_run_integrity": {
     "snapshot_time": "2026-10-14T07:10:33.327962+08:00",
     "completed": 66,
@@ -175,7 +175,7 @@
     "scientific_figure_visually_inspected": true,
     "first_available_gmt8": "2026-10-14T04:01:53+08:00",
     "metric_test_revision": "fbbdf1e",
-    "snapshot": "2026-10-14T07:07:21.781072+08:00",
+    "snapshot": "2026-10-14T07:31:59.881152+08:00",
     "common_seed_comparisons_preserve_coverage": true
   },
   "scalar_head_confirmation_integrity": {
@@ -206,5 +206,30 @@
     "frozen_training_sources_unchanged": true,
     "figure_visually_inspected": true,
     "ruff_changed_scope": "passed"
+  },
+  "extension_cutoff_audit": {
+    "audit_snapshot": "2026-10-14T07:30:58.498619+08:00",
+    "report_snapshot": "2026-10-14T07:31:59.881152+08:00",
+    "post_cutoff_local_available_gmt8": "2026-10-14T07:35:13.5754073+08:00",
+    "report_deadline_gmt8": "2026-10-14T08:30:00+08:00",
+    "record": "cutoff-audit.json",
+    "status": "deadline_reached",
+    "completed_extension_runs": 0,
+    "deadline_skipped_extension_runs": 56,
+    "extension_attempts": 0,
+    "extension_gpu_hours": 0.0,
+    "admission_stopped": true,
+    "normal_supervisor_exit": true,
+    "active_extension_attempts": 0,
+    "immutable_plan_hashes_verified": [
+      "1ecd0d0a6a1cae81ad1c8e2567ce226dbc47d5d7577ab027f97cb4ba08345fb6",
+      "9b28c9dee4fff9c6158952f10813e8bd3c7abf06445e5c0a8015d4d74c273619"
+    ],
+    "frozen_training_sources_verified": true,
+    "before_handoff_attempts_preserved": 224,
+    "original_required_jobs": 430,
+    "original_required_completed": 216,
+    "original_required_pending": 214,
+    "scientific_endpoints_unchanged_from_previous_publication": true
   }
 }

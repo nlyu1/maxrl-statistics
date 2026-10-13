@@ -1,21 +1,21 @@
 {
-  "status": "running",
+  "status": "deadline_reached",
   "gpu_hours": 0.0,
   "budget_gpu_hours": 24.0,
   "counts": {
-    "pending": 56
+    "skipped": 56
   },
   "stages": {
     "matched_steps": {
-      "pending": 8
+      "skipped": 8
     },
     "noise_realization": {
-      "pending": 32
+      "skipped": 32
     },
     "subset_replication": {
-      "pending": 16
+      "skipped": 16
     }
   },
   "active": [],
-  "updated_at": 1791932869.2093158
+  "updated_at": 1791934201.1199172
 }

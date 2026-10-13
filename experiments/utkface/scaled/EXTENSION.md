@@ -1,5 +1,7 @@
 # Deadline extension, 2026-10-14
 
+Outcome: the extension closed at 07:30 GMT+8 with **0/56 runs launched, 56 deadline-skipped and 0/24 GPU-hours used**. GPU scarcity delayed its original subset-tuning dependencies. [Coverage and retained accounting](COVERAGE.md), [post-cutoff audit](cutoff-audit.json). The protocol below records the planned work; its unrun arms provide no empirical results.
+
 The extension ends at **07:30 Asia/Shanghai on October 14** and has a separate **24 GPU-hour cap**. Both queues share one dispatch lock and a combined six-GPU cap. The original 64 GPU-hour budget, immutable plan, saved attempts and results remain intact. The original queue may continue if required work remains after the extension deadline. A first interactive report will be available before 08:30, with incomplete cells and actual seed counts shown explicitly.
 
 The extension adds 56 candidate runs using the same frozen training implementation and cleaned split:
