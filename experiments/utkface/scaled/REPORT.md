@@ -1,6 +1,6 @@
 # Scaled UTKFace study
 
-State: **running**. GPU time: **40.61 / 64 hours**. Completed primary runs: **66 / 66**.
+State: **running**. GPU time: **40.99 / 64 hours**. Completed primary runs: **66 / 66**.
 
 Metrics use clean held-out labels. All tuning and scalar-head gates use validation data. Values are means ± sample SD across distinct training seeds; single-seed values have no SD. Label NLL is unavailable for scalar heads. Population zero-one MaxRL equals CE. Training subsets are fixed and nested.
 
@@ -41,6 +41,7 @@ These are precomputed perturbation statistics for the fixed 4,096-image subset; 
 | main | rloo_mse_population | full | none 0 | 3 | 6.640 ± 0.450 | 6.702 ± 0.465 | 0.888 ± 0.006 | 39.942 ± 0.837 |
 | main | rloo_mse | full | none 0 | 3 | 6.657 ± 0.465 | 6.734 ± 0.476 | 0.885 ± 0.006 | 41.929 ± 1.607 |
 | main | grpo_mse_population | full | none 0 | 3 | 6.808 ± 0.281 | 6.881 ± 0.279 | 0.887 ± 0.007 | 35.231 ± 2.314 |
+| scalar | mae_scalar | full | none 0 | 1 | 4.611 | 4.611 | 0.911 | n/a |
 
 ![Main comparison](main.png)
 

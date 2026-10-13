@@ -45348,5 +45348,259 @@
         "gpu": "NVIDIA L40"
       }
     }
+  },
+  {
+    "study_job": {
+      "identifier": "main_mae_scalar_seed42",
+      "stage": "scalar",
+      "variant": "mae_scalar",
+      "priority": 35,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/main_mae_scalar_seed42",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "refine_mae_scalar_rank0",
+        "refine_mae_scalar_rank1",
+        "refine_mae_rank0",
+        "refine_mae_rank1"
+      ],
+      "tune_from": [
+        "refine_mae_scalar_rank0",
+        "refine_mae_scalar_rank1"
+      ],
+      "tuning_rank": 0,
+      "gate_candidate": [
+        "refine_mae_scalar_rank0",
+        "refine_mae_scalar_rank1"
+      ],
+      "gate_reference": [
+        "refine_mae_rank0",
+        "refine_mae_rank1"
+      ],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/main_mae_scalar_seed42/attempt_0",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 50,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": true,
+        "save_checkpoint": true,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 41,
+      "validation": {
+        "mae_mean": 4.731796477939062,
+        "mse_mean": 46.19250103677651,
+        "mae_median": 4.731796477939062,
+        "mae_mode": 4.731796477939062,
+        "rmse_mean": 6.796506531798268,
+        "count": 2308,
+        "median_spearman": 0.9078333939578895,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.5255147753567095,
+            "mae_median": 1.5255147753567095
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 3.965989509144345,
+            "mae_median": 3.965989509144345
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 2.9078048957514393,
+            "mae_median": 2.9078048957514393
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.413367415010259,
+            "mae_median": 5.413367415010259
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.386426525028873,
+            "mae_median": 7.386426525028873
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.02115889106478,
+            "mae_median": 7.02115889106478
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 8.097890838863343,
+            "mae_median": 8.097890838863343
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 9.073873491429572,
+            "mae_median": 9.073873491429572
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 9.438923950195312,
+            "mae_median": 9.438923950195312
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 7.108162513146033,
+            "mae_median": 7.108162513146033
+          }
+        }
+      },
+      "seconds": 1185.0597720480291,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "ad22c25dcecfe7e0a2cea84811e177cb62b92d25",
+        "gpu": "NVIDIA L40"
+      },
+      "test": {
+        "mae_mean": 4.611232109509886,
+        "mse_mean": 46.26249619954128,
+        "mae_median": 4.611232109509886,
+        "mae_mode": 4.611232109509886,
+        "rmse_mean": 6.801653931180363,
+        "count": 2308,
+        "median_spearman": 0.9111280649679766,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.4045421512711127,
+            "mae_median": 1.4045421512711127
+          },
+          "10": {
+            "count": 149,
+            "mae_mean": 3.9511969521541723,
+            "mae_median": 3.9511969521541723
+          },
+          "20": {
+            "count": 712,
+            "mae_mean": 3.022623879186223,
+            "mae_median": 3.022623879186223
+          },
+          "30": {
+            "count": 444,
+            "mae_mean": 5.289273777523556,
+            "mae_median": 5.289273777523556
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 6.910540872512887,
+            "mae_median": 6.910540872512887
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 6.6508031232016425,
+            "mae_median": 6.6508031232016425
+          },
+          "60": {
+            "count": 128,
+            "mae_mean": 7.573202043771744,
+            "mae_median": 7.573202043771744
+          },
+          "70": {
+            "count": 68,
+            "mae_mean": 9.826241661520566,
+            "mae_median": 9.826241661520566
+          },
+          "80": {
+            "count": 49,
+            "mae_mean": 8.615465358811981,
+            "mae_median": 8.615465358811981
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 5.105955857496995,
+            "mae_median": 5.105955857496995
+          }
+        }
+      }
+    }
   }
 ]

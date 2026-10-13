@@ -504,5 +504,28 @@
     "expected_mae_sd": 0.27690373513026334,
     "entropy_mean": 0.04148758967181011,
     "entropy_sd": 0.012674193974521452
+  },
+  {
+    "stage": "scalar",
+    "variant": "mae_scalar",
+    "train_limit": 0,
+    "lr_schedule": "cosine",
+    "noise_mode": "none",
+    "noise_std": 0.0,
+    "seeds": 1,
+    "mae_mean_mean": 4.611232109509886,
+    "mae_mean_sd": null,
+    "mae_median_mean": 4.611232109509886,
+    "mae_median_sd": null,
+    "rmse_mean_mean": 6.801653931180363,
+    "rmse_mean_sd": null,
+    "median_spearman_mean": 0.9111280649679766,
+    "median_spearman_sd": null,
+    "label_nll_mean": null,
+    "label_nll_sd": null,
+    "expected_mae_mean": null,
+    "expected_mae_sd": null,
+    "entropy_mean": null,
+    "entropy_sd": null
   }
 ]

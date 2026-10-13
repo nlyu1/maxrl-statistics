@@ -1,0 +1,176 @@
+{
+  "snapshot": "2026-10-14T06:51:54.723907+08:00",
+  "analysis_time": "2026-10-14T06:52:15.790054+08:00",
+  "comparison_seeds": [
+    42
+  ],
+  "matched_pairs": [
+    {
+      "objective": "mae",
+      "seed": 42,
+      "scalar_id": "main_mae_scalar_seed42",
+      "categorical_id": "main_mae_seed42",
+      "scalar_best_epoch": 41,
+      "categorical_best_epoch": 40,
+      "scalar_lr": 0.001,
+      "categorical_lr": 0.001,
+      "scalar_best_validation": {
+        "mae_mean": 4.731796477939062,
+        "mse_mean": 46.19250103677651,
+        "mae_median": 4.731796477939062,
+        "mae_mode": 4.731796477939062,
+        "expected_mae": null,
+        "expected_mse": null,
+        "label_nll": null,
+        "tailrl": null,
+        "entropy": null,
+        "mode_accuracy": null,
+        "mass_within_5": null,
+        "oracle_best_of_8_mae": null,
+        "oracle_best_of_64_mae": null,
+        "rmse_mean": 6.796506531798268,
+        "median_spearman": 0.9078333939578895
+      },
+      "scalar_final_validation": {
+        "mae_mean": 4.748466240962002,
+        "mse_mean": 44.92884897806978,
+        "mae_median": 4.748466240962002,
+        "mae_mode": 4.748466240962002,
+        "expected_mae": null,
+        "expected_mse": null,
+        "label_nll": null,
+        "tailrl": null,
+        "entropy": null,
+        "mode_accuracy": null,
+        "mass_within_5": null,
+        "oracle_best_of_8_mae": null,
+        "oracle_best_of_64_mae": null,
+        "rmse_mean": 6.7028985504832,
+        "median_spearman": 0.9061674379257103
+      },
+      "scalar_test": {
+        "mae_mean": 4.611232109509886,
+        "mse_mean": 46.26249619954128,
+        "mae_median": 4.611232109509886,
+        "mae_mode": 4.611232109509886,
+        "expected_mae": null,
+        "expected_mse": null,
+        "label_nll": null,
+        "tailrl": null,
+        "entropy": null,
+        "mode_accuracy": null,
+        "mass_within_5": null,
+        "oracle_best_of_8_mae": null,
+        "oracle_best_of_64_mae": null,
+        "rmse_mean": 6.801653931180363,
+        "median_spearman": 0.9111280649679766
+      },
+      "categorical_best_validation": {
+        "mae_mean": 4.810615485835209,
+        "mse_mean": 46.86252894645828,
+        "mae_median": 4.957105719237434,
+        "mae_mode": 5.259532062391681,
+        "expected_mae": 6.338724227153495,
+        "expected_mse": 89.83325983365587,
+        "label_nll": 9.293046956084895,
+        "tailrl": 0.29593270355563306,
+        "entropy": 1.7626396212262072,
+        "mode_accuracy": 0.12088388214904679,
+        "mass_within_5": 0.5901208992803689,
+        "oracle_best_of_8_mae": 2.6243787697944083,
+        "oracle_best_of_64_mae": 1.5277855934994338,
+        "rmse_mean": 6.845621151251235,
+        "median_spearman": 0.897684027560514
+      },
+      "categorical_final_validation": {
+        "mae_mean": 4.864861926053441,
+        "mse_mean": 46.945482511334234,
+        "mae_median": 4.964471403812825,
+        "mae_mode": 5.324090121317157,
+        "expected_mae": 6.58704703516707,
+        "expected_mse": 98.253045102881,
+        "label_nll": 9.532323532160973,
+        "tailrl": 0.2977307750448536,
+        "entropy": 1.85418178300306,
+        "mode_accuracy": 0.1169844020797227,
+        "mass_within_5": 0.5782818414601567,
+        "oracle_best_of_8_mae": 2.5561222068962146,
+        "oracle_best_of_64_mae": 1.4565768987345469,
+        "rmse_mean": 6.851677350206607,
+        "median_spearman": 0.8975307647317298
+      },
+      "categorical_test": {
+        "mae_mean": 4.674867284645815,
+        "mse_mean": 47.631126456117585,
+        "mae_median": 4.827123050259965,
+        "mae_mode": 5.21317157712305,
+        "expected_mae": 6.302916156644961,
+        "expected_mse": 92.64859472555626,
+        "label_nll": 9.4369022202132,
+        "tailrl": 0.29080539744298567,
+        "entropy": 1.7622865358794095,
+        "mode_accuracy": 0.1130849220103986,
+        "mass_within_5": 0.6031664868837909,
+        "oracle_best_of_8_mae": 2.598311194146425,
+        "oracle_best_of_64_mae": 1.4981750908420506,
+        "rmse_mean": 6.901530732824247,
+        "median_spearman": 0.9007450944561706
+      },
+      "test_mae_difference_scalar_minus_categorical": -0.06363517513592942,
+      "relative_test_mae_change_percent": -1.3612188595157226
+    }
+  ],
+  "same_seed_reference_methods": [
+    {
+      "id": "main_mae_seed42",
+      "best_epoch": 40,
+      "test_mae": 4.674867284645815,
+      "test_spearman": 0.9007450944561706,
+      "test_label_nll": 9.4369022202132,
+      "learning_rate": 0.001
+    },
+    {
+      "id": "main_mse_seed42",
+      "best_epoch": 47,
+      "test_mae": 4.708706518379884,
+      "test_spearman": 0.9085509760400269,
+      "test_label_nll": 7.75407140222405,
+      "learning_rate": 0.001
+    },
+    {
+      "id": "main_stat_maxrl_mae_population_s2_seed42",
+      "best_epoch": 14,
+      "test_mae": 4.619108712047688,
+      "test_spearman": 0.9058183080031781,
+      "test_label_nll": 7.342825378329473,
+      "learning_rate": 0.001
+    },
+    {
+      "id": "main_tailrl_population_seed42",
+      "best_epoch": 13,
+      "test_mae": 4.718717327018622,
+      "test_spearman": 0.9052510491651959,
+      "test_label_nll": 3.2148649677815015,
+      "learning_rate": 0.0001
+    },
+    {
+      "id": "main_tailrl_seed42",
+      "best_epoch": 41,
+      "test_mae": 4.745849216963945,
+      "test_spearman": 0.9022296266410853,
+      "test_label_nll": 7.369001359764143,
+      "learning_rate": 0.001
+    }
+  ],
+  "scalar_completed": 1,
+  "scalar_planned": 6,
+  "all_scalar_test_counts": 2308,
+  "limitations": [
+    "One matched optimization seed is insufficient to establish a replicated head advantage.",
+    "Best checkpoint is selected by validation mean MAE; test is evaluated only at that checkpoint.",
+    "Final-epoch test models are unavailable.",
+    "Scalar Spearman uses continuous predictions; categorical Spearman uses the policy median.",
+    "Learning rates are selected independently using validation; this is a tuned-system comparison.",
+    "Scalar heads define no label probability or categorical NLL."
+  ]
+}
