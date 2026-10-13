@@ -1,21 +1,21 @@
-# First learning-rate pilot results, 2026-10-13
+# Learning-rate pilot results, 2026-10-13
 
-The four initial learning-rate pilots for 64-sample binary MaxRL completed ten full-data epochs each, with training seed 42. They use the same 18,462-image training pool and 2,308 clean validation images; each epoch presents 18,432 training images. No pilot evaluated test data. Metrics below come from the checkpoint selected by validation mean-prediction MAE.
+At 13:47 Asia/Shanghai, 16 of 96 initial full-data learning-rate pilots were complete. Four methods have finished the four-rate grid. Each run uses ten epochs, training seed 42, the same 18,462-image training pool and 2,308 clean validation images; each epoch presents 18,432 training images. No pilot evaluated test data. The table shows each completed grid's lowest validation mean-prediction MAE, with metrics from that checkpoint.
 
-| LR | Best epoch | Validation mean MAE, years | Median Spearman | Label NLL, nats |
-|---:|---:|---:|---:|---:|
-| 1e-4 | 8 | 5.170 | 0.8878 | 3.434 |
-| 3e-4 | 10 | 4.909 | 0.8961 | 3.674 |
-| 1e-3 | 10 | 4.956 | 0.8953 | 3.895 |
-| 3e-3 | 10 | 5.426 | 0.8876 | 4.089 |
+| Method | LR | Best epoch | Mean MAE, years | Median Spearman | Label NLL, nats | Entropy, nats |
+|---|---:|---:|---:|---:|---:|---:|
+| Population binary MaxRL (CE) | 1e-3 | 9 | 4.718 | 0.9017 | 2.998 | 2.471 |
+| 64-sample binary MaxRL | 3e-4 | 10 | 4.909 | 0.8961 | 3.674 | 2.148 |
+| 64-sample GRPO, MAE reward | 3e-4 | 9 | 6.501 | 0.8850 | 18.081 | 0.094 |
+| Population GRPO, MAE reward | 1e-3 | 10 | 6.638 | 0.8855 | 30.485 | 0.090 |
 
-Rates 3e-4 and 1e-3 qualify for the planned 30-epoch confirmations. This is an initial single-seed tuning result; the final LR remains unset until confirmation. The lowest-MAE checkpoint differs from the lowest-NLL checkpoint. [Per-run records](runs.csv), [full validation metrics and configs](results.json), and [epoch curves](curves.csv).
+Population binary MaxRL qualifies rates 1e-3 and 3e-3 for 30-epoch confirmation. The other three completed grids qualify 3e-4 and 1e-3. Final learning rates remain unset until confirmation. GRPO's low entropy and high NLL show very concentrated predictions at these early checkpoints; the longer runs will test whether its point error improves. These are single-seed tuning results. [Per-run records](runs.csv), [full validation metrics and configs](results.json), [epoch curves](curves.csv), and [integrity checks and all pilot metrics](pilot_integrity.json).
 
 All four real-image bf16 preflights passed: sampled Statistical MaxRL with MAE/MSE kernels, scalar MAE, and the conditional digit policy with CE. Each trained on 256 images and evaluated 65 validation and 65 test images. Losses, gradients and distribution metrics were finite; scalar NLL was unavailable as intended. These are pipeline checks, not method-comparison results. [Preflight validation](preflight_validation.json).
 
 The first full-data LR pilot was preempted three times by another workload appearing on its GPU. The original three-attempt limit stopped the queue. Scheduler revision `50ac82d` replaces that limit with per-GPU cooldowns and retries external interruptions within the same budget. Genuine training errors still halt dispatch. The original state is backed up, every attempt and its charge is preserved, and training source hashes and the plan are unchanged. [Recovery record](queue_recovery.json).
 
-The recovered supervisor is running on `cmu-L40-live` with PID `1425732`. The snapshot has eight completed nodes (four preflights and four LR pilots) and 522 pending nodes, including **0/66 completed main runs**. Charged time is **0.477/64 GPU-hours**. A further external interruption of the population binary pilot was queued for retry without stopping the queue. GPU 0 is temporarily cooling down; the other nine GPUs currently have compute processes. The queue uses at most six GPUs concurrently and charges no waiting time. Observed peak study concurrency so far is one GPU.
+The recovered supervisor is running on `cmu-L40-live` with PID `1425732`. The snapshot has 20 completed nodes (four preflights and 16 LR pilots), 509 pending nodes and one active pilot on GPU 1, including **0/66 completed main runs**. Charged time at the report snapshot is **1.410/64 GPU-hours**. The sampled MSE-GRPO grid is in progress. There are no permanently failed jobs. The queue uses at most six GPUs concurrently and charges no waiting time. Observed peak study concurrency so far is one GPU.
 
 State, process ownership, attempts, logs and budget accounting are under `/tmp/utkface-study-20261013/`. The [protocol](PLAN.md) includes inspection and report commands. Training sources are frozen in the [execution metadata](execution.json).
 
