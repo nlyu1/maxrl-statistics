@@ -5475,6 +5475,1134 @@
   },
   {
     "study_job": {
+      "identifier": "wide_rloo_mae_lr0.0001",
+      "stage": "wide",
+      "variant": "rloo_mae",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_rloo_mae_lr0.0001",
+        "loss": {
+          "method": "rloo_mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_rloo_mae_lr0.0001/attempt_0",
+        "loss": {
+          "method": "rloo_mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 6.626980355861082,
+        "mse_mean": 83.846222182058,
+        "mae_median": 6.84055459272097,
+        "mae_mode": 6.857019064124783,
+        "expected_mae": 6.890528176923971,
+        "expected_mse": 89.07764099414769,
+        "label_nll": 13.411427759805362,
+        "tailrl": 0.7368210761221982,
+        "entropy": 0.12690565507139573,
+        "mode_accuracy": 0.0498266897746967,
+        "mass_within_5": 0.5057815083942973,
+        "oracle_best_of_8_mae": 6.229331811201531,
+        "oracle_best_of_64_mae": 5.7944981691130995,
+        "rmse_mean": 9.156758279110463,
+        "count": 2308,
+        "median_spearman": 0.8801026960969965,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 6.0971866012468485,
+            "mae_median": 6.059602649006623
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 5.828122635145445,
+            "mae_median": 6.554054054054054
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.484060046835356,
+            "mae_median": 3.685834502103787
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 6.049510314748387,
+            "mae_median": 6.280898876404494
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.968995642990509,
+            "mae_median": 8.255707762557078
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.062059627944889,
+            "mae_median": 7.433035714285714
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 8.657634536112388,
+            "mae_median": 8.708661417322835
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 17.87717708189096,
+            "mae_median": 17.850746268656717
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 26.810331115722658,
+            "mae_median": 26.8
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 34.62098811222957,
+            "mae_median": 34.61538461538461
+          }
+        }
+      },
+      "seconds": 230.6799620660022,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_rloo_mae_lr0.0003",
+      "stage": "wide",
+      "variant": "rloo_mae",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_rloo_mae_lr0.0003",
+        "loss": {
+          "method": "rloo_mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_rloo_mae_lr0.0003/attempt_0",
+        "loss": {
+          "method": "rloo_mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 6.6350467728197415,
+        "mse_mean": 81.81531819036681,
+        "mae_median": 6.748266897746967,
+        "mae_mode": 6.74263431542461,
+        "expected_mae": 6.77855113851976,
+        "expected_mse": 84.72816702483374,
+        "label_nll": 16.13926059222962,
+        "tailrl": 0.9027846792223622,
+        "entropy": 0.14148073039215828,
+        "mode_accuracy": 0.05329289428076256,
+        "mass_within_5": 0.5057615757363354,
+        "oracle_best_of_8_mae": 6.291096811196042,
+        "oracle_best_of_64_mae": 5.9374703153377,
+        "rmse_mean": 9.045182042964464,
+        "count": 2308,
+        "median_spearman": 0.8846764494445416,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 6.033356480400068,
+            "mae_median": 6.013245033112582
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 6.17954356887856,
+            "mae_median": 6.47972972972973
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.6696683755416153,
+            "mae_median": 3.7896213183730714
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.720119592028911,
+            "mae_median": 5.853932584269663
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 8.435622897252417,
+            "mae_median": 8.58904109589041
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 6.741418218019196,
+            "mae_median": 6.982142857142857
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 8.52026946338143,
+            "mae_median": 8.551181102362206
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 17.693800072171793,
+            "mae_median": 17.492537313432837
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 26.801446952819823,
+            "mae_median": 26.8
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 34.61575434758113,
+            "mae_median": 34.61538461538461
+          }
+        }
+      },
+      "seconds": 234.08364576508757,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_lr0.0001",
+      "stage": "wide",
+      "variant": "mse",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.0001",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.0001/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 9,
+      "validation": {
+        "mae_mean": 5.280371953267604,
+        "mse_mean": 49.21609595382736,
+        "mae_median": 6.91421143847487,
+        "mae_mode": 13.831455805892547,
+        "expected_mae": 17.658844089869124,
+        "expected_mse": 582.4974635047531,
+        "label_nll": 5.596363073637348,
+        "tailrl": 0.4085972488963786,
+        "entropy": 3.14316300297707,
+        "mode_accuracy": 0.037694974003466206,
+        "mass_within_5": 0.2741189189970681,
+        "oracle_best_of_8_mae": 4.651136164863864,
+        "oracle_best_of_64_mae": 1.350363654475326,
+        "rmse_mean": 7.015418444670807,
+        "count": 2308,
+        "median_spearman": 0.8766212228062328,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 4.647019626147157,
+            "mae_median": 4.3907284768211925
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 5.197769700675397,
+            "mae_median": 6.047297297297297
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.4836857053875754,
+            "mae_median": 2.4333800841514726
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.114194080668889,
+            "mae_median": 6.9707865168539325
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.080446573152934,
+            "mae_median": 11.867579908675799
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.305141576166664,
+            "mae_median": 14.227678571428571
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.264537704741861,
+            "mae_median": 14.94488188976378
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 9.159137101315741,
+            "mae_median": 12.91044776119403
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.734961376190185,
+            "mae_median": 6.46
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 7.289868909579057,
+            "mae_median": 2.1538461538461537
+          }
+        }
+      },
+      "seconds": 236.1995954309823,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_lr0.0003",
+      "stage": "wide",
+      "variant": "mse",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.0003",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.0003/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 4.768911617450828,
+        "mse_mean": 43.27795319004044,
+        "mae_median": 5.374783362218371,
+        "mae_mode": 7.412478336221836,
+        "expected_mae": 12.19850187427575,
+        "expected_mse": 336.3626815964253,
+        "label_nll": 5.237399500236027,
+        "tailrl": 0.26789571764837394,
+        "entropy": 2.815353721621716,
+        "mode_accuracy": 0.058058925476603115,
+        "mass_within_5": 0.434063964065658,
+        "oracle_best_of_8_mae": 2.947713014050396,
+        "oracle_best_of_64_mae": 0.8676069325703547,
+        "rmse_mean": 6.578598117383402,
+        "count": 2308,
+        "median_spearman": 0.897073453053461,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 2.097528946810303,
+            "mae_median": 1.9834437086092715
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 4.092126716633101,
+            "mae_median": 6.385135135135135
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.600792103163574,
+            "mae_median": 2.868162692847125
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.3024108179834455,
+            "mae_median": 5.060674157303371
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 6.908388137681299,
+            "mae_median": 9.02283105022831
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 6.602747741288373,
+            "mae_median": 10.620535714285714
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.159680408051633,
+            "mae_median": 10.590551181102363
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 8.044844194134669,
+            "mae_median": 8.611940298507463
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 6.438516237735748,
+            "mae_median": 5.06
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 6.035357892513275,
+            "mae_median": 2.6153846153846154
+          }
+        }
+      },
+      "seconds": 239.02677013794892,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_lr0.001",
+      "stage": "wide",
+      "variant": "mse",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.001",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.001/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 4.78606130034712,
+        "mse_mean": 44.38466684355727,
+        "mae_median": 4.884315424610052,
+        "mae_mode": 5.816724436741768,
+        "expected_mae": 8.132477741552908,
+        "expected_mse": 160.28916417602676,
+        "label_nll": 4.653410060749271,
+        "tailrl": 0.1911708036423709,
+        "entropy": 2.567089687858545,
+        "mode_accuracy": 0.09748700173310225,
+        "mass_within_5": 0.5337661323234772,
+        "oracle_best_of_8_mae": 2.113207919685759,
+        "oracle_best_of_64_mae": 0.7045147019381012,
+        "rmse_mean": 6.662181838073566,
+        "count": 2308,
+        "median_spearman": 0.9081376281991461,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.7750051574417642,
+            "mae_median": 1.5298013245033113
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 4.358647846922001,
+            "mae_median": 5.777027027027027
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.2658956976082347,
+            "mae_median": 2.9368863955119213
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.1357084038217415,
+            "mae_median": 4.844943820224719
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.327358466985563,
+            "mae_median": 7.844748858447488
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 6.940735153188663,
+            "mae_median": 8.424107142857142
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.4890759143773025,
+            "mae_median": 8.220472440944881
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 9.159082789029648,
+            "mae_median": 9.17910447761194
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.607168591022491,
+            "mae_median": 7.58
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 7.429105699062347,
+            "mae_median": 4.846153846153846
+          }
+        }
+      },
+      "seconds": 235.86446585098747,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_lr0.003",
+      "stage": "wide",
+      "variant": "mse",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.003",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_lr0.003/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 5.135757602731583,
+        "mse_mean": 52.83726350178346,
+        "mae_median": 5.344887348353552,
+        "mae_mode": 6.461005199306759,
+        "expected_mae": 8.136381151776561,
+        "expected_mse": 160.84713202230898,
+        "label_nll": 7.173475370734726,
+        "tailrl": 0.2417760922278301,
+        "entropy": 2.075380921467737,
+        "mode_accuracy": 0.12824956672443674,
+        "mass_within_5": 0.5240978780268949,
+        "oracle_best_of_8_mae": 2.53229440316273,
+        "oracle_best_of_64_mae": 1.0713116717230382,
+        "rmse_mean": 7.26892450791611,
+        "count": 2308,
+        "median_spearman": 0.892232579130369,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.9665236239921338,
+            "mae_median": 2.0496688741721854
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 5.065320352444777,
+            "mae_median": 5.175675675675675
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.321468040462045,
+            "mae_median": 3.3338008415147264
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.6261413989442115,
+            "mae_median": 5.453932584269663
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.673561590039022,
+            "mae_median": 7.949771689497717
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.593291843110429,
+            "mae_median": 9.111607142857142
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 8.053133917605782,
+            "mae_median": 9.582677165354331
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 10.144838385617556,
+            "mae_median": 10.194029850746269
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.69767989397049,
+            "mae_median": 7.28
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 9.16829461317796,
+            "mae_median": 7.769230769230769
+          }
+        }
+      },
+      "seconds": 237.60567017202266,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
       "identifier": "wide_mae_lr0.0001",
       "stage": "wide",
       "variant": "mae",
@@ -6033,6 +7161,1642 @@
         "torchvision": "0.26.0+cu130",
         "hostname": "ada.ece.local.cmu.edu",
         "git_commit": "eec3274ddbd17964b26d1cb1de681c553bd914aa",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mae_lr0.003",
+      "stage": "wide",
+      "variant": "mae",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_lr0.003",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_lr0.003/attempt_0",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "categorical",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 6.038840446960707,
+        "mse_mean": 66.00525430053236,
+        "mae_median": 6.159878682842288,
+        "mae_mode": 6.49740034662045,
+        "expected_mae": 7.653092299900837,
+        "expected_mse": 125.82302236216145,
+        "label_nll": 14.821233335281077,
+        "tailrl": 0.6474518652288148,
+        "entropy": 1.3370179891996539,
+        "mode_accuracy": 0.05502599653379549,
+        "mass_within_5": 0.498489455327663,
+        "oracle_best_of_8_mae": 3.9301827661260673,
+        "oracle_best_of_64_mae": 2.7545847684411617,
+        "rmse_mean": 8.12436177804339,
+        "count": 2308,
+        "median_spearman": 0.8796416725689693,
+        "median_spearman_defined": true,
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 6.522824548493763,
+            "mae_median": 6.420529801324503
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 6.034246059392604,
+            "mae_median": 6.074324324324325
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 2.946909876525935,
+            "mae_median": 3.0084151472650773
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 6.290882526605986,
+            "mae_median": 6.152808988764045
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 8.474591501227252,
+            "mae_median": 9.073059360730594
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.94312032185761,
+            "mae_median": 8.71875
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.430697623434968,
+            "mae_median": 8.070866141732283
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 8.680756777153114,
+            "mae_median": 8.014925373134329
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 14.647058296203614,
+            "mae_median": 14.26
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 21.633549763606144,
+            "mae_median": 21.615384615384617
+          }
+        }
+      },
+      "seconds": 244.214543760987,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "eec3274ddbd17964b26d1cb1de681c553bd914aa",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_scalar_lr0.0001",
+      "stage": "wide",
+      "variant": "mse_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.0001",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.0001/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 5.419676655422463,
+        "mse_mean": 55.687348149947134,
+        "mae_median": 5.419676655422463,
+        "mae_mode": 5.419676655422463,
+        "rmse_mean": 7.462395603956355,
+        "count": 2308,
+        "median_spearman": 0.8925073077964811,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 2.2845478130886887,
+            "mae_median": 2.2845478130886887
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 5.1743133422490715,
+            "mae_median": 5.1743133422490715
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 4.191141537830839,
+            "mae_median": 4.191141537830839
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.307710677586245,
+            "mae_median": 5.307710677586245
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.397788531159701,
+            "mae_median": 7.397788531159701
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 8.067555001803807,
+            "mae_median": 8.067555001803807
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 8.407562060618964,
+            "mae_median": 8.407562060618964
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 10.054712437871677,
+            "mae_median": 10.054712437871677
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.700668029785156,
+            "mae_median": 8.700668029785156
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 7.612247173602764,
+            "mae_median": 7.612247173602764
+          }
+        }
+      },
+      "seconds": 238.3303090929985,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_scalar_lr0.0003",
+      "stage": "wide",
+      "variant": "mse_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.0003",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.0003/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 8,
+      "validation": {
+        "mae_mean": 4.981595622708107,
+        "mse_mean": 47.44439232667196,
+        "mae_median": 4.981595622708107,
+        "mae_mode": 4.981595622708107,
+        "rmse_mean": 6.887988990022556,
+        "count": 2308,
+        "median_spearman": 0.9014045323685671,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.9041568372423285,
+            "mae_median": 1.9041568372423285
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 4.4832611631702735,
+            "mae_median": 4.4832611631702735
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 4.0497971503965315,
+            "mae_median": 4.0497971503965315
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 4.876021790236569,
+            "mae_median": 4.876021790236569
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 6.848718050952371,
+            "mae_median": 6.848718050952371
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.308881938457489,
+            "mae_median": 7.308881938457489
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.427864044670045,
+            "mae_median": 7.427864044670045
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 9.476134285997988,
+            "mae_median": 9.476134285997988
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.193265151977538,
+            "mae_median": 8.193265151977538
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 5.895986116849459,
+            "mae_median": 5.895986116849459
+          }
+        }
+      },
+      "seconds": 239.62339002103545,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_scalar_lr0.001",
+      "stage": "wide",
+      "variant": "mse_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.001",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.001/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 4.8684537882304895,
+        "mse_mean": 46.019949958082016,
+        "mae_median": 4.8684537882304895,
+        "mae_mode": 4.8684537882304895,
+        "rmse_mean": 6.783800554120235,
+        "count": 2308,
+        "median_spearman": 0.9087978811648721,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.7553621731846538,
+            "mae_median": 1.7553621731846538
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 3.48156594585728,
+            "mae_median": 3.48156594585728
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.3423288206231545,
+            "mae_median": 3.3423288206231545
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.502027052975772,
+            "mae_median": 5.502027052975772
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.452279452319559,
+            "mae_median": 7.452279452319559
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.06072142294475,
+            "mae_median": 7.06072142294475
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.8357833201490985,
+            "mae_median": 7.8357833201490985
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 9.134626929439715,
+            "mae_median": 9.134626929439715
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.753808059692382,
+            "mae_median": 8.753808059692382
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 7.77015627347506,
+            "mae_median": 7.77015627347506
+          }
+        }
+      },
+      "seconds": 235.33050387201365,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mse_scalar_lr0.003",
+      "stage": "wide",
+      "variant": "mse_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.003",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mse_scalar_lr0.003/attempt_0",
+        "loss": {
+          "method": "mse",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 5.01504947678985,
+        "mse_mean": 49.75871751514466,
+        "mae_median": 5.01504947678985,
+        "mae_mode": 5.01504947678985,
+        "rmse_mean": 7.053985931028262,
+        "count": 2308,
+        "median_spearman": 0.904642585805603,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.717581832843111,
+            "mae_median": 1.717581832843111
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 3.959548705332988,
+            "mae_median": 3.959548705332988
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.2727559719647465,
+            "mae_median": 3.2727559719647465
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.47484840650237,
+            "mae_median": 5.47484840650237
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.584243704739227,
+            "mae_median": 7.584243704739227
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.973440630095346,
+            "mae_median": 7.973440630095346
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 8.167922643225962,
+            "mae_median": 8.167922643225962
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 9.29821099807967,
+            "mae_median": 9.29821099807967
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 9.745017013549806,
+            "mae_median": 9.745017013549806
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 8.128575838529146,
+            "mae_median": 8.128575838529146
+          }
+        }
+      },
+      "seconds": 232.6089802189963,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mae_scalar_lr0.0001",
+      "stage": "wide",
+      "variant": "mae_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.0001",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.0001/attempt_0",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 9,
+      "validation": {
+        "mae_mean": 5.073826408055667,
+        "mse_mean": 49.76781699714392,
+        "mae_median": 5.073826408055667,
+        "mae_mode": 5.073826408055667,
+        "rmse_mean": 7.054630890212748,
+        "count": 2308,
+        "median_spearman": 0.8989672694384689,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 2.1628358032529715,
+            "mae_median": 2.1628358032529715
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 4.838040867367306,
+            "mae_median": 4.838040867367306
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.5638961283722566,
+            "mae_median": 3.5638961283722566
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.409765582138233,
+            "mae_median": 5.409765582138233
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.564267354468777,
+            "mae_median": 7.564267354468777
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 8.008603547300611,
+            "mae_median": 8.008603547300611
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.304208665382205,
+            "mae_median": 7.304208665382205
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 8.628587068016849,
+            "mae_median": 8.628587068016849
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 6.9369354248046875,
+            "mae_median": 6.9369354248046875
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 6.898685748760517,
+            "mae_median": 6.898685748760517
+          }
+        }
+      },
+      "seconds": 242.2174586240435,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mae_scalar_lr0.0003",
+      "stage": "wide",
+      "variant": "mae_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.0003",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.0003/attempt_0",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 10,
+      "validation": {
+        "mae_mean": 4.835801112564019,
+        "mse_mean": 45.987407115913705,
+        "mae_median": 4.835801112564019,
+        "mae_mode": 4.835801112564019,
+        "rmse_mean": 6.781401559848355,
+        "count": 2308,
+        "median_spearman": 0.9079042229192109,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.8665358244583308,
+            "mae_median": 1.8665358244583308
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 4.00429874497491,
+            "mae_median": 4.00429874497491
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.31279574871732,
+            "mae_median": 3.31279574871732
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.272308718220572,
+            "mae_median": 5.272308718220572
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 7.220303923027701,
+            "mae_median": 7.220303923027701
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.334867383752551,
+            "mae_median": 7.334867383752551
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.763163348821204,
+            "mae_median": 7.763163348821204
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 8.374013644545826,
+            "mae_median": 8.374013644545826
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.37691665649414,
+            "mae_median": 8.37691665649414
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 8.18575697678786,
+            "mae_median": 8.18575697678786
+          }
+        }
+      },
+      "seconds": 243.05803244700655,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mae_scalar_lr0.001",
+      "stage": "wide",
+      "variant": "mae_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.001",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.001/attempt_0",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 9,
+      "validation": {
+        "mae_mean": 4.9104504995370855,
+        "mse_mean": 47.584655766015096,
+        "mae_median": 4.9104504995370855,
+        "mae_mode": 4.9104504995370855,
+        "rmse_mean": 6.89816321682918,
+        "count": 2308,
+        "median_spearman": 0.9056130267452202,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 1.6990719149444278,
+            "mae_median": 1.6990719149444278
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 4.409922235720867,
+            "mae_median": 4.409922235720867
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 2.8717209252869766,
+            "mae_median": 2.8717209252869766
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.879803899700722,
+            "mae_median": 5.879803899700722
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 8.011408705689592,
+            "mae_median": 8.011408705689592
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.581541981015887,
+            "mae_median": 7.581541981015887
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 6.980470537200687,
+            "mae_median": 6.980470537200687
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 9.719924812886253,
+            "mae_median": 9.719924812886253
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.52514190673828,
+            "mae_median": 8.52514190673828
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 6.66969710129958,
+            "mae_median": 6.66969710129958
+          }
+        }
+      },
+      "seconds": 240.2098231370328,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
+        "gpu": "NVIDIA L40"
+      }
+    }
+  },
+  {
+    "study_job": {
+      "identifier": "wide_mae_scalar_lr0.003",
+      "stage": "wide",
+      "variant": "mae_scalar",
+      "priority": 10,
+      "optional": false,
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.003",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "dependencies": [
+        "smoke_categorical_stat_maxrl_mse",
+        "smoke_categorical_stat_maxrl_mae",
+        "smoke_scalar_mae",
+        "smoke_digits_ce"
+      ],
+      "tune_from": [],
+      "tuning_rank": 0,
+      "gate_candidate": [],
+      "gate_reference": [],
+      "competitive_ratio": 1.05
+    },
+    "result": {
+      "config": {
+        "manifest": "/tmp/utkface-clean-v2/manifest.json",
+        "output_dir": "/tmp/utkface-study-20261013/runs/wide_mae_scalar_lr0.003/attempt_0",
+        "loss": {
+          "method": "mae",
+          "kernel_scale_years": 2.0,
+          "num_rollouts": 64,
+          "survival_floor": 0.0,
+          "std_floor": 0.0001
+        },
+        "head": "scalar",
+        "noise": {
+          "mode": "none",
+          "std_years": 0.0,
+          "seed": 2026
+        },
+        "subset_seed": 2026,
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "eval_batch_size": 128,
+        "num_workers": 4,
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "clip_grad_norm": 5.0,
+        "schedule": {
+          "lr_schedule": "cosine",
+          "warmup_ratio": 0.05,
+          "lr_min_ratio": 0.1
+        },
+        "pretrained": true,
+        "device": "cuda:0",
+        "precision": "bf16",
+        "train_limit": 0,
+        "eval_limit": 0,
+        "evaluate_test": false,
+        "save_checkpoint": false,
+        "deterministic": false,
+        "cpu_threads": 4
+      },
+      "best_epoch": 9,
+      "validation": {
+        "mae_mean": 5.008867309633739,
+        "mse_mean": 48.26919724690524,
+        "mae_median": 5.008867309633739,
+        "mae_mode": 5.008867309633739,
+        "rmse_mean": 6.947603705372468,
+        "count": 2308,
+        "median_spearman": 0.9007372359519533,
+        "median_spearman_defined": true,
+        "label_nll": null,
+        "label_nll_reason": "Scalar regression defines no categorical label distribution",
+        "decades": {
+          "0": {
+            "count": 302,
+            "mae_mean": 2.2041022159800625,
+            "mae_median": 2.2041022159800625
+          },
+          "10": {
+            "count": 148,
+            "mae_mean": 5.3765233207393335,
+            "mae_median": 5.3765233207393335
+          },
+          "20": {
+            "count": 713,
+            "mae_mean": 3.1266780615187293,
+            "mae_median": 3.1266780615187293
+          },
+          "30": {
+            "count": 445,
+            "mae_mean": 5.47360564242588,
+            "mae_median": 5.47360564242588
+          },
+          "40": {
+            "count": 219,
+            "mae_mean": 8.053045464432946,
+            "mae_median": 8.053045464432946
+          },
+          "50": {
+            "count": 224,
+            "mae_mean": 7.384008816310337,
+            "mae_median": 7.384008816310337
+          },
+          "60": {
+            "count": 127,
+            "mae_mean": 7.169371567373201,
+            "mae_median": 7.169371567373201
+          },
+          "70": {
+            "count": 67,
+            "mae_mean": 8.369009103348006,
+            "mae_median": 8.369009103348006
+          },
+          "80": {
+            "count": 50,
+            "mae_mean": 8.780366516113281,
+            "mae_median": 8.780366516113281
+          },
+          "90": {
+            "count": 13,
+            "mae_mean": 8.164492680476261,
+            "mae_median": 8.164492680476261
+          }
+        }
+      },
+      "seconds": 239.9417646130314,
+      "data_fingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+      "training_fingerprint": "89579373b5c5f4c3508d7a28b4eea61a7b4ec44de712467806ab2b14742ccd92",
+      "train_unique_images": 18462,
+      "world_size": 1,
+      "global_batch_size": 64,
+      "environment": {
+        "python": "3.12.13",
+        "torch": "2.11.0+cu130",
+        "torchvision": "0.26.0+cu130",
+        "hostname": "ada.ece.local.cmu.edu",
+        "git_commit": "7bf00d055b730b6f0fc6b5a16a63a3c08ef77937",
         "gpu": "NVIDIA L40"
       }
     }
