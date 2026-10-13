@@ -68,6 +68,11 @@ const paired=groups([...baseline,scalar]);
 const categorical=paired.find(g=>g.r.head==='categorical');
 check(categorical.completedN===3&&categorical.n===1&&categorical.done[0].seed===42,'retain coverage while matching seeds');
 check(categorical.values['test.mae_mean']===baseline.find(r=>r.seed===42).test.mae_mean,'paired summary uses matched baseline');
+const pending=groups([...baseline,{...scalar,status:'running'}]).find(g=>g.r.head==='scalar');
+const previousPartial=document.getElementById('partial').checked;
+document.getElementById('partial').checked=true;
+check(pending.n===0&&curve(pending,1).length>0,'unfinished curves can precede completed results');
+document.getElementById('partial').checked=previousPartial;
 document.getElementById('matched').checked=false;
 """
 
@@ -107,6 +112,7 @@ def verify(*, html_path: Path) -> dict:
             "finite SVG geometry",
             "curve hover and dismissal",
             "common-seed comparisons preserve actual coverage",
+            "unfinished curves before the first completed seed",
         ],
         "passed": True,
         "environment": "isolated QuickJS DOM harness; no browser rendering",
