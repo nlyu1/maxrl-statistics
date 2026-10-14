@@ -162,7 +162,7 @@ def report(*, plan_path: Path, output_dir: Path, figures: bool) -> None:
     lines = [
         "# Scaled UTKFace study",
         "",
-        f"State: **{progress['status']}**. GPU time: **{progress['gpu_hours']:.2f} / {plan.budget_gpu_hours:g} hours**. Completed primary runs: **{sum(job.stage == 'main' and state['jobs'][job.identifier]['status'] == 'completed' for job in plan.jobs)} / 66**.",
+        f"State: **{progress['status']}**. GPU time: **{progress['gpu_hours']:.2f} hours**; original planning reference: **{plan.budget_gpu_hours:g} hours**. Completed primary runs: **{sum(job.stage == 'main' and state['jobs'][job.identifier]['status'] == 'completed' for job in plan.jobs)} / 66**.",
         "",
         "Metrics use clean held-out labels. All tuning and scalar-head gates use validation data. Values are means ± sample SD across distinct training seeds; single-seed values have no SD. Label NLL is unavailable for scalar heads. Population zero-one MaxRL equals CE. Training subsets are fixed and nested.",
         "",

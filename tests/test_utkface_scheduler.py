@@ -12,6 +12,19 @@ from src.experiments.utkface.scheduler import charged_seconds, gpu_is_free, run
 from src.experiments.utkface.study import StudyJob, StudyPlan, make_plan
 
 
+@pytest.fixture(autouse=True)
+def simulated_dispatch_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.experiments.utkface import scheduler
+
+    clock = [time.time()]
+
+    def wait(*, active: list[dict], timeout: float) -> None:
+        clock[0] += 10
+
+    monkeypatch.setattr(scheduler.time, "time", lambda: clock[0])
+    monkeypatch.setattr(scheduler, "wait_for_progress", wait)
+
+
 def test_adopted_external_preemption_preserves_unknown_exit_status() -> None:
     from src.experiments.utkface.scheduler import retryable_preemption
 
@@ -240,10 +253,37 @@ def test_study_contains_requested_main_subset_and_noise_matrices(
         set(item.dependencies) <= {source.identifier for source in plan.jobs}
         for item in extra.jobs
     )
+    from src.experiments.utkface.requeue import continuation
+
+    original_path = tmp_path / "plan.json"
+    original_path.write_text(plan.model_dump_json())
+    extra.output_dir.mkdir()
+    archived_path = extra.output_dir / "plan.json"
+    archived_path.write_text(extra.model_dump_json())
+    resumed, updated = continuation(
+        original_path=original_path,
+        archived_path=archived_path,
+        previous_control=control.model_dump(mode="json"),
+        output_dir=tmp_path / "continuation",
+    )
+    assert len(resumed.jobs) == 24
+    assert sum(j.stage == "subset_replication" for j in resumed.jobs) == 16
+    assert sum(j.stage == "matched_steps" for j in resumed.jobs) == 8
+    assert all(j.config.noise.mode == "none" for j in resumed.jobs)
+    assert len(updated.held_jobs) == 40
+    assert all(
+        j.stage == "noise_replication"
+        for j in plan.jobs
+        if j.identifier in updated.held_jobs
+    )
+    assert updated.max_concurrent == 8 and not updated.enforce_gpu_hour_budget
+    assert not updated.deadlines
+    assert original_path.read_text() == frozen
+    assert archived_path.read_text() == extra.model_dump_json()
 
 
 @pytest.mark.parametrize("peer_count", [0, 2])
-def test_scheduler_selects_validation_lr_respects_six_gpu_cap_and_exports_state(
+def test_scheduler_selects_validation_lr_respects_eight_gpu_cap_and_exports_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, peer_count: int
 ) -> None:
     from src.experiments.utkface import scheduler
@@ -333,13 +373,14 @@ def test_scheduler_selects_validation_lr_respects_six_gpu_cap_and_exports_state(
         })
     run(plan=plan, poll_seconds=0, coordination=control)
     state = json.loads((tmp_path / "state.json").read_text())
-    assert state["status"] == "completed" and max(peaks) == 6 - peer_count
+    assert state["status"] == "completed" and max(peaks) == 8 - peer_count
     assert selected[-1]["learning_rate"] == pytest.approx(8e-4)
     assert all(item["status"] == "completed" for item in state["jobs"].values())
 
 
-def test_scheduler_does_not_start_a_job_exceeding_remaining_budget(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("enforce", [False, True])
+def test_scheduler_only_enforces_gpu_hour_budget_when_enabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, enforce: bool
 ) -> None:
     from src.experiments.utkface import scheduler
 
@@ -354,14 +395,195 @@ def test_scheduler_does_not_start_a_job_exceeding_remaining_budget(
     )
     monkeypatch.setattr(scheduler, "gpu_inventory", fake_inventory)
     monkeypatch.setattr(scheduler.time, "sleep", lambda seconds: None)
+
+    class Child:
+        pid = 123456
+
+        def __init__(self, command, **kwargs):
+            config = json.loads(
+                Path(command[command.index("--config") + 1]).read_text()
+            )
+            output = Path(config["output_dir"])
+            output.mkdir(parents=True)
+            (output / "result.json").write_text(
+                json.dumps({
+                    "config": config,
+                    "validation": {"mae_mean": 5},
+                    "train_unique_images": 18462,
+                })
+            )
+
+        def poll(self):
+            return 0
+
+    old_attempt = {"started_at": time.time() - 1000, "seconds": 1000, "returncode": 143}
+    (tmp_path / "state.json").write_text(
+        json.dumps({
+            "status": "running",
+            "jobs": {item.identifier: {"status": "pending", "attempts": [old_attempt]}},
+        })
+    )
+    monkeypatch.setattr(scheduler.subprocess, "Popen", Child)
     run(
         plan=plan,
         poll_seconds=0,
-        coordination=canonical_coordination(root=plan.output_dir),
+        coordination=canonical_coordination(root=plan.output_dir).model_copy(
+            update={"enforce_gpu_hour_budget": enforce}
+        ),
     )
     state = json.loads((tmp_path / "state.json").read_text())
-    assert state["status"] == "budget_exhausted"
-    assert state["jobs"]["cannot_fit"]["attempts"] == []
+    assert state["status"] == ("budget_exhausted" if enforce else "completed")
+    attempts = state["jobs"]["cannot_fit"]["attempts"]
+    assert attempts[0] == old_attempt
+    assert len(attempts) == (1 if enforce else 2)
+    assert charged_seconds(state=state, now=time.time()) >= 1000
+
+
+def test_immediate_reuse_preserves_final_free_check_and_held_jobs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.experiments.utkface import scheduler
+
+    jobs = tuple(
+        job(root=tmp_path, identifier=name, lr=1e-4)
+        for name in ("first", "second", "held")
+    )
+    plan = StudyPlan(
+        output_dir=tmp_path,
+        data_fingerprint="test",
+        training_source_sha256={},
+        budget_gpu_hours=10,
+        max_concurrent=6,
+        jobs=jobs,
+    )
+    launches = []
+    checks = []
+
+    def inventory():
+        checks.append(time.time())
+        return fake_inventory()[:1]
+
+    class Child:
+        pid = 123456
+
+        def __init__(self, command, **kwargs):
+            config = json.loads(
+                Path(command[command.index("--config") + 1]).read_text()
+            )
+            launches.append(time.time())
+            assert checks[-1] == launches[-1]
+            output = Path(config["output_dir"])
+            output.mkdir(parents=True)
+            (output / "result.json").write_text(
+                json.dumps({
+                    "config": config,
+                    "validation": {"mae_mean": 5},
+                    "train_unique_images": 18462,
+                })
+            )
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(scheduler, "gpu_inventory", inventory)
+    monkeypatch.setattr(scheduler.subprocess, "Popen", Child)
+    run(
+        plan=plan,
+        poll_seconds=10,
+        coordination=canonical_coordination(root=tmp_path).model_copy(
+            update={"held_jobs": ("held",)}
+        ),
+    )
+    state = json.loads((tmp_path / "state.json").read_text())
+    first = state["jobs"]["first"]["attempts"][-1]
+    second = state["jobs"]["second"]["attempts"][-1]
+    assert second["started_at"] == first["ended_at"]
+    assert state["jobs"]["held"] == {"status": "pending", "attempts": []}
+    progress = json.loads((tmp_path / "status.json").read_text())
+    assert progress["held_pending"] == 1 and progress["queued_pending"] == 0
+
+
+def test_final_free_check_rejects_gpu_that_became_occupied(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.experiments.utkface import scheduler
+
+    item = job(root=tmp_path, identifier="race", lr=1e-4)
+    plan = StudyPlan(
+        output_dir=tmp_path,
+        data_fingerprint="test",
+        training_source_sha256={},
+        budget_gpu_hours=1,
+        max_concurrent=6,
+        jobs=(item,),
+    )
+    calls = [0]
+
+    def inventory():
+        calls[0] += 1
+        gpus = fake_inventory()[:1]
+        if calls[0] == 3:
+            gpus[0]["pids"] = [99999]
+        return gpus
+
+    class Child:
+        pid = 123456
+
+        def __init__(self, command, **kwargs):
+            assert calls[0] >= 6
+            config = json.loads(
+                Path(command[command.index("--config") + 1]).read_text()
+            )
+            output = Path(config["output_dir"])
+            output.mkdir(parents=True)
+            (output / "result.json").write_text(
+                json.dumps({
+                    "config": config,
+                    "validation": {"mae_mean": 5},
+                    "train_unique_images": 18462,
+                })
+            )
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(scheduler, "gpu_inventory", inventory)
+    monkeypatch.setattr(scheduler.subprocess, "Popen", Child)
+    run(plan=plan, poll_seconds=10, coordination=canonical_coordination(root=tmp_path))
+    assert json.loads((tmp_path / "state.json").read_text())["status"] == "completed"
+
+
+def test_new_gpu_requires_idle_checks_ten_seconds_apart_and_resets_when_busy() -> None:
+    from src.experiments.utkface.scheduler import ready_gpus
+
+    gpu = fake_inventory()[0]
+    first_idle = {}
+
+    def ready(*, now, current=gpu, reusable=frozenset(), interruptions=None):
+        return ready_gpus(
+            inventory=[current],
+            leased=set(),
+            interruptions=interruptions or {},
+            first_idle=first_idle,
+            reusable=set(reusable),
+            now=now,
+        )
+
+    assert ready(now=0) == []
+    assert ready(now=9.99) == []
+    assert ready(now=10) == [gpu]
+    assert ready(now=11, current={**gpu, "pids": [99999]}) == []
+    assert ready(now=12) == []
+    assert ready(now=22) == [gpu]
+    assert (
+        ready(
+            now=23,
+            reusable={gpu["uuid"]},
+            interruptions={gpu["uuid"]: {"cooldown_until": 30}},
+        )
+        == []
+    )
+    assert ready(now=30, reusable={gpu["uuid"]}) == [gpu]
 
 
 def test_scheduler_adopts_completed_attempt_without_charging_offline_gap(

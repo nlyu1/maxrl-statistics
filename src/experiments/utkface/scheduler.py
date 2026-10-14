@@ -3,6 +3,7 @@ import fcntl
 import hashlib
 import json
 import os
+import select
 import signal
 import subprocess
 import time
@@ -18,6 +19,7 @@ from src.experiments.utkface.run import write_json
 from src.experiments.utkface.study import StudyJob, StudyPlan
 
 TERMINAL = {"completed", "skipped", "failed"}
+IDLE_CHECK_INTERVAL_SECONDS = 10.0
 
 
 def gpu_inventory() -> list[dict]:
@@ -60,6 +62,52 @@ def gpu_inventory() -> list[dict]:
 
 def gpu_is_free(*, gpu: dict) -> bool:
     return not gpu["pids"] and gpu["memory_mib"] <= 1024 and gpu["utilization"] <= 5
+
+
+def ready_gpus(
+    *,
+    inventory: list[dict],
+    leased: set[str],
+    interruptions: dict,
+    first_idle: dict[str, float],
+    reusable: set[str],
+    now: float,
+) -> list[dict]:
+    ready = []
+    for gpu in inventory:
+        uuid = gpu["uuid"]
+        if (
+            not gpu_is_free(gpu=gpu)
+            or uuid in leased
+            or now < interruptions.get(uuid, {}).get("cooldown_until", 0)
+        ):
+            first_idle.pop(uuid, None)
+            reusable.discard(uuid)
+            continue
+        if uuid in reusable:
+            ready.append(gpu)
+        elif uuid not in first_idle:
+            first_idle[uuid] = now
+        elif now - first_idle[uuid] >= IDLE_CHECK_INTERVAL_SECONDS:
+            ready.append(gpu)
+    return sorted(ready, key=lambda gpu: (gpu["uuid"] not in reusable, gpu["index"]))
+
+
+def wait_for_progress(*, active: list[dict], timeout: float) -> None:
+    descriptors = []
+    try:
+        for record in active:
+            try:
+                descriptors.append(os.pidfd_open(record["attempts"][-1]["pid"]))
+            except ProcessLookupError:
+                continue
+        if descriptors:
+            select.select(descriptors, [], [], timeout)
+        else:
+            time.sleep(timeout)
+    finally:
+        for descriptor in descriptors:
+            os.close(descriptor)
 
 
 def owned_process(*, attempt: dict) -> bool:
@@ -211,6 +259,7 @@ def status_summary(*, plan: StudyPlan, state: dict) -> dict:
         )
         for stage in sorted({job.stage for job in plan.jobs})
     }
+
     active = [
         {
             "job": identifier,
@@ -228,6 +277,30 @@ def status_summary(*, plan: StudyPlan, state: dict) -> dict:
         "stages": stages,
         "active": active,
         "updated_at": state.get("updated_at"),
+    }
+
+
+def dispatch_summary(
+    *, plan: StudyPlan, state: dict, coordination: CoordinationConfig
+) -> dict:
+    held = sum(
+        record["status"] == "pending" and identifier in coordination.held_jobs
+        for identifier, record in state["jobs"].items()
+    )
+    pending = sum(r["status"] == "pending" for r in state["jobs"].values())
+    return {
+        **status_summary(plan=plan, state=state),
+        "budget_gpu_hours": plan.budget_gpu_hours
+        if coordination.enforce_gpu_hour_budget
+        else None,
+        "planning_gpu_hours": plan.budget_gpu_hours,
+        "gpu_hour_cap_enforced": coordination.enforce_gpu_hour_budget,
+        "max_concurrent": coordination.max_concurrent,
+        "queued_pending": pending - held,
+        "held_pending": held,
+        "new_gpu_idle_checks": 2,
+        "new_gpu_idle_interval_seconds": IDLE_CHECK_INTERVAL_SECONDS,
+        "immediate_successful_gpu_reuse": True,
     }
 
 
@@ -282,7 +355,7 @@ def run(
             print(json.dumps({"recovered_preempted_jobs": recovered}), flush=True)
         children = {}
         logs = {}
-        streaks = {}
+        first_idle = {}
         (root / "configs").mkdir(exist_ok=True)
         (root / "logs").mkdir(exist_ok=True)
         budget = plan.budget_gpu_hours * 3600
@@ -298,6 +371,7 @@ def run(
                 peers.append((peer, json.loads(peer_state_path.read_text())))
             inventory = gpu_inventory()
             by_uuid = {gpu["uuid"]: gpu for gpu in inventory}
+            reusable = set()
             for job in plan.jobs:
                 record = state["jobs"][job.identifier]
                 if record["status"] != "running":
@@ -340,6 +414,12 @@ def run(
                             "status": "completed",
                             "result_path": str(result_path),
                         })
+                        if (
+                            "gpu_uuid" in attempt
+                            and "termination_requested_at" not in attempt
+                            and not attempt.get("yielded_to_foreign_process")
+                        ):
+                            reusable.add(attempt["gpu_uuid"])
                     elif attempt.get("deadline_reached"):
                         record.update({
                             "status": "skipped",
@@ -401,7 +481,7 @@ def run(
                 for record in active:
                     record["attempts"][-1]["deadline_reached"] = True
                     terminate_attempt(attempt=record["attempts"][-1])
-            if spent >= budget:
+            if coordination.enforce_gpu_hour_budget and spent >= budget:
                 state["status"] = "budget_exhausted"
                 for record in active:
                     terminate_attempt(attempt=record["attempts"][-1])
@@ -414,7 +494,9 @@ def run(
                     write_json(path=state_path, payload=state)
                     write_json(
                         path=root / "status.json",
-                        payload=status_summary(plan=plan, state=state),
+                        payload=dispatch_summary(
+                            plan=plan, state=state, coordination=coordination
+                        ),
                     )
                     break
             else:
@@ -435,18 +517,14 @@ def run(
                     record["attempts"][-1]["gpu_uuid"]
                     for record in (*active, *peer_active)
                 }
-                for gpu in inventory:
-                    streaks[gpu["uuid"]] = (
-                        streaks.get(gpu["uuid"], 0) + 1
-                        if gpu_is_free(gpu=gpu)
-                        and gpu["uuid"] not in leased
-                        and now
-                        >= state["gpu_interruptions"]
-                        .get(gpu["uuid"], {})
-                        .get("cooldown_until", 0)
-                        else 0
-                    )
-                free = [gpu for gpu in inventory if streaks[gpu["uuid"]] >= 3]
+                free = ready_gpus(
+                    inventory=inventory,
+                    leased=leased,
+                    interruptions=state["gpu_interruptions"],
+                    first_idle=first_idle,
+                    reusable=reusable,
+                    now=now,
+                )
                 mandatory_done = all(
                     state["jobs"][job.identifier]["status"] in TERMINAL
                     for job in plan.jobs
@@ -461,10 +539,14 @@ def run(
                     ),
                 ):
                     record = state["jobs"][job.identifier]
-                    if record["status"] != "pending" or (
-                        job.optional
-                        and not mandatory_done
-                        and job.identifier not in coordination.promoted
+                    if (
+                        job.identifier in coordination.held_jobs
+                        or record["status"] != "pending"
+                        or (
+                            job.optional
+                            and not mandatory_done
+                            and job.identifier not in coordination.promoted
+                        )
                     ):
                         continue
                     if not all(
@@ -501,6 +583,7 @@ def run(
                         or now + 180 < coordination.deadlines[str(peer.output_dir)]
                     )
                     and record["status"] == "pending"
+                    and item.identifier not in coordination.held_jobs
                     and not item.optional
                     and all(
                         combined["jobs"][dependency]["status"] == "completed"
@@ -515,7 +598,6 @@ def run(
                 for job in ready:
                     if (
                         not free
-                        or len(active) >= plan.max_concurrent
                         or len(active) + len(peer_active) >= coordination.max_concurrent
                         or (
                             peer_ready
@@ -532,15 +614,12 @@ def run(
                     limit = runtime_limit(job=job, state=state, plan=plan)
                     if deadline and now + limit > deadline:
                         continue
-                    if closed + reserved + limit > budget:
+                    if (
+                        coordination.enforce_gpu_hour_budget
+                        and closed + reserved + limit > budget
+                    ):
                         continue
                     gpu = free.pop(0)
-                    current = next(
-                        item for item in gpu_inventory() if item["uuid"] == gpu["uuid"]
-                    )
-                    if not gpu_is_free(gpu=current):
-                        streaks[gpu["uuid"]] = 0
-                        continue
                     if any(
                         hashlib.sha256(Path(name).read_bytes()).hexdigest() != digest
                         for name, digest in plan.training_source_sha256.items()
@@ -573,9 +652,6 @@ def run(
                     write_json(
                         path=config_path, payload=configuration.model_dump(mode="json")
                     )
-                    log = (
-                        root / "logs" / f"{job.identifier}_attempt{attempt_number}.log"
-                    ).open("w")
                     environment = {
                         **os.environ,
                         "CUDA_VISIBLE_DEVICES": gpu["uuid"],
@@ -596,6 +672,15 @@ def run(
                         "--output-dir",
                         str(output),
                     ]
+                    current = next(
+                        item for item in gpu_inventory() if item["uuid"] == gpu["uuid"]
+                    )
+                    if not gpu_is_free(gpu=current):
+                        first_idle.pop(gpu["uuid"], None)
+                        continue
+                    log = (
+                        root / "logs" / f"{job.identifier}_attempt{attempt_number}.log"
+                    ).open("w")
                     child = subprocess.Popen(
                         command,
                         stdout=log,
@@ -611,6 +696,15 @@ def run(
                         "runtime_limit_seconds": limit,
                         "config_path": str(config_path),
                         "output_dir": str(output),
+                        "gpu_admission": "reuse"
+                        if gpu["uuid"] in reusable
+                        else "two_idle_checks",
+                        "idle_observed_seconds": time.time() - first_idle[gpu["uuid"]]
+                        if gpu["uuid"] in first_idle
+                        else 0,
+                        "dispatch_source_revision": os.environ.get(
+                            "UTKFACE_DISPATCH_REVISION", ""
+                        ),
                     }
                     record["attempts"].append(attempt)
                     record["status"] = "running"
@@ -620,24 +714,39 @@ def run(
                     turn_path.write_text(str(root))
                     previous_owner = str(root)
                     reserved += limit
-                    streaks[gpu["uuid"]] = 0
+                    first_idle.pop(gpu["uuid"], None)
                     print(
                         json.dumps({
                             "launched": job.identifier,
                             "gpu": gpu["index"],
                             "learning_rate": configuration.learning_rate,
+                            "gpu_admission": "reuse"
+                            if gpu["uuid"] in reusable
+                            else "two_idle_checks",
+                            "previous_completion_gap_seconds": min(
+                                (
+                                    attempt["started_at"] - earlier["ended_at"]
+                                    for item in state["jobs"].values()
+                                    for earlier in item["attempts"]
+                                    if earlier.get("gpu_uuid") == gpu["uuid"]
+                                    and "ended_at" in earlier
+                                ),
+                                default=None,
+                            ),
                         }),
                         flush=True,
                     )
                 pending = [
                     record
-                    for record in state["jobs"].values()
+                    for identifier, record in state["jobs"].items()
                     if record["status"] == "pending"
+                    and identifier not in coordination.held_jobs
                 ]
                 if not pending and not active:
                     state["status"] = "completed"
                 elif (
                     not active
+                    and coordination.enforce_gpu_hour_budget
                     and ready
                     and all(
                         closed + runtime_limit(job=job, state=state, plan=plan) > budget
@@ -649,42 +758,58 @@ def run(
             write_json(path=state_path, payload=state)
             write_json(
                 path=root / "status.json",
-                payload=status_summary(plan=plan, state=state),
+                payload=dispatch_summary(
+                    plan=plan, state=state, coordination=coordination
+                ),
             )
             if state["status"] == "completed":
                 break
             fcntl.flock(dispatch_lock, fcntl.LOCK_UN)
-            time.sleep(poll_seconds)
-        print(json.dumps(status_summary(plan=plan, state=state), indent=2), flush=True)
+            wait_for_progress(active=active, timeout=poll_seconds)
+        print(
+            json.dumps(
+                dispatch_summary(plan=plan, state=state, coordination=coordination),
+                indent=2,
+            ),
+            flush=True,
+        )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--plan", type=Path, required=True)
-    parser.add_argument("--poll-seconds", type=float, default=20)
+    parser.add_argument("--poll-seconds", type=float, default=10)
     parser.add_argument("--status", action="store_true")
     parser.add_argument("--coordination", type=Path)
     args = parser.parse_args()
     plan = StudyPlan.model_validate_json(args.plan.read_text())
+    coordination = (
+        CoordinationConfig.model_validate_json(args.coordination.read_text())
+        if args.coordination
+        else canonical_coordination(root=plan.output_dir)
+    )
     if args.status:
         state_path = plan.output_dir / "state.json"
         print(
             json.dumps(
-                status_summary(plan=plan, state=json.loads(state_path.read_text())),
+                dispatch_summary(
+                    plan=plan,
+                    state=json.loads(state_path.read_text()),
+                    coordination=coordination,
+                ),
                 indent=2,
             )
             if state_path.exists()
             else "Study has not started"
         )
     else:
+        os.environ["UTKFACE_DISPATCH_REVISION"] = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip()
         run(
             plan=plan,
             poll_seconds=args.poll_seconds,
-            coordination=CoordinationConfig.model_validate_json(
-                args.coordination.read_text()
-            )
-            if args.coordination
-            else canonical_coordination(root=plan.output_dir),
+            coordination=coordination,
         )
 
 

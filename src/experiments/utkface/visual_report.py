@@ -13,7 +13,7 @@ import polars as pl
 
 from src.experiments.utkface.coordination import CoordinationConfig
 from src.experiments.utkface.metrics import METRIC_NAMES
-from src.experiments.utkface.scheduler import status_summary
+from src.experiments.utkface.scheduler import dispatch_summary, status_summary
 from src.experiments.utkface.study import StudyPlan
 
 CURVE_METRICS = ("mae_mean", "rmse_mean", "median_spearman", "label_nll", "entropy")
@@ -173,12 +173,22 @@ def build(*, plans: tuple[Path, ...], output_dir: Path, coordination_path: str) 
     studies, runs = [], []
     for path, state in zip(plans, states, strict=True):
         study, rows = collect(plan_path=path, state=state)
+        if control:
+            study["progress"] = dispatch_summary(
+                plan=StudyPlan.model_validate_json(path.read_text()),
+                state=state,
+                coordination=control,
+            )
+            for row in rows:
+                if row["id"] in control.held_jobs and row["status"] == "pending":
+                    row["status"] = "held"
+                    row["reason"] = "training_seed_repetition_not_selected"
         studies.append(study)
         runs.extend(rows)
     payload = {
         "generated": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
-        "deadline": "2026-10-14T08:30:00+08:00",
-        "trainingDeadline": "2026-10-14T07:30:00+08:00",
+        "historicalReportDeadline": "2026-10-14T08:30:00+08:00",
+        "historicalExtensionCutoff": "2026-10-14T07:30:00+08:00",
         "studies": studies,
         "runs": runs,
         "curveColumns": [

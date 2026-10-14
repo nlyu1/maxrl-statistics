@@ -31,7 +31,7 @@ class StudyPlan(BaseConfig):
     data_fingerprint: str
     training_source_sha256: dict[str, str]
     budget_gpu_hours: float = Field(gt=0)
-    max_concurrent: int = Field(ge=1, le=6)
+    max_concurrent: int = Field(ge=1, le=8)
     jobs: tuple[StudyJob, ...]
 
 

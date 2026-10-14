@@ -130,6 +130,8 @@ def make_coordination(
         lock_path=extension.output_dir / "global-dispatch.lock",
         peer_plans=(base_path, extension_path),
         max_concurrent=6,
+        enforce_gpu_hour_budget=True,
+        held_jobs=(),
         deadlines={str(extension.output_dir): deadline},
         priorities=priorities,
         promoted=tuple(promoted),

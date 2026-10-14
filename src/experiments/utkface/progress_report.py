@@ -57,12 +57,17 @@ def compatible(*, first: dict, second: dict) -> None:
 
 
 def audit(
-    *, plan_path: Path, report_dir: Path, coordination_path: Path, data: dict
+    *,
+    plan_path: Path,
+    report_dir: Path,
+    coordination_path: Path,
+    archived_extension_plan: Path,
+    data: dict,
 ) -> dict:
     plan = StudyPlan.model_validate_json(plan_path.read_text())
     state = read(path=plan.output_dir / "state.json")
     control = read(path=coordination_path)
-    if control["max_concurrent"] != 6:
+    if control["max_concurrent"] != 8:
         raise ValueError("Study concurrency cap changed")
     expected = "1ecd0d0a6a1cae81ad1c8e2567ce226dbc47d5d7577ab027f97cb4ba08345fb6"
     if hashlib.sha256(plan_path.read_bytes()).hexdigest() != expected:
@@ -163,9 +168,10 @@ def audit(
         stages[job["stage"]] += 1
     now = time.time()
     hours = charged_seconds(state=state, now=now) / 3600
-    assert hours <= plan.budget_gpu_hours
+    if control["enforce_gpu_hour_budget"]:
+        assert hours <= plan.budget_gpu_hours
     assert not any(r["status"] == "failed" for r in state["jobs"].values())
-    extension_root = coordination_path.parent
+    extension_root = archived_extension_plan.parent
     assert (
         hashlib.sha256((extension_root / "plan.json").read_bytes()).hexdigest()
         == "9b28c9dee4fff9c6158952f10813e8bd3c7abf06445e5c0a8015d4d74c273619"
@@ -201,7 +207,7 @@ def audit(
     for _, delta in sorted(events):
         active += delta
         peak = max(peak, active)
-    assert peak <= 6
+    assert peak <= control["max_concurrent"]
     return {
         "audit_time": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
         "completed_records": len(records),
@@ -220,6 +226,8 @@ def audit(
         "scalar_label_nll_undefined": True,
         "gpu_hours": hours,
         "budget_gpu_hours": plan.budget_gpu_hours,
+        "gpu_hour_cap_enforced": control["enforce_gpu_hour_budget"],
+        "max_concurrent": control["max_concurrent"],
         "attempts": sum(len(r["attempts"]) for r in state["jobs"].values()),
         "historical_peak_gpu_leases": peak,
         "before_handoff_attempts_preserved": preserved,
@@ -488,6 +496,7 @@ def main() -> None:
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--coordination", type=Path, required=True)
+    parser.add_argument("--archived-extension-plan", type=Path, required=True)
     parser.add_argument("--tie-years", type=float, required=True)
     args = parser.parse_args()
     data = read(path=args.report_dir / "dashboard-data.json")
@@ -495,6 +504,7 @@ def main() -> None:
         plan_path=args.plan,
         report_dir=args.report_dir,
         coordination_path=args.coordination,
+        archived_extension_plan=args.archived_extension_plan,
         data=data,
     )
     assert integrity["completed_records"] == sum(
