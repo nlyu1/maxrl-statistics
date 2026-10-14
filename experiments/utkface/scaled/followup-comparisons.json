@@ -1,0 +1,198 @@
+{
+  "snapshot": "2026-10-14T21:24:21.556389+08:00",
+  "optimization_seed": 42,
+  "training_size": 4096,
+  "tie_threshold_years": 0.1,
+  "pairs": {
+    "schedule": [
+      {
+        "id": "flat_tailrl_population_seed42",
+        "baseline_id": "subset_4096_tailrl_population_seed42",
+        "label": "TailRL population",
+        "test_mae_delta": 0.16650441428414453,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.4230745004246046
+      },
+      {
+        "id": "flat_mse_seed42",
+        "baseline_id": "subset_4096_mse_seed42",
+        "label": "Direct MSE",
+        "test_mae_delta": -0.047713062112359594,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": -0.01592334635704784
+      },
+      {
+        "id": "flat_mae_seed42",
+        "baseline_id": "subset_4096_mae_seed42",
+        "label": "Direct MAE",
+        "test_mae_delta": -0.015418123796878014,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": 0.34442190758053925
+      },
+      {
+        "id": "flat_ce_seed42",
+        "baseline_id": "subset_4096_ce_seed42",
+        "label": "CE",
+        "test_mae_delta": -0.1631050014187334,
+        "outcome": "better",
+        "final_validation_mae_delta": 0.46142345762602766
+      },
+      {
+        "id": "flat_mse_scalar_seed42",
+        "baseline_id": "subset_4096_mse_scalar_seed42",
+        "label": "Direct MSE scalar",
+        "test_mae_delta": 0.011764859616033796,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": 0.10671705046291002
+      },
+      {
+        "id": "flat_mae_scalar_seed42",
+        "baseline_id": "subset_4096_mae_scalar_seed42",
+        "label": "Direct MAE scalar",
+        "test_mae_delta": 0.17592410079527987,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.3811536394898978
+      }
+    ],
+    "digits": [
+      {
+        "id": "digits_subset_tailrl_population",
+        "baseline_id": "subset_4096_tailrl_population_seed42",
+        "label": "TailRL population",
+        "test_mae_delta": -0.02993244317348509,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": 0.20715904267127794
+      },
+      {
+        "id": "digits_subset_mse",
+        "baseline_id": "subset_4096_mse_seed42",
+        "label": "Direct MSE",
+        "test_mae_delta": -0.01587291879827024,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": -0.1483318082956684
+      },
+      {
+        "id": "digits_subset_ce",
+        "baseline_id": "subset_4096_ce_seed42",
+        "label": "CE",
+        "test_mae_delta": -0.18988580239339115,
+        "outcome": "better",
+        "final_validation_mae_delta": -0.04589602565941853
+      }
+    ],
+    "noise": [
+      {
+        "id": "noise_fixed_s5_tailrl_population_seed42",
+        "baseline_id": "subset_4096_tailrl_population_seed42",
+        "label": "TailRL population",
+        "test_mae_delta": 0.5608931488134141,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.7859624680611361
+      },
+      {
+        "id": "noise_fresh_s5_tailrl_population_seed42",
+        "baseline_id": "subset_4096_tailrl_population_seed42",
+        "label": "TailRL population",
+        "test_mae_delta": -0.1908265492898824,
+        "outcome": "better",
+        "final_validation_mae_delta": -0.08800385362050811
+      },
+      {
+        "id": "noise_fixed_s5_mse_seed42",
+        "baseline_id": "subset_4096_mse_seed42",
+        "label": "Direct MSE",
+        "test_mae_delta": 0.3712770577411284,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.5638072593047339
+      },
+      {
+        "id": "noise_fresh_s5_mse_seed42",
+        "baseline_id": "subset_4096_mse_seed42",
+        "label": "Direct MSE",
+        "test_mae_delta": 0.014382538742652606,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": -0.05190897280118456
+      },
+      {
+        "id": "noise_fixed_s5_mae_seed42",
+        "baseline_id": "subset_4096_mae_seed42",
+        "label": "Direct MAE",
+        "test_mae_delta": 0.32027132580426,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.3863782471436874
+      },
+      {
+        "id": "noise_fresh_s5_mae_seed42",
+        "baseline_id": "subset_4096_mae_seed42",
+        "label": "Direct MAE",
+        "test_mae_delta": 0.03291389605638617,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": 0.21854669862424192
+      },
+      {
+        "id": "noise_fixed_s1_ce_seed42",
+        "baseline_id": "subset_4096_ce_seed42",
+        "label": "CE",
+        "test_mae_delta": -0.20920881304954086,
+        "outcome": "better",
+        "final_validation_mae_delta": 0.14181017895823977
+      },
+      {
+        "id": "noise_fixed_s5_ce_seed42",
+        "baseline_id": "subset_4096_ce_seed42",
+        "label": "CE",
+        "test_mae_delta": 0.21550447945904683,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.7370463815577724
+      },
+      {
+        "id": "noise_fresh_s5_ce_seed42",
+        "baseline_id": "subset_4096_ce_seed42",
+        "label": "CE",
+        "test_mae_delta": -0.6577145565232376,
+        "outcome": "better",
+        "final_validation_mae_delta": -0.48531736159449057
+      },
+      {
+        "id": "noise_fixed_s5_mse_scalar_seed42",
+        "baseline_id": "subset_4096_mse_scalar_seed42",
+        "label": "Direct MSE scalar",
+        "test_mae_delta": 0.42671724980893977,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.5567302120981843
+      },
+      {
+        "id": "noise_fresh_s5_mse_scalar_seed42",
+        "baseline_id": "subset_4096_mse_scalar_seed42",
+        "label": "Direct MSE scalar",
+        "test_mae_delta": 0.174788463725168,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.19904516637325287
+      },
+      {
+        "id": "noise_fixed_s1_mae_scalar_seed42",
+        "baseline_id": "subset_4096_mae_scalar_seed42",
+        "label": "Direct MAE scalar",
+        "test_mae_delta": 0.052810888279042345,
+        "outcome": "practical tie",
+        "final_validation_mae_delta": 0.07517614803136574
+      },
+      {
+        "id": "noise_fixed_s5_mae_scalar_seed42",
+        "baseline_id": "subset_4096_mae_scalar_seed42",
+        "label": "Direct MAE scalar",
+        "test_mae_delta": 0.6183553048291692,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.6503914133153303
+      },
+      {
+        "id": "noise_fresh_s5_mae_scalar_seed42",
+        "baseline_id": "subset_4096_mae_scalar_seed42",
+        "label": "Direct MAE scalar",
+        "test_mae_delta": 0.11705136089948898,
+        "outcome": "worse",
+        "final_validation_mae_delta": 0.15282951631103892
+      }
+    ]
+  }
+}

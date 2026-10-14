@@ -1,6 +1,6 @@
 # Scaled UTKFace study
 
-State: **running**. GPU time: **41.23 / 64 hours**. Completed primary runs: **66 / 66**.
+State: **running**. GPU time: **46.89 / 64 hours**. Completed primary runs: **66 / 66**.
 
 Metrics use clean held-out labels. All tuning and scalar-head gates use validation data. Values are means ± sample SD across distinct training seeds; single-seed values have no SD. Label NLL is unavailable for scalar heads. Population zero-one MaxRL equals CE. Training subsets are fixed and nested.
 
@@ -19,6 +19,15 @@ These are precomputed perturbation statistics for the fixed 4,096-image subset; 
 
 | Stage | Variant | Training size | Noise | Seeds | Mean MAE ↓ | Median MAE ↓ | Median Spearman ↑ | Label NLL ↓ |
 |---|---|---:|---|---:|---:|---:|---:|---:|
+| digits | mse_digits | 4096 | none 0 | 1 | 5.200 | 5.650 | 0.885 | 4.608 |
+| digits | tailrl_population_digits | 4096 | none 0 | 1 | 5.376 | 5.435 | 0.884 | 3.650 |
+| digits | ce_digits | 4096 | none 0 | 1 | 5.907 | 6.065 | 0.867 | 3.288 |
+| flat | mse | 4096 | none 0 | 1 | 5.169 | 5.536 | 0.884 | 5.003 |
+| flat | mae_scalar | 4096 | none 0 | 1 | 5.321 | 5.321 | 0.889 | n/a |
+| flat | mse_scalar | 4096 | none 0 | 1 | 5.326 | 5.326 | 0.895 | n/a |
+| flat | mae | 4096 | none 0 | 1 | 5.561 | 5.671 | 0.881 | 6.773 |
+| flat | tailrl_population | 4096 | none 0 | 1 | 5.573 | 5.592 | 0.875 | 3.525 |
+| flat | ce | 4096 | none 0 | 1 | 5.934 | 6.063 | 0.864 | 3.721 |
 | main | stat_maxrl_mae_population_s2 | full | none 0 | 3 | 4.718 ± 0.086 | 4.828 ± 0.120 | 0.902 ± 0.006 | 7.439 ± 0.451 |
 | main | tailrl | full | none 0 | 3 | 4.724 ± 0.019 | 4.765 ± 0.020 | 0.905 ± 0.002 | 6.698 ± 0.626 |
 | main | tailrl_population | full | none 0 | 3 | 4.752 ± 0.037 | 4.730 ± 0.081 | 0.903 ± 0.004 | 3.214 ± 0.222 |
@@ -41,8 +50,28 @@ These are precomputed perturbation statistics for the fixed 4,096-image subset; 
 | main | rloo_mse_population | full | none 0 | 3 | 6.640 ± 0.450 | 6.702 ± 0.465 | 0.888 ± 0.006 | 39.942 ± 0.837 |
 | main | rloo_mse | full | none 0 | 3 | 6.657 ± 0.465 | 6.734 ± 0.476 | 0.885 ± 0.006 | 41.929 ± 1.607 |
 | main | grpo_mse_population | full | none 0 | 3 | 6.808 ± 0.281 | 6.881 ± 0.279 | 0.887 ± 0.007 | 35.231 ± 2.314 |
+| noise | mae_scalar | 4096 | fixed 1 | 1 | 5.198 | 5.198 | 0.889 | n/a |
+| noise | ce | 4096 | fixed 1 | 1 | 5.887 | 6.032 | 0.863 | 3.745 |
+| noise | tailrl_population | 4096 | fresh 5 | 1 | 5.215 | 5.228 | 0.888 | 3.330 |
+| noise | mse | 4096 | fresh 5 | 1 | 5.231 | 5.416 | 0.888 | 5.209 |
+| noise | mae_scalar | 4096 | fresh 5 | 1 | 5.262 | 5.262 | 0.895 | n/a |
+| noise | ce | 4096 | fresh 5 | 1 | 5.439 | 5.421 | 0.881 | 3.375 |
+| noise | mse_scalar | 4096 | fresh 5 | 1 | 5.489 | 5.489 | 0.889 | n/a |
+| noise | mse | 4096 | fixed 5 | 1 | 5.588 | 5.718 | 0.873 | 5.003 |
+| noise | mae | 4096 | fresh 5 | 1 | 5.609 | 5.741 | 0.876 | 8.033 |
+| noise | mse_scalar | 4096 | fixed 5 | 1 | 5.741 | 5.741 | 0.877 | n/a |
+| noise | mae_scalar | 4096 | fixed 5 | 1 | 5.764 | 5.764 | 0.874 | n/a |
+| noise | mae | 4096 | fixed 5 | 1 | 5.896 | 6.093 | 0.860 | 11.393 |
+| noise | tailrl_population | 4096 | fixed 5 | 1 | 5.967 | 6.014 | 0.859 | 3.589 |
+| noise | ce | 4096 | fixed 5 | 1 | 6.312 | 6.455 | 0.854 | 3.609 |
 | scalar | mae_scalar | full | none 0 | 1 | 4.611 | 4.611 | 0.911 | n/a |
 | scalar | mse_scalar | full | none 0 | 1 | 4.680 | 4.680 | 0.912 | n/a |
+| subset | mae_scalar | 4096 | none 0 | 1 | 5.145 | 5.145 | 0.899 | n/a |
+| subset | mse | 4096 | none 0 | 1 | 5.216 | 5.392 | 0.890 | 5.371 |
+| subset | mse_scalar | 4096 | none 0 | 1 | 5.314 | 5.314 | 0.892 | n/a |
+| subset | tailrl_population | 4096 | none 0 | 1 | 5.406 | 5.646 | 0.866 | 4.260 |
+| subset | mae | 4096 | none 0 | 1 | 5.576 | 5.901 | 0.868 | 9.432 |
+| subset | ce | 4096 | none 0 | 1 | 6.097 | 6.273 | 0.856 | 3.583 |
 
 ![Main comparison](main.png)
 
