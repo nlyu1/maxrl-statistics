@@ -23,4 +23,10 @@ After a successful owned process exits, the dispatcher wakes through a process-e
 
 Training implementation, data, subset fingerprints, learning-rate selection, epochs and noise settings remain unchanged. The update records its orchestration source revision separately. All previous attempts and their charges are preserved. Historical cutoff documents remain dated evidence; the current dashboard uses the original and continuation plans and labels held jobs explicitly.
 
-Deployment and validation are pending. The source must be committed locally, pushed to GitHub and pulled remotely before tests, preparation or execution, following `server.md`.
+Activated at **01:11 GMT+8 on October 15**, source revision **eef7b21**, after local commit, GitHub push and remote pull. The live check at **01:13** verified original supervisor **3151561** and continuation supervisor **3151836**, 212 queued jobs, 40 held jobs, zero active attempts and zero eligible GPUs. All 325 previous attempts and 46.89244767076439 GPU-hours were preserved. Both immutable historical plans and all eleven frozen training sources verified unchanged.
+
+The 23 focused scheduler tests passed remotely in 9.88 seconds, including eight-GPU coordination, disabled budget enforcement, immediate reuse, the final occupied-GPU rejection, the ten-second new-claim interval, held jobs and process-exit wakeup. The refreshed dashboard passed all thirteen isolated QuickJS interaction checks. Its 01:14 snapshot contains the same 302 completed jobs; this refresh changes orchestration and coverage, not experimental findings. Browser rendering remains unverified.
+
+[Activation audit](requeue-audit.json), [live deployment audit](post-update-audit.json), [current coordination policy](current-coordination.json), [continuation plan](continuation-plan.json), [interactive report](dashboard.html).
+
+Read live status for each plan with `uv run --python 3.12 python -m src.experiments.utkface.scheduler --plan <plan-path> --coordination /tmp/utkface-followup-20261015/coordination.json --status`. The saved app follow-up instructions were updated while retaining their existing paused state; the two server supervisors run independently.

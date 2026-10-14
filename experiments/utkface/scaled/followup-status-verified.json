@@ -1,0 +1,26 @@
+{
+  "status": "running",
+  "gpu_hours": 0.0,
+  "budget_gpu_hours": null,
+  "counts": {
+    "pending": 24
+  },
+  "stages": {
+    "matched_steps": {
+      "pending": 8
+    },
+    "subset_replication": {
+      "pending": 16
+    }
+  },
+  "active": [],
+  "updated_at": 1791997999.5228062,
+  "planning_gpu_hours": 24.0,
+  "gpu_hour_cap_enforced": false,
+  "max_concurrent": 8,
+  "queued_pending": 24,
+  "held_pending": 0,
+  "new_gpu_idle_checks": 2,
+  "new_gpu_idle_interval_seconds": 10.0,
+  "immediate_successful_gpu_reuse": true
+}

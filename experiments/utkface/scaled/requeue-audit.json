@@ -1,0 +1,23 @@
+{
+  "authorized_at": "2026-10-15T01:11:34.353986+08:00",
+  "source_revision": "eef7b21e2d3325716459f6c5e91715398443e3e9",
+  "original_plan": "/tmp/utkface-study-20261013/plan.json",
+  "original_plan_sha256": "1ecd0d0a6a1cae81ad1c8e2567ce226dbc47d5d7577ab027f97cb4ba08345fb6",
+  "archived_extension_plan": "/tmp/utkface-extension-20261014/plan.json",
+  "archived_extension_plan_sha256": "9b28c9dee4fff9c6158952f10813e8bd3c7abf06445e5c0a8015d4d74c273619",
+  "original_attempts_preserved": 325,
+  "original_gpu_hours_preserved": 46.89244767076439,
+  "original_required_pending": 140,
+  "original_new_setting_optional_pending": 48,
+  "held_training_seed_repetitions": 40,
+  "reinstated_runs": 24,
+  "removed_independent_noise_runs": 32,
+  "queued_pending": 212,
+  "previous_supervisor_pid": 1141199,
+  "previous_supervisor_command": "/home/zitongw2/maxrl-statistics/.venv/bin/python3 -m src.experiments.utkface.scheduler --plan /tmp/utkface-study-20261013/plan.json --coordination /tmp/utkface-extension-20261014/coordination.json ",
+  "frozen_training_sources_verified": true,
+  "gpu_hour_cap_enforced": false,
+  "max_concurrent": 8,
+  "applied": true,
+  "previous_supervisor_exited": true
+}

@@ -1,6 +1,6 @@
 {
-  "snapshot": "2026-10-14T21:24:21.556389+08:00",
-  "data_runs": 586,
+  "snapshot": "2026-10-15T01:14:03.298976+08:00",
+  "data_runs": 554,
   "main_methods": 22,
   "checks": [
     "script evaluation",

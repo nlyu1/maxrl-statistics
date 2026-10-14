@@ -1,0 +1,30 @@
+{
+  "verified_at": "2026-10-15T01:13:33.045014+08:00",
+  "supervisors": [
+    {
+      "root": "/tmp/utkface-study-20261013",
+      "pid": 3151561,
+      "command": "/home/zitongw2/maxrl-statistics/.venv/bin/python3 -m src.experiments.utkface.scheduler --plan /tmp/utkface-study-20261013/plan.json --coordination /tmp/utkface-followup-20261015/coordination.json --poll-seconds 10 ",
+      "updated_at": 1791998010.445599
+    },
+    {
+      "root": "/tmp/utkface-followup-20261015",
+      "pid": 3151836,
+      "command": "/home/zitongw2/maxrl-statistics/.venv/bin/python3 -m src.experiments.utkface.scheduler --plan /tmp/utkface-followup-20261015/plan.json --coordination /tmp/utkface-followup-20261015/coordination.json --poll-seconds 10 ",
+      "updated_at": 1791998009.8538258
+    }
+  ],
+  "queued_pending": 212,
+  "held_pending": 40,
+  "active": 0,
+  "gpu_hours": 46.89244767076439,
+  "original_attempts_preserved": 325,
+  "archived_extension_unchanged": true,
+  "training_sources_verified": true,
+  "max_concurrent": 8,
+  "gpu_hour_cap_enforced": false,
+  "free_gpus": 0,
+  "tests_passed": 23,
+  "test_seconds": 9.88,
+  "dispatch_source_revision": "eef7b21e2d3325716459f6c5e91715398443e3e9"
+}

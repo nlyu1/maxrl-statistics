@@ -1,0 +1,68 @@
+{
+  "status": "running",
+  "gpu_hours": 46.89244767076439,
+  "budget_gpu_hours": null,
+  "counts": {
+    "completed": 302,
+    "pending": 228
+  },
+  "stages": {
+    "digits": {
+      "completed": 3,
+      "pending": 13
+    },
+    "digits_tuning": {
+      "completed": 9,
+      "pending": 15
+    },
+    "flat": {
+      "completed": 6,
+      "pending": 4
+    },
+    "flat_tuning": {
+      "completed": 24,
+      "pending": 16
+    },
+    "main": {
+      "completed": 66
+    },
+    "noise": {
+      "pending": 66,
+      "completed": 14
+    },
+    "noise_replication": {
+      "pending": 40
+    },
+    "refine": {
+      "completed": 48
+    },
+    "scalar": {
+      "completed": 2,
+      "pending": 4
+    },
+    "smoke": {
+      "completed": 4
+    },
+    "subset": {
+      "completed": 6,
+      "pending": 14
+    },
+    "subset_tuning": {
+      "completed": 24,
+      "pending": 56
+    },
+    "wide": {
+      "completed": 96
+    }
+  },
+  "active": [],
+  "updated_at": 1791997989.8018422,
+  "planning_gpu_hours": 64.0,
+  "gpu_hour_cap_enforced": false,
+  "max_concurrent": 8,
+  "queued_pending": 188,
+  "held_pending": 40,
+  "new_gpu_idle_checks": 2,
+  "new_gpu_idle_interval_seconds": 10.0,
+  "immediate_successful_gpu_reuse": true
+}

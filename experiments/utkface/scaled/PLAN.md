@@ -1,4 +1,6 @@
-# Scaled UTKFace study: 64 GPU-hour allocation
+# Scaled UTKFace study: original 64 GPU-hour planning reference
+
+On October 15 the user removed GPU-hour enforcement, raised combined concurrency to eight and revised the retained follow-up scope. [Current orchestration, queue and deployment audit](ORCHESTRATION.md). The immutable original plan retains its initial planning values; current dispatch uses the explicit coordination policy.
 
 This study uses a new split created after image deduplication. The earlier [12-epoch report](../RESULTS.md) describes the original split and is a separate experiment. Code is on `codex/utkface-scaled-study`.
 
@@ -46,11 +48,13 @@ Evaluation includes mean/median/mode MAE, mean RMSE, **Spearman correlation betw
 
 Optional work begins only after required work finishes. It includes a noise standard deviation of 10 years; a two-token digit-policy pilot; and a second training seed for noise levels 3 and 5. The digit policy models `p(tens | image) * p(units | image, tens)` with a 10-way tens head and a shared conditional units head. It computes all 100 joint age probabilities, allowing the same population objectives and age metrics. The reduced matrix tunes three LRs for 20 epochs on 4,096 images, followed by 50-epoch subset/full confirmations if budget permits. This is an exploratory architecture comparison; its tuning protocol differs from the primary full-data matrix.
 
-The queue charges elapsed time for every launched GPU attempt, including startup, validation, final test evaluation, failed attempts, retries and polling overhead. Waiting for a free GPU consumes no GPU budget. The hard allocation is **64 GPU-hours**, with **at most six GPUs occupied by this study concurrently**. Historical timings suggest roughly 50 GPU-hours for required and qualifying scalar work; optional studies fill the remaining allocation, subject to measured timings. The exact endpoint can be below 64 hours because the queue reserves time for complete runs.
+The queue records elapsed time for every launched GPU attempt, including startup, validation, final test evaluation, failed attempts, retries and polling overhead. Waiting for a free GPU is uncharged. GPU-hour enforcement has been removed; the original 64-hour value remains a planning reference. Combined concurrency is now **at most eight GPUs**, and the selected work is described in ORCHESTRATION.md.
 
-The dispatcher polls physical GPUs every 20 seconds. A GPU must have no compute process, use at most 1,024 MiB, and remain at or below 5% utilization for three observations. It rechecks before dispatch and assigns by GPU UUID. If another workload appears during a run, it yields its own process group and retries the interrupted run in a fresh attempt directory. The interrupted GPU receives a cooldown of 15 minutes per observed interruption, capped at one hour. External preemptions do not exhaust a retry count; genuine training errors and timeouts halt dispatch for investigation. All attempts count against the budget. It never signals another workload. A supervisor lock prevents duplicate queues; persisted state allows adoption of still-running jobs after supervisor restart. Training source hashes are frozen in the plan and verified before dispatch.
+The dispatcher wakes on owned-process completion and otherwise polls every ten seconds. Successful completion permits immediate reuse after the final free-GPU check. New claims require two idle observations at least ten seconds apart. A GPU must have no compute process, use at most 1,024 MiB and remain at or below 5% utilization. It rechecks immediately before dispatch and assigns by GPU UUID. If another workload appears during a run, it yields its own process group and retries the interrupted run in a fresh attempt directory. The interrupted GPU receives a cooldown of 15 minutes per observed interruption, capped at one hour. Genuine training errors and timeouts halt dispatch for investigation. It never signals another workload. Supervisor and shared dispatch locks prevent duplicate queues and enforce combined concurrency; persisted state allows adoption. Frozen training hashes are verified before dispatch.
 
 All Python execution runs remotely through `uv`, following `server.md`. Data, checkpoints, plans, logs and budget accounting live under `/tmp`. Code reaches the server through committed GitHub pushes and remote pulls.
+
+The following block records initial data and plan preparation. Do not recreate retained plans or ledgers.
 
 ```bash
 uv run --python 3.12 python -m src.experiments.utkface.clean \
@@ -60,11 +64,17 @@ uv run --python 3.12 python -m src.experiments.utkface.audit \
 uv run --python 3.12 python -m src.experiments.utkface.study \
   --manifest /tmp/utkface-clean-v2/manifest.json --output-dir /tmp/utkface-study-20261013 \
   --budget-gpu-hours 64 --max-concurrent 6
-nohup uv run --python 3.12 python -m src.experiments.utkface.scheduler \
-  --plan /tmp/utkface-study-20261013/plan.json \
-  > /tmp/utkface-study-20261013/supervisor.log 2>&1 < /dev/null &
+```
+
+Current read-only status and reporting commands:
+
+```bash
 uv run --python 3.12 python -m src.experiments.utkface.scheduler \
-  --plan /tmp/utkface-study-20261013/plan.json --status
+  --plan /tmp/utkface-study-20261013/plan.json \
+  --coordination /tmp/utkface-followup-20261015/coordination.json --status
+uv run --python 3.12 python -m src.experiments.utkface.scheduler \
+  --plan /tmp/utkface-followup-20261015/plan.json \
+  --coordination /tmp/utkface-followup-20261015/coordination.json --status
 uv run --python 3.12 python -m src.experiments.utkface.study_report \
   --plan /tmp/utkface-study-20261013/plan.json \
   --output-dir /tmp/utkface-study-20261013/report --figures
