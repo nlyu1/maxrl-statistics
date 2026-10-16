@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import statistics
+import subprocess
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -323,6 +324,18 @@ def completion_audit(
         "completed_records": sum(
             r["status"] == "completed" for s in states for r in s["jobs"].values()
         ),
+        "original_completed_records": original["completed_records"],
+        "completed_stages": dict(
+            Counter(
+                job.stage
+                for plan, state in zip(plans, states, strict=True)
+                for job in plan.jobs
+                if state["jobs"][job.identifier]["status"] == "completed"
+            )
+        ),
+        "report_source_revision": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip(),
         "completed_test_evaluations": sum(
             r["status"] == "completed"
             and r["test"]["mae_mean"] is not None

@@ -460,7 +460,7 @@ def figures(*, data: dict, comparisons: dict, output_dir: Path) -> None:
             squeeze=False,
             layout="constrained",
         )
-        for ax, p in zip(axes.flat, digits, strict=True):
+        for ax, p in zip(axes.flat, digits):
             r, base = by_id[p["id"]], by_id[p["baseline_id"]]
             curve(
                 ax,
