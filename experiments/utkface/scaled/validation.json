@@ -396,5 +396,24 @@
     "interaction_checks_passed": 20,
     "ruff_changed_scope_passed": true,
     "browser_rendering_verified": false
+  },
+  "dashboard_size_navigation_fix_20261017": {
+    "data_snapshot": "2026-10-17T00:44:42.960062+08:00",
+    "fix_commit": "11bb4de",
+    "direct_full_data_size_1024_bug_reproduced": true,
+    "prior_direct_selection_rows": 0,
+    "completed_1024_evaluations": 18,
+    "completed_1024_50_epoch_evaluations": 10,
+    "completed_1024_200_epoch_evaluations": 8,
+    "direct_size_change_event_verified": true,
+    "size_changes_reset_unavailable_horizons": true,
+    "section_navigation_resets_hidden_methods": true,
+    "unsupported_section_sizes_disabled": true,
+    "canonical_template_matches_saved_snapshot": true,
+    "server_html_sha256": "3ce04b9c0b0218355827c2404a992c052ffd94ddf7fcc2c710919e3c75d404b4",
+    "scientific_results_unchanged": true,
+    "interaction_checks_passed": 24,
+    "ruff_changed_scope_passed": true,
+    "browser_rendering_verified": false
   }
 }

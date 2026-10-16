@@ -25,7 +25,11 @@
     "4096-image defaults retain all three categorical seeds",
     "1024-image 50/200-epoch horizon selection",
     "all eighty noise settings with held repetitions excluded",
-    "all sixteen digit-policy objectives and matching baselines"
+    "all sixteen digit-policy objectives and matching baselines",
+    "direct training-size change opens all eighteen 1024-image evaluations",
+    "size changes reset unavailable horizons and hidden selections",
+    "unsupported section-size combinations are disabled",
+    "scalar and digit baselines use matching training settings"
   ],
   "passed": true,
   "environment": "isolated QuickJS DOM harness; no browser rendering",
