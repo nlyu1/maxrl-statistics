@@ -454,9 +454,9 @@ def figures(*, data: dict, comparisons: dict, output_dir: Path) -> None:
     digits = comparisons["pairs"]["digits"]
     if digits:
         fig, axes = plt.subplots(
-            1,
-            len(digits),
-            figsize=(6 * len(digits), 5),
+            math.ceil(len(digits) / 3),
+            min(3, len(digits)),
+            figsize=(6 * min(3, len(digits)), 5 * math.ceil(len(digits) / 3)),
             squeeze=False,
             layout="constrained",
         )
@@ -485,6 +485,8 @@ def figures(*, data: dict, comparisons: dict, output_dir: Path) -> None:
                 fontsize=9,
             )
             ax.legend(fontsize=8)
+        for ax in list(axes.flat)[len(digits) :]:
+            ax.set_visible(False)
         fig.suptitle(
             "Flat 100-bin versus conditional 10×10 policy; one matched seed (42)\nFixed 4096 images, 50 epochs; heads and LR candidate sets differ"
         )
