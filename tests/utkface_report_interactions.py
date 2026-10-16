@@ -26,6 +26,7 @@ class Element {
 const document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement:t=>new Element(t),createElementNS:(ns,t)=>new Element(t),documentElement:new Element()};
 document.getElementById('report-data').textContent=snapshot_json;
 for(const [id,value] of Object.entries({'size':'all','epochs':'all','start-epoch':'1','noise-mode':'fixed','noise-std':'5','noise-field':'2026','x-axis':'epoch','extra-metric':'rmse_mean','tolerance':'0.1'}))document.getElementById(id).value=value;
+for(const [id,values] of Object.entries({size:['all','18462','4096','1024'],epochs:['all','50','200']}))for(const value of values){const option=new Element('option');option.value=value;document.getElementById(id).append(option);}
 document.getElementById('seed-sd').checked=true;
 for(const name of ['main','subset','schedule','scalar','noise','digits']){const b=new Element('button');b.dataset.view=name;document.getElementById('navigation').append(b);}
 const window={innerWidth:1280,innerHeight:900,matchMedia:()=>({matches:false,addEventListener(){}})};
@@ -38,6 +39,8 @@ const URL={createObjectURL:()=>'',revokeObjectURL:()=>{}};
 
 ASSERTIONS = r"""
 function check(condition,message){if(!condition)throw Error(message);}
+function changeControl(id,value){const node=document.getElementById(id);node.value=value;(node.listeners.change||[]).forEach(f=>f({target:node}));}
+function option(id,value){return document.getElementById(id).children.find(n=>n.value===value);}
 check(state.groups.length===24,'full-data view must contain 22 categorical methods and two scalar heads');
 check(state.groups.filter(g=>g.r.head==='categorical').length===22&&state.groups.filter(g=>g.r.head==='scalar').length===2,'full-data head coverage');
 check(state.groups.reduce((n,g)=>n+g.n,0)===D.runs.filter(r=>['main','scalar'].includes(r.stage)&&r.status==='completed').length,'full-data coverage mismatch');
@@ -55,6 +58,23 @@ headers[4].children[0].click();check(!state.ascending,'descending sort');
 check(document.getElementById('results-table').children[0].children[1].children[0].children[0].textContent.startsWith(label(sorted(state.groups)[0].r)),'sorted first row');
 details(state.groups[0]);check(!document.getElementById('run-details').hidden,'run evidence');
 exportRows();check(downloaded.includes('selected_test_mae'),'CSV export');
+changeControl('size','1024');
+check(state.view==='subset'&&document.getElementById('size').value==='1024','direct 1024 selection opens subset results');
+check(state.groups.length===18&&state.groups.every(g=>g.r.size===1024&&g.n===1),'direct 1024 selection shows all eighteen completed evaluations');
+changeControl('epochs','50');check(state.groups.length===10,'direct 1024 selection includes ten 50-epoch runs');
+changeControl('epochs','200');check(state.groups.length===8,'direct 1024 selection includes eight 200-epoch runs');
+changeControl('size','4096');
+check(document.getElementById('epochs').value==='all'&&state.groups.length===10,'changing size resets an unavailable horizon');
+check(option('epochs','200').disabled,'4096-image 200-epoch choice is unavailable');
+changeControl('size','18462');check(state.view==='main'&&state.groups.length===24,'full-size selection restores full-data comparison');
+document.getElementById('hide-all').click();changeControl('size','1024');
+check(state.groups.length===18,'subset navigation clears incompatible hidden-method selection');
+view('noise');check(option('size','1024').disabled&&option('size','18462').disabled,'noise sizes require matching experiments');
+view('schedule');check(option('size','1024').disabled&&option('size','18462').disabled,'schedule sizes require matching experiments');
+view('digits');check(option('size','1024').disabled&&!option('size','18462').disabled,'digit sizes require actual digit pilots');
+view('scalar');check(!option('size','1024').disabled,'1024-image scalar comparisons are available');
+changeControl('size','1024');check(state.groups.length===4&&state.groups.every(g=>g.r.epochs===50),'scalar comparisons use matched training horizons');
+view('main');exportRows();
 for(const b of document.getElementById('navigation').children){b.click();check(state.view===b.dataset.view,'section navigation');}
 view('subset');
 check(document.getElementById('size').value==='4096'&&!document.getElementById('matched').checked,'subset defaults retain all available seeds');
@@ -143,6 +163,10 @@ def verify(*, html_path: Path) -> dict:
             "1024-image 50/200-epoch horizon selection",
             "all eighty noise settings with held repetitions excluded",
             "all sixteen digit-policy objectives and matching baselines",
+            "direct training-size change opens all eighteen 1024-image evaluations",
+            "size changes reset unavailable horizons and hidden selections",
+            "unsupported section-size combinations are disabled",
+            "scalar and digit baselines use matching training settings",
         ],
         "passed": True,
         "environment": "isolated QuickJS DOM harness; no browser rendering",

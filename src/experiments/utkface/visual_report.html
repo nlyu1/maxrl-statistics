@@ -54,7 +54,7 @@ label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:
 <p><strong>Best checkpoint</strong> means the checkpoint selected by minimum validation mean-prediction MAE. The best columns show all metrics at that same checkpoint. Final columns show the last validation epoch of a completed run. Test columns use clean held-out labels at the selected checkpoint. Historical runs did not retain final-epoch test models; final-epoch test metrics are unavailable.</p>
 <p>Curves are validation metrics. Means and sample SDs describe the completed training seeds included in the comparison, not confidence intervals or dataset uncertainty. Full-data and subset views initially use all completed seeds, so the replicated 4096-image categorical methods retain all three seeds while scalar subset heads have one. “Compare common optimization seeds” uses the intersection of completed seeds across visible groups with results; coverage still shows every completed run. It is enabled initially for scalar, schedule, noise and digit comparisons. Exact best epochs, metric-specific extrema, status and source commits are available through each row's “Runs” button. Scalar regression has no label NLL; scalar Spearman ranks its continuous prediction, while categorical Spearman ranks the distribution median.</p>
 <p>The 1024×200 continuation matches the 3,200 training updates of 4096×50, while 1024×50 uses 800 updates. Changing the horizon also stretches warmup and cosine decay; learning rates were inherited from short 1024-image tuning. Validation is evaluated more frequently per update at 1024 images. Digit pilots have one seed, different head capacity and tuning grids; full-data digit runs reuse subset-selected rates. Noise is rounded and clipped to ages 0–99; SNR is 10 log10(clean-age variance / realized perturbation MSE). Optimization seeds and noise-realization seeds remain distinct dimensions.</p>
-<p>Held repetitions are excluded from the comparison tables and curves, and retained in the raw snapshot and coverage records. Independent noise fields 2027/2028 were excluded from the study and supply no trained evidence. “Plot from epoch” changes only the displayed curve range; metrics and checkpoint selection still use the full training history.</p>
+<p>Held repetitions are excluded from the comparison tables and curves, and retained in the raw snapshot and coverage records. Independent noise fields 2027/2028 were excluded from the study and supply no trained evidence. “Plot from epoch” changes only the displayed curve range; metrics and checkpoint selection still use the full training history. Selecting a subset size from Full data opens Smaller datasets; selecting Full from Smaller datasets opens Full data. Other sections offer only sizes with matching experiments, and unavailable training horizons are disabled.</p>
 <p>Rows are kept separate across training-source cohorts, data splits, subsets, horizons, learning-rate schedules and noise realizations. Exact RGB duplicates were removed before splitting; this is not a subject-disjoint or near-duplicate-disjoint benchmark.</p>
 <details><summary>Coverage, budgets and reproducibility</summary><div id="provenance"></div></details>
 <p><a href="dashboard-runs.csv">All run metrics</a> · <a href="dashboard-curves.csv">All epoch curves</a> · <a href="dashboard-data.json">Report snapshot</a> · <a href="COVERAGE.md">Historical extension coverage</a></p>
@@ -65,6 +65,7 @@ label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:
 const D=JSON.parse(document.getElementById("report-data").textContent);
 const el=id=>document.getElementById(id);
 const NS="http://www.w3.org/2000/svg";
+const digitSizes=new Set(D.runs.filter(r=>r.stage==="digits").map(r=>r.size));
 const state={view:"main",hidden:new Set(),sort:"test.mae_mean",ascending:true,groups:[]};
 const specs={main:["Full data: categorical matrix and scalar heads","Fifty full-data epochs: 22 categorical methods and two scalar heads, each with three optimization seeds. Hide methods to compare objectives or heads directly."],subset:["Training-set size and optimization budget","Fixed stratified subsets. Eight categorical methods have three seeds at 4096 images; scalar subset heads and all 1024-image settings have one. Available-seed means are shown initially; enable common seeds for a paired comparison."],schedule:["Cosine decay versus constant learning rate","End-of-run selected-checkpoint test results only. Both schedules have independently validation-selected rates. Good/bad/tied denotes a practical threshold, not statistical significance."],scalar:["Direct scalar versus categorical-mean regression","The same ResNet-18 backbone, direct MAE/MSE objectives, and clean labels. Full-data heads have three seeds; subset scalar heads have one. Scalar label NLL is undefined."],noise:["Fixed and fresh training-label noise","All 80 runs are complete: ten methods × fixed/fresh × SD 1/3/5/10, with optimization seed 42 and noise field 2026. Held-out labels stay clean; all noise arms reuse their clean-subset selected rate."],digits:["Conditional 10×10 policy versus 100 bins","All 16 pilots are complete: eight objectives × 4096/full data, with seed 42 and 50 epochs. The head models p(tens|image) × p(units|image,tens) over the same 100 ages; head capacity and LR tuning differ."]};
 const finite=x=>typeof x==="number"&&Number.isFinite(x);
@@ -89,9 +90,9 @@ function inView(r){
  if(state.view==="main")return ["main","scalar"].includes(p);
  if(state.view==="subset")return p==="subset";
  if(state.view==="schedule")return r.size===4096&&r.noise==="none"&&["subset","flat"].includes(p);
- if(state.view==="scalar")return ["mae","mse"].includes(r.method)&&["main","scalar","subset"].includes(p);
+ if(state.view==="scalar")return r.epochs===50&&["mae","mse"].includes(r.method)&&["main","scalar","subset"].includes(p);
  if(state.view==="noise")return p==="noise"||(p==="subset"&&r.size===4096&&r.epochs===50&&r.noise==="none");
- return ["digits","subset","main","scalar"].includes(p)&&r.epochs===50&&["ce","binary_maxrl_population","mse","mae","tailrl_population","stat_maxrl_mae_population","stat_maxrl_mse_population","grpo_mae_population","grpo_mse_population"].includes(r.method)&&(!r.method.startsWith("stat_maxrl")||r.width===2);
+ return digitSizes.has(r.size)&&["digits","subset","main","scalar"].includes(p)&&r.epochs===50&&["ce","binary_maxrl_population","mse","mae","tailrl_population","stat_maxrl_mae_population","stat_maxrl_mse_population","grpo_mae_population","grpo_mse_population"].includes(r.method)&&(!r.method.startsWith("stat_maxrl")||r.width===2);
 }
 function filtered(ignoreStd=false){
  return D.runs.filter(r=>{
@@ -219,7 +220,23 @@ function exportRows(){
  sorted(state.groups).forEach(g=>lines.push([label(g.r),setup(g.r),g.completedN,g.planned,g.n,g.done.map(r=>r.seed).join(";"),g.done.map(r=>r.seed+":"+r.bestEpoch).join(";"),g.values["best.mae_mean"],g.values["final.mae_mean"],g.values["test.mae_mean"],g.values["test.median_spearman"],g.values["test.label_nll"]].map(quote).join(",")));
  const url=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"})),a=make("a",undefined,{href:url,download:"utkface-"+state.view+".csv"});a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+function configureChoices(){
+ const rows=D.runs.filter(r=>r.status!=="held"&&inView(r));
+ const navigation=["main","subset"].includes(state.view);
+ const sizes=new Set((navigation?D.runs.filter(r=>r.status!=="held"&&["main","scalar","subset"].includes(role(r))):rows).map(r=>String(r.size)));
+ el("size").querySelectorAll("option").forEach(option=>option.disabled=option.value!=="all"&&!sizes.has(option.value));
+ const horizons=new Set(rows.filter(r=>el("size").value==="all"||r.size===+el("size").value).map(r=>String(r.epochs)));
+ el("epochs").querySelectorAll("option").forEach(option=>option.disabled=option.value!=="all"&&!horizons.has(option.value));
+ if(el("epochs").value!=="all"&&!horizons.has(el("epochs").value))el("epochs").value="all";
+}
+function changeSize(){
+ const size=el("size").value;
+ if(state.view==="main"&&["4096","1024"].includes(size)){state.hidden.clear();view("subset",size);return;}
+ if(state.view==="subset"&&size==="18462"){state.hidden.clear();view("main",size);return;}
+ render();
+}
 function render(){
+ configureChoices();
  const rows=filtered();showLegend(rows);
  const gs=groups(rows.filter(r=>!state.hidden.has(methodKey(r))));state.groups=gs;
  const n=gs.reduce((s,g)=>s+g.n,0),completed=gs.reduce((s,g)=>s+g.completedN,0),planned=gs.reduce((s,g)=>s+g.planned,0);
@@ -238,7 +255,7 @@ function render(){
   map.forEach(s=>s.points.sort((a,b)=>a.x-b.x));plot("snr-plot",Array.from(map.values()),"Selected-checkpoint test MAE versus measured SNR","Measured training-label SNR · dB");
  }
 }
-function view(name){
+function view(name,requestedSize){
  state.view=name;el("section-title").textContent=specs[name][0];el("section-description").textContent=specs[name][1];
  el("navigation").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.view===name)));
  const noise=name==="noise",schedule=name==="schedule";
@@ -246,13 +263,14 @@ function view(name){
  ["x-control","start-control","partial-control","sd-control","curves"].forEach(id=>el(id).hidden=schedule);
  el("horizon-control").hidden=name!=="subset";
  el("tolerance-control").hidden=!schedule;
- el("size").value=["main","scalar"].includes(name)?"18462":"4096";
+ el("size").value=requestedSize||(["main","scalar"].includes(name)?"18462":"4096");
  el("epochs").value="all";el("start-epoch").value="1";
  el("matched").checked=!["main","subset"].includes(name);
  el("x-axis").value=name==="subset"?"updates":"epoch";render();
 }
 el("navigation").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>view(b.dataset.view)));
-["size","epochs","start-epoch","noise-mode","noise-std","noise-field","x-axis","partial","seed-sd","tolerance","extra-metric","matched"].forEach(id=>el(id).addEventListener("change",render));
+el("size").addEventListener("change",changeSize);
+["epochs","start-epoch","noise-mode","noise-std","noise-field","x-axis","partial","seed-sd","tolerance","extra-metric","matched"].forEach(id=>el(id).addEventListener("change",render));
 el("show-all").addEventListener("click",()=>{state.hidden.clear();render();});
 el("hide-all").addEventListener("click",()=>{filtered().forEach(r=>state.hidden.add(methodKey(r)));render();});
 el("baselines").addEventListener("click",()=>{state.hidden.clear();filtered().forEach(r=>{if(!["ce","binary_maxrl_population","mae","mse"].includes(r.method))state.hidden.add(methodKey(r));});render();});
