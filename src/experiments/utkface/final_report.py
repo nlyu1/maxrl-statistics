@@ -18,9 +18,11 @@ from src.experiments.utkface.coordination import CoordinationConfig
 from src.experiments.utkface.progress_report import audit, read
 from src.experiments.utkface.scheduler import charged_seconds, selected_result
 from src.experiments.utkface.study import REDUCED_VARIANTS, StudyPlan
+from src.experiments.utkface.study_report import FINAL_STAGES
 
 METRICS = ("mae_mean", "rmse_mean", "median_spearman", "label_nll")
 METHODS = tuple(method for method, _ in REDUCED_VARIANTS)
+SCIENTIFIC_STAGES = FINAL_STAGES | {"subset_replication", "matched_steps"}
 
 
 def name(*, run: dict) -> str:
@@ -322,8 +324,13 @@ def completion_audit(
             r["status"] == "completed" for s in states for r in s["jobs"].values()
         ),
         "completed_test_evaluations": sum(
-            r["status"] == "completed" and r["test"]["mae_mean"] is not None
+            r["status"] == "completed"
+            and r["test"]["mae_mean"] is not None
+            and r["stage"] in SCIENTIFIC_STAGES
             for r in data["runs"]
+        ),
+        "preflight_test_evaluations": sum(
+            r["stage"] == "smoke" and r["status"] == "completed" for r in data["runs"]
         ),
         "held_records": len(control.held_jobs),
         "excluded_noise_realizations": 32,
@@ -722,7 +729,9 @@ def main() -> None:
     runs = [
         r
         for r in data["runs"]
-        if r["status"] == "completed" and r["test"]["mae_mean"] is not None
+        if r["status"] == "completed"
+        and r["test"]["mae_mean"] is not None
+        and r["stage"] in SCIENTIFIC_STAGES
     ]
     assert len(runs) == 222 and integrity["completed_records"] == 514
     summaries = summarize(runs=runs)
