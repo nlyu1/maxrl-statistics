@@ -1,6 +1,6 @@
 # UTKFace final interpretation
 
-The selected study is complete: **514 jobs**, including **222 scientific final evaluations**, using **65.265 GPU-hours**. Scientific snapshot: October 16, 2026, 14:47 GMT+8. [Detailed final report](FINAL.md), [interactive report](dashboard.html), [all tables and selected epochs](FINAL_TABLES.md).
+The selected study is complete: **514 jobs**, including **222 scientific final evaluations**, using **65.265 GPU-hours**. The October 16 scientific results were reconfirmed unchanged on October 17; the interactive dashboard was refreshed at 00:44 GMT+8 with complete comparison coverage. [Detailed final report](FINAL.md), [interactive report](dashboard.html), [all tables and selected epochs](FINAL_TABLES.md).
 
 Scalar MAE now has the lowest observed full-data three-seed MAE, **4.632 ± 0.023 years**, versus **4.718 ± 0.086** for population Stat-MAE width 2 and **4.724 ± 0.019** for sampled TailRL. Its paired gap against Stat-MAE width 2 is −0.085 ± 0.070 years, improving on all three seeds. Three optimization seeds on one fixed split support a promising result, not a general superiority claim. Scalar heads do not provide categorical label probabilities. [Full-data scalar curves](final-scalar.pdf).
 

@@ -368,5 +368,33 @@
       "subset.png"
     ],
     "followup_automation_removed_after_completion": true
+  },
+  "dashboard_refresh_20261017": {
+    "snapshot": "2026-10-17T00:44:42.960062+08:00",
+    "generator_commit": "58caf0e",
+    "completed_jobs": 514,
+    "scientific_final_evaluations": 222,
+    "learning_rate_pilots": 288,
+    "preflight_checks": 4,
+    "held_repetitions": 40,
+    "selected_work_complete": true,
+    "new_training_results": false,
+    "training_sources_changed": false,
+    "per_run_metrics_sha256": "1925f583da4df6e068a0fa4128341f5ad8017d48237bca997ac4b9f637c06989",
+    "epoch_curves_sha256": "677ea9322d93a0aaacda32748fbb7be03cdac0b1e6d5731ce6b9100009ee4523",
+    "per_run_metrics_and_curves_unchanged": true,
+    "download_archive_sha256": "f67925635f328119ceec6d3d88676fbea657ba1c3cf086cd4227b901ef4ca590",
+    "full_data_methods": 24,
+    "full_data_categorical_methods": 22,
+    "full_data_scalar_heads": 2,
+    "default_4096_categorical_seeds": 3,
+    "digit_policy_pilots_visible": 16,
+    "noise_runs_visible": 80,
+    "held_repetitions_excluded_from_comparisons": true,
+    "horizon_filter_verified": true,
+    "late_epoch_curve_range_verified": true,
+    "interaction_checks_passed": 20,
+    "ruff_changed_scope_passed": true,
+    "browser_rendering_verified": false
   }
 }

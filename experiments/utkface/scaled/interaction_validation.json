@@ -1,7 +1,10 @@
 {
-  "snapshot": "2026-10-16T14:47:23.969804+08:00",
+  "snapshot": "2026-10-17T00:44:42.960062+08:00",
   "data_runs": 554,
-  "main_methods": 22,
+  "categorical_main_methods": 22,
+  "full_data_methods": 24,
+  "completed_jobs": 514,
+  "scientific_final_evaluations": 222,
   "checks": [
     "script evaluation",
     "six sections",
@@ -15,7 +18,14 @@
     "finite SVG geometry",
     "curve hover and dismissal",
     "common-seed comparisons preserve actual coverage",
-    "unfinished curves before the first completed seed"
+    "unfinished curves before the first completed seed",
+    "full-data categorical and scalar comparisons",
+    "completed study counts exclude tuning and preflight evaluations",
+    "late-epoch curve range preserves table results",
+    "4096-image defaults retain all three categorical seeds",
+    "1024-image 50/200-epoch horizon selection",
+    "all eighty noise settings with held repetitions excluded",
+    "all sixteen digit-policy objectives and matching baselines"
   ],
   "passed": true,
   "environment": "isolated QuickJS DOM harness; no browser rendering",

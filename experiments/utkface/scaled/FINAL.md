@@ -1,6 +1,6 @@
 # UTKFace completed study
 
-Verified October 16, 2026, GMT+8. Training finished **October 15 at 12:15:54 GMT+8**. The interactive report was refreshed at **14:47 on October 16**; its timestamp identifies retrieval and analysis, not new training.
+Results verified October 16, 2026, and reconfirmed unchanged on October 17, GMT+8. Training finished **October 15 at 12:15:54 GMT+8**. The interactive report was refreshed at **00:44 on October 17**; its timestamp identifies the dashboard refresh, not new training.
 
 [Interactive report](dashboard.html) · [all final tables and selected epochs](FINAL_TABLES.md) · [grouped metrics](final-summaries.csv) · [exact paired comparisons](final-comparisons.json) · [completion audit](final-audit.json) · [individual runs](dashboard-runs.csv) · [all validation curves](dashboard-curves.csv).
 

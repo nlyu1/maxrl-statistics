@@ -1,6 +1,6 @@
 # UTKFace study: completed
 
-All selected work finished **October 15, 2026 at 12:15:54 GMT+8**. The latest scientific snapshot was retrieved **October 16 at 14:47 GMT+8**. Both supervisors exited normally. There are no active attempts or selected pending jobs.
+All selected work finished **October 15, 2026 at 12:15:54 GMT+8**. The completed records were reconfirmed on **October 17**, and the interactive dashboard was refreshed at **00:44 GMT+8**. Per-run metrics and epoch curves are unchanged from the October 16 final audit. Both supervisors exited normally. There are no active attempts or selected pending jobs.
 
 **[Open the interactive report](dashboard.html)** · [Final interpretation](FINAL.md) · [All metrics and best epochs](FINAL_TABLES.md) · [Completion audit](final-audit.json).
 
@@ -23,7 +23,9 @@ Usage totals **65.265 GPU-hours across 542 attempts**, including **28 recorded c
 
 The new scientific result is the three-seed scalar comparison: scalar MAE reaches **4.632 ± 0.023 years**, the lowest observed three-seed full-data mean. At 4096 images, categorical MSE and population TailRL reach **5.297 ± 0.174** and **5.359 ± 0.097**, while categorical MAE varies substantially across seeds. The 1024-image 200-epoch runs do not close the gap to 4096 images. Fresh noise usually outperforms fixed noise, but all noise comparisons still have only one optimization seed and one corruption field. Digit-policy pilots have mixed full-data outcomes.
 
-All 514 completed histories, frozen training sources, split/subset fingerprints, held-out counts and validation-only LR/checkpoint choices have been audited. All 325 attempts present at the policy handoff were preserved. The continuation plan and shared coordination match their authorized Git artifacts. The refreshed dashboard passed thirteen isolated QuickJS interaction checks. Browser rendering remains unverified because the in-app browser blocks file URLs.
+All 514 completed histories, frozen training sources, split/subset fingerprints, held-out counts and validation-only LR/checkpoint choices have been audited. All 325 attempts present at the policy handoff were preserved. The continuation plan and shared coordination match their authorized Git artifacts. The refreshed dashboard passed twenty isolated QuickJS interaction checks. Browser rendering remains unverified because the in-app browser blocks file URLs.
+
+The full-data tab now includes all 22 categorical methods and both scalar heads. The 4096-image subset tab initially retains all three categorical seeds, with explicit common-seed and 50/200-epoch controls. All sixteen digit-policy pilots are visible, including statistical and GRPO objectives. Held repetitions are excluded from comparison coverage. A starting-epoch control focuses the curves without changing metrics or checkpoint selection.
 
 Best/final epoch metrics refer to validation; clean test evaluates the validation-MAE-selected checkpoint. Scalar label NLL is undefined. Scalar Spearman uses continuous predictions; categorical Spearman uses policy medians. Final-epoch test models were not retained. Sample SD across optimization seeds on one fixed split is not a confidence interval.
 
