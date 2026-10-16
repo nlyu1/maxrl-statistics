@@ -1,35 +1,32 @@
-# UTKFace visual report and study status
+# UTKFace study: completed
 
-**The interactive report is available:** [dashboard.html](dashboard.html). It was first generated at **04:01 GMT+8 on October 14**, before the requested 08:30 deadline. [Read the interpretation](ANALYSIS.md).
+All selected work finished **October 15, 2026 at 12:15:54 GMT+8**. The latest scientific snapshot was retrieved **October 16 at 14:47 GMT+8**. Both supervisors exited normally. There are no active attempts or selected pending jobs.
 
-The dashboard snapshot is **01:14 GMT+8 on October 15**. Its **302 completed jobs** and scientific results are unchanged from the October 14 21:24 publication. **290/430 original required jobs** are complete and 140 remain pending. The user has revised dispatch to **eight GPUs combined, no GPU-hour enforcement, immediate successful reuse and two new-claim checks ten seconds apart**. [Operating policy and deployment audit](ORCHESTRATION.md), [follow-up results](FOLLOWUP.md), [complete main table](MAIN_MATRIX.md).
+**[Open the interactive report](dashboard.html)** · [Final interpretation](FINAL.md) · [All metrics and best epochs](FINAL_TABLES.md) · [Completion audit](final-audit.json).
 
-The active queue contains **212 pending jobs**: 140 original required jobs, 24 reinstated extension jobs and 48 original optional new-setting jobs. Forty optional noise training-seed repetitions remain held. The reinstated work comprises sixteen clean 4096-image replications and eight 1024-image × 200-epoch runs. Thirty-two independent SD-5 noise-field runs are excluded from current scope.
+The study completed **514 jobs**: 288 LR pilots, four real-image preflight checks and **222 scientific final evaluations**. All **212 jobs selected in the October 15 update** completed. The original and continuation queues contribute 490 and 24 completed jobs, respectively.
 
-| Experiment | Completed / planned |
+| Scientific work | Completed |
 |---|---:|
-| Main categorical matrix, 22 methods × three seeds | **66/66** |
-| Full-data scalar confirmations | 2/6 |
-| Fixed 4096-image subset | 6/10 |
-| Fixed 1024-image subset | 0/10 |
-| Constant-LR confirmations | 6/10 |
-| Required SD-1/3/5 noise confirmations | 14/60 |
-| Optional digit-policy confirmations | 3/16 |
-| Reinstated clean 4096-image replications | 0/16 |
-| Reinstated 1024-image × 200-epoch comparisons | 0/8 |
+| Full-data categorical matrix, 22 methods × three seeds | 66/66 |
+| Full-data scalar heads, two objectives × three seeds | 6/6 |
+| Clean 4096-image comparisons, including 16 reinstated replications | 26/26 |
+| Clean 1024-image × 50-epoch comparisons | 10/10 |
+| Reinstated 1024-image × 200-epoch comparisons | 8/8 |
+| Constant-LR comparisons | 10/10 |
+| Fixed/fresh SD-1/3/5/10 noise comparisons | 80/80 |
+| Conditional 10×10 policy comparisons, subset and full data | 16/16 |
 
-The reduced sets include eight categorical methods and two qualified scalar heads. Completed follow-up comparisons use one optimization seed, 42. All three priority digit pilots are complete. The missing 4096-image categorical objectives are population Stat-MAE/MSE width 2 and population GRPO MAE/MSE. The original 96 wide LR pilots and 48 longer full-data confirmations remain complete; new subset/constant/digit tuning has completed 24/24/9 additional pilots.
+Forty optional noise training-seed repetitions remain held and unrun. Thirty-two independent SD-5 noise-field runs were deliberately excluded. The old deadline extension remains an unchanged historical record; its selected 24 jobs completed in the new continuation. Held and excluded work supplies no additional replication evidence.
 
-The live deployment audit preserves **46.892 GPU-hours across 325 original attempts**, including preemptions. Both coordinated supervisors are healthy and waiting for eligible GPUs; no permanently failed job is present. Historical peak concurrency was six; the updated combined ceiling is eight. The old extension remains closed with zero attempts and zero hours, preserving all 56 historical deadline skips. Its selected 24 jobs now have a separate continuation ledger. [Current deployment](post-update-audit.json), [historical result integrity](progress_integrity.json), [historical cutoff](COVERAGE.md).
+Usage totals **65.265 GPU-hours across 542 attempts**, including **28 recorded contention preemptions** costing 1.854 hours. No jobs are permanently failed. The authorized combined concurrency ceiling was eight; actual peak concurrency was six. All prior charges remain intact. The updated dispatcher recorded 149 immediate reuses with a **1.010-second median recorded turnaround**, and 68 new claims with at least **10.814 seconds** of idle confirmation.
 
-Both historical plans and all eleven frozen training sources remain intact. The earlier scientific audit checks all 302 completed histories, epoch counts, raw versus reported metrics, common split/subset fingerprints, shared noise fields and validation-only LR selection. The new audit preserves all 325 attempts through the policy handoff. The expired CPU watcher and closed historical extension are not restarted. The original and continuation supervisors use the new shared coordination policy.
+The new scientific result is the three-seed scalar comparison: scalar MAE reaches **4.632 ± 0.023 years**, the lowest observed three-seed full-data mean. At 4096 images, categorical MSE and population TailRL reach **5.297 ± 0.174** and **5.359 ± 0.097**, while categorical MAE varies substantially across seeds. The 1024-image 200-epoch runs do not close the gap to 4096 images. Fresh noise usually outperforms fixed noise, but all noise comparisons still have only one optimization seed and one corruption field. Digit-policy pilots have mixed full-data outcomes.
 
-The dashboard offers sorting, method hiding, common-seed comparisons with actual completion counts retained, best epochs, best/final validation metrics, selected-checkpoint test metrics, validation curves, subset/update axes, paired schedule outcomes, scalar comparisons, noise/SNR controls and digit-policy comparisons. Additional evaluation metrics are selectable; complete run and epoch CSVs are downloadable. Best checkpoint always means minimum validation mean-age MAE. Final-epoch test models were not retained.
+All 514 completed histories, frozen training sources, split/subset fingerprints, held-out counts and validation-only LR/checkpoint choices have been audited. All 325 attempts present at the policy handoff were preserved. The continuation plan and shared coordination match their authorized Git artifacts. The refreshed dashboard passed thirteen isolated QuickJS interaction checks. Browser rendering remains unverified because the in-app browser blocks file URLs.
 
-The completed categorical matrix is unchanged: its lowest test-MAE mean is population Statistical MaxRL with MAE width 2, **4.718 ± 0.086 years**. Sampled TailRL reaches **4.724 ± 0.019**, with a paired difference of only **+0.006 ± 0.105 years**; no clear point-error winner is established. Population TailRL reaches **4.752 ± 0.037**, with substantially lower label NLL than sampled TailRL, **3.214 versus 6.698**. Population does not improve mean MAE uniformly across objectives: five of ten estimator pairs improve and five worsen. [Scientific figure](main.pdf), [full analysis](ANALYSIS.md).
+Best/final epoch metrics refer to validation; clean test evaluates the validation-MAE-selected checkpoint. Scalar label NLL is undefined. Scalar Spearman uses continuous predictions; categorical Spearman uses policy medians. Final-epoch test models were not retained. Sample SD across optimization seeds on one fixed split is not a confidence interval.
 
-New 4096-image test MAEs include **5.145 for scalar MAE**, **5.216 for categorical-mean MSE**, and **5.406 for population TailRL**. At SD 5, fresh noise has lower test MAE than fixed noise for all six completed methods; independent noise fields and most other noise levels remain missing. Constant LR has mixed results. Digit policies have small MAE differences for TailRL/MSE and a 0.190-year CE improvement, with lower NLL for all three pilots. These are single-seed observations. [Tables, limitations and best epochs](FOLLOWUP.md), [subset](subset.pdf), [schedule](schedule.pdf), [noise](noise.pdf), [SNR](snr.pdf), [digits](digits.pdf).
+The follow-up automation was deleted after completion. All nine refreshed scientific figures were visually inspected; the downloaded 40-file artifact archive passed SHA256 and member-list verification.
 
-The dashboard and interaction validation capture **01:14:03 GMT+8 on October 15**. Endpoints and scientific figures are unchanged; no new training result is implied by the refresh. Best/final validation metrics remain distinct from selected-checkpoint test metrics; scalar NLL is undefined. Final-epoch test models were not retained. Full-data scalar results remain 4.611/4.680 years MAE for MAE/MSE at seed 42; their other two seeds remain pending.
-
-[Current integrity and tuning decisions](progress_integrity.json), [data audit](data_audit.json), [interaction validation](interaction_validation.json), [follow-up metrics](followup-metrics.csv), [all metrics](dashboard-runs.csv), and [all curves](dashboard-curves.csv) support this snapshot. Earlier main/preflight audits remain historical evidence for unchanged runs. Report interactions passed an isolated JavaScript harness; browser rendering is unverified because the in-app browser blocks local file URLs.
+[Final audit](final-audit.json) · [Plan verification](final-plan-verification.json) · [All grouped metrics](final-summaries.csv) · [Exact paired comparisons](final-comparisons.json) · [Original raw results](results.json) · [Continuation raw results](continuation-results.json) · [Interactive checks](interaction_validation.json).

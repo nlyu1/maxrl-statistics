@@ -1,34 +1,29 @@
 {
-  "status": "running",
-  "gpu_hours": 46.89244767076439,
+  "status": "completed",
+  "gpu_hours": 62.070433510343236,
   "budget_gpu_hours": 64.0,
   "counts": {
-    "completed": 302,
-    "pending": 228
+    "completed": 490,
+    "pending": 40
   },
   "stages": {
     "digits": {
-      "completed": 3,
-      "pending": 13
+      "completed": 16
     },
     "digits_tuning": {
-      "completed": 9,
-      "pending": 15
+      "completed": 24
     },
     "flat": {
-      "completed": 6,
-      "pending": 4
+      "completed": 10
     },
     "flat_tuning": {
-      "completed": 24,
-      "pending": 16
+      "completed": 40
     },
     "main": {
       "completed": 66
     },
     "noise": {
-      "pending": 66,
-      "completed": 14
+      "completed": 80
     },
     "noise_replication": {
       "pending": 40
@@ -37,24 +32,21 @@
       "completed": 48
     },
     "scalar": {
-      "completed": 2,
-      "pending": 4
+      "completed": 6
     },
     "smoke": {
       "completed": 4
     },
     "subset": {
-      "completed": 6,
-      "pending": 14
+      "completed": 20
     },
     "subset_tuning": {
-      "completed": 24,
-      "pending": 56
+      "completed": 80
     },
     "wide": {
       "completed": 96
     }
   },
   "active": [],
-  "updated_at": 1791984246.8164558
+  "updated_at": 1792037755.0983942
 }

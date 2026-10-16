@@ -1,19 +1,20 @@
-# Scalar versus categorical heads: matched seed 42
+# Full-data scalar heads: three-seed results
 
-Snapshot: 2026-10-14T07:07:21.781072+08:00. Both heads train for 50 full-data epochs on the same split and training-source cohort. Checkpoints minimize validation mean-prediction MAE. Test labels remain clean.
+All six scalar confirmations completed, using seeds **42, 43 and 44** and 50 full-data epochs. Both scalar and corresponding categorical-mean heads use learning rate **0.001**, the same pretrained ResNet-18 backbone, batch 64, bf16, AdamW and cosine schedule. Scalar output is `99 * sigmoid(linear(features))`.
 
-| Objective | Head | LR | Best epoch | Best val MAE | Final val MAE | Test MAE | Spearman |
-|---|---|---:|---:|---:|---:|---:|---:|
-| MSE | categorical | 0.001 | 47 | 4.8206 | 4.8930 | 4.7087 | 0.9086 |
-| MSE | scalar | 0.001 | 39 | 4.7511 | 4.7924 | 4.6798 | 0.9124 |
-| MAE | categorical | 0.001 | 40 | 4.8106 | 4.8649 | 4.6749 | 0.9007 |
-| MAE | scalar | 0.001 | 41 | 4.7318 | 4.7485 | 4.6112 | 0.9111 |
+| Objective and head | Test MAE, mean ± sample SD | Best validation MAE | Final validation MAE | Best epochs, 42/43/44 |
+|---|---:|---:|---:|---|
+| MAE, scalar | **4.632 ± 0.023** | 4.667 | 4.716 | 41 / 44 / 42 |
+| MAE, categorical mean | 4.762 ± 0.193 | 4.860 | 4.921 | 40 / 36 / 32 |
+| MSE, scalar | **4.701 ± 0.025** | 4.771 | 4.817 | 39 / 42 / 49 |
+| MSE, categorical mean | 4.817 ± 0.191 | 4.902 | 4.987 | 47 / 33 / 32 |
 
-MSE: scalar-minus-categorical test MAE is -0.0289 years (-0.61%). This is one matched seed, not a replicated advantage.
-MAE: scalar-minus-categorical test MAE is -0.0636 years (-1.36%). This is one matched seed, not a replicated advantage.
+Scalar-minus-categorical MAE differences are **−0.064, −0.326, +0.000** years for the MAE objective, averaging **−0.130 ± 0.173**. For MSE they are **−0.029, −0.309, −0.011**, averaging **−0.116 ± 0.167**. The corresponding-head mean improvements are influenced strongly by categorical seed 43; scalar MAE is effectively tied on seed 44.
 
-Scalar label NLL is undefined. Scalar Spearman ranks continuous predictions, whereas categorical Spearman ranks policy medians. Learning rates are validation-selected independently. Final-epoch values are validation metrics; final-epoch test models were not retained.
+Against population Stat-MAE width 2, scalar MAE improves by **0.008, 0.106 and 0.143 years**, averaging **0.085 ± 0.070**. This is the lowest observed three-seed full-data mean in the completed study, with only three optimization seeds on one fixed split.
 
-Completed scalar confirmations: 2/6. Missing scalar seeds and objectives remain visible in the dashboard.
+[Three-seed curves and endpoints](final-scalar.pdf) · [All metrics](FINAL_TABLES.md) · [Exact paired differences](final-comparisons.json) · [Interactive report](dashboard.html).
 
-[Curves and selected test endpoints](scalar.pdf). [Exact paired metrics](scalar-comparison.json).
+Scalar Spearman uses continuous outputs, reaching approximately **0.9108 for MAE** and **0.9114 for MSE**. Categorical Spearman uses the policy median, so the decision rules differ. Scalar label NLL is undefined. Test metrics evaluate the minimum-validation-MAE checkpoint; final-epoch test models were not retained.
+
+The 4096-image scalar MAE/MSE results are **5.145 / 5.314** at selected epochs **41 / 48**; the 1024-image results are **6.177 / 6.367**, both at epoch **44**. These subset results have **one seed**, and the tuned rates differ across heads. They do not supply the same three-seed architectural comparison as full-data training.

@@ -1,5 +1,7 @@
 # Scaled UTKFace study: original 64 GPU-hour planning reference
 
+**The selected study is complete.** All 514 selected jobs, including tuning and preflight, finished; 222 provide scientific final evaluations. Forty optional seed repetitions remain held and thirty-two independent noise-field runs were excluded. [Final report](FINAL.md), [all result tables](FINAL_TABLES.md), [completion audit](final-audit.json).
+
 On October 15 the user removed GPU-hour enforcement, raised combined concurrency to eight and revised the retained follow-up scope. [Current orchestration, queue and deployment audit](ORCHESTRATION.md). The immutable original plan retains its initial planning values; current dispatch uses the explicit coordination policy.
 
 This study uses a new split created after image deduplication. The earlier [12-epoch report](../RESULTS.md) describes the original split and is a separate experiment. Code is on `codex/utkface-scaled-study`.

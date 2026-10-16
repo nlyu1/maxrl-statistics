@@ -1,0 +1,8 @@
+{
+  "continuation_plan_matches_authorized_git_artifact": true,
+  "coordination_matches_authorized_git_artifact": true,
+  "continuation_plan_sha256": "d74a43bf93df306bae39e66b85411d42797dbe4078fde2e859023db29f700010",
+  "original_full_results": 490,
+  "continuation_full_results": 24,
+  "scientific_snapshot": "2026-10-16T14:47:23.969804+08:00"
+}

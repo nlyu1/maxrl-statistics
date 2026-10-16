@@ -1,5 +1,7 @@
 # UTKFace orchestration update, October 15
 
+**Completion update, October 16:** all 212 jobs selected below completed. Training finished October 15 at 12:15:54 GMT+8, using 65.265 GPU-hours total across both queues. The forty held noise seed repetitions remain unrun. Both supervisors exited normally. [Final results](FINAL.md), [current status](STATUS.md), [completion audit](final-audit.json). The authorization and deployment record below is historical.
+
 The user removed GPU-hour enforcement, raised combined concurrency to eight GPUs and selected which unfinished extension work should resume. GPU-hours remain measured across every attempt. The 64/24-hour values in historical plans are planning references, not operating caps under the updated coordination policy.
 
 The original plan, results and attempt ledger stay at `/tmp/utkface-study-20261013`. The closed October 14 extension remains an unchanged historical record at `/tmp/utkface-extension-20261014`. A new continuation at `/tmp/utkface-followup-20261015` restores only its sixteen clean 4096-image seed replications and eight 1024-image, 200-epoch runs. The thirty-two independent SD-5 noise-field runs are excluded.
