@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>UTKFace experimental report</title>
+<title>UTKFace completed study · interactive results</title>
 <style>
 :root{color-scheme:light dark;--bg:#fafbfc;--fg:#172331;--muted:#536172;--line:#d8dfe7;--panel:#fff;--blue:#2867a8;--green:#16815d;--orange:#b65f21;--purple:#8953b2;--red:#b84750;--teal:#177e8a;--gray:#68778a}
 @media(prefers-color-scheme:dark){:root{--bg:#121920;--fg:#e2eaf1;--muted:#a9b7c4;--line:#34424e;--panel:#19232d;--blue:#7eb6f0;--green:#73c8a2;--orange:#e9ae75;--purple:#c6a5ec;--red:#ed9ba3;--teal:#7dcbd5;--gray:#afbed0}}
@@ -21,9 +21,9 @@ label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:
 </head>
 <body><main>
 <header><p class="secondary">ResNet-18 · deduplicated UTKFace · clean validation and test labels</p><h1>Learning objectives, data size, and label noise</h1>
-<p id="timestamp" class="secondary"></p><p class="secondary"><a href="ANALYSIS.md">Read the interpretation and limitations</a> · <a href="main.pdf">Scientific comparison figure</a> · <a href="STATUS.md">Queue and report status</a></p><div class="status numbers" id="status"></div></header>
+<p id="timestamp" class="secondary"></p><p class="secondary"><a href="FINAL.md">Final interpretation and limitations</a> · <a href="FINAL_TABLES.md">All metrics and selected epochs</a> · <a href="STATUS.md">Study status</a></p><p id="coverage" class="note"></p><div class="status numbers" id="status"></div></header>
 <nav aria-label="Report sections" id="navigation">
-<button type="button" data-view="main" aria-pressed="true">Main matrix</button>
+<button type="button" data-view="main" aria-pressed="true">Full data</button>
 <button type="button" data-view="subset" aria-pressed="false">Smaller datasets</button>
 <button type="button" data-view="schedule" aria-pressed="false">Learning-rate decay</button>
 <button type="button" data-view="scalar" aria-pressed="false">Scalar heads</button>
@@ -32,10 +32,12 @@ label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:
 <h2 id="section-title"></h2><p id="section-description" class="secondary"></p>
 <div class="controls">
 <label>Training size <select id="size"><option value="all">All sizes</option><option value="18462">Full · 18,462</option><option value="4096">4,096 fixed</option><option value="1024">1,024 fixed</option></select></label>
+<label id="horizon-control" hidden>Training horizon <select id="epochs"><option value="all">All horizons</option><option value="50">50 epochs</option><option value="200">200 epochs</option></select></label>
 <label id="mode-control" hidden>Noise <select id="noise-mode"><option value="fixed">Fixed</option><option value="fresh">Fresh</option><option value="all">Both modes</option></select></label>
 <label id="std-control" hidden>Requested SD <select id="noise-std"><option value="5">5 years</option><option value="3">3 years</option><option value="1">1 year</option><option value="10">10 years</option><option value="all">All levels</option></select></label>
-<label id="field-control" hidden>Noise realization <select id="noise-field"><option value="2026">2026 · original</option><option value="2027">2027 · independent</option><option value="2028">2028 · independent</option><option value="all">All realizations</option></select></label>
+<label id="field-control" hidden>Noise realization <select id="noise-field"><option value="2026">2026 · original</option><option value="all">All completed realizations</option></select></label>
 <label id="x-control">Curve x axis <select id="x-axis"><option value="epoch">Epoch</option><option value="updates">Optimizer updates</option><option value="examples">Training presentations</option></select></label>
+<label id="start-control">Plot from epoch <input id="start-epoch" type="number" value="1" min="1" max="200" step="1"></label>
 <label id="partial-control"><input id="partial" type="checkbox">Include unfinished curves</label>
 <label id="sd-control"><input id="seed-sd" type="checkbox" checked>Seed SD bands</label>
 <label><input id="matched" type="checkbox">Compare common optimization seeds</label>
@@ -50,11 +52,12 @@ label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:
 <div class="table-wrap" id="results-table"></div><div id="run-details" class="details" hidden></div>
 <footer><h2>How to read this report</h2>
 <p><strong>Best checkpoint</strong> means the checkpoint selected by minimum validation mean-prediction MAE. The best columns show all metrics at that same checkpoint. Final columns show the last validation epoch of a completed run. Test columns use clean held-out labels at the selected checkpoint. Historical runs did not retain final-epoch test models; final-epoch test metrics are unavailable.</p>
-<p>Curves are validation metrics. Means and sample SDs describe the completed training seeds included in the comparison, not confidence intervals or dataset uncertainty. “Compare common optimization seeds” uses the intersection of completed seeds across visible groups with results; coverage still shows every completed run. It is enabled initially for scalar, subset, schedule, noise and digit comparisons. Exact best epochs, metric-specific extrema, status and source commits are available through each row's “Runs” button. Scalar regression has no label NLL; scalar Spearman ranks its continuous prediction, while categorical Spearman ranks the distribution median.</p>
-<p>The 1024×200 extension matches the 3,200 training updates of 4096×50, while 1024×50 uses 800 updates. Validation is evaluated more frequently in the longer small-subset run. Noise is rounded and clipped to ages 0–99; SNR is 10 log10(clean-age variance / realized perturbation MSE). Optimization seeds and noise-realization seeds remain distinct dimensions.</p>
+<p>Curves are validation metrics. Means and sample SDs describe the completed training seeds included in the comparison, not confidence intervals or dataset uncertainty. Full-data and subset views initially use all completed seeds, so the replicated 4096-image categorical methods retain all three seeds while scalar subset heads have one. “Compare common optimization seeds” uses the intersection of completed seeds across visible groups with results; coverage still shows every completed run. It is enabled initially for scalar, schedule, noise and digit comparisons. Exact best epochs, metric-specific extrema, status and source commits are available through each row's “Runs” button. Scalar regression has no label NLL; scalar Spearman ranks its continuous prediction, while categorical Spearman ranks the distribution median.</p>
+<p>The 1024×200 continuation matches the 3,200 training updates of 4096×50, while 1024×50 uses 800 updates. Changing the horizon also stretches warmup and cosine decay; learning rates were inherited from short 1024-image tuning. Validation is evaluated more frequently per update at 1024 images. Digit pilots have one seed, different head capacity and tuning grids; full-data digit runs reuse subset-selected rates. Noise is rounded and clipped to ages 0–99; SNR is 10 log10(clean-age variance / realized perturbation MSE). Optimization seeds and noise-realization seeds remain distinct dimensions.</p>
+<p>Held repetitions are excluded from the comparison tables and curves, and retained in the raw snapshot and coverage records. Independent noise fields 2027/2028 were excluded from the study and supply no trained evidence. “Plot from epoch” changes only the displayed curve range; metrics and checkpoint selection still use the full training history.</p>
 <p>Rows are kept separate across training-source cohorts, data splits, subsets, horizons, learning-rate schedules and noise realizations. Exact RGB duplicates were removed before splitting; this is not a subject-disjoint or near-duplicate-disjoint benchmark.</p>
 <details><summary>Coverage, budgets and reproducibility</summary><div id="provenance"></div></details>
-<p><a href="dashboard-runs.csv">All run metrics</a> · <a href="dashboard-curves.csv">All epoch curves</a> · <a href="dashboard-data.json">Report snapshot</a> · <a href="EXTENSION.md">Extension protocol</a></p>
+<p><a href="dashboard-runs.csv">All run metrics</a> · <a href="dashboard-curves.csv">All epoch curves</a> · <a href="dashboard-data.json">Report snapshot</a> · <a href="COVERAGE.md">Historical extension coverage</a></p>
 </footer><div id="tooltip" class="tooltip" role="tooltip" hidden></div>
 <script id="report-data" type="application/json">__REPORT_DATA__</script>
 <script>
@@ -63,7 +66,7 @@ const D=JSON.parse(document.getElementById("report-data").textContent);
 const el=id=>document.getElementById(id);
 const NS="http://www.w3.org/2000/svg";
 const state={view:"main",hidden:new Set(),sort:"test.mae_mean",ascending:true,groups:[]};
-const specs={main:["Full method matrix","Fifty full-data epochs; three planned optimization seeds per categorical method. All rows remain visible even when no run has finished."],subset:["Training-set size and optimization budget","Fixed stratified subsets. The 1024×200 extension matches training updates to 4096×50; keep horizons separate when comparing best epochs."],schedule:["Cosine decay versus constant learning rate","End-of-run selected-checkpoint test results only. Both schedules have independently validation-selected rates. Good/bad/tied denotes a practical threshold, not statistical significance."],scalar:["Direct scalar versus categorical-mean regression","The same ResNet-18 backbone, direct MAE/MSE objectives, and clean labels. Scalar label NLL is undefined. Compare matched seeds before interpreting small gaps."],noise:["Fixed and fresh training-label noise","Validation and test labels stay clean. Change the requested noise level, mode or realization; the SNR sweep spans all levels of the chosen mode and realization."],digits:["Autoregressive 10×10 policy versus 100 bins","The two-digit head models p(tens|image) × p(units|image,tens), with the same 100 joint ages. Prioritized pilots use CE, direct MSE and population TailRL on 4096 images."]};
+const specs={main:["Full data: categorical matrix and scalar heads","Fifty full-data epochs: 22 categorical methods and two scalar heads, each with three optimization seeds. Hide methods to compare objectives or heads directly."],subset:["Training-set size and optimization budget","Fixed stratified subsets. Eight categorical methods have three seeds at 4096 images; scalar subset heads and all 1024-image settings have one. Available-seed means are shown initially; enable common seeds for a paired comparison."],schedule:["Cosine decay versus constant learning rate","End-of-run selected-checkpoint test results only. Both schedules have independently validation-selected rates. Good/bad/tied denotes a practical threshold, not statistical significance."],scalar:["Direct scalar versus categorical-mean regression","The same ResNet-18 backbone, direct MAE/MSE objectives, and clean labels. Full-data heads have three seeds; subset scalar heads have one. Scalar label NLL is undefined."],noise:["Fixed and fresh training-label noise","All 80 runs are complete: ten methods × fixed/fresh × SD 1/3/5/10, with optimization seed 42 and noise field 2026. Held-out labels stay clean; all noise arms reuse their clean-subset selected rate."],digits:["Conditional 10×10 policy versus 100 bins","All 16 pilots are complete: eight objectives × 4096/full data, with seed 42 and 50 epochs. The head models p(tens|image) × p(units|image,tens) over the same 100 ages; head capacity and LR tuning differ."]};
 const finite=x=>typeof x==="number"&&Number.isFinite(x);
 const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
 const sd=a=>a.length>1?Math.sqrt(a.reduce((s,x)=>s+Math.pow(x-avg(a),2),0)/(a.length-1)):null;
@@ -83,17 +86,18 @@ function label(r){
 function role(r){return ["subset_replication","matched_steps"].includes(r.stage)?"subset":["noise_replication","noise_realization"].includes(r.stage)?"noise":r.stage;}
 function inView(r){
  const p=role(r);
- if(state.view==="main")return p==="main";
+ if(state.view==="main")return ["main","scalar"].includes(p);
  if(state.view==="subset")return p==="subset";
  if(state.view==="schedule")return r.size===4096&&r.noise==="none"&&["subset","flat"].includes(p);
  if(state.view==="scalar")return ["mae","mse"].includes(r.method)&&["main","scalar","subset"].includes(p);
  if(state.view==="noise")return p==="noise"||(p==="subset"&&r.size===4096&&r.epochs===50&&r.noise==="none");
- return ["digits","subset","main","scalar"].includes(p)&&["ce","binary_maxrl_population","mse","mae","tailrl_population"].includes(r.method);
+ return ["digits","subset","main","scalar"].includes(p)&&r.epochs===50&&["ce","binary_maxrl_population","mse","mae","tailrl_population","stat_maxrl_mae_population","stat_maxrl_mse_population","grpo_mae_population","grpo_mse_population"].includes(r.method)&&(!r.method.startsWith("stat_maxrl")||r.width===2);
 }
 function filtered(ignoreStd=false){
  return D.runs.filter(r=>{
-  if(!inView(r))return false;
+  if(r.status==="held"||!inView(r))return false;
   if(el("size").value!=="all"&&r.size!==+el("size").value)return false;
+  if(el("epochs").value!=="all"&&r.epochs!==+el("epochs").value)return false;
   if(state.view==="noise"&&r.noise!=="none"){
    if(el("noise-mode").value!=="all"&&r.noise!==el("noise-mode").value)return false;
    if(!ignoreStd&&el("noise-std").value!=="all"&&r.std!==+el("noise-std").value)return false;
@@ -128,14 +132,15 @@ function dashed(r){if(r.head==="scalar")return "2 3";if(r.head==="digits")return
 function curve(g,index){
  const source=el("partial").checked?g.runs.filter(r=>r.curves.length&&(!el("matched").checked||g.comparisonSeeds.includes(r.seed))):g.done;
  const points=new Map(),xi=el("x-axis").value==="epoch"?0:el("x-axis").value==="updates"?8:7;
- source.forEach(r=>r.curves.forEach(p=>{if(finite(p[index])){if(!points.has(p[xi]))points.set(p[xi],[]);points.get(p[xi]).push(p[index]);}}));
+ const start=Math.max(1,+el("start-epoch").value||1);
+ source.forEach(r=>r.curves.forEach(p=>{if(p[0]>=start&&finite(p[index])){if(!points.has(p[xi]))points.set(p[xi],[]);points.get(p[xi]).push(p[index]);}}));
  return Array.from(points.entries()).sort((a,b)=>a[0]-b[0]).map(([x,v])=>({x,y:avg(v),sd:sd(v),n:v.length}));
 }
 function numberTick(x){return Math.abs(x)>=1000?(x/1000).toFixed(x%1000?1:0)+"k":Math.abs(x)<1?x.toFixed(3):Math.abs(x)<10?x.toFixed(2):Math.round(x).toString();}
 function plot(container,series,title,xTitle){
  const node=el(container);node.replaceChildren(make("h3",title));
  const active=series.filter(s=>s.points.length);
- if(!active.length){node.append(make("div","No completed curves for this selection. Queued and missing runs remain in the table.",{class:"empty"}));return;}
+ if(!active.length){node.append(make("div","No recorded values for this selection and curve range. Completed and missing runs remain listed in the table.",{class:"empty"}));return;}
  const width=Math.max(280,node.getBoundingClientRect().width),height=300,box={left:54,right:16,top:18,bottom:45};
  const all=active.flatMap(s=>s.points),bands=el("seed-sd").checked;
  let xmin=Math.min(...all.map(p=>p.x)),xmax=Math.max(...all.map(p=>p.x)),ymin=Math.min(...all.map(p=>p.y-(bands&&finite(p.sd)?p.sd:0))),ymax=Math.max(...all.map(p=>p.y+(bands&&finite(p.sd)?p.sd:0)));
@@ -218,7 +223,7 @@ function render(){
  const rows=filtered();showLegend(rows);
  const gs=groups(rows.filter(r=>!state.hidden.has(methodKey(r))));state.groups=gs;
  const n=gs.reduce((s,g)=>s+g.n,0),completed=gs.reduce((s,g)=>s+g.completedN,0),planned=gs.reduce((s,g)=>s+g.planned,0);
- el("selection-note").textContent=completed+" completed runs of "+planned+" planned in this selection. "+(el("matched").checked?"Summaries compare "+n+" runs on common completed optimization seeds; gray rows have no comparable result. ":"Summaries use all available completed seeds. ")+"Best/final columns are validation; test is at the MAE-selected checkpoint. "+(el("partial").checked?"Unfinished curves are included within the selected seed set and may have varying counts by epoch.":"Curves use completed runs only.")+(state.view==="subset"?" Subset line styles: 4096×50 solid; 1024×50 dashed; 1024×200 dotted. Hover for exact settings.":"");
+ el("selection-note").textContent=completed+" completed runs of "+planned+" selected in this view. "+(el("matched").checked?"Summaries compare "+n+" runs on common completed optimization seeds; gray rows have no comparable result. ":"Summaries use all available completed seeds. ")+"Best/final columns are validation; test is at the MAE-selected checkpoint. "+(el("partial").checked?"Unfinished curves are included within the selected seed set and may have varying counts by epoch.":"Curves use completed runs only.")+(state.view==="subset"?" Subset line styles: 4096×50 solid; 1024×50 dashed; 1024×200 dotted. Hover for exact settings.":"")+(+el("start-epoch").value>1?" Curves start at epoch "+el("start-epoch").value+"; table metrics still use the full training history.":"");
  el("run-details").hidden=true;
  if(state.view==="schedule"){scheduleTable(gs);return;}
  table(gs);
@@ -238,21 +243,23 @@ function view(name){
  el("navigation").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.view===name)));
  const noise=name==="noise",schedule=name==="schedule";
  ["mode-control","std-control","field-control","snr-section"].forEach(id=>el(id).hidden=!noise);
- ["x-control","partial-control","sd-control","curves"].forEach(id=>el(id).hidden=schedule);
+ ["x-control","start-control","partial-control","sd-control","curves"].forEach(id=>el(id).hidden=schedule);
+ el("horizon-control").hidden=name!=="subset";
  el("tolerance-control").hidden=!schedule;
- el("size").value=["main","scalar"].includes(name)?"18462":name==="subset"?"all":"4096";
- el("matched").checked=name!=="main";
+ el("size").value=["main","scalar"].includes(name)?"18462":"4096";
+ el("epochs").value="all";el("start-epoch").value="1";
+ el("matched").checked=!["main","subset"].includes(name);
  el("x-axis").value=name==="subset"?"updates":"epoch";render();
 }
 el("navigation").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>view(b.dataset.view)));
-["size","noise-mode","noise-std","noise-field","x-axis","partial","seed-sd","tolerance","extra-metric","matched"].forEach(id=>el(id).addEventListener("change",render));
+["size","epochs","start-epoch","noise-mode","noise-std","noise-field","x-axis","partial","seed-sd","tolerance","extra-metric","matched"].forEach(id=>el(id).addEventListener("change",render));
 el("show-all").addEventListener("click",()=>{state.hidden.clear();render();});
 el("hide-all").addEventListener("click",()=>{filtered().forEach(r=>state.hidden.add(methodKey(r)));render();});
 el("baselines").addEventListener("click",()=>{state.hidden.clear();filtered().forEach(r=>{if(!["ce","binary_maxrl_population","mae","mse"].includes(r.method))state.hidden.add(methodKey(r));});render();});
 el("export").addEventListener("click",exportRows);
-el("timestamp").textContent="Snapshot "+new Date(D.generated).toLocaleString("en-GB",{timeZone:"Asia/Shanghai"})+" GMT+8 · historical extension cutoff: 14 Oct 07:30";
-D.studies.forEach((s,i)=>{const p=s.progress,n=make("div");n.append(make("span",i?"Follow-up GPU-hours":"Original GPU-hours",{class:"secondary"}),make("br"),make("strong",fmt(p.gpu_hours,2)+(p.gpu_hour_cap_enforced===false?" · uncapped":" / "+p.budget_gpu_hours)));el("status").append(n);});
-if(D.studies[0].progress.max_concurrent){const n=make("div"),queued=D.studies.reduce((a,s)=>a+(s.progress.queued_pending||0),0),held=D.studies.reduce((a,s)=>a+(s.progress.held_pending||0),0);n.append(make("span","Dispatch policy",{class:"secondary"}),make("br"),make("strong",D.studies[0].progress.max_concurrent+" GPUs max"),make("p",queued+" queued · "+held+" held"));el("status").append(n);}
+el("timestamp").textContent="Report refreshed "+new Date(D.generated).toLocaleString("en-GB",{timeZone:"Asia/Shanghai"})+" GMT+8 · refresh time does not imply new training";
+el("coverage").textContent=(D.summary.selectedComplete?"All selected study work is complete. ":"Selected study work is not yet complete. ")+D.summary.completed+" completed jobs include "+D.summary.evaluations+" scientific final evaluations, "+D.summary.tuning+" LR pilots and "+D.summary.preflight+" preflight checks; "+D.summary.queued+" jobs queued and "+D.summary.held+" optional repetitions held outside the comparisons.";
+[["Completed jobs",D.summary.completed],["Scientific final evaluations",D.summary.evaluations],["Total GPU-hours",fmt(D.summary.gpuHours,2)],["Held repetitions",D.summary.held]].forEach(([title,value])=>{const n=make("div");n.append(make("span",title,{class:"secondary"}),make("br"),make("strong",String(value)));el("status").append(n);});
 const mainStudy=D.studies[0].progress.stages.main||{},mainStatus=make("div");mainStatus.append(make("span","Categorical main runs",{class:"secondary"}),make("br"),make("strong",(mainStudy.completed||0)+" / 66"));el("status").append(mainStatus);
 D.studies.forEach(s=>{const p=make("section");p.append(make("h3",s.root),make("p","State: "+s.progress.status+" · "+JSON.stringify(s.progress.counts)),make("p","Plan SHA-256: "+s.planSha256),make("p","Training-source cohort: "+s.cohort),make("p","Data fingerprint: "+s.dataFingerprint));const t=make("table");Object.entries(s.progress.stages).forEach(([stage,counts])=>{const row=make("tr");row.append(make("td",stage),make("td",JSON.stringify(counts)));t.append(row);});p.append(t);el("provenance").append(p);});
 let timer;new ResizeObserver(()=>{clearTimeout(timer);timer=setTimeout(render,100);}).observe(el("curves"));

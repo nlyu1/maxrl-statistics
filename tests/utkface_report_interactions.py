@@ -25,7 +25,7 @@ class Element {
 }
 const document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement:t=>new Element(t),createElementNS:(ns,t)=>new Element(t),documentElement:new Element()};
 document.getElementById('report-data').textContent=snapshot_json;
-for(const [id,value] of Object.entries({'size':'all','noise-mode':'fixed','noise-std':'5','noise-field':'2026','x-axis':'epoch','extra-metric':'rmse_mean','tolerance':'0.1'}))document.getElementById(id).value=value;
+for(const [id,value] of Object.entries({'size':'all','epochs':'all','start-epoch':'1','noise-mode':'fixed','noise-std':'5','noise-field':'2026','x-axis':'epoch','extra-metric':'rmse_mean','tolerance':'0.1'}))document.getElementById(id).value=value;
 document.getElementById('seed-sd').checked=true;
 for(const name of ['main','subset','schedule','scalar','noise','digits']){const b=new Element('button');b.dataset.view=name;document.getElementById('navigation').append(b);}
 const window={innerWidth:1280,innerHeight:900,matchMedia:()=>({matches:false,addEventListener(){}})};
@@ -38,21 +38,41 @@ const URL={createObjectURL:()=>'',revokeObjectURL:()=>{}};
 
 ASSERTIONS = r"""
 function check(condition,message){if(!condition)throw Error(message);}
-check(state.groups.length===22,'main matrix must contain all 22 methods');
-check(state.groups.reduce((n,g)=>n+g.n,0)===D.runs.filter(r=>r.stage==='main'&&r.status==='completed').length,'main coverage mismatch');
+check(state.groups.length===24,'full-data view must contain 22 categorical methods and two scalar heads');
+check(state.groups.filter(g=>g.r.head==='categorical').length===22&&state.groups.filter(g=>g.r.head==='scalar').length===2,'full-data head coverage');
+check(state.groups.reduce((n,g)=>n+g.n,0)===D.runs.filter(r=>['main','scalar'].includes(r.stage)&&r.status==='completed').length,'full-data coverage mismatch');
+check(D.summary.completed===D.runs.filter(r=>r.status==='completed').length,'completed study total');
+check(D.summary.evaluations===D.runs.filter(r=>['main','scalar','subset','subset_replication','matched_steps','flat','noise','noise_replication','digits'].includes(r.stage)&&r.status==='completed').length,'scientific evaluation total excludes tuning and preflight');
 document.getElementById('hide-all').click();check(state.groups.length===0,'hide all');
-document.getElementById('show-all').click();check(state.groups.length===22,'show all');
-document.getElementById('baselines').click();check(state.groups.length===3,'baseline filter');
+document.getElementById('show-all').click();check(state.groups.length===24,'show all');
+document.getElementById('baselines').click();check(state.groups.length===5,'baseline filter includes scalar heads');
 document.getElementById('show-all').click();
+document.getElementById('start-epoch').value='20';render();
+check(state.groups.every(g=>curve(g,1).length>0&&curve(g,1).every(p=>p.x>=20)),'late-epoch curve range');
+document.getElementById('start-epoch').value='1';render();
 const headers=document.getElementById('results-table').children[0].children[0].children[0].children;
 headers[4].children[0].click();check(!state.ascending,'descending sort');
 check(document.getElementById('results-table').children[0].children[1].children[0].children[0].textContent.startsWith(label(sorted(state.groups)[0].r)),'sorted first row');
 details(state.groups[0]);check(!document.getElementById('run-details').hidden,'run evidence');
 exportRows();check(downloaded.includes('selected_test_mae'),'CSV export');
 for(const b of document.getElementById('navigation').children){b.click();check(state.view===b.dataset.view,'section navigation');}
-view('subset');document.getElementById('size').value='1024';render();
+view('subset');
+check(document.getElementById('size').value==='4096'&&!document.getElementById('matched').checked,'subset defaults retain all available seeds');
+check(state.groups.filter(g=>g.r.head==='categorical').length===8&&state.groups.filter(g=>g.r.head==='categorical').every(g=>g.n===3),'all eight categorical subset replications visible');
+check(state.groups.filter(g=>g.r.head==='scalar').every(g=>g.n===1),'scalar subset seed count remains one');
+document.getElementById('size').value='1024';document.getElementById('epochs').value='200';render();
+check(state.groups.length===8&&state.groups.every(g=>g.r.epochs===200&&g.n===1),'all eight matched-update runs visible');
+document.getElementById('epochs').value='50';render();
+check(state.groups.length===10&&state.groups.every(g=>g.r.epochs===50&&g.n===1),'1024-image 50-epoch comparisons visible');
 document.getElementById('partial').checked=true;render();
 view('noise');for(const id of ['noise-mode','noise-std','noise-field'])document.getElementById(id).value='all';render();
+check(state.groups.filter(g=>g.r.noise!=='none').length===80,'all eighty noise settings visible');
+check(filtered().every(r=>r.status!=='held'),'held repetitions do not inflate comparison coverage');
+view('digits');
+check(state.groups.filter(g=>g.r.head==='digits').length===8,'all eight 4096-image digit objectives visible');
+document.getElementById('size').value='18462';render();
+check(state.groups.filter(g=>g.r.head==='digits').length===8,'all eight full-data digit objectives visible');
+check(state.groups.filter(g=>g.r.method.startsWith('stat_maxrl')).every(g=>g.r.width===2),'digit baselines use matching statistical kernel widths');
 view('main');document.getElementById('extra-metric').value='mode_accuracy';render();
 check(document.getElementById('results-table').textContent.includes('mode_accuracy'),'additional metric');
 check(created.filter(n=>n.tagName==='path').every(n=>!/(NaN|Infinity|undefined)/.test(n.attrs.d||'')),'nonfinite chart geometry');
@@ -93,12 +113,15 @@ def verify(*, html_path: Path) -> dict:
     context.eval(script)
     context.eval(ASSERTIONS)
     exported = list(csv.reader(context.eval("downloaded").splitlines()))
-    assert len(exported) == 23 and all(len(row) == 12 for row in exported)
+    assert len(exported) == 25 and all(len(row) == 12 for row in exported)
     payload = json.loads(data)
     return {
         "snapshot": payload["generated"],
         "data_runs": len(payload["runs"]),
-        "main_methods": 22,
+        "categorical_main_methods": 22,
+        "full_data_methods": 24,
+        "completed_jobs": payload["summary"]["completed"],
+        "scientific_final_evaluations": payload["summary"]["evaluations"],
         "checks": [
             "script evaluation",
             "six sections",
@@ -113,6 +136,13 @@ def verify(*, html_path: Path) -> dict:
             "curve hover and dismissal",
             "common-seed comparisons preserve actual coverage",
             "unfinished curves before the first completed seed",
+            "full-data categorical and scalar comparisons",
+            "completed study counts exclude tuning and preflight evaluations",
+            "late-epoch curve range preserves table results",
+            "4096-image defaults retain all three categorical seeds",
+            "1024-image 50/200-epoch horizon selection",
+            "all eighty noise settings with held repetitions excluded",
+            "all sixteen digit-policy objectives and matching baselines",
         ],
         "passed": True,
         "environment": "isolated QuickJS DOM harness; no browser rendering",

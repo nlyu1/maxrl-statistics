@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import time
+from collections import Counter
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,7 @@ from src.experiments.utkface.coordination import CoordinationConfig
 from src.experiments.utkface.metrics import METRIC_NAMES
 from src.experiments.utkface.scheduler import dispatch_summary, status_summary
 from src.experiments.utkface.study import StudyPlan
+from src.experiments.utkface.study_report import FINAL_STAGES
 
 CURVE_METRICS = ("mae_mean", "rmse_mean", "median_spearman", "label_nll", "entropy")
 METRICS = (*METRIC_NAMES, "rmse_mean", "median_spearman")
@@ -185,12 +187,31 @@ def build(*, plans: tuple[Path, ...], output_dir: Path, coordination_path: str) 
                     row["reason"] = "training_seed_repetition_not_selected"
         studies.append(study)
         runs.extend(rows)
+    completed = [row for row in runs if row["status"] == "completed"]
+    stages = Counter(row["stage"] for row in completed)
+    evaluations = sum(
+        count
+        for stage, count in stages.items()
+        if stage in FINAL_STAGES | {"subset_replication", "matched_steps"}
+    )
     payload = {
         "generated": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
         "historicalReportDeadline": "2026-10-14T08:30:00+08:00",
         "historicalExtensionCutoff": "2026-10-14T07:30:00+08:00",
         "studies": studies,
         "runs": runs,
+        "summary": {
+            "completed": len(completed),
+            "evaluations": evaluations,
+            "preflight": stages["smoke"],
+            "tuning": len(completed) - evaluations - stages["smoke"],
+            "held": sum(row["status"] == "held" for row in runs),
+            "queued": sum(row["status"] == "pending" for row in runs),
+            "gpuHours": sum(study["progress"]["gpu_hours"] for study in studies),
+            "selectedComplete": all(
+                study["progress"]["status"] == "completed" for study in studies
+            ),
+        },
         "curveColumns": [
             "epoch",
             *CURVE_METRICS,
