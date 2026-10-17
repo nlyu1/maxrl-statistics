@@ -29,7 +29,7 @@ def test_plot_omits_initial_stats_and_uses_training_only_moving_means() -> None:
     assert smoothed["x"] == [2, 3, 4, 5]
     assert raw["x"] == list(range(1, 7))
     assert smoothed["mean"][0] == 3 and raw["mean"][0] == 2
-    assert smoothed["sd"][0] == raw["sd"][0] == pytest.approx(2**0.5)
+    assert [smoothed["sd"][0], raw["sd"][0]] == pytest.approx([2**0.5, 2**0.5])
 
 
 def test_initial_validation_preserves_weights_mode_and_random_streams(
