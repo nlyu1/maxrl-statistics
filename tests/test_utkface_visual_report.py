@@ -47,6 +47,14 @@ def test_report_distinguishes_selected_final_and_metric_optimal_epochs(
         )
     ]
     (output / "history.json").write_text(json.dumps(history))
+    initial = {
+        "epoch": 0,
+        "data_fingerprint": "clean-split",
+        "head": head,
+        "seed": config.seed,
+        "validation": {"mae_mean": 1.0, "label_nll": None if head == "scalar" else 2.0},
+    }
+    (output / "initial_validation.json").write_text(json.dumps(initial))
     result_path = output / "result.json"
     result_path.write_text(
         json.dumps({
@@ -100,6 +108,8 @@ def test_report_distinguishes_selected_final_and_metric_optimal_epochs(
     (tmp_path / "state.json").write_text(json.dumps(state))
     _, rows = collect(plan_path=plan_path, state=state)
     row = rows[0]
+    assert row["initial"] == initial
+    assert row["completedEpochs"] == 2 and len(row["curves"]) == 2
     assert row["bestEpoch"] == 1
     assert row["best"]["mae_mean"] == 4
     assert row["final"]["mae_mean"] == 5

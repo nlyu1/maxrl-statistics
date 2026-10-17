@@ -37,21 +37,23 @@ check(graph.layout.legend.groupclick==='togglegroup'&&graph.layout.legend.itemdo
 const scalarNll=graph.data.filter(t=>t.meta.panel===3&&t.meta.key==='scalar_mae');check(!scalarNll.length,'undefined scalar NLL omitted');
 const r=B.runs[uniqueGroups(current()).find(g=>g.key==='scalar_mae').ids[0]];
 const firstExpected=r.curves.slice(0,5).reduce((s,c)=>s+c[1],0)/5;
-const firstCurve=curve({ids:[r.id]},'mae_mean',50);check(Math.abs(firstCurve.mean[0]-firstExpected)<1e-12&&firstCurve.x[0]===3,'moving mean and centered epochs');
-change('smoothing','1');check(graph.data.find(t=>t.meta.kind==='mean').x.length===50,'raw epochs');
+const firstCurve=curve({ids:[r.id]},'mae_mean',50);check(firstCurve.mean[0]===r.initial.validation.mae_mean&&firstCurve.x[0]===0,'raw epoch zero');
+check(Math.abs(firstCurve.mean[1]-firstExpected)<1e-12&&firstCurve.x[1]===3,'moving mean excludes epoch zero');
+change('smoothing','1');check(graph.data.find(t=>t.meta.kind==='mean').x.length===51,'raw epochs plus epoch zero');
 change('smoothing','auto');
 Plotly.relayout(graph,{'xaxis.range':[10,40],'yaxis.range':[4,7]});
 check(pageState().ranges.xaxis[0]===10&&pageState().ranges.yaxis[1]===7,'native Plotly zoom saved');
 change('smoothing','10');check(graph.layout.xaxis.range[0]===10&&graph.layout.yaxis.range[1]===7,'native zoom survives smoothing');
+check(curve({ids:[r.id]},'mae_mean',50).mean[0]===r.initial.validation.mae_mean,'epoch zero remains unsmoothed');
 change('smoothing','auto');
 for(const trace of graph.data)if(trace.meta.key==='tailrl')trace.visible='legendonly';captureLegend();check(pageState().hidden.has('tailrl'),'legend selection retained');
 render();check(graph.data.filter(t=>t.meta.key==='tailrl'&&t.meta.kind==='mean').every(t=>t.visible==='legendonly'),'hidden methods survive rerender');
 state.bands=false;document.getElementById('bands').checked=false;render();check(graph.data.filter(t=>t.meta.kind==='band').every(t=>t.visible===false),'SD visibility');
-for(const f of B.figures){setPage(f.id);check(!document.getElementById('render-error').textContent,'page render error');check(graph.data.filter(t=>t.meta.kind==='mean').every(t=>t.x.length===t.y.length&&t.y.every(Number.isFinite)),'finite matched traces');}
+for(const f of B.figures){setPage(f.id);check(!document.getElementById('render-error').textContent,'page render error');check(graph.data.filter(t=>t.meta.kind==='mean').every(t=>t.x[0]===0&&t.x.length===t.y.length&&t.y.every(Number.isFinite)),'finite matched traces with connected epoch zero');check(current().panels.every(p=>p.defaultX[0]===0),'epoch zero visible in every default panel');}
 setPage('03-main-1024');check(new Set(graph.data.filter(t=>t.meta.kind==='mean').map(t=>t.meta.key)).size===8,'eight actual 1024 methods');
 check(graph.data.filter(t=>t.meta.kind==='mean').every(t=>t.meta.n===1),'1024 seed count');
 check(document.getElementById('seed').children.find(n=>n.value==='43').disabled,'unavailable seeds disabled');
-change('smoothing','1');check(graph.data.find(t=>t.meta.kind==='mean').x.length===200,'all 200 raw epochs');
+change('smoothing','1');check(graph.data.find(t=>t.meta.kind==='mean').x.length===201,'all 200 raw epochs plus epoch zero');
 change('x-mode','updates');const updatePoints=graph.data.find(t=>t.meta.kind==='mean').x;check(updatePoints[updatePoints.length-1]===3200,'optimizer update axis');
 change('x-mode','epoch');change('smoothing','auto');
 setPage('06-fixed-noise');check(current().panels.length===16,'sixteen noise panels');
@@ -130,6 +132,8 @@ def verify(*, html_path: Path) -> dict:
             "method coverage and legend groups",
             "scalar NLL omitted",
             "raw and centered moving means",
+            "unsmoothed epoch zero connected in every panel",
+            "epoch zero excluded from training moving means",
             "seed coverage",
             "native Plotly zoom persistence",
             "custom axis toolbar removed",

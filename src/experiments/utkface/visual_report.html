@@ -37,7 +37,7 @@ label{display:inline-flex;align-items:center;gap:7px}input[type=checkbox]{width:
 <label id="std-control" hidden>Requested SD <select id="noise-std"><option value="5">5 years</option><option value="3">3 years</option><option value="1">1 year</option><option value="10">10 years</option><option value="all">All levels</option></select></label>
 <label id="field-control" hidden>Noise realization <select id="noise-field"><option value="2026">2026 · original</option><option value="all">All completed realizations</option></select></label>
 <label id="x-control">Curve x axis <select id="x-axis"><option value="epoch">Epoch</option><option value="updates">Optimizer updates</option><option value="examples">Training presentations</option></select></label>
-<label id="start-control">Plot from epoch <input id="start-epoch" type="number" value="1" min="1" max="200" step="1"></label>
+<label id="start-control">Plot from epoch <input id="start-epoch" type="number" value="0" min="0" max="200" step="1"></label>
 <label id="partial-control"><input id="partial" type="checkbox">Include unfinished curves</label>
 <label id="sd-control"><input id="seed-sd" type="checkbox" checked>Seed SD bands</label>
 <label><input id="matched" type="checkbox">Compare common optimization seeds</label>
@@ -265,7 +265,7 @@ function view(name,requestedSize){
  el("horizon-control").hidden=name!=="subset";
  el("tolerance-control").hidden=!schedule;
  el("size").value=requestedSize||(["main","scalar"].includes(name)?"18462":"4096");
- el("epochs").value="all";el("start-epoch").value="1";
+ el("epochs").value="all";el("start-epoch").value="0";
  el("matched").checked=!["main","subset"].includes(name);
  el("x-axis").value=name==="subset"?"updates":"epoch";render();
 }
