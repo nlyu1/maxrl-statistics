@@ -1,0 +1,91 @@
+{
+  "population_limits": [
+    {
+      "kernel": "mae",
+      "width": 5,
+      "loss": 2.4653118425602587,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.9005672423821133
+    },
+    {
+      "kernel": "mae",
+      "width": 2,
+      "loss": 3.366356589628183,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.7551792378026354
+    },
+    {
+      "kernel": "mae",
+      "width": 1,
+      "loss": 4.001554733854672,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.5379262528697333
+    },
+    {
+      "kernel": "mae",
+      "width": 0.5,
+      "loss": 4.501225570355264,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.2384199101042852
+    },
+    {
+      "kernel": "mae",
+      "width": 0.1,
+      "loss": 4.773494704178607,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 9.080036961739424e-05
+    },
+    {
+      "kernel": "mae",
+      "width": 0.01,
+      "loss": 4.773585508670828,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.0
+    },
+    {
+      "kernel": "mse",
+      "width": 5,
+      "loss": 2.2439336829688155,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.9203132396617292
+    },
+    {
+      "kernel": "mse",
+      "width": 2,
+      "loss": 3.1612957340960883,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.8005695598889611
+    },
+    {
+      "kernel": "mse",
+      "width": 1,
+      "loss": 3.854595954923821,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.6010780733308398
+    },
+    {
+      "kernel": "mse",
+      "width": 0.5,
+      "loss": 4.533501880074944,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.21343792076629142
+    },
+    {
+      "kernel": "mse",
+      "width": 0.1,
+      "loss": 4.773585508670828,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.0
+    },
+    {
+      "kernel": "mse",
+      "width": 0.01,
+      "loss": 4.773585508670828,
+      "CE": 4.773585508670828,
+      "gradient_max_abs_diff": 0.0
+    }
+  ],
+  "sampled_no_exact_hit_stat_advantage_max": 3.0,
+  "sampled_no_exact_hit_binary_advantage_max": 0.0,
+  "uniform_policy_probability_no_exact_hit_64": 0.525596487525562
+}

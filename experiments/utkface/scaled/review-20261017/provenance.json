@@ -1,0 +1,20 @@
+{
+  "reviewed_at": "2026-10-17T22:33:30.5813502+08:00",
+  "source_revision": "fdae2eab3ac4c9e050a5790539169b2a4d451144",
+  "original_dashboard_snapshot": "2026-10-17T00:44:42.960062+08:00",
+  "new_training_runs": 0,
+  "completed_runs_reviewed": 514,
+  "lr_pilots_reviewed": 288,
+  "frozen_training_sources_verified": 11,
+  "all_execution": "CPU analysis and numerical checks via uv on cmu-L40-live; no GPU training launched",
+  "checkpoint_selection": "All original checkpoints and learning rates selected by minimum validation mean-age MAE; no test-driven reselection",
+  "primary_correlations": "Spearman of categorical policy median; continuous prediction for scalar heads; mean-policy Spearman/Pearson not recorded",
+  "descriptive_windows": "Five consecutive validation epochs; ten for 200-epoch MAE comparisons. Minima of moving means describe low-error regions, do not change saved checkpoints or test results.",
+  "seed_interpretation": "Full-data categorical/scalar and clean 4096 categorical: three optimization seeds. Other scientific comparisons predominantly one optimization seed; noise uses one corruption field.",
+  "figure_inspection": "All three generated PNG figures inspected; LR panels zoomed to show close low-error regions",
+  "numerical_check": "Population Gaussian/Laplace kernel loss and gradients approach CE on fixed logits as width approaches zero. A no-hit sampled example gives nonzero statistical advantages and zero binary-MaxRL advantages.",
+  "original_metrics_unchanged": {
+    "runs_csv_sha256": "1925f583da4df6e068a0fa4128341f5ad8017d48237bca997ac4b9f637c06989",
+    "curves_csv_sha256": "677ea9322d93a0aaacda32748fbb7be03cdac0b1e6d5731ce6b9100009ee4523"
+  }
+}
