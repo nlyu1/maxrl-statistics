@@ -528,11 +528,14 @@ def series(*, runs: list[dict], metric: str, window: int) -> dict:
     }
 
 
-def panel_range(*, curves: list[dict], metric: str, horizon: int) -> list[float]:
-    values = [
-        y for curve in curves for x, y in zip(curve["x"], curve["mean"], strict=True)
-    ]
-    low, high = min(values), max(values)
+def panel_range(*, curves: list[dict], metric: str) -> list[float]:
+    lower, upper = [], []
+    for curve in curves:
+        deviations = curve["sd"] or [0] * len(curve["mean"])
+        for mean, sd in zip(curve["mean"], deviations, strict=True):
+            lower.append(mean - sd)
+            upper.append(mean + sd)
+    low, high = min(lower), max(upper)
     pad = max((high - low) * 0.1, 0.003 if metric == "median_spearman" else 0.1)
     return [
         max(-1 if metric == "median_spearman" else 0, low - pad),
@@ -603,9 +606,7 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
                 )
                 ax.set_xlabel("Epoch")
                 ax.set_xlim(0, panel["horizon"])
-                ax.set_ylim(
-                    panel_range(curves=curves, metric=metric, horizon=panel["horizon"])
-                )
+                ax.set_ylim(panel_range(curves=curves, metric=metric))
                 ax.grid(alpha=0.16)
                 panel["defaultX"] = list(ax.get_xlim())
                 panel["defaultY"] = list(ax.get_ylim())
