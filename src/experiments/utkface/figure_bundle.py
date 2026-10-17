@@ -271,6 +271,7 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
                     "fingerprint",
                     "trainingFingerprint",
                     "curves",
+                    "initial",
                 )
             }
         return {
@@ -516,24 +517,25 @@ def series(*, runs: list[dict], metric: str, window: int) -> dict:
         raise ValueError("Partially undefined or nonfinite series")
     kernel = np.ones(window) / window
     smoothed = np.array([np.convolve(row, kernel, mode="valid") for row in values])
+    initial = np.array([r["initial"]["validation"][metric] for r in runs])
+    if not np.isfinite(initial).all():
+        raise ValueError("Nonfinite epoch-zero metric")
+    plotted = np.column_stack((initial, smoothed))
     return {
-        "x": (np.arange(epochs - window + 1) + (window + 1) / 2).tolist(),
-        "mean": smoothed.mean(0).tolist(),
-        "sd": smoothed.std(0, ddof=1).tolist() if len(runs) > 1 else [],
+        "x": [0, *(np.arange(epochs - window + 1) + (window + 1) / 2).tolist()],
+        "mean": plotted.mean(0).tolist(),
+        "sd": plotted.std(0, ddof=1).tolist() if len(runs) > 1 else [],
     }
 
 
 def panel_range(*, curves: list[dict], metric: str, horizon: int) -> list[float]:
     values = [
-        y
-        for curve in curves
-        for x, y in zip(curve["x"], curve["mean"], strict=True)
-        if x >= horizon * 0.4
+        y for curve in curves for x, y in zip(curve["x"], curve["mean"], strict=True)
     ]
     low, high = min(values), max(values)
     pad = max((high - low) * 0.1, 0.003 if metric == "median_spearman" else 0.1)
     return [
-        max(0, low - pad),
+        max(-1 if metric == "median_spearman" else 0, low - pad),
         min(1, high + pad) if metric == "median_spearman" else high + pad,
     ]
 
@@ -550,7 +552,7 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
             width = 14 if spec["cols"] == 2 else 20
             foot = (
                 spec["note"]
-                + " Moving means: 5 epochs (10 for 200-epoch runs); bands: between-seed sample SD where n=3. Axes emphasize later fit; interactive viewer can show the full trajectories."
+                + " Moving means: 5 epochs (10 for 200-epoch runs); bands: between-seed sample SD where n=3. Use the interactive viewer to zoom into later training."
             )
             caption = "\n".join(textwrap.wrap(foot, width=145 if width == 14 else 210))
             caption_height = (len(caption.splitlines()) * 12 + 8) / 72
@@ -600,7 +602,7 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
                     fontsize=10,
                 )
                 ax.set_xlabel("Epoch")
-                ax.set_xlim(20 if panel["horizon"] == 200 else 5, panel["horizon"])
+                ax.set_xlim(0, panel["horizon"])
                 ax.set_ylim(
                     panel_range(curves=curves, metric=metric, horizon=panel["horizon"])
                 )
@@ -642,12 +644,29 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
             plt.close(fig)
 
 
-def build(*, data: Path, output_dir: Path) -> None:
+def build(*, data: Path, output_dir: Path, epoch_zero_path: str) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     contents = data.read_bytes()
-    bundle = prepare(
-        payload=json.loads(contents), source_hash=hashlib.sha256(contents).hexdigest()
-    )
+    source_hash = hashlib.sha256(contents).hexdigest()
+    payload = json.loads(contents)
+    if epoch_zero_path:
+        initial = json.loads(Path(epoch_zero_path).read_text())
+        if initial["sourceDataSha256"] != source_hash:
+            raise ValueError("Epoch-zero metrics belong to another report snapshot")
+        for run in payload["runs"]:
+            if run["id"] in initial["runs"]:
+                record = initial["records"][initial["runs"][run["id"]]]
+                if (
+                    record["epoch"] != 0
+                    or record["head"] != run["head"]
+                    or record["seed"] != run["seed"]
+                    or record["data_fingerprint"] != run["fingerprint"]
+                ):
+                    raise ValueError(f"Epoch-zero provenance mismatch: {run['id']}")
+                run["initial"] = record
+        write_initial = json.dumps(initial, indent=2, allow_nan=False) + "\n"
+        (output_dir / "epoch-zero.json").write_text(write_initial)
+    bundle = prepare(payload=payload, source_hash=source_hash)
     render_static(bundle=bundle, output_dir=output_dir)
     serialized = json.dumps(bundle, separators=(",", ":"), allow_nan=False).replace(
         "<", "\\u003c"
@@ -666,9 +685,10 @@ def build(*, data: Path, output_dir: Path) -> None:
         "The full-data curves aggregate seeds 42/43/44. Other panels state their actual coverage. "
         "No new training or test-driven selection was performed.\n\n"
         "Default moving means are five epochs, or ten for 200-epoch runs. Choose Raw to inspect unsmoothed curves. "
-        "Bands are sample SD across optimization seeds, not confidence intervals. Initial axis limits focus on later fit; "
-        "Fit all data includes early transients. Scalar label NLL is undefined. "
-        "Curves begin after one training epoch; epoch-zero metrics were not recorded.\n\n"
+        "Bands are sample SD across optimization seeds, not confidence intervals. "
+        "Epoch zero is unsmoothed and connected directly to the training curves. "
+        "Use native zoom/pan to inspect later training. Scalar label NLL is undefined. "
+        "epoch-zero.json retains reconstruction provenance; historical training and checkpoint selections are unchanged.\n\n"
         "Approved coverage adaptations: SD 1/3/5/10; eight available categorical 1024x200 settings; "
         "TailRL-versus-supervised and digit figures show full data only. No 1024x200 digit runs exist. "
         "The Statistical MaxRL figure uses five shared legend entries across its two estimator rows. "
@@ -687,6 +707,7 @@ def build(*, data: Path, output_dir: Path) -> None:
         "figureCount": len(bundle["figures"]),
         "runCount": len(bundle["runs"]),
         "newTrainingRuns": 0,
+        "epochZeroRuns": len(bundle["runs"]),
         "adaptations": bundle["adaptations"],
         "files": {
             p.name: hashlib.sha256(p.read_bytes()).hexdigest()
@@ -710,8 +731,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--epoch-zero", default="")
     args = parser.parse_args()
-    build(data=args.data, output_dir=args.output_dir)
+    build(data=args.data, output_dir=args.output_dir, epoch_zero_path=args.epoch_zero)
 
 
 if __name__ == "__main__":

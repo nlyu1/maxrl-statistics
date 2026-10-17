@@ -3,12 +3,14 @@ import hashlib
 import json
 import os
 import platform
+import random
 import subprocess
 import time
 from contextlib import nullcontext
 from pathlib import Path
-from typing import get_args
+from typing import Literal, get_args
 
+import numpy as np
 import torch
 import torchvision
 from torch import nn
@@ -146,6 +148,52 @@ def evaluate(
     return result
 
 
+def initial_validation(
+    *,
+    model: nn.Module,
+    loader: DataLoader,
+    config: RunConfig,
+    context: DistributedContext,
+    data_fingerprint: str,
+    origin: Literal["recorded", "reconstructed"],
+) -> dict:
+    started = time.monotonic()
+    digest = hashlib.sha256()
+    for name, value in model.state_dict().items():
+        digest.update(name.encode())
+        digest.update(value.detach().cpu().contiguous().numpy().tobytes())
+    numpy_state, python_state = np.random.get_state(), random.getstate()
+    training = model.training
+    generator_state = loader.generator.get_state()
+    devices = [context.device.index] if context.device.type == "cuda" else []
+    try:
+        with torch.random.fork_rng(devices=devices):
+            validation = evaluate(
+                model=model, loader=loader, config=config, context=context
+            )
+    finally:
+        model.train(training)
+        np.random.set_state(numpy_state)
+        random.setstate(python_state)
+        loader.generator.set_state(generator_state)
+    return {
+        "epoch": 0,
+        "validation": validation,
+        "model_sha256": digest.hexdigest(),
+        "data_fingerprint": data_fingerprint,
+        "head": config.head,
+        "seed": config.seed,
+        "pretrained": config.pretrained,
+        "precision": config.precision,
+        "eval_batch_size": config.eval_batch_size,
+        "eval_limit": config.eval_limit,
+        "world_size": context.world_size,
+        "device": str(context.device),
+        "origin": origin,
+        "seconds": time.monotonic() - started,
+    }
+
+
 def train(*, config: RunConfig, context: DistributedContext) -> dict:
     torch.set_num_threads(config.cpu_threads)
     set_seeds(config.seed)
@@ -194,6 +242,26 @@ def train(*, config: RunConfig, context: DistributedContext) -> dict:
         schedule_config=config.schedule,
         train_steps=config.epochs * len(train_loader),
     )
+    started = time.monotonic()
+    initial = initial_validation(
+        model=model,
+        loader=val_loader,
+        config=config,
+        context=context,
+        data_fingerprint=payload["fingerprint"],
+        origin="recorded",
+    )
+    if context.primary:
+        write_json(path=config.output_dir / "initial_validation.json", payload=initial)
+        print(
+            json.dumps({
+                "epoch": 0,
+                "val_mae": initial["validation"]["mae_mean"],
+                "val_rmse": initial["validation"]["rmse_mean"],
+                "seconds": initial["seconds"],
+            }),
+            flush=True,
+        )
     history = []
     best_mae = float("inf")
     best_epoch = 0
@@ -203,7 +271,6 @@ def train(*, config: RunConfig, context: DistributedContext) -> dict:
     training_fingerprint = hashlib.sha256(
         json.dumps(train_loader.dataset.indices).encode()
     ).hexdigest()
-    started = time.monotonic()
     for epoch in range(1, config.epochs + 1):
         train_loader.sampler.set_epoch(epoch - 1)
         wrapped.train()
@@ -287,6 +354,7 @@ def train(*, config: RunConfig, context: DistributedContext) -> dict:
     model.load_state_dict(best_state)
     result = {
         "config": config.model_dump(mode="json"),
+        "initial_validation": initial,
         "best_epoch": best_epoch,
         "validation": history[best_epoch - 1]["validation"],
         "seconds": time.monotonic() - started,

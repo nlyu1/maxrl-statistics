@@ -133,7 +133,8 @@ function dashed(r){if(r.head==="scalar")return "2 3";if(r.head==="digits")return
 function curve(g,index){
  const source=el("partial").checked?g.runs.filter(r=>r.curves.length&&(!el("matched").checked||g.comparisonSeeds.includes(r.seed))):g.done;
  const points=new Map(),xi=el("x-axis").value==="epoch"?0:el("x-axis").value==="updates"?8:7;
- const start=Math.max(1,+el("start-epoch").value||1);
+ const start=Math.max(0,+el("start-epoch").value||0);
+ if(start===0)source.forEach(r=>{const v=r.initial&&r.initial.validation&&r.initial.validation[D.curveColumns[index]];if(finite(v)){if(!points.has(0))points.set(0,[]);points.get(0).push(v);}});
  source.forEach(r=>r.curves.forEach(p=>{if(p[0]>=start&&finite(p[index])){if(!points.has(p[xi]))points.set(p[xi],[]);points.get(p[xi]).push(p[index]);}}));
  return Array.from(points.entries()).sort((a,b)=>a[0]-b[0]).map(([x,v])=>({x,y:avg(v),sd:sd(v),n:v.length}));
 }

@@ -47,13 +47,23 @@ def collect(*, plan_path: Path, state: dict) -> tuple[dict, list[dict]]:
     for job in plan.jobs:
         record = state["jobs"][job.identifier]
         config = job.config.model_dump(mode="json")
-        history, result = [], {}
+        history, result, initial = [], {}, {}
         if record["attempts"]:
             last = record["attempts"][-1]
             config = read_json(path=Path(last["config_path"]))
             history_path = Path(last["output_dir"]) / "history.json"
             if history_path.exists():
                 history = read_json(path=history_path)
+            initial_path = Path(last["output_dir"]) / "initial_validation.json"
+            if initial_path.exists():
+                initial = read_json(path=initial_path)
+                if (
+                    initial["epoch"] != 0
+                    or initial["data_fingerprint"] != plan.data_fingerprint
+                    or initial["head"] != config["head"]
+                    or initial["seed"] != config["seed"]
+                ):
+                    raise ValueError(f"Invalid initial validation: {job.identifier}")
         if record["status"] == "completed":
             result = read_json(path=Path(record["result_path"]))
             if len(history) != config["epochs"]:
@@ -136,6 +146,7 @@ def collect(*, plan_path: Path, state: dict) -> tuple[dict, list[dict]]:
             "commit": result.get("environment", {}).get("git_commit", ""),
             "attempts": len(record["attempts"]),
             "curves": curves,
+            "initial": initial,
         })
     return {
         "path": str(plan_path),
@@ -239,7 +250,7 @@ def build(*, plans: tuple[Path, ...], output_dir: Path, coordination_path: str) 
             **{
                 key: value
                 for key, value in row.items()
-                if key not in {"curves", "best", "final", "test", "optima"}
+                if key not in {"curves", "best", "final", "test", "optima", "initial"}
             },
             **{
                 f"{phase}_{key}": value
