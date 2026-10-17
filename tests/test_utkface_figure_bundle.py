@@ -3,9 +3,12 @@ import json
 import re
 import runpy
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import quickjs
 from plotly.graph_objects import Figure
+
+if TYPE_CHECKING:
+    import quickjs
 
 HARNESS = r"""
 document.getElementById('bundle-data').textContent=snapshot_json;
@@ -67,12 +70,14 @@ click('reset');check(pageState().hidden.size===0&&Object.keys(pageState().ranges
 """
 
 
-def drain(*, context: quickjs.Context) -> None:
+def drain(*, context: "quickjs.Context") -> None:
     while context.execute_pending_job():
         pass
 
 
 def verify(*, html_path: Path) -> dict:
+    import quickjs
+
     html = html_path.read_text()
     data = re.search(
         r'<script id="bundle-data" type="application/json">(.*?)</script>',
