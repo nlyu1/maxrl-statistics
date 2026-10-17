@@ -5,6 +5,7 @@ import runpy
 from pathlib import Path
 
 import quickjs
+from plotly.graph_objects import Figure
 
 HARNESS = r"""
 document.getElementById('bundle-data').textContent=snapshot_json;
@@ -13,7 +14,7 @@ for(const [id,value] of Object.entries({'smoothing':'auto','seed':'all','x-mode'
 document.getElementById('bands').checked=true;
 for(const value of ['all','42','43','44']){const o=new Element('option');o.value=value;document.getElementById('seed').append(o);}
 window.location={hash:''};window.addEventListener=()=>{};
-function setDeep(obj,key,value){const parts=key.split('.');let item=obj;for(const p of parts.slice(0,-1))item=item[p]||(item[p]={});item[parts.at(-1)]=value;}
+function setDeep(obj,key,value){const parts=key.split('.');let item=obj;for(const p of parts.slice(0,-1))item=item[p]||(item[p]={});item[parts[parts.length-1]]=value;}
 const Plotly={
  react(div,data,layout,config){div.data=data;div.layout=layout;div.config=config;div.events=div.events||{};div.on=(event,fn)=>{div.events[event]=fn;};return Promise.resolve();},
  relayout(div,changes){for(const [k,v] of Object.entries(changes))setDeep(div.layout,k,v);if(div.events.plotly_relayout)div.events.plotly_relayout(changes);return Promise.resolve();},
@@ -50,7 +51,7 @@ setPage('03-main-1024');check(new Set(graph.data.filter(t=>t.meta.kind==='mean')
 check(graph.data.filter(t=>t.meta.kind==='mean').every(t=>t.meta.n===1),'1024 seed count');
 check(document.getElementById('seed').children.find(n=>n.value==='43').disabled,'unavailable seeds disabled');
 change('smoothing','1');check(graph.data.find(t=>t.meta.kind==='mean').x.length===200,'all 200 raw epochs');
-change('x-mode','updates');check(graph.data.find(t=>t.meta.kind==='mean').x.at(-1)===3200,'optimizer update axis');
+change('x-mode','updates');const updatePoints=graph.data.find(t=>t.meta.kind==='mean').x;check(updatePoints[updatePoints.length-1]===3200,'optimizer update axis');
 change('x-mode','epoch');change('smoothing','auto');
 setPage('06-fixed-noise');check(current().panels.length===16,'sixteen noise panels');
 check(new Set(current().panels.flatMap(p=>p.groups.map(g=>g.key))).size===5,'five noise methods');
@@ -96,6 +97,12 @@ def verify(*, html_path: Path) -> dict:
             drain(context=context)
     payload = json.loads(data)
     for fig in payload["figures"]:
+        context.eval(f"setPage({json.dumps(fig['id'])});")
+        drain(context=context)
+        plot = json.loads(
+            context.eval("JSON.stringify({data:graph.data,layout:graph.layout})")
+        )
+        Figure(data=plot["data"], layout=plot["layout"], skip_invalid=False)
         assert len(fig["panels"]) == fig["rows"] * fig["cols"]
         for panel in fig["panels"]:
             for group in panel["groups"]:
@@ -127,6 +134,7 @@ def verify(*, html_path: Path) -> dict:
             "digit policy provenance",
             "full-range fit and reset",
             "offline runtime",
+            "all seven figures pass the installed Plotly schema",
         ],
         "browserRenderingVerified": False,
         "scope": "Isolated DOM and Plotly API interaction contract; static PNGs inspected separately.",
