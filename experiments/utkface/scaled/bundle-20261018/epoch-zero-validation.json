@@ -14,5 +14,6 @@
   "pdfRenderedWith": "pdftoppm",
   "browserRenderingVerified": false,
   "historicalTrainingSourceAndCheckpointResultsUnchanged": true,
-  "pdfVisualInspectionVerified": true
+  "pdfVisualInspectionVerified": true,
+  "epochZeroPlotted": false
 }

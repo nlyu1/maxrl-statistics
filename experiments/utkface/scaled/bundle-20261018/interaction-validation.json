@@ -8,7 +8,7 @@
     "method coverage and legend groups",
     "scalar NLL omitted",
     "raw and centered moving means",
-    "unsmoothed epoch zero connected in every panel",
+    "epoch zero omitted from every panel",
     "epoch zero excluded from training moving means",
     "seed coverage",
     "native Plotly zoom persistence",
