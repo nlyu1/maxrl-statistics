@@ -15,7 +15,7 @@ from src.experiments.utkface.figure_bundle import series
 from src.experiments.utkface.model import DigitHead, ScalarHead
 
 
-def test_plot_connects_raw_epoch_zero_to_training_only_moving_means() -> None:
+def test_plot_omits_initial_stats_and_uses_training_only_moving_means() -> None:
     runs = [
         {
             "epochs": 6,
@@ -26,11 +26,10 @@ def test_plot_connects_raw_epoch_zero_to_training_only_moving_means() -> None:
     ]
     smoothed = series(runs=runs, metric="mae_mean", window=3)
     raw = series(runs=runs, metric="mae_mean", window=1)
-    assert smoothed["x"] == [0, 2, 3, 4, 5]
-    assert raw["x"] == list(range(7))
-    assert smoothed["mean"][0] == raw["mean"][0] == 25
-    assert smoothed["mean"][1] == 3 and raw["mean"][1] == 2
-    assert smoothed["sd"][0] == raw["sd"][0] == pytest.approx(5 * 2**0.5)
+    assert smoothed["x"] == [2, 3, 4, 5]
+    assert raw["x"] == list(range(1, 7))
+    assert smoothed["mean"][0] == 3 and raw["mean"][0] == 2
+    assert smoothed["sd"][0] == raw["sd"][0] == pytest.approx(2**0.5)
 
 
 def test_initial_validation_preserves_weights_mode_and_random_streams(

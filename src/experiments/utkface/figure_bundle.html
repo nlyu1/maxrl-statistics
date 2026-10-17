@@ -27,7 +27,7 @@
   </section>
   <div class="plot-wrap"><div id="loading">Preparing figure…</div><div id="plot" class="plot" aria-label="Interactive validation curves"></div><div id="render-error" role="alert"></div></div>
   <div class="downloads"><a id="png-link">Static PNG</a><a id="pdf-link">Vector PDF</a><a href="all-seven.pdf">All seven · PDF</a><a href="bundle-data.json">Raw curves and provenance</a></div>
-  <p class="hint">Use Plotly’s native zoom and pan controls to inspect later training. “Fit all data” restores the complete visible trajectories. Moving means do not alter saved checkpoints or test results. Bands are sample SD, not confidence intervals. Scalar label NLL is undefined.</p>
+  <p class="hint">Default axes emphasize later training. “Fit all data” restores the full training trajectories. Use Plotly’s native zoom and pan controls to inspect the curves. Moving means do not alter saved checkpoints or test results. Bands are sample SD, not confidence intervals. Scalar label NLL is undefined.</p>
   <details><summary>Methods, seeds and learning rates</summary><div class="table-wrap"><table><thead><tr><th>Panel setting</th><th>Method</th><th>Seeds</th><th>Peak LR</th><th>Source runs</th></tr></thead><tbody id="evidence"></tbody></table></div></details>
   <footer id="provenance"></footer>
 </main>
@@ -52,8 +52,8 @@ function curve(group,metric,horizon){
  const column=B.curveColumns.indexOf(metric), xColumn=B.curveColumns.indexOf(state.xMode);
  const window=state.smoothing==="auto"?(horizon===200?10:5):Number(state.smoothing);
  if(runs.every(r=>r.curves.every(c=>c[column]===null)))return null;
- const ys=runs.map(r=>{const initial=r.initial.validation[metric];if(!Number.isFinite(initial))throw Error("Undefined epoch-zero metric");const y=[initial];for(let i=0;i<=r.curves.length-window;i++){let total=0;for(let j=0;j<window;j++){const v=r.curves[i+j][column];if(v===null||!Number.isFinite(v))throw Error("Undefined curve point");total+=v;}y.push(total/window);}return y;});
- const x=ys[0].map((_,i)=>i===0?0:(runs[0].curves[i-1][xColumn]+runs[0].curves[i+window-2][xColumn])/2);
+ const ys=runs.map(r=>{const y=[];for(let i=0;i<=r.curves.length-window;i++){let total=0;for(let j=0;j<window;j++){const v=r.curves[i+j][column];if(v===null||!Number.isFinite(v))throw Error("Undefined curve point");total+=v;}y.push(total/window);}return y;});
+ const x=ys[0].map((_,i)=>(runs[0].curves[i][xColumn]+runs[0].curves[i+window-1][xColumn])/2);
  const mean=x.map((_,i)=>ys.reduce((sum,row)=>sum+row[i],0)/ys.length);
  const sd=ys.length>1?x.map((_,i)=>Math.sqrt(ys.reduce((sum,row)=>sum+(row[i]-mean[i])**2,0)/(ys.length-1))):[];
  return {x,mean,sd,n:runs.length,window,seeds:runs.map(r=>r.seed),lr:[...new Set(runs.map(r=>r.lr))]};

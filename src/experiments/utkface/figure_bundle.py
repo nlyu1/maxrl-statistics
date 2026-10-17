@@ -517,24 +517,21 @@ def series(*, runs: list[dict], metric: str, window: int) -> dict:
         raise ValueError("Partially undefined or nonfinite series")
     kernel = np.ones(window) / window
     smoothed = np.array([np.convolve(row, kernel, mode="valid") for row in values])
-    initial = np.array([r["initial"]["validation"][metric] for r in runs])
-    if not np.isfinite(initial).all():
-        raise ValueError("Nonfinite epoch-zero metric")
-    plotted = np.column_stack((initial, smoothed))
     return {
-        "x": [0, *(np.arange(epochs - window + 1) + (window + 1) / 2).tolist()],
-        "mean": plotted.mean(0).tolist(),
-        "sd": plotted.std(0, ddof=1).tolist() if len(runs) > 1 else [],
+        "x": (np.arange(epochs - window + 1) + (window + 1) / 2).tolist(),
+        "mean": smoothed.mean(0).tolist(),
+        "sd": smoothed.std(0, ddof=1).tolist() if len(runs) > 1 else [],
     }
 
 
-def panel_range(*, curves: list[dict], metric: str) -> list[float]:
+def panel_range(*, curves: list[dict], metric: str, horizon: int) -> list[float]:
     lower, upper = [], []
     for curve in curves:
         deviations = curve["sd"] or [0] * len(curve["mean"])
-        for mean, sd in zip(curve["mean"], deviations, strict=True):
-            lower.append(mean - sd)
-            upper.append(mean + sd)
+        for epoch, mean, sd in zip(curve["x"], curve["mean"], deviations, strict=True):
+            if epoch >= horizon * 0.4:
+                lower.append(mean - sd)
+                upper.append(mean + sd)
     low, high = min(lower), max(upper)
     pad = max((high - low) * 0.1, 0.003 if metric == "median_spearman" else 0.1)
     return [
@@ -555,7 +552,7 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
             width = 14 if spec["cols"] == 2 else 20
             foot = (
                 spec["note"]
-                + " Moving means: 5 epochs (10 for 200-epoch runs); bands: between-seed sample SD where n=3. Use the interactive viewer to zoom into later training."
+                + " Moving means: 5 epochs (10 for 200-epoch runs); bands: between-seed sample SD where n=3. Axes emphasize later fit; the interactive viewer can show full training trajectories."
             )
             caption = "\n".join(textwrap.wrap(foot, width=145 if width == 14 else 210))
             caption_height = (len(caption.splitlines()) * 12 + 8) / 72
@@ -605,8 +602,10 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
                     fontsize=10,
                 )
                 ax.set_xlabel("Epoch")
-                ax.set_xlim(0, panel["horizon"])
-                ax.set_ylim(panel_range(curves=curves, metric=metric))
+                ax.set_xlim(20 if panel["horizon"] == 200 else 5, panel["horizon"])
+                ax.set_ylim(
+                    panel_range(curves=curves, metric=metric, horizon=panel["horizon"])
+                )
                 ax.grid(alpha=0.16)
                 panel["defaultX"] = list(ax.get_xlim())
                 panel["defaultY"] = list(ax.get_ylim())
@@ -687,7 +686,8 @@ def build(*, data: Path, output_dir: Path, epoch_zero_path: str) -> None:
         "No new training or test-driven selection was performed.\n\n"
         "Default moving means are five epochs, or ten for 200-epoch runs. Choose Raw to inspect unsmoothed curves. "
         "Bands are sample SD across optimization seeds, not confidence intervals. "
-        "Epoch zero is unsmoothed and connected directly to the training curves. "
+        "Plots show trained epochs only; epoch-zero stats remain in the data files. "
+        "Default axes emphasize later training; Fit all data restores full training trajectories. "
         "Use native zoom/pan to inspect later training. Scalar label NLL is undefined. "
         "epoch-zero.json retains reconstruction provenance; historical training and checkpoint selections are unchanged.\n\n"
         "Approved coverage adaptations: SD 1/3/5/10; eight available categorical 1024x200 settings; "
@@ -709,6 +709,7 @@ def build(*, data: Path, output_dir: Path, epoch_zero_path: str) -> None:
         "runCount": len(bundle["runs"]),
         "newTrainingRuns": 0,
         "epochZeroRuns": len(bundle["runs"]),
+        "epochZeroPlotted": False,
         "adaptations": bundle["adaptations"],
         "files": {
             p.name: hashlib.sha256(p.read_bytes()).hexdigest()
