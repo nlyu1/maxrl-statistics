@@ -1,0 +1,18 @@
+{
+  "result": "passed",
+  "initializations": 7,
+  "historicalRunsCovered": 510,
+  "plottedRuns": 87,
+  "cleanValidationImages": 2308,
+  "precision": "bf16",
+  "device": "cpu",
+  "gpuHours": 0,
+  "evaluationSeconds": 580.3984229757916,
+  "unitTestsPassed": 7,
+  "interactionChecksPassed": 21,
+  "pdfPages": 7,
+  "pdfRenderedWith": "pdftoppm",
+  "browserRenderingVerified": false,
+  "historicalTrainingSourceAndCheckpointResultsUnchanged": true,
+  "pdfVisualInspectionVerified": true
+}

@@ -1,8 +1,10 @@
 # UTKFace study: completed
 
-All selected work finished **October 15, 2026 at 12:15:54 GMT+8**. The completed records were reconfirmed on **October 17**, and the interactive dashboard was refreshed at **00:44 GMT+8**. Per-run metrics and epoch curves are unchanged from the October 16 final audit. Both supervisors exited normally. There are no active attempts or selected pending jobs.
+All selected work finished **October 15, 2026 at 12:15:54 GMT+8**. The completed records were reconfirmed on **October 17**, and the interactive dashboard was refreshed at **00:44 GMT+8**. Trained-epoch metrics and curves are unchanged from the October 16 final audit. Both supervisors exited normally. There are no active attempts or selected pending jobs.
 
 **[Open the interactive report](dashboard.html)** · [Final interpretation](FINAL.md) · [All metrics and best epochs](FINAL_TABLES.md) · [Completion audit](final-audit.json).
+
+The [seven-figure bundle](bundle-20261018/viewer.html) was refreshed on October 18 with unsmoothed epoch-zero values connected to each curve, including the [seven-page PDF](bundle-20261018/all-seven.pdf). Seven reconstructed initial models cover its 87 source runs and all 510 completed non-preflight runs. Reconstruction used the same clean validation set and bfloat16 precision on the server CPU; framework versions and historical inference sources were checked. [Raw initialization records](bundle-20261018/epoch-zero.json) retain weights hashes, settings and provenance. Historical checkpoint selections and trained-epoch curves remain intact. Future runs now save `initial_validation.json` before the first optimizer update and include those stats in `result.json`.
 
 The study completed **514 jobs**: 288 LR pilots, four real-image preflight checks and **222 scientific final evaluations**. All **212 jobs selected in the October 15 update** completed. The original and continuation queues contribute 490 and 24 completed jobs, respectively.
 
