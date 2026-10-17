@@ -177,9 +177,12 @@ def best_family(*, runs: list[dict], family: str, size: int) -> tuple[Method, li
     groups = defaultdict(list)
     stages = {"main"} if size == 18462 else {"subset", "subset_replication"}
     for run in runs:
-        if run["stage"] in stages and run["size"] == size:
-            if run["method"].startswith(family + "_"):
-                groups[run["method"]].append(run)
+        if (
+            run["stage"] in stages
+            and run["size"] == size
+            and run["method"].startswith(family + "_")
+        ):
+            groups[run["method"]].append(run)
     ranking = sorted(
         [
             {
