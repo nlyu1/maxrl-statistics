@@ -1,0 +1,32 @@
+{
+  "pages": 7,
+  "sourceRuns": 95,
+  "sourceSha256": "9723a6975898f985e9a2c5b8a52c5f41869176127a340e4a5dfbc72ed31e2038",
+  "result": "passed",
+  "checks": [
+    "seven pages and navigation",
+    "method coverage and legend groups",
+    "scalar NLL omitted",
+    "raw and centered moving means",
+    "seed coverage",
+    "explicit X/Y ranges",
+    "invalid range atomicity",
+    "legend state retention",
+    "SD bands",
+    "finite traces",
+    "200 epochs and optimizer updates",
+    "16 noise panels and SD3 adaptation",
+    "metric-wide axis ranges",
+    "focused setting provenance",
+    "width and estimator coverage",
+    "digit policy provenance",
+    "full-range fit and reset",
+    "offline runtime",
+    "all seven figures pass the installed Plotly schema"
+  ],
+  "browserRenderingVerified": false,
+  "scope": "Isolated DOM and Plotly API interaction contract; static PNGs inspected separately.",
+  "staticPdfPages": 7,
+  "allSevenStaticPngsVisuallyInspected": true,
+  "captionsAndLegendsSeparated": true
+}

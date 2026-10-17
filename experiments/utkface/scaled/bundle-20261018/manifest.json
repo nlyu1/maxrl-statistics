@@ -1,0 +1,38 @@
+{
+  "generated": "2026-10-18T01:30:51.773314+08:00",
+  "dataSnapshot": "2026-10-17T00:44:42.960062+08:00",
+  "sourceSha256": "9723a6975898f985e9a2c5b8a52c5f41869176127a340e4a5dfbc72ed31e2038",
+  "sourceCohort": "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6",
+  "revision": "7244f312d4f7dd6eb30069d3a6a621829ac03651",
+  "figureCount": 7,
+  "runCount": 95,
+  "newTrainingRuns": 0,
+  "adaptations": [
+    "Use SD 3 instead of unavailable SD 2.",
+    "Use the eight tested categorical 1024\u00d7200 methods.",
+    "Use categorical MAE/MSE in the focused 1024\u00d7200 row."
+  ],
+  "files": {
+    "01-main-full.pdf": "315a615c217e25e7c98e5e0c9b639c0107c66efb329963fa615f86c3fe151c2d",
+    "01-main-full.png": "16a14668252f821fbce0f31a3350341766f59aa5c47c878ccf725daa94c1bd2c",
+    "02-sl-heads.pdf": "e912cb67bb998e193bd85890bd70d6e9d720611458ecdff65e14596e0e07b88e",
+    "02-sl-heads.png": "9fd027168790010edb919157ea04a5747a568dc4869ba146fb0e81b81e4ecd34",
+    "03-main-1024.pdf": "0e8b6624d920454d5c8b426e475f9ce24b1c325d9b5255cb2c32f09dd0c02437",
+    "03-main-1024.png": "427bbb240b5b9a05fc4a4f15eb1fb23c10354382de48becaeba00ba9a9a3db25",
+    "04-stat-widths.pdf": "8863066f29807d895fa964d3761ddf0a768c9828ebd9d886bf2967dde5cc7ce6",
+    "04-stat-widths.png": "c7300474dd77703586a16ccd536c8b67f2d06a1916ca0ae3f2d5c74fd0ff246c",
+    "05-tail-focus.pdf": "eff7bd3b97f8971be78a863cf97296ff8b704dfc09051178450e4892082bc343",
+    "05-tail-focus.png": "49988d9a99e8c5508e056b595e205ce37282fd9919bf2057d985e6a3aee3c4ec",
+    "06-fixed-noise.pdf": "c7b1d46b18a5dbdbbd58efe09a2118b1f349f233154140d282a79012d118139d",
+    "06-fixed-noise.png": "cb24d60ed5d0144e9efb7a9e5d51c3ef57bb07b812086fb4b4cfe3af2a47107c",
+    "07-digits.pdf": "d05f76a81ab75a8dd6f07573fe6181ec8466a3c2de897e530dde56c210390576",
+    "07-digits.png": "4a0b675a4a360f8e36e8a467e2c032617b6ef7506aa3c40818670c6c4c02d858",
+    "README.txt": "12215c300332a87375afd1cf18fdfffc31ac446bdd73d8a2865bf56c054ead46",
+    "all-seven.pdf": "7e3503649b6b1c3d09261039a01341ffca72d6824daeea096daab6438f562f7c",
+    "bundle-data.json": "6f7ee99671ebd07d878e749c9b19258beb261d3cbac7c054635ef2962552867f",
+    "interaction-validation.json": "a0c018371a94d93443510af6b52451d59f96f3ee4a3566d7ab8b8aeb34c3edf1",
+    "viewer.html": "9cb07ccda8ac26a91e2ca49bc0db0fd2c2a8a9f23d822c9767cd9032cab6af8b"
+  },
+  "viewerRevision": "df3ab4ab031594111a66f18af7f1012bac0cb88c",
+  "staticVisualInspection": "All seven PNG exports inspected; legends and captions separated."
+}
