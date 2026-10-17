@@ -549,12 +549,21 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
     with PdfPages(output_dir / "all-seven.pdf") as book:
         for spec in bundle["figures"]:
             width = 14 if spec["cols"] == 2 else 20
-            height = 9 if spec["cols"] == 2 else 4 * spec["rows"] + 1.5
+            foot = (
+                spec["note"]
+                + " Moving means: 5 epochs (10 for 200-epoch runs); bands: between-seed sample SD where n=3. Axes emphasize later fit; interactive viewer can show the full trajectories."
+            )
+            caption = "\n".join(textwrap.wrap(foot, width=145 if width == 14 else 210))
+            caption_height = (len(caption.splitlines()) * 12 + 8) / 72
+            legend_columns = 3 if width == 14 else 4
+            keys = {g["key"] for p in spec["panels"] for g in p["groups"]}
+            legend_height = (math.ceil(len(keys) / legend_columns) * 16 + 12) / 72
+            footer_height = caption_height + legend_height + 0.35
+            height = 3.6 * spec["rows"] + footer_height + 0.7
             fig, axes = plt.subplots(
                 spec["rows"],
                 spec["cols"],
                 figsize=(width, height),
-                layout="constrained",
             )
             legend = {}
             for ax, panel in zip(axes.flat, spec["panels"], strict=True):
@@ -617,17 +626,16 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
             fig.legend(
                 handles,
                 labels,
-                loc="outside lower center",
-                ncol=3 if width == 14 else 4,
+                loc="lower center",
+                bbox_to_anchor=(0.5, (caption_height + 0.22) / height),
+                ncol=legend_columns,
                 fontsize=9,
             )
-            foot = (
-                spec["note"]
-                + " Moving means: 5 epochs (10 for 200-epoch runs); bands: between-seed sample SD where n=3. Axes emphasize later fit; interactive viewer can show the full trajectories."
-            )
-            fig.supxlabel(
-                "\n".join(textwrap.wrap(foot, width=145 if width == 14 else 210)),
-                fontsize=8,
+            fig.text(0.5, 0.012, caption, ha="center", va="bottom", fontsize=9)
+            fig.tight_layout(
+                rect=(0, (footer_height + 0.1) / height, 1, 0.95),
+                h_pad=2.0,
+                w_pad=2.0,
             )
             fig.savefig(output_dir / f"{spec['id']}.png")
             fig.savefig(output_dir / f"{spec['id']}.pdf")

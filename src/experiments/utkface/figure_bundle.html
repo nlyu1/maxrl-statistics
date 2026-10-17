@@ -74,7 +74,7 @@ function makeFigure(){
  const gapX=spec.cols===4?.07:.09,gapY=spec.rows===4?.075:.14;
  const cellW=(1-gapX*(spec.cols-1))/spec.cols,cellH=(1-gapY*(spec.rows-1))/spec.rows;
  spec.panels.forEach((p,i)=>{
-  const row=Math.floor(i/spec.cols),col=i%spec.cols,xd=[col*(cellW+gapX),col*(cellW+gapX)+cellW],yd=[1-row*(cellH+gapY)-cellH,1-row*(cellH+gapY)];
+  const row=Math.floor(i/spec.cols),col=i%spec.cols,clamp=v=>Math.max(0,Math.min(1,v)),xd=[col*(cellW+gapX),col*(cellW+gapX)+cellW].map(clamp),yd=[1-row*(cellH+gapY)-cellH,1-row*(cellH+gapY)].map(clamp);
   const xn=axisName("x",i),yn=axisName("y",i),scale=scaleFor(p);
   layout[xn]={domain:xd,anchor:axisRef("y",i),title:{text:xNames[state.xMode],font:{size:11}},range:saved.ranges[xn]||p.defaultX.map(v=>v*scale),showline:true,linecolor:"#c9d2d8",gridcolor:"#edf0f2",zeroline:false,tickfont:{size:11},automargin:true};
   layout[yn]={domain:yd,anchor:axisRef("x",i),range:saved.ranges[yn]||p.defaultY,showline:true,linecolor:"#c9d2d8",gridcolor:"#edf0f2",zeroline:false,tickfont:{size:11},automargin:true};
