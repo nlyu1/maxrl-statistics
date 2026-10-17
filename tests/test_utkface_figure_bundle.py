@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 HARNESS = r"""
 document.getElementById('bundle-data').textContent=snapshot_json;
 document.getElementById('navigation').replaceChildren();
-for(const [id,value] of Object.entries({'smoothing':'auto','seed':'all','x-mode':'epoch','axis-target':'all'}))document.getElementById(id).value=value;
+for(const [id,value] of Object.entries({'smoothing':'auto','seed':'all','x-mode':'epoch'}))document.getElementById(id).value=value;
 document.getElementById('bands').checked=true;
 for(const value of ['all','42','43','44']){const o=new Element('option');o.value=value;document.getElementById('seed').append(o);}
 window.location={hash:''};window.addEventListener=()=>{};
@@ -40,12 +40,10 @@ const firstExpected=r.curves.slice(0,5).reduce((s,c)=>s+c[1],0)/5;
 const firstCurve=curve({ids:[r.id]},'mae_mean',50);check(Math.abs(firstCurve.mean[0]-firstExpected)<1e-12&&firstCurve.x[0]===3,'moving mean and centered epochs');
 change('smoothing','1');check(graph.data.find(t=>t.meta.kind==='mean').x.length===50,'raw epochs');
 change('smoothing','auto');
-change('axis-target','metric:mae_mean');
-document.getElementById('x-min').value='10';document.getElementById('x-max').value='40';document.getElementById('y-min').value='4';document.getElementById('y-max').value='7';click('apply-ranges');
-check(graph.layout.xaxis.range[0]===10&&graph.layout.yaxis.range[1]===7,'explicit panel axis ranges');
-const previous=JSON.stringify(pageState().ranges);
-document.getElementById('x-min').value='12';document.getElementById('y-min').value='9';document.getElementById('y-max').value='1';click('apply-ranges');
-check(document.getElementById('axis-error').textContent.length>0&&JSON.stringify(pageState().ranges)===previous,'invalid ranges do not partially mutate the view');
+Plotly.relayout(graph,{'xaxis.range':[10,40],'yaxis.range':[4,7]});
+check(pageState().ranges.xaxis[0]===10&&pageState().ranges.yaxis[1]===7,'native Plotly zoom saved');
+change('smoothing','10');check(graph.layout.xaxis.range[0]===10&&graph.layout.yaxis.range[1]===7,'native zoom survives smoothing');
+change('smoothing','auto');
 for(const trace of graph.data)if(trace.meta.key==='tailrl')trace.visible='legendonly';captureLegend();check(pageState().hidden.has('tailrl'),'legend selection retained');
 render();check(graph.data.filter(t=>t.meta.key==='tailrl'&&t.meta.kind==='mean').every(t=>t.visible==='legendonly'),'hidden methods survive rerender');
 state.bands=false;document.getElementById('bands').checked=false;render();check(graph.data.filter(t=>t.meta.kind==='band').every(t=>t.visible===false),'SD visibility');
@@ -59,12 +57,18 @@ change('x-mode','epoch');change('smoothing','auto');
 setPage('06-fixed-noise');check(current().panels.length===16,'sixteen noise panels');
 check(new Set(current().panels.flatMap(p=>p.groups.map(g=>g.key))).size===5,'five noise methods');
 check(current().panels[4].title.startsWith('SD 3'),'approved SD3 substitution');
-change('axis-target','metric:label_nll');document.getElementById('x-min').value='5';document.getElementById('x-max').value='50';document.getElementById('y-min').value='0';document.getElementById('y-max').value='10';click('apply-ranges');
-check([3,7,11,15].every(i=>graph.layout[axisName('y',i)].range[1]===10),'metric ranges across all noise levels');
-setPage('05-tail-focus');check(current().panels.length===8,'two focused settings');
-check(current().panels.slice(4).every(p=>p.groups.every(g=>g.ids.every(id=>B.runs[id].size===1024&&B.runs[id].epochs===200))),'focus adaptation uses only completed 1024x200 runs');
+setPage('05-tail-focus');check(current().panels.length===4,'full-data focus only');
+check(current().panels.every(p=>p.groups.every(g=>g.ids.every(id=>B.runs[id].size===18462&&B.runs[id].epochs===50))),'focus uses full-data runs');
 setPage('04-stat-widths');check(current().panels.length===8&&uniqueGroups(current()).length===9,'widths and estimators');
+check(graph.data.filter(t=>t.showlegend).length===5,'five shared width legend entries');
+check(new Set(graph.data.filter(t=>t.meta.kind==='mean').map(t=>t.legendgroup)).size===5,'five shared legend groups');
+check(graph.data.filter(t=>t.meta.kind==='mean'&&t.meta.panel===0).length===5&&graph.data.filter(t=>t.meta.kind==='mean'&&t.meta.panel===4).length===5,'five curves per estimator panel');
+const widthKey=graph.data.find(t=>t.showlegend&&t.meta.methodKey.startsWith('stat_')).meta.key;
+for(const trace of graph.data)if(trace.legendgroup===widthKey)trace.visible='legendonly';captureLegend();render();
+check(graph.data.filter(t=>t.meta.key===widthKey&&t.meta.kind==='mean').length===8&&graph.data.filter(t=>t.meta.key===widthKey&&t.meta.kind==='mean').every(t=>t.visible==='legendonly'),'shared legend hides kernel and width across both rows');
+check(new Set(graph.data.filter(t=>t.meta.key===widthKey&&t.meta.kind==='mean').map(t=>t.meta.methodKey)).size===2,'shared legends retain separate estimator provenance');
 setPage('07-digits');check(uniqueGroups(current()).length===8&&current().panels.every(p=>p.groups.every(g=>g.ids.every(id=>B.runs[id].head==='digits'))),'eight actual digit objectives');
+check(current().panels.length===4&&current().panels.every(p=>p.groups.every(g=>g.ids.every(id=>B.runs[id].size===18462&&B.runs[id].epochs===50))),'digit figure uses full data only');
 click('fit-all');check(Object.values(graph.layout).filter(v=>v&&v.range).every(v=>v.range[0]<v.range[1]),'full trajectory fitting');
 click('reset');check(pageState().hidden.size===0&&Object.keys(pageState().ranges).length===0,'reset view');
 """
@@ -115,6 +119,7 @@ def verify(*, html_path: Path) -> dict:
                     assert identifier in payload["runs"]
     assert "__PLOTLY_RUNTIME__" not in html and "__BUNDLE_DATA__" not in html
     assert not re.search(r"<script[^>]+src=", html)
+    assert 'id="axis-target"' not in html and 'id="apply-ranges"' not in html
     return {
         "pages": len(payload["figures"]),
         "sourceRuns": len(payload["runs"]),
@@ -126,17 +131,17 @@ def verify(*, html_path: Path) -> dict:
             "scalar NLL omitted",
             "raw and centered moving means",
             "seed coverage",
-            "explicit X/Y ranges",
-            "invalid range atomicity",
+            "native Plotly zoom persistence",
+            "custom axis toolbar removed",
             "legend state retention",
             "SD bands",
             "finite traces",
             "200 epochs and optimizer updates",
             "16 noise panels and SD3 adaptation",
-            "metric-wide axis ranges",
-            "focused setting provenance",
-            "width and estimator coverage",
-            "digit policy provenance",
+            "full-data focus provenance",
+            "five shared width legends and cross-row toggling",
+            "distinct estimator provenance",
+            "full-data digit policy provenance",
             "full-range fit and reset",
             "offline runtime",
             "all seven figures pass the installed Plotly schema",

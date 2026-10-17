@@ -276,6 +276,8 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
         return {
             "key": method.key,
             "label": method.label,
+            "legendKey": method.key,
+            "legendLabel": method.label,
             "color": method.color,
             "dash": method.dash,
             "ids": [r["id"] for r in chosen],
@@ -394,18 +396,21 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
             for kind in ("mae", "mse")
             for width in (2, 5)
         ]
+        groups = []
+        for method in [*methods, METHODS["ce"]]:
+            selected = clean(method=method, size=18462, epochs=50)
+            selected["legendKey"] = method.key.replace("_population", "")
+            selected["legendLabel"] = method.label.split(" (")[0]
+            groups.append(selected)
         width_rows.append({
             "title": "Population" if population else "64 samples",
             "horizon": 50,
-            "groups": [
-                clean(method=m, size=18462, epochs=50)
-                for m in [*methods, METHODS["ce"]]
-            ],
+            "groups": groups,
         })
     add(
         slug="04-stat-widths",
         title="Statistical MaxRL: widths and estimators",
-        note="Full data, three seeds per setting. Solid: width 2; dashed: width 5. The same exact CE reference appears in both rows. Rates are independently validation-selected; this is not a matched-LR intervention.",
+        note="Full data, three seeds per setting. Five shared legend entries control both estimator rows. Solid: width 2; dashed: width 5. The same exact CE reference appears in both rows. Rates are independently validation-selected; this is not a matched-LR intervention.",
         rows=width_rows,
     )
     focus_rows = [
@@ -417,20 +422,13 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
                 for k in ("tailrl", "tailrl_population", "scalar_mae", "ce")
             ],
         },
-        {
-            "title": "1024 × 200 · n=1",
-            "horizon": 200,
-            "groups": [
-                clean(method=METHODS[k], size=1024, epochs=200)
-                for k in ("tailrl_population", "mae", "mse", "ce")
-            ],
-        },
     ]
     add(
         slug="05-tail-focus",
         title="TailRL and supervised baselines",
-        note="Full data: sampled TailRL, population TailRL, scalar MAE and CE. At 1024 × 200, sampled TailRL and scalar heads were not run; categorical MAE/MSE are the available SL baselines. Rows have different training sizes and horizons.",
+        note="Full data × 50 epochs, three matched seeds: sampled TailRL, population TailRL, scalar MAE and CE. TailRL peak LR: population 0.0001; 64 samples 0.001. Rates are independently validation-selected.",
         rows=focus_rows,
+        four_grid=True,
     )
     noise_rows = []
     for std in (1, 3, 5, 10):
@@ -459,34 +457,34 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
         note="4096 images × 50 epochs; optimization seed 42, noise seed 2026; held-out labels are clean. η = noise RMS / clean-age SD (about 0.05 at SD 1); conventional power SNR = 1/η². SD 3 replaces the unrun SD 2 by request. GRPO MAE is the best available clean-validation RL configuration; RLOO noise arms were not run.",
         rows=noise_rows,
     )
-    digit_rows = []
-    for size in (18462, 4096):
-        digit_methods = []
-        for m in reduced_methods:
-            digit_methods.append(
-                Method(
-                    key=m.key,
-                    label=m.label,
-                    method=m.method,
-                    head="digits",
-                    width=m.width,
-                    color=m.color,
-                    dash=m.dash,
-                )
-            )
-        digit_rows.append({
-            "title": f"{'Full data' if size == 18462 else '4096 images'} × 50 · n=1",
+    digit_methods = [
+        Method(
+            key=m.key,
+            label=m.label,
+            method=m.method,
+            head="digits",
+            width=m.width,
+            color=m.color,
+            dash=m.dash,
+        )
+        for m in reduced_methods
+    ]
+    digit_rows = [
+        {
+            "title": "Full data × 50 · n=1",
             "horizon": 50,
             "groups": [
-                clean(method=m, size=size, epochs=50, digits=True)
+                clean(method=m, size=18462, epochs=50, digits=True)
                 for m in digit_methods
             ],
-        })
+        }
+    ]
     add(
         slug="07-digits",
         title="Conditional two-digit policies: eight objectives",
-        note="Seed 42. Eight conditional 10×10 objectives on full data and 4096 images. All digit rates were selected on 4096 images; full-data digit runs reuse them. These panels contain digit policies only.",
+        note="Seed 42. Eight conditional 10×10 objectives on full data × 50 epochs. No 1024 × 200 digit runs are available. All digit rates were selected on 4096 images; full-data digit runs reuse them. These panels contain digit policies only.",
         rows=digit_rows,
+        four_grid=True,
     )
     return {
         "generated": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
@@ -502,7 +500,8 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
         "adaptations": [
             "Use SD 3 instead of unavailable SD 2.",
             "Use the eight tested categorical 1024×200 methods.",
-            "Use categorical MAE/MSE in the focused 1024×200 row.",
+            "Show full data only in the TailRL-versus-supervised figure.",
+            "Show full data only for digit policies; no 1024×200 digit runs exist.",
         ],
     }
 
@@ -556,7 +555,7 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
             caption = "\n".join(textwrap.wrap(foot, width=145 if width == 14 else 210))
             caption_height = (len(caption.splitlines()) * 12 + 8) / 72
             legend_columns = 3 if width == 14 else 4
-            keys = {g["key"] for p in spec["panels"] for g in p["groups"]}
+            keys = {g["legendKey"] for p in spec["panels"] for g in p["groups"]}
             legend_height = (math.ceil(len(keys) / legend_columns) * 16 + 12) / 72
             footer_height = caption_height + legend_height + 0.35
             height = 3.6 * spec["rows"] + footer_height + 0.7
@@ -585,7 +584,7 @@ def render_static(*, bundle: dict, output_dir: Path) -> None:
                         lw=1.9,
                         label=g["label"],
                     )[0]
-                    legend.setdefault(g["key"], (line, g["label"]))
+                    legend.setdefault(g["legendKey"], (line, g["legendLabel"]))
                     if curve["sd"]:
                         sd = np.array(curve["sd"])
                         ax.fill_between(
@@ -663,14 +662,16 @@ def build(*, data: Path, output_dir: Path) -> None:
     (output_dir / "viewer.html").write_text(html)
     (output_dir / "README.txt").write_text(
         "UTKFace seven-figure bundle\n\nOpen viewer.html in a browser. It is self-contained and needs no network connection. "
-        "Use the seven page links, Plotly legend clicks/double-clicks, zoom/pan tools, and the axis range controls. "
+        "Use the seven page links, Plotly legend clicks/double-clicks and native zoom/pan tools. "
         "The full-data curves aggregate seeds 42/43/44. Other panels state their actual coverage. "
         "No new training or test-driven selection was performed.\n\n"
         "Default moving means are five epochs, or ten for 200-epoch runs. Choose Raw to inspect unsmoothed curves. "
         "Bands are sample SD across optimization seeds, not confidence intervals. Initial axis limits focus on later fit; "
-        "Fit all data includes early transients. Scalar label NLL is undefined.\n\n"
+        "Fit all data includes early transients. Scalar label NLL is undefined. "
+        "Curves begin after one training epoch; epoch-zero metrics were not recorded.\n\n"
         "Approved coverage adaptations: SD 1/3/5/10; eight available categorical 1024x200 settings; "
-        "categorical MAE/MSE replace unavailable scalar/sampled-TailRL baselines in the focused 1024x200 row. "
+        "TailRL-versus-supervised and digit figures show full data only. No 1024x200 digit runs exist. "
+        "The Statistical MaxRL figure uses five shared legend entries across its two estimator rows. "
         "Eta is noise RMS / signal SD; conventional SNR = 1/eta^2.\n\n"
         "Each figure is supplied as PNG and vector PDF. all-seven.pdf contains all seven pages. "
         "bundle-data.json records source IDs, LR values, seeds, raw curves and validation-only selection decisions.\n"
