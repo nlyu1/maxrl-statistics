@@ -165,7 +165,15 @@ def initial_validation(
     numpy_state, python_state = np.random.get_state(), random.getstate()
     training = model.training
     generator_state = loader.generator.get_state()
-    devices = [context.device.index] if context.device.type == "cuda" else []
+    devices = (
+        [
+            context.device.index
+            if context.device.index is not None
+            else torch.cuda.current_device()
+        ]
+        if context.device.type == "cuda"
+        else []
+    )
     try:
         with torch.random.fork_rng(devices=devices):
             validation = evaluate(

@@ -58,6 +58,9 @@ def reconstruct(
 ) -> dict:
     if output.exists():
         raise FileExistsError(output)
+    evaluation_revision = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], text=True
+    ).strip()
     contents = data.read_bytes()
     payload = json.loads(contents)
     selected = {
@@ -157,9 +160,7 @@ def reconstruct(
         "generated": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
         "sourceDataSha256": hashlib.sha256(contents).hexdigest(),
         "sourceSnapshot": payload["generated"],
-        "evaluationRevision": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], text=True
-        ).strip(),
+        "evaluationRevision": evaluation_revision,
         "torch": torch.__version__,
         "torchvision": torchvision.__version__,
         "verifiedHistoricalSources": verified,
