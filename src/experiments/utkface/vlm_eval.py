@@ -466,8 +466,19 @@ def tune(
             output=directory / "pilot" / f"tokens_{cap}",
         )
         metrics = summarize_records(records=records, samples=2)
-        cap_results.append({"max_tokens": cap, "seconds": seconds, "metrics": metrics})
-        if metrics["truncated_predictions"] / metrics["requested_predictions"] <= 0.03:
+        unfinished = sum(
+            choice["finish_reason"] == "length"
+            and parse_age(content=choice["message"].get("content") or "") is None
+            for record in records
+            for choice in record["response"]["choices"]
+        )
+        cap_results.append({
+            "max_tokens": cap,
+            "seconds": seconds,
+            "metrics": metrics,
+            "unfinished_length_limited": unfinished,
+        })
+        if unfinished / metrics["requested_predictions"] <= 0.03:
             break
     concurrency_results = []
     for concurrency in plan.client_concurrencies:
@@ -519,6 +530,8 @@ def docker_command(
         container,
         "--label",
         f"utkface.vlm.root={root}",
+        "--entrypoint",
+        "uv",
         "--gpus",
         f"device={gpu_uuid}",
         "--ipc=host",
@@ -533,6 +546,11 @@ def docker_command(
         "-e",
         "DO_NOT_TRACK=1",
         plan.image,
+        "run",
+        "--no-project",
+        "--no-sync",
+        "vllm",
+        "serve",
         "--model",
         model.repository,
         "--revision",
