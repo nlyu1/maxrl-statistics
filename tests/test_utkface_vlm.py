@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import runpy
 from types import SimpleNamespace
 
 import pytest
@@ -147,7 +148,9 @@ def test_download_helper_is_valid_python_and_handles_json(tmp_path, monkeypatch)
         })
     )
     source = DOWNLOAD_SCRIPT.replace("Path('/study')", f"Path({str(tmp_path)!r})")
-    exec(compile(source, "download-helper", "exec"), {})
+    helper = tmp_path / "download_helper.py"
+    helper.write_text(source)
+    runpy.run_path(str(helper))
     assert (
         json.loads((tmp_path / "downloads.json").read_text())["model"]["snapshot"]
         == "/cached/snapshot"
