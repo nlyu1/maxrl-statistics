@@ -33,6 +33,7 @@ class ModelSpec(BaseModel):
     repository: str
     revision: str
     template_file: str
+    template_sha256: str
 
 
 class EvaluationSpec(BaseModel):
@@ -46,7 +47,7 @@ class EvaluationPlan(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     manifest: Path
     fingerprint: str
-    image: str
+    image: str = Field(pattern=r"^vllm/vllm-openai@sha256:[0-9a-f]{64}$")
     cache_volume: str
     models: tuple[ModelSpec, ...]
     evaluations: tuple[EvaluationSpec, ...]
@@ -91,6 +92,12 @@ def load_plan(*, root: Path) -> EvaluationPlan:
     plan = EvaluationPlan.model_validate_json((root / "plan.json").read_text())
     if source_hashes() != plan.source_hashes:
         raise ValueError("Evaluation sources differ from the frozen plan")
+    for model in plan.models:
+        if (
+            hashlib.sha256((root / model.template_file).read_bytes()).hexdigest()
+            != model.template_sha256
+        ):
+            raise ValueError("Chat template differs from the pinned checkpoint")
     return plan
 
 
@@ -137,6 +144,9 @@ def prepare(*, root: Path, manifest: Path, image: str) -> None:
                     repository=repository,
                     revision=api.model_info(repository).sha,
                     template_file=template_file,
+                    template_sha256=hashlib.sha256(
+                        Path(template_path).read_bytes()
+                    ).hexdigest(),
                 )
             )
             modes = ("base",) if kind == "base" else ("thinking_off", "thinking_on")
@@ -470,7 +480,7 @@ def tune(
             samples=plan.samples,
             max_tokens=cap,
             concurrency=concurrency,
-            output=directory / "pilot" / f"concurrency_{concurrency}",
+            output=directory / "pilot" / f"concurrency_{concurrency}_{time.time_ns()}",
         )
         metrics = summarize_records(records=records, samples=plan.samples)
         concurrency_results.append({
