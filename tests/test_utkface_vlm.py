@@ -1,12 +1,17 @@
+import json
 import math
+import os
+from types import SimpleNamespace
 
 import pytest
 
 from src.experiments.utkface.vlm_eval import (
     parse_age,
     prediction_metrics,
+    query_image,
     summarize_records,
 )
+from src.experiments.utkface.vlm_queue import DOWNLOAD_SCRIPT, owned_worker
 
 
 @pytest.mark.parametrize(
@@ -84,3 +89,70 @@ def test_constant_predictions_have_undefined_correlation():
 def test_missing_completion_is_an_error():
     with pytest.raises(ValueError, match="completion indices"):
         summarize_records(records=[record(index=0, target=30, values=[30])], samples=2)
+
+
+def test_request_sends_pixels_without_age_filename_or_label(tmp_path, monkeypatch):
+    source = tmp_path / "37_0_0_123.jpg"
+    source.write_bytes(b"image-pixels")
+    captured = []
+
+    def fake_request(*, url, payload):
+        captured.append(payload)
+        return {"model": payload["model"], "choices": [], "usage": {}}
+
+    monkeypatch.setattr("src.experiments.utkface.vlm_eval.request_json", fake_request)
+    plan = SimpleNamespace(
+        manifest=tmp_path / "manifest.json",
+        prompt="Estimate age in years.",
+        temperature=0.7,
+        top_p=0.8,
+        top_k=20,
+        presence_penalty=0.0,
+        sampling_seed=20261020,
+    )
+    spec = SimpleNamespace(model_identifier="model", mode="thinking_on")
+    result = query_image(
+        plan=plan,
+        spec=spec,
+        payload={"records": [{"relative_path": source.name, "age": 37}]},
+        index=0,
+        port=8000,
+        samples=8,
+        max_tokens=256,
+    )
+    request = captured[0]
+    assert request["n"] == 8
+    assert request["chat_template_kwargs"] == {"enable_thinking": True}
+    assert request["messages"][0]["content"][0]["image_url"]["url"].startswith(
+        "data:image/jpeg;base64,"
+    )
+    assert source.name not in str(request)
+    assert "target" not in request
+    assert result["target"] == 37
+
+
+def test_download_helper_is_valid_python_and_handles_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "huggingface_hub.snapshot_download", lambda **kwargs: "/cached/snapshot"
+    )
+    (tmp_path / "plan.json").write_text(
+        json.dumps({
+            "models": [
+                {
+                    "identifier": "model",
+                    "repository": "Qwen/model",
+                    "revision": "pinned",
+                }
+            ]
+        })
+    )
+    source = DOWNLOAD_SCRIPT.replace("Path('/study')", f"Path({str(tmp_path)!r})")
+    exec(compile(source, "download-helper", "exec"), {})
+    assert (
+        json.loads((tmp_path / "downloads.json").read_text())["model"]["snapshot"]
+        == "/cached/snapshot"
+    )
+
+
+def test_process_ownership_rejects_unrelated_pid(tmp_path):
+    assert not owned_worker(pid=os.getpid(), root=tmp_path)
