@@ -1,5 +1,6 @@
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import signal
@@ -10,7 +11,13 @@ from pathlib import Path
 
 from src.experiments.utkface.run import write_json
 from src.experiments.utkface.scheduler import gpu_inventory, gpu_is_free, ready_gpus
-from src.experiments.utkface.vlm_eval import load_plan, report, stop_container
+from src.experiments.utkface.vlm_eval import (
+    EvaluationPlan,
+    GPUProcessException,
+    load_plan,
+    report,
+    stop_container,
+)
 
 DOWNLOAD_SCRIPT = """
 import json
@@ -33,6 +40,42 @@ for model in plan['models']:
     os.replace(temporary, target)
     print(model['identifier'], 'ready', flush=True)
 """
+
+
+def process_matches_exception(*, exception: GPUProcessException) -> bool:
+    process = Path(f"/proc/{exception.pid}")
+    try:
+        uid = process.stat().st_uid
+        command = (process / "cmdline").read_bytes()
+        fields = (process / "stat").read_text().rsplit(")", 1)[1].split()
+        boot_id = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except (FileNotFoundError, ProcessLookupError, PermissionError):
+        return False
+    return (
+        uid == exception.uid
+        and int(fields[19]) == exception.start_time_ticks
+        and hashlib.sha256(command).hexdigest() == exception.command_sha256
+        and boot_id == exception.boot_id
+    )
+
+
+def gpu_inventory_for_plan(*, plan: EvaluationPlan) -> list[dict]:
+    inventory = gpu_inventory()
+    verified = {
+        (exception.gpu_uuid, exception.pid)
+        for exception in plan.ignored_gpu_processes
+        if process_matches_exception(exception=exception)
+    }
+    return [
+        {
+            **gpu,
+            "pids": [pid for pid in gpu["pids"] if (gpu["uuid"], pid) not in verified],
+            "ignored_pids": [
+                pid for pid in gpu["pids"] if (gpu["uuid"], pid) in verified
+            ],
+        }
+        for gpu in inventory
+    ]
 
 
 def owned_worker(*, pid: int, root: Path) -> bool:
@@ -170,7 +213,7 @@ def run_queue(*, root: Path) -> None:
         signal.signal(signal.SIGINT, interrupt)
         while True:
             now = time.time()
-            inventory = gpu_inventory()
+            inventory = gpu_inventory_for_plan(plan=plan)
             by_uuid = {gpu["uuid"]: gpu for gpu in inventory}
             for identifier, record in state["jobs"].items():
                 if record["status"] != "running":
@@ -283,7 +326,7 @@ def run_queue(*, root: Path) -> None:
                     ):
                         refreshed = next(
                             item
-                            for item in gpu_inventory()
+                            for item in gpu_inventory_for_plan(plan=plan)
                             if item["uuid"] == gpu["uuid"]
                         )
                         if not gpu_is_free(gpu=refreshed):
@@ -332,6 +375,7 @@ def run_queue(*, root: Path) -> None:
                             "container": container,
                             "gpu_uuid": gpu["uuid"],
                             "gpu_index": gpu["index"],
+                            "ignored_gpu_processes": refreshed["ignored_pids"],
                             "started_at": time.time(),
                             "command": command,
                             "idle_observed_seconds": now
@@ -357,6 +401,11 @@ def run_queue(*, root: Path) -> None:
                 for spec in plan.evaluations
             )
             state["ready_models"] = sorted(downloads)
+            state["ignored_gpu_processes"] = {
+                gpu["uuid"]: gpu["ignored_pids"]
+                for gpu in inventory
+                if gpu["ignored_pids"]
+            }
             write_json(path=state_path, payload=state)
             report(root=root)
             if state["status"] == "completed":

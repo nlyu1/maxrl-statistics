@@ -43,6 +43,16 @@ class EvaluationSpec(BaseModel):
     mode: Literal["base", "thinking_off", "thinking_on"]
 
 
+class GPUProcessException(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    pid: int = Field(gt=0)
+    uid: int = Field(ge=0)
+    start_time_ticks: int = Field(ge=0)
+    command_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    gpu_uuid: str
+    boot_id: str
+
+
 class EvaluationPlan(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     manifest: Path
@@ -71,6 +81,7 @@ class EvaluationPlan(BaseModel):
     max_parallel_models: int
     poll_seconds: float
     dispatch_lock: Path
+    ignored_gpu_processes: tuple[GPUProcessException, ...]
     source_hashes: dict[str, str]
 
 
@@ -187,6 +198,7 @@ def prepare(*, root: Path, manifest: Path, image: str) -> None:
         max_parallel_models=3,
         poll_seconds=10,
         dispatch_lock=Path("/tmp/utkface-extension-20261014/global-dispatch.lock"),
+        ignored_gpu_processes=(),
         source_hashes=source_hashes(),
     )
     write_json(path=root / "plan.json", payload=plan.model_dump(mode="json"))

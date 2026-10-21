@@ -1,3 +1,4 @@
+import hashlib
 import http.client
 import json
 import math
@@ -5,18 +6,26 @@ import os
 import runpy
 import urllib.error
 from contextlib import nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from src.experiments.utkface.scheduler import gpu_is_free
 from src.experiments.utkface.vlm_eval import (
+    GPUProcessException,
     parse_age,
     prediction_metrics,
     query_image,
     summarize_records,
     wait_for_server,
 )
-from src.experiments.utkface.vlm_queue import DOWNLOAD_SCRIPT, owned_worker
+from src.experiments.utkface.vlm_queue import (
+    DOWNLOAD_SCRIPT,
+    gpu_inventory_for_plan,
+    owned_worker,
+    process_matches_exception,
+)
 
 
 @pytest.mark.parametrize(
@@ -188,7 +197,9 @@ def test_readiness_retries_transient_connections(monkeypatch, failure):
         "src.experiments.utkface.vlm_eval.subprocess.run",
         lambda *args, **kwargs: SimpleNamespace(stdout="true"),
     )
-    monkeypatch.setattr("src.experiments.utkface.vlm_eval.urllib.request.urlopen", urlopen)
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.urllib.request.urlopen", urlopen
+    )
     monkeypatch.setattr("src.experiments.utkface.vlm_eval.time.sleep", sleeps.append)
     wait_for_server(port=8000, container="study-worker")
     assert sleeps == [3]
@@ -201,3 +212,74 @@ def test_readiness_still_rejects_exited_container(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="exited during startup"):
         wait_for_server(port=8000, container="study-worker")
+
+
+@pytest.fixture
+def gpu_holder_exception():
+    process = Path(f"/proc/{os.getpid()}")
+    fields = (process / "stat").read_text().rsplit(")", 1)[1].split()
+    return GPUProcessException(
+        pid=os.getpid(),
+        uid=os.getuid(),
+        start_time_ticks=int(fields[19]),
+        command_sha256=hashlib.sha256((process / "cmdline").read_bytes()).hexdigest(),
+        gpu_uuid="approved-gpu",
+        boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+    )
+
+
+def test_process_exception_requires_verified_live_identity(gpu_holder_exception):
+    assert process_matches_exception(exception=gpu_holder_exception)
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("uid", -1),
+        ("start_time_ticks", 0),
+        ("command_sha256", "0" * 64),
+        ("boot_id", "another-boot"),
+        ("pid", 2**31 - 1),
+    ],
+)
+def test_changed_or_missing_process_is_not_exempt(gpu_holder_exception, field, value):
+    exception = gpu_holder_exception.model_copy(update={field: value})
+    assert not process_matches_exception(exception=exception)
+
+
+@pytest.mark.parametrize(
+    "uuid, other_pids, memory_mib, utilization, expected_free",
+    [
+        ("approved-gpu", [], 439, 0, True),
+        ("approved-gpu", [9999999], 439, 0, False),
+        ("approved-gpu", [], 2048, 0, False),
+        ("approved-gpu", [], 439, 10, False),
+        ("another-gpu", [], 439, 0, False),
+    ],
+)
+def test_gpu_exceptions_preserve_other_process_and_usage_checks(
+    monkeypatch,
+    gpu_holder_exception,
+    uuid,
+    other_pids,
+    memory_mib,
+    utilization,
+    expected_free,
+):
+    gpu = {
+        "uuid": uuid,
+        "index": 0,
+        "pids": [gpu_holder_exception.pid, *other_pids],
+        "memory_mib": memory_mib,
+        "utilization": utilization,
+    }
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.gpu_inventory", lambda: [gpu]
+    )
+    inventory = gpu_inventory_for_plan(
+        plan=SimpleNamespace(ignored_gpu_processes=(gpu_holder_exception,))
+    )
+    assert gpu_is_free(gpu=inventory[0]) is expected_free
+    assert gpu["pids"] == [gpu_holder_exception.pid, *other_pids]
+    if uuid == gpu_holder_exception.gpu_uuid:
+        assert inventory[0]["ignored_pids"] == [gpu_holder_exception.pid]
