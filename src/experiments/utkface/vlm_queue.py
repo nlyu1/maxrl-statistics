@@ -155,6 +155,7 @@ def run_queue(*, root: Path) -> None:
             if record["status"] == "failed":
                 record["status"] = "pending"
         state["status"] = "running"
+        state.pop("error", None)
         download_container = start_downloads(root=root, plan=plan)
         state["download_container"] = download_container
         first_idle, reusable, children, downloads = {}, set(), {}, {}

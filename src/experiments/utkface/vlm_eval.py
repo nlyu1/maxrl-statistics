@@ -622,7 +622,7 @@ def wait_for_server(*, port: int, container: str) -> None:
             ) as response:
                 if response.status == 200:
                     return
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
             pass
         time.sleep(3)
     raise TimeoutError("vLLM did not become ready within 20 minutes")

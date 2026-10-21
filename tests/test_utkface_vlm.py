@@ -1,7 +1,10 @@
+import http.client
 import json
 import math
 import os
 import runpy
+import urllib.error
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +14,7 @@ from src.experiments.utkface.vlm_eval import (
     prediction_metrics,
     query_image,
     summarize_records,
+    wait_for_server,
 )
 from src.experiments.utkface.vlm_queue import DOWNLOAD_SCRIPT, owned_worker
 
@@ -159,3 +163,41 @@ def test_download_helper_is_valid_python_and_handles_json(tmp_path, monkeypatch)
 
 def test_process_ownership_rejects_unrelated_pid(tmp_path):
     assert not owned_worker(pid=os.getpid(), root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        ConnectionResetError("Container port is not ready"),
+        http.client.RemoteDisconnected("Server is not ready"),
+        urllib.error.URLError("Connection refused"),
+        TimeoutError("Health request timed out"),
+    ],
+)
+def test_readiness_retries_transient_connections(monkeypatch, failure):
+    responses = iter([failure, nullcontext(SimpleNamespace(status=200))])
+    sleeps = []
+
+    def urlopen(*args, **kwargs):
+        response = next(responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="true"),
+    )
+    monkeypatch.setattr("src.experiments.utkface.vlm_eval.urllib.request.urlopen", urlopen)
+    monkeypatch.setattr("src.experiments.utkface.vlm_eval.time.sleep", sleeps.append)
+    wait_for_server(port=8000, container="study-worker")
+    assert sleeps == [3]
+
+
+def test_readiness_still_rejects_exited_container(monkeypatch):
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="false"),
+    )
+    with pytest.raises(RuntimeError, match="exited during startup"):
+        wait_for_server(port=8000, container="study-worker")
