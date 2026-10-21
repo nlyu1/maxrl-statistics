@@ -257,7 +257,7 @@ def assemble(*, original: Path, reruns: Path, old_bundle: Path) -> tuple:
             row["initial"] = (
                 historical_bundle["runs"]
                 .get(identifier, {})
-                .get("initial", row["initial"])
+                .get("initial", row.get("initial", {}))
             )
         result = read(path=source)
         history_path = Path(result["config"]["output_dir"]) / "history.json"
