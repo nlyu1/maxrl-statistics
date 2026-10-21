@@ -95,7 +95,12 @@ def test_deadline_preserves_attempts_and_only_stops_owned_queue(
     monkeypatch.setattr(scheduler, "owned_process", lambda **kwargs: alive[0])
     monkeypatch.setattr(scheduler, "terminate_attempt", stop)
     monkeypatch.setattr(scheduler.time, "sleep", lambda seconds: None)
-    run(plan=plan, poll_seconds=0, coordination=control)
+    run(
+        plan=plan,
+        poll_seconds=0,
+        coordination=control,
+        gpu_inventory_source=scheduler.gpu_inventory,
+    )
     state = json.loads((tmp_path / "state.json").read_text())
     record = state["jobs"][item.identifier]
     assert state["status"] == "deadline_reached"
@@ -371,7 +376,12 @@ def test_scheduler_selects_validation_lr_respects_eight_gpu_cap_and_exports_stat
             **control.model_dump(),
             "peer_plans": (peer_path,),
         })
-    run(plan=plan, poll_seconds=0, coordination=control)
+    run(
+        plan=plan,
+        poll_seconds=0,
+        coordination=control,
+        gpu_inventory_source=scheduler.gpu_inventory,
+    )
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["status"] == "completed" and max(peaks) == 8 - peer_count
     assert selected[-1]["learning_rate"] == pytest.approx(8e-4)
@@ -425,6 +435,7 @@ def test_scheduler_only_enforces_gpu_hour_budget_when_enabled(
     )
     monkeypatch.setattr(scheduler.subprocess, "Popen", Child)
     run(
+        gpu_inventory_source=scheduler.gpu_inventory,
         plan=plan,
         poll_seconds=0,
         coordination=canonical_coordination(root=plan.output_dir).model_copy(
@@ -488,6 +499,7 @@ def test_immediate_reuse_preserves_final_free_check_and_held_jobs(
     monkeypatch.setattr(scheduler, "gpu_inventory", inventory)
     monkeypatch.setattr(scheduler.subprocess, "Popen", Child)
     run(
+        gpu_inventory_source=scheduler.gpu_inventory,
         plan=plan,
         poll_seconds=10,
         coordination=canonical_coordination(root=tmp_path).model_copy(
@@ -549,7 +561,12 @@ def test_final_free_check_rejects_gpu_that_became_occupied(
 
     monkeypatch.setattr(scheduler, "gpu_inventory", inventory)
     monkeypatch.setattr(scheduler.subprocess, "Popen", Child)
-    run(plan=plan, poll_seconds=10, coordination=canonical_coordination(root=tmp_path))
+    run(
+        plan=plan,
+        poll_seconds=10,
+        coordination=canonical_coordination(root=tmp_path),
+        gpu_inventory_source=scheduler.gpu_inventory,
+    )
     assert json.loads((tmp_path / "state.json").read_text())["status"] == "completed"
 
 
@@ -627,6 +644,7 @@ def test_scheduler_adopts_completed_attempt_without_charging_offline_gap(
     monkeypatch.setattr(scheduler, "gpu_inventory", fake_inventory)
     monkeypatch.setattr(scheduler, "owned_process", lambda **kwargs: False)
     run(
+        gpu_inventory_source=scheduler.gpu_inventory,
         plan=plan,
         poll_seconds=0,
         coordination=canonical_coordination(root=plan.output_dir),
@@ -827,6 +845,7 @@ def test_repeated_external_gpu_preemptions_back_off_without_aborting_study(
     monkeypatch.setattr(scheduler, "terminate_attempt", terminate)
     monkeypatch.setattr(scheduler.time, "sleep", lambda seconds: None)
     run(
+        gpu_inventory_source=scheduler.gpu_inventory,
         plan=plan,
         poll_seconds=0,
         coordination=canonical_coordination(root=plan.output_dir),

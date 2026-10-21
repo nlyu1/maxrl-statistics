@@ -8,6 +8,7 @@ import signal
 import subprocess
 import time
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 
 from src.experiments.utkface.config import RunConfig
@@ -305,7 +306,11 @@ def dispatch_summary(
 
 
 def run(
-    *, plan: StudyPlan, poll_seconds: float, coordination: CoordinationConfig
+    *,
+    plan: StudyPlan,
+    poll_seconds: float,
+    coordination: CoordinationConfig,
+    gpu_inventory_source: Callable[[], list[dict]],
 ) -> None:
     root = plan.output_dir
     root.mkdir(parents=True, exist_ok=True)
@@ -369,7 +374,7 @@ def run(
                 if peer.output_dir == root or not peer_state_path.exists():
                     continue
                 peers.append((peer, json.loads(peer_state_path.read_text())))
-            inventory = gpu_inventory()
+            inventory = gpu_inventory_source()
             by_uuid = {gpu["uuid"]: gpu for gpu in inventory}
             reusable = set()
             for job in plan.jobs:
@@ -673,7 +678,9 @@ def run(
                         str(output),
                     ]
                     current = next(
-                        item for item in gpu_inventory() if item["uuid"] == gpu["uuid"]
+                        item
+                        for item in gpu_inventory_source()
+                        if item["uuid"] == gpu["uuid"]
                     )
                     if not gpu_is_free(gpu=current):
                         first_idle.pop(gpu["uuid"], None)
@@ -692,6 +699,7 @@ def run(
                         "pid": child.pid,
                         "gpu_index": gpu["index"],
                         "gpu_uuid": gpu["uuid"],
+                        "ignored_gpu_processes": current.get("ignored_pids", []),
                         "started_at": time.time(),
                         "runtime_limit_seconds": limit,
                         "config_path": str(config_path),
@@ -810,6 +818,7 @@ def main() -> None:
             plan=plan,
             poll_seconds=args.poll_seconds,
             coordination=coordination,
+            gpu_inventory_source=gpu_inventory,
         )
 
 
