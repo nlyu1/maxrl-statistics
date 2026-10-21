@@ -5,6 +5,7 @@ import json
 import math
 import shutil
 import statistics
+import textwrap
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -20,10 +21,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from src.experiments.utkface.figure_bundle import build, panel_range, series
 from src.experiments.utkface.final_report import (
     SCIENTIFIC_STAGES,
-    comparisons,
     name,
     summarize,
-    tables,
 )
 from src.experiments.utkface.visual_report import collect
 
@@ -39,7 +38,7 @@ GROUP_FIELDS = (
     "std",
     "noiseSeed",
     "subsetSeed",
-    "cohort",
+    "comparisonCohort",
     "fingerprint",
     "trainingFingerprint",
 )
@@ -111,6 +110,8 @@ def compare(*, previous: list[dict], current: list[dict]) -> list[dict]:
             "family": group_key[0],
             **{field: new[0][field] for field in GROUP_FIELDS},
             "label": name(run=new[0]),
+            "oldSourceCohorts": sorted({r["cohort"] for r in old}),
+            "newSourceCohorts": sorted({r["cohort"] for r in new}),
             "seeds": [r["seed"] for r in new],
             "oldIds": [r["id"] for r in old],
             "newIds": [r["id"] for r in new],
@@ -159,12 +160,40 @@ def assemble(*, original: Path, reruns: Path, old_bundle: Path) -> tuple:
     state = read(path=reruns / "state.json")
     status = read(path=reruns / "status.json")
     check(condition=state["status"] == "completed", message="Reruns are incomplete")
+    historical_sources = migration["historical_training_source_sha256"]
+    source_changes = {
+        filename: {"old": historical_sources.get(filename), "new": digest}
+        for filename, digest in plan["training_source_sha256"].items()
+        if historical_sources.get(filename) != digest
+    }
+    check(
+        condition=source_changes
+        == {
+            "src/experiments/utkface/run.py": {
+                "old": "764ebad17ec97dc8bfc802f86bcdb98360fdfe8408df2d0ee61bee2804ab72ce",
+                "new": "8bb27dd5018ee180c5172232b80ff4dec08f37256606d387cbb74e5291e22a3d",
+            }
+        }
+        and historical_sources.keys() == plan["training_source_sha256"].keys(),
+        message="Unexpected training source changes beyond audited epoch-zero recording",
+    )
+    common_cohort = hashlib.sha256(
+        json.dumps(historical_sources, sort_keys=True).encode()
+    ).hexdigest()
+    check(
+        condition={r["cohort"] for r in previous} == {common_cohort},
+        message="Historical source cohort differs",
+    )
+    for row in previous:
+        row["comparisonCohort"] = common_cohort
     for source, digest in migration["source_plans"].items():
         check(
             condition=hashlib.sha256(Path(source).read_bytes()).hexdigest() == digest,
             message=f"Historical source plan changed: {source}",
         )
     study, rows = collect(plan_path=reruns / "plan.json", state=state)
+    for row in rows:
+        row["comparisonCohort"] = common_cohort
     by_new_id = {r["id"]: r for r in rows}
     replacements = {c["identifier"]: c for c in migration["changes"]}
     reused = {r["identifier"]: r["result_path"] for r in migration["reused"]}
@@ -295,6 +324,17 @@ def assemble(*, original: Path, reruns: Path, old_bundle: Path) -> tuple:
     }
     payload = {
         "generated": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
+        "cohortAudit": {
+            "comparisonCohort": common_cohort,
+            "sourceCohorts": sorted({r["cohort"] for r in current}),
+            "sourceChanges": source_changes,
+            "basis": (
+                "Reviewed diff 928ddd9..b3da562: epoch-zero evaluation/logging "
+                "and timing only. Training loop, optimizer, losses and data path "
+                "are unchanged. Initial evaluation restores model mode and "
+                "Python/NumPy/Torch/loader-generator random state."
+            ),
+        },
         "learningRateRevision": revision,
         "runs": current,
         "summary": {
@@ -324,6 +364,13 @@ def comparison_tables(*, records: list[dict], output: Path) -> None:
             "checkpoint. Values with three seeds show sample SD, not confidence intervals. "
             "Noise and 1024-image comparisons have one optimization seed. Rank changes are "
             "descriptive; no statistical significance is claimed."
+        ),
+        "",
+        (
+            "The rerun trainer additionally records epoch-zero validation. Its source diff "
+            "was reviewed separately; both source hashes are retained in cohortAudit. "
+            "Fixed-LR and digit-policy runs retain their historical rates and are not "
+            "reinterpreted as interventions isolating only the schedule or architecture."
         ),
         "",
     ]
@@ -434,9 +481,20 @@ def render_modes(*, bundle: dict, path: Path) -> None:
             panels = [p for p in spec["panels"] if p["metric"] == "mae_mean"]
             cols = 2 if len(panels) == 4 else 1
             rows = math.ceil(len(panels) / cols)
-            fig, axes = plt.subplots(
-                rows, cols, figsize=(14, 4.1 * rows + 2.0), squeeze=False
+            foot = (
+                "Shared-LR revision, 2026-10-22. Faint: raw; bold: moving mean "
+                "(5 epochs; 10 for 200-epoch runs). Bands: between-seed sample SD. "
+                "Axes emphasize later training. Checkpoints use mean-age MAE. "
+                + spec["note"]
             )
+            caption = "\n".join(textwrap.wrap(foot, width=155))
+            caption_height = (len(caption.splitlines()) * 11 + 8) / 72
+            legend_count = len({g["legendKey"] for p in panels for g in p["groups"]})
+            footer_height = (
+                caption_height + (math.ceil(legend_count / 3) * 16 + 12) / 72 + 0.4
+            )
+            height = 4.1 * rows + footer_height + 0.8
+            fig, axes = plt.subplots(rows, cols, figsize=(14, height), squeeze=False)
             legend = {}
             for ax, panel in zip(axes.flat, panels, strict=True):
                 curves = []
@@ -499,23 +557,20 @@ def render_modes(*, bundle: dict, path: Path) -> None:
                 handles,
                 labels,
                 loc="lower center",
-                bbox_to_anchor=(0.5, 0.065),
+                bbox_to_anchor=(0.5, (caption_height + 0.18) / height),
                 ncol=3,
                 fontsize=9,
             )
             fig.text(
                 0.5,
-                0.025,
-                "Shared-LR revision, 2026-10-22. Faint: raw; bold: moving mean (5 epochs; 10 for 200-epoch runs).\n"
-                "Bands: between-seed sample SD. Axes emphasize later training. Checkpoints use mean-age MAE.\n"
-                f"{spec['note']}",
+                0.1 / height,
+                caption,
                 ha="center",
                 va="bottom",
                 fontsize=8,
-                wrap=True,
             )
             fig.text(0.98, 0.015, f"{page} / 6", ha="right", fontsize=8)
-            fig.tight_layout(rect=(0, 0.23 if rows == 1 else 0.17, 1, 0.94), h_pad=2)
+            fig.tight_layout(rect=(0, (footer_height + 0.1) / height, 1, 0.94), h_pad=2)
             pdf.savefig(fig)
             fig.savefig(path.parent / f"mode-{page:02d}.png")
             plt.close(fig)
@@ -534,15 +589,8 @@ def refresh(*, args: argparse.Namespace) -> None:
     write(path=args.output_dir / "lr-comparison.json", value=changes)
     comparison_tables(records=changes, output=args.output_dir)
     summaries = summarize(runs=payload["runs"])
-    pairs = comparisons(runs=payload["runs"])
     write(path=args.output_dir / "final-summaries.json", value=summaries)
-    write(path=args.output_dir / "final-comparisons.json", value=pairs)
-    tables(
-        summaries=summaries,
-        pairs=pairs,
-        runs=payload["runs"],
-        output_dir=args.output_dir,
-    )
+    write(path=args.output_dir / "cohort-audit.json", value=payload["cohortAudit"])
     for filename in ("plan.json", "migration.json", "status.json"):
         shutil.copy2(args.reruns / filename, args.output_dir / filename)
     initial = {
@@ -569,6 +617,8 @@ def refresh(*, args: argparse.Namespace) -> None:
                 "sourceSha256",
                 "snapshot",
                 "sourceCohort",
+                "sourceCohorts",
+                "cohortAudit",
                 "dataFingerprint",
                 "curveColumns",
                 "selection",

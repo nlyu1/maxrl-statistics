@@ -214,11 +214,19 @@ def best_family(*, runs: list[dict], family: str, size: int) -> tuple[Method, li
 
 def prepare(*, payload: dict, source_hash: str) -> dict:
     runs = [r for r in payload["runs"] if r["status"] == "completed"]
-    if (
-        len({r["cohort"] for r in runs}) != 1
-        or len({r["fingerprint"] for r in runs}) != 1
+    cohorts = {r["cohort"] for r in runs}
+    cohort_audit = payload.get("cohortAudit", {})
+    if len(cohorts) != 1 and (
+        cohorts != set(cohort_audit.get("sourceCohorts", []))
+        or {r.get("comparisonCohort") for r in runs}
+        != {cohort_audit.get("comparisonCohort")}
+        or not cohort_audit.get("sourceChanges")
     ):
-        raise ValueError("Bundle must use one training implementation and split")
+        raise ValueError(
+            "Multiple source cohorts require an explicit compatibility audit"
+        )
+    if len({r["fingerprint"] for r in runs}) != 1:
+        raise ValueError("Bundle must use one data split")
     for run in runs:
         if len(run["curves"]) != run["epochs"]:
             raise ValueError((run["id"], "incomplete history"))
@@ -474,6 +482,8 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
         "snapshot": payload["generated"],
         "sourceSha256": source_hash,
         "sourceCohort": runs[0]["cohort"],
+        "sourceCohorts": sorted(cohorts),
+        "cohortAudit": cohort_audit,
         "dataFingerprint": runs[0]["fingerprint"],
         "learningRateRevision": payload.get("learningRateRevision", {}),
         "curveColumns": payload["curveColumns"],
