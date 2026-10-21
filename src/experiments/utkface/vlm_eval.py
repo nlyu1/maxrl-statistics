@@ -296,7 +296,7 @@ def prepare_followup(*, root: Path, reference: Path, cache_volume: str) -> None:
             ).hexdigest(),
             "unchanged": "Pinned checkpoints, templates, 1024 evaluation images, 64 pilot images, eight samples, seeds and sampling parameters",
             "serving": "BF16, FlashAttention 2, CUDA graphs/compilation enabled, 256 active sequences, 12288-token context",
-            "pilot_selection": "At most 3% length-limited answers without a valid final number; an unmet criterion at the maximum authorized cap is explicitly flagged. Throughput uses all 64 disjoint pilot images with n=8, comparing 32/64 HTTP requests; accuracy is not a selection criterion.",
+            "pilot_selection": "At most 3% length-limited answers without a valid final number; an unmet criterion at the maximum authorized cap is explicitly flagged. Throughput uses full decode warm-up and two trials in opposite orders on all 64 disjoint pilot images with n=8, comparing 32/64 HTTP requests; accuracy is not a selection criterion.",
             "created_at": time.time(),
         },
     )
@@ -487,7 +487,8 @@ def evaluate_images(
     output.mkdir(parents=True, exist_ok=True)
     pending = [i for i in indices if not (output / f"{i:05d}.json").exists()]
     started = time.monotonic()
-    with ThreadPoolExecutor(max_workers=concurrency) as executor:
+    executor = ThreadPoolExecutor(max_workers=concurrency)
+    try:
         futures = {
             executor.submit(
                 query_image,
@@ -504,6 +505,8 @@ def evaluate_images(
         for future in as_completed(futures):
             record = future.result()
             write_json(path=output / f"{record['index']:05d}.json", payload=record)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
     elapsed = time.monotonic() - started
     records = [json.loads((output / f"{i:05d}.json").read_text()) for i in indices]
     for index, record in zip(indices, records, strict=True):
@@ -592,7 +595,10 @@ def tune(
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / "tuning.json"
     if target.exists():
-        return json.loads(target.read_text())
+        tuning = json.loads(target.read_text())
+        if tuning["pilot_protocol"] != "warm_decode_balanced_v2":
+            raise ValueError("Archive the previous tuning before repeating pilots")
+        return tuning
     caps = (
         plan.token_caps_thinking
         if spec.mode == "thinking_on"
@@ -635,12 +641,19 @@ def tune(
         payload=payload,
         indices=plan.pilot_indices,
         port=port,
-        samples=1,
-        max_tokens=1,
-        concurrency=min(plan.client_concurrencies),
+        samples=plan.samples,
+        max_tokens=min(cap, 256),
+        concurrency=max(plan.client_concurrencies),
         output=warmup,
     )
-    for concurrency in plan.client_concurrencies:
+    order = [
+        (round_index, concurrency)
+        for round_index, candidates in enumerate(
+            (plan.client_concurrencies, plan.client_concurrencies[::-1])
+        )
+        for concurrency in candidates
+    ]
+    for round_index, concurrency in order:
         if len(plan.pilot_indices) < concurrency:
             raise ValueError("Throughput pilot must fill the HTTP concurrency limit")
         with utilization_monitor(gpu_uuid=gpu_uuid, port=port) as snapshots:
@@ -658,6 +671,7 @@ def tune(
         metrics = summarize_records(records=records, samples=plan.samples)
         concurrency_results.append({
             "concurrency": concurrency,
+            "round": round_index,
             "requests": len(records),
             "seconds": seconds,
             "images_per_second": len(records) / max(seconds, 1e-6),
@@ -666,17 +680,26 @@ def tune(
             "utilization": snapshots,
             "metrics": metrics,
         })
-    peak = max(row["images_per_second"] for row in concurrency_results)
+    rates = {
+        concurrency: statistics.median(
+            row["images_per_second"]
+            for row in concurrency_results
+            if row["concurrency"] == concurrency
+        )
+        for concurrency in plan.client_concurrencies
+    }
+    peak = max(rates.values())
     selected = min(
-        (row for row in concurrency_results if row["images_per_second"] >= 0.95 * peak),
-        key=lambda row: row["concurrency"],
+        concurrency for concurrency, rate in rates.items() if rate >= 0.95 * peak
     )
     result = {
+        "pilot_protocol": "warm_decode_balanced_v2",
         "max_tokens": cap,
-        "concurrency": selected["concurrency"],
+        "concurrency": selected,
+        "median_images_per_second": rates,
         "cap_criterion_met": cap_criterion_met,
         "token_budget_limited": not cap_criterion_met,
-        "selection": "Lowest concurrency within 5% of peak images/s on the same 64 pilot images, using all eight samples and the selected token cap",
+        "selection": "Lowest concurrency within 5% of peak median images/s from two trials in opposite orders on the same 64 pilot images, using all eight samples and the selected token cap after decode warm-up",
         "token_trials": cap_results,
         "concurrency_trials": concurrency_results,
         "selected_without_age_accuracy": True,
@@ -843,8 +866,6 @@ def worker(
             if spec.model_identifier != identifier:
                 continue
             destination = root / "evaluations" / spec.identifier
-            if (destination / "result.json").exists():
-                continue
             tuning = tune(
                 root=root,
                 plan=plan,
@@ -853,6 +874,8 @@ def worker(
                 port=port,
                 gpu_uuid=gpu_uuid,
             )
+            if (destination / "result.json").exists():
+                continue
             records, seconds = evaluate_images(
                 plan=plan,
                 spec=spec,

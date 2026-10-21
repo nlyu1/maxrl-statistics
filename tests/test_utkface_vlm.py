@@ -6,8 +6,10 @@ import math
 import os
 import runpy
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 
 import pytest
@@ -15,6 +17,7 @@ import pytest
 from src.experiments.utkface.scheduler import gpu_is_free
 from src.experiments.utkface.vlm_eval import (
     GPUProcessException,
+    evaluate_images,
     parse_age,
     prediction_metrics,
     query_image,
@@ -381,7 +384,43 @@ def test_tuning_reports_exhausted_caps_and_fills_http_limits(
     assert result["cap_criterion_met"] is cap_passes
     assert result["token_budget_limited"] is not cap_passes
     assert result["concurrency"] == 64
-    throughput_calls = [call for call in calls if call["samples"] == 8]
-    assert [call["concurrency"] for call in throughput_calls] == [32, 64]
+    throughput_calls = [
+        call for call in calls if "concurrency_" in call["output"].name
+    ]
+    assert [call["concurrency"] for call in throughput_calls] == [32, 64, 64, 32]
     assert all(len(call["indices"]) >= call["concurrency"] for call in throughput_calls)
     assert all(call["max_tokens"] == expected_cap for call in throughput_calls)
+
+
+def test_evaluation_error_does_not_wait_for_blocked_http_requests(tmp_path, monkeypatch):
+    release = Event()
+    blocked = Event()
+
+    def query(**kwargs):
+        if kwargs["index"] == 0:
+            assert blocked.wait(timeout=5)
+            raise OSError(errno.ENOSPC, "No space left on device")
+        blocked.set()
+        assert release.wait(timeout=10)
+        return record(index=1, target=30, values=[30, 30])
+
+    monkeypatch.setattr("src.experiments.utkface.vlm_eval.query_image", query)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            evaluate_images,
+            plan=SimpleNamespace(),
+            spec=SimpleNamespace(),
+            payload={},
+            indices=(0, 1),
+            port=8000,
+            samples=2,
+            max_tokens=256,
+            concurrency=2,
+            output=tmp_path,
+        )
+        try:
+            with pytest.raises(OSError) as caught:
+                future.result(timeout=3)
+            assert caught.value.errno == errno.ENOSPC
+        finally:
+            release.set()
