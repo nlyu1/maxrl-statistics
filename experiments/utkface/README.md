@@ -32,16 +32,19 @@ Use `--survival-floor` to clamp population TailRL log-survival and mask matching
 
 Follow `server.md`: edit and commit locally, push to GitHub, pull on `cmu-L40-live:~/maxrl-statistics`, then execute there. All commands below run on that server.
 
+Keep datasets, checkpoints and retained logs under `~/.local/state/maxrl-statistics/`. Check available space before launching a sweep. Existing dataset and checkpoint paths under `/tmp` are symlinks to that persistent storage after the 2026-10-22 migration; historical configs retain their original paths. Use the `UTKFACE_ROOT` variable below in each shell session.
+
 ```bash
+UTKFACE_ROOT="$HOME/.local/state/maxrl-statistics"
 uv sync --dev --python 3.12
-uv run --python 3.12 python -m src.experiments.utkface.prepare --destination /tmp/utkface-data
+uv run --python 3.12 python -m src.experiments.utkface.prepare --destination "$UTKFACE_ROOT/utkface-data"
 uv run --python 3.12 pytest tests/test_utkface_losses.py tests/test_utkface_data.py -q
 uv run --python 3.12 python -m src.experiments.utkface.run \
-  --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-ce \
+  --manifest "$UTKFACE_ROOT/utkface-data/manifest.json" --output-dir "$UTKFACE_ROOT/utkface-ce" \
   --method ce --device cuda:1 --epochs 20 --evaluate-test
 CUDA_VISIBLE_DEVICES=1,5 uv run --python 3.12 torchrun --standalone --nproc-per-node=2 \
-  -m src.experiments.utkface.run --manifest /tmp/utkface-data/manifest.json \
-  --output-dir /tmp/utkface-ddp --method tailrl_population --batch-size 32
+  -m src.experiments.utkface.run --manifest "$UTKFACE_ROOT/utkface-data/manifest.json" \
+  --output-dir "$UTKFACE_ROOT/utkface-ddp" --method tailrl_population --batch-size 32
 ```
 
 Batch size is per rank, so the DDP example keeps global batch 64. Use a fresh output directory for every run. `config.json`, `initial_validation.json`, `history.json`, `result.json` and optionally `best.pt` record configs, split fingerprint, environment, commit, counts, validation curves and test metrics. Test evaluation is disabled unless requested. The selected checkpoint minimizes validation MAE of the policy mean for every method. Mean, median and mode age errors, RMSE, median Spearman, label NLL, policy entropy, expected action errors, TailRL and age-decade errors are reported. Scalar regression has no label NLL. Oracle best-of-K errors use the true target to select the closest of K draws; they are distribution diagnostics, not deployable predictions.
@@ -52,25 +55,25 @@ The pilot compares learning rates 1e−4, 3e−4, 1e−3 and kernel scales 2, 5,
 
 ```bash
 uv run --python 3.12 python -m src.experiments.utkface.sweep --stage pilot \
-  --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-pilot --gpu-ids 1 5 7 9
+  --manifest "$UTKFACE_ROOT/utkface-data/manifest.json" --output-dir "$UTKFACE_ROOT/utkface-pilot" --gpu-ids 1 5 7 9
 uv run --python 3.12 python -m src.experiments.utkface.sweep --stage select \
-  --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-pilot --gpu-ids 1 \
-  --selection /tmp/utkface-selection.json
+  --manifest "$UTKFACE_ROOT/utkface-data/manifest.json" --output-dir "$UTKFACE_ROOT/utkface-pilot" --gpu-ids 1 \
+  --selection "$UTKFACE_ROOT/utkface-selection.json"
 uv run --python 3.12 python -m src.experiments.utkface.sweep --stage main \
-  --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-main --gpu-ids 1 5 7 9 \
-  --selection /tmp/utkface-selection.json --epochs 12 --seeds 42 43 44
+  --manifest "$UTKFACE_ROOT/utkface-data/manifest.json" --output-dir "$UTKFACE_ROOT/utkface-main" --gpu-ids 1 5 7 9 \
+  --selection "$UTKFACE_ROOT/utkface-selection.json" --epochs 12 --seeds 42 43 44
 ```
 
 The archive contains exact duplicate images, including inconsistent age labels and overlaps across the original splits. New `prepare.py` manifests deduplicate before splitting: conflicting-age groups are dropped, and consistently labeled groups retain one copy. `clean.py` rebuilds a manifest from an already extracted archive. `audit.py` independently records byte and decoded-pixel duplicate counts and produces a singleton test slice. This does not establish person-level independence or remove near-duplicates. The following audit/score workflow describes the earlier study and its original manifest.
 
 ```bash
 uv run --python 3.12 python -m src.experiments.utkface.audit \
-  --manifest /tmp/utkface-data/manifest.json --output-dir /tmp/utkface-audit
+  --manifest "$UTKFACE_ROOT/utkface-data/manifest.json" --output-dir "$UTKFACE_ROOT/utkface-audit"
 uv run --python 3.12 python -m src.experiments.utkface.score \
-  --runs-dir /tmp/utkface-main --manifest /tmp/utkface-data/manifest.json \
-  --subset /tmp/utkface-audit/test_singletons.json --output-dir /tmp/utkface-scores --gpu-ids 1 5 7 9
+  --runs-dir "$UTKFACE_ROOT/utkface-main" --manifest "$UTKFACE_ROOT/utkface-data/manifest.json" \
+  --subset "$UTKFACE_ROOT/utkface-audit/test_singletons.json" --output-dir "$UTKFACE_ROOT/utkface-scores" --gpu-ids 1 5 7 9
 uv run --python 3.12 python -m src.experiments.utkface.analyze \
-  --runs-dir /tmp/utkface-main --scores-dir /tmp/utkface-scores --output-dir /tmp/utkface-report
+  --runs-dir "$UTKFACE_ROOT/utkface-main" --scores-dir "$UTKFACE_ROOT/utkface-scores" --output-dir "$UTKFACE_ROOT/utkface-report"
 CUDA_VISIBLE_DEVICES=1,5 uv run --python 3.12 torchrun --standalone --nproc-per-node=2 tests/utkface_ddp_probe.py
 CUDA_VISIBLE_DEVICES=1,5 uv run --python 3.12 torchrun --standalone --nproc-per-node=2 tests/utkface_ddp_resnet_probe.py
 ```

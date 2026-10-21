@@ -9,7 +9,7 @@ Always use `uv`.
 - `uv run python -c "import src.experiments.multimodal_gaussian.integrated as m; print(m.__file__)"`: trace implementation paths.
 - `uv run python -c "from src.experiments.multimodal_gaussian.canonical import get_canonical_chart_transport_configs"`: quick import smoke test.
 - Upon running into cuda device errors: ``sudo rmmod nvidia_uvm && sudo modprobe nvidia_uvm`
-- All `/tmp` run artifacts, unless otherwise indicated, should go in `/tmp` instead of the main code repository folder.
+- Store datasets, checkpoints and retained run artifacts under `~/.local/state/maxrl-statistics/` on the server, outside the code repository. Reserve `/tmp` for disposable scratch files and short symlinks to persistent storage.
 
 For debugging, prefer `uv run python -c ...` snippets or short one-off scripts in `/tmp`.
 

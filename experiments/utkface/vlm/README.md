@@ -12,15 +12,16 @@ Metrics are MAE, RMSE and Spearman correlation for pooled single draws, per-imag
 
 The server queue reuses `scheduler.py` GPU inventory and idle checks: no blocking compute process, at most 1024 MiB used and at most 5% utilization, confirmed twice at least ten seconds apart and rechecked immediately before launch. Explicitly approved process exceptions require matching GPU UUID, PID, owner UID, process start time, command hash and server boot ID. Only those verified instances are excluded from dispatch and contention checks; their memory and utilization remain included. The shared training scheduler keeps its original process checks. GPUs are selected by UUID. Contention causes only the study's own worker/container to stop, with saved responses retained for resumption and a 15-minute escalating GPU cooldown. Infrastructure errors stop dispatch for investigation. Downloads run in a CPU-only container and use a named Docker volume, avoiding dataset/weights growth in `/tmp`.
 
-All Python commands run on `cmu-L40-live` through `uv`, following `server.md`. Commit/push locally and pull remotely before execution. Run artifacts belong under `/tmp/utkface-vlm-20261020`.
+All Python commands run on `cmu-L40-live` through `uv`, following `server.md`. Commit/push locally and pull remotely before execution. Run artifacts are retained under `~/.local/state/maxrl-statistics/utkface-vlm-20261020`; the historical `/tmp/utkface-vlm-20261020` path remains a symlink.
 
 ```bash
+UTKFACE_ROOT="$HOME/.local/state/maxrl-statistics"
 uv run --no-sync python -m src.experiments.utkface.vlm_eval prepare \
-  --root /tmp/utkface-vlm-20261020 \
-  --manifest /tmp/utkface-clean-v2/manifest.json \
+  --root "$UTKFACE_ROOT/utkface-vlm-20261020" \
+  --manifest "$UTKFACE_ROOT/utkface-clean-v2/manifest.json" \
   --image vllm/vllm-openai@sha256:PINNED_DIGEST
 uv run --no-sync python -m src.experiments.utkface.vlm_queue \
-  --root /tmp/utkface-vlm-20261020 --detach
+  --root "$UTKFACE_ROOT/utkface-vlm-20261020" --detach
 ```
 
 `state.json`, `supervisor.log` and `downloads.json` record autonomous progress. The supervisor refreshes `summary.json`, `summary.csv` and `REPORT.md`, including the final report when all nine configurations complete. Restart the same queue without recreating the plan to adopt active workers or resume saved image responses. Containers and their logs remain identifiable by study labels.
