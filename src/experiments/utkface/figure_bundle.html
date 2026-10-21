@@ -136,7 +136,7 @@ $("reset").addEventListener("click",()=>{pages.set(current().id,{hidden:new Set(
 $("previous").addEventListener("click",()=>setPage(B.figures[(state.index+B.figures.length-1)%B.figures.length].id));
 $("next").addEventListener("click",()=>setPage(B.figures[(state.index+1)%B.figures.length].id));
 window.addEventListener("hashchange",()=>{const id=window.location.hash.slice(1);if(id!==current().id)setPage(id);});
-$("provenance").textContent="Source snapshot: "+B.snapshot+" · Figure build: "+B.generated+". All panels use the same training-source cohort and cleaned split. Method choices use validation only; no new training was launched. Correlation uses categorical policy medians and continuous scalar predictions. Source SHA256: "+B.sourceSha256+".";
+$("provenance").textContent="Source snapshot: "+B.snapshot+" · Figure build: "+B.generated+". All panels use the same cleaned split. Source hashes and the initialization-only compatibility audit remain in the raw provenance. Method choices use validation only; no additional training was launched during rendering. Correlation uses categorical policy medians and continuous scalar predictions. Source SHA256: "+B.sourceSha256+".";
 setPage(window.location.hash.slice(1));
 </script>
 </body>
