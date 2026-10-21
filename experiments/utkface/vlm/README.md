@@ -2,6 +2,31 @@
 
 Three model sizes (0.8B, 2B, 4B), each with Base, post-trained thinking-off and post-trained thinking-on: nine configurations. Six pinned checkpoints share one pinned vLLM Docker image. Each configuration generates eight samples for each image in the same decade-stratified 1024-image subset of the cleaned 2308-image validation split. The subset seed is 20261020. Sixty-four disjoint validation images support pipeline checks and tuning.
 
+## Prompt and budget follow-up, 2026-10-22
+
+The completed 20261020 study remains unchanged. `vlm_eval followup` copies its exact subset file and pinned checkpoint/template specifications into a new study, preserving the eight samples, seeds and temperature/top-p/top-k/presence penalty. It resolves the manifest to persistent storage and records the reference plan/subset hashes.
+
+Follow-up prompt: `Estimate the person's age in years from their appearance in this photo. Give your single best estimate, even if uncertain. Your final answer must be exactly one integer from 0 to 99 inside \boxed{}, with no other text or range.` Thinking-on retains its internal reasoning; the restriction applies to the final answer.
+
+Base/off have a 1024-token cap. Thinking-on pilots try 4096 then 8192, choosing the first cap with at most 3% length-limited completions lacking a valid boxed answer. If neither passes, the run uses the authorized 8192 cap and explicitly records `token_budget_limited=true`; it does not claim the pilot criterion passed.
+
+The follow-up uses bf16, FlashAttention 2, CUDA graphs/compilation, 256 active sequences, an 8192-token batching budget and a 12288-token context. `--enforce-eager` in the original study disabled CUDA graphs; its logs confirm that attention already used FA2. Gated DeltaNet layers use their own Triton/FLA kernels.
+
+Each mode benchmarks 32 and 64 concurrent HTTP requests on all 64 disjoint pilot images, with eight generations per image and the selected token cap, after warming the image/prefix caches. Each request offers eight sequences: 32 HTTP requests can already supply 256 sequences. The lowest concurrency within 5% of peak images/second is selected. The pilot retains tokens/second, GPU utilization/memory, running/waiting sequences, KV-cache usage and preemption counts. This fixes the original 16-image throughput pilot, which could not fill its 32-request limit. Short pilot timings are throughput estimates, not full-pass runtime predictions.
+
+Checkpoint files are reused through a Docker volume bound to persistent checkpoint storage. All new study state, outputs and logs live under `~/.local/state/maxrl-statistics/utkface-vlm-20261022-followup`. The existing idle-GPU checks, process exceptions and contention handling apply.
+
+```bash
+uv run --no-sync python -m src.experiments.utkface.vlm_eval followup \
+  --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-followup" \
+  --reference /tmp/utkface-vlm-20261020 \
+  --cache-volume utkface-vlm-qwen35-persistent
+uv run --no-sync python -m src.experiments.utkface.vlm_queue \
+  --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-followup" --detach
+```
+
+## Original 20261020 protocol
+
 Prompt: `What is the person's age in years? Put your final answer in \boxed{}.`
 
 Every model uses temperature 0.7, top-p 0.8, top-k 20 and no presence penalty. Base weights use their own tokenizer and processor with the paired post-trained checkpoint's official chat template and thinking disabled. Post-trained modes explicitly set `enable_thinking`. Neither labels nor filenames are included in model requests. Numeric boxed final answers must lie in 0–99; invalid answers remain in saved responses and coverage counts.

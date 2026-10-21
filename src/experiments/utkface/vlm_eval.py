@@ -7,10 +7,12 @@ import re
 import signal
 import statistics
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -89,6 +91,13 @@ SOURCE_FILES = (
     "src/experiments/utkface/vlm_eval.py",
     "src/experiments/utkface/vlm_queue.py",
     "src/experiments/utkface/scheduler.py",
+)
+
+FOLLOWUP_PROMPT = (
+    "Estimate the person's age in years from their appearance in this photo. "
+    "Give your single best estimate, even if uncertain. "
+    r"Your final answer must be exactly one integer from 0 to 99 inside \boxed{}, "
+    "with no other text or range."
 )
 
 
@@ -233,6 +242,66 @@ def prepare(*, root: Path, manifest: Path, image: str) -> None:
     )
 
 
+def prepare_followup(*, root: Path, reference: Path, cache_volume: str) -> None:
+    if root.exists():
+        raise FileExistsError(root)
+    reference_plan = EvaluationPlan.model_validate_json(
+        (reference / "plan.json").read_text()
+    )
+    manifest = reference_plan.manifest.resolve()
+    payload = read_manifest(path=manifest)
+    if payload["fingerprint"] != reference_plan.fingerprint:
+        raise ValueError("Reference dataset fingerprint changed")
+    if (
+        len(reference_plan.indices) != 1024
+        or len(set(reference_plan.indices)) != 1024
+        or len(reference_plan.pilot_indices) < 64
+        or set(reference_plan.indices) & set(reference_plan.pilot_indices)
+        or not set(reference_plan.indices).issubset(payload["splits"]["val"])
+    ):
+        raise ValueError("Reference evaluation and pilot subsets are not valid")
+    plan = EvaluationPlan.model_validate({
+        **reference_plan.model_dump(),
+        "manifest": manifest,
+        "cache_volume": cache_volume,
+        "prompt": FOLLOWUP_PROMPT,
+        "token_caps_direct": (1024,),
+        "token_caps_thinking": (4096, 8192),
+        "client_concurrencies": (32, 64),
+        "max_num_seqs": 256,
+        "max_model_len": 12288,
+        "source_hashes": source_hashes(),
+    })
+    root.mkdir(parents=True)
+    (root / "templates").mkdir()
+    for model in plan.models:
+        content = (reference / model.template_file).read_bytes()
+        if hashlib.sha256(content).hexdigest() != model.template_sha256:
+            raise ValueError("Reference template differs from the pinned checkpoint")
+        (root / model.template_file).write_bytes(content)
+    write_json(path=root / "plan.json", payload=plan.model_dump(mode="json"))
+    (root / "subset.json").write_bytes((reference / "subset.json").read_bytes())
+    write_json(
+        path=root / "provenance.json",
+        payload={
+            "commit": subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], text=True
+            ).strip(),
+            "reference_root": str(reference.resolve()),
+            "reference_plan_sha256": hashlib.sha256(
+                (reference / "plan.json").read_bytes()
+            ).hexdigest(),
+            "reference_subset_sha256": hashlib.sha256(
+                (reference / "subset.json").read_bytes()
+            ).hexdigest(),
+            "unchanged": "Pinned checkpoints, templates, 1024 evaluation images, 64 pilot images, eight samples, seeds and sampling parameters",
+            "serving": "BF16, FlashAttention 2, CUDA graphs/compilation enabled, 256 active sequences, 12288-token context",
+            "pilot_selection": "At most 3% length-limited answers without a valid final number; an unmet criterion at the maximum authorized cap is explicitly flagged. Throughput uses all 64 disjoint pilot images with n=8, comparing 32/64 HTTP requests; accuracy is not a selection criterion.",
+            "created_at": time.time(),
+        },
+    )
+
+
 def parse_age(*, content: str) -> float | None:
     final = content.rsplit("</think>", 1)[-1]
     boxes = re.findall(r"\\boxed\s*\{([^{}]*)\}", final)
@@ -337,7 +406,7 @@ def request_json(*, url: str, payload: dict) -> dict:
     )
     for attempt in range(3):
         try:
-            with urllib.request.urlopen(request, timeout=900) as response:
+            with urllib.request.urlopen(request, timeout=3600) as response:
                 return json.load(response)
         except urllib.error.HTTPError as error:
             detail = error.read().decode()
@@ -362,6 +431,7 @@ def query_image(
 ) -> dict:
     record = payload["records"][index]
     image_bytes = (plan.manifest.parent / record["relative_path"]).read_bytes()
+    started = time.monotonic()
     response = request_json(
         url=f"http://127.0.0.1:{port}/v1/chat/completions",
         payload={
@@ -397,6 +467,7 @@ def query_image(
         "index": index,
         "target": record["age"],
         "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
+        "request_seconds": time.monotonic() - started,
         "response": response,
     }
 
@@ -446,6 +517,68 @@ def evaluate_images(
     return records, elapsed
 
 
+@contextmanager
+def utilization_monitor(*, gpu_uuid: str, port: int):
+    snapshots = []
+    stopped = threading.Event()
+
+    def sample():
+        while not stopped.is_set():
+            measurement = {"time": time.time()}
+            result = subprocess.run(
+                [
+                    "nvidia-smi",
+                    f"--id={gpu_uuid}",
+                    "--query-gpu=utilization.gpu,memory.used",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+            )
+            if result.returncode:
+                measurement["gpu_error"] = result.stderr
+            else:
+                utilization, memory = result.stdout.strip().split(",")
+                measurement.update({
+                    "gpu_utilization_percent": float(utilization),
+                    "memory_mib": float(memory),
+                })
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/metrics", timeout=5
+                ) as response:
+                    metrics = response.read().decode()
+                for name in (
+                    "num_requests_running",
+                    "num_requests_waiting",
+                    "kv_cache_usage_perc",
+                    "num_preemptions_total",
+                ):
+                    values = re.findall(
+                        rf"^vllm:{name}(?:\{{[^\n]*\}})? ([\d.eE+-]+)$",
+                        metrics,
+                        re.MULTILINE,
+                    )
+                    if values:
+                        measurement[name] = sum(float(value) for value in values)
+            except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+                measurement["metrics_error"] = str(error)
+            snapshots.append(measurement)
+            stopped.wait(2)
+
+    thread = threading.Thread(target=sample, daemon=True)
+    thread.start()
+    try:
+        yield snapshots
+    finally:
+        stopped.set()
+        thread.join(timeout=20)
+        if thread.is_alive():
+            raise RuntimeError("GPU utilization monitor did not finish")
+
+
 def tune(
     *,
     root: Path,
@@ -453,6 +586,7 @@ def tune(
     spec: EvaluationSpec,
     payload: dict,
     port: int,
+    gpu_uuid: str,
 ) -> dict:
     directory = root / "evaluations" / spec.identifier
     directory.mkdir(parents=True, exist_ok=True)
@@ -490,33 +624,59 @@ def tune(
             "metrics": metrics,
             "unfinished_length_limited": unfinished,
         })
-        if unfinished / metrics["requested_predictions"] <= 0.03:
+        cap_criterion_met = unfinished / metrics["requested_predictions"] <= 0.03
+        if cap_criterion_met:
             break
     concurrency_results = []
+    warmup = directory / "pilot" / f"warmup_{time.time_ns()}"
+    evaluate_images(
+        plan=plan,
+        spec=spec,
+        payload=payload,
+        indices=plan.pilot_indices,
+        port=port,
+        samples=1,
+        max_tokens=1,
+        concurrency=min(plan.client_concurrencies),
+        output=warmup,
+    )
     for concurrency in plan.client_concurrencies:
-        records, seconds = evaluate_images(
-            plan=plan,
-            spec=spec,
-            payload=payload,
-            indices=plan.pilot_indices[16:32],
-            port=port,
-            samples=plan.samples,
-            max_tokens=cap,
-            concurrency=concurrency,
-            output=directory / "pilot" / f"concurrency_{concurrency}_{time.time_ns()}",
-        )
+        if len(plan.pilot_indices) < concurrency:
+            raise ValueError("Throughput pilot must fill the HTTP concurrency limit")
+        with utilization_monitor(gpu_uuid=gpu_uuid, port=port) as snapshots:
+            records, seconds = evaluate_images(
+                plan=plan,
+                spec=spec,
+                payload=payload,
+                indices=plan.pilot_indices,
+                port=port,
+                samples=plan.samples,
+                max_tokens=cap,
+                concurrency=concurrency,
+                output=directory / "pilot" / f"concurrency_{concurrency}_{time.time_ns()}",
+            )
         metrics = summarize_records(records=records, samples=plan.samples)
         concurrency_results.append({
             "concurrency": concurrency,
+            "requests": len(records),
             "seconds": seconds,
+            "images_per_second": len(records) / max(seconds, 1e-6),
             "output_tokens_per_second": metrics["completion_tokens"]
             / max(seconds, 1e-6),
+            "utilization": snapshots,
             "metrics": metrics,
         })
-    selected = max(concurrency_results, key=lambda row: row["output_tokens_per_second"])
+    peak = max(row["images_per_second"] for row in concurrency_results)
+    selected = min(
+        (row for row in concurrency_results if row["images_per_second"] >= 0.95 * peak),
+        key=lambda row: row["concurrency"],
+    )
     result = {
         "max_tokens": cap,
         "concurrency": selected["concurrency"],
+        "cap_criterion_met": cap_criterion_met,
+        "token_budget_limited": not cap_criterion_met,
+        "selection": "Lowest concurrency within 5% of peak images/s on the same 64 pilot images, using all eight samples and the selected token cap",
         "token_trials": cap_results,
         "concurrency_trials": concurrency_results,
         "selected_without_age_accuracy": True,
@@ -579,7 +739,10 @@ def docker_command(
         "vllm",
         "--reasoning-parser",
         "qwen3",
-        "--enforce-eager",
+        "--attention-backend",
+        "FLASH_ATTN",
+        "--attention-config",
+        '{"flash_attn_version":2}',
         "--max-model-len",
         str(plan.max_model_len),
         "--max-num-seqs",
@@ -682,7 +845,14 @@ def worker(
             destination = root / "evaluations" / spec.identifier
             if (destination / "result.json").exists():
                 continue
-            tuning = tune(root=root, plan=plan, spec=spec, payload=payload, port=port)
+            tuning = tune(
+                root=root,
+                plan=plan,
+                spec=spec,
+                payload=payload,
+                port=port,
+                gpu_uuid=gpu_uuid,
+            )
             records, seconds = evaluate_images(
                 plan=plan,
                 spec=spec,
@@ -812,7 +982,7 @@ def report(*, root: Path) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("prepare", "worker", "report"))
+    parser.add_argument("action", choices=("prepare", "followup", "worker", "report"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--image")
@@ -820,11 +990,19 @@ def main() -> None:
     parser.add_argument("--gpu-uuid")
     parser.add_argument("--port", type=int)
     parser.add_argument("--container")
+    parser.add_argument("--reference", type=Path)
+    parser.add_argument("--cache-volume")
     args = parser.parse_args()
     if args.action == "prepare":
         if args.manifest is None or args.image is None:
             parser.error("prepare requires --manifest and --image")
         prepare(root=args.root, manifest=args.manifest, image=args.image)
+    elif args.action == "followup":
+        if args.reference is None or args.cache_volume is None:
+            parser.error("followup requires --reference and --cache-volume")
+        prepare_followup(
+            root=args.root, reference=args.reference, cache_volume=args.cache_volume
+        )
     elif args.action == "worker":
         if any(
             value is None

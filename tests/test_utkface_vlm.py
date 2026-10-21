@@ -19,6 +19,7 @@ from src.experiments.utkface.vlm_eval import (
     prediction_metrics,
     query_image,
     summarize_records,
+    tune,
     wait_for_server,
     worker,
 )
@@ -335,3 +336,52 @@ def test_worker_releases_container_when_log_storage_is_full(tmp_path, monkeypatc
         )
     assert caught.value.errno == errno.ENOSPC
     assert stopped == ["study-worker"]
+
+
+@pytest.mark.parametrize("cap_passes, expected_cap", [(True, 4096), (False, 8192)])
+def test_tuning_reports_exhausted_caps_and_fills_http_limits(
+    tmp_path, monkeypatch, cap_passes, expected_cap
+):
+    calls = []
+
+    def evaluate(**kwargs):
+        calls.append(kwargs)
+        records = [
+            record(index=i, target=30, values=[30] * kwargs["samples"])
+            for i in kwargs["indices"]
+        ]
+        if kwargs["samples"] == 2 and not cap_passes:
+            for response in records:
+                for choice in response["response"]["choices"]:
+                    choice["message"]["content"] = ""
+                    choice["finish_reason"] = "length"
+        seconds = 1 if kwargs["concurrency"] == 64 else 2
+        return records, seconds
+
+    monkeypatch.setattr("src.experiments.utkface.vlm_eval.evaluate_images", evaluate)
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.utilization_monitor",
+        lambda **kwargs: nullcontext([]),
+    )
+    result = tune(
+        root=tmp_path,
+        plan=SimpleNamespace(
+            token_caps_direct=(1024,),
+            token_caps_thinking=(4096, 8192),
+            pilot_indices=tuple(range(64)),
+            client_concurrencies=(32, 64),
+            samples=8,
+        ),
+        spec=SimpleNamespace(identifier="thinking", mode="thinking_on"),
+        payload={},
+        port=8000,
+        gpu_uuid="test-gpu",
+    )
+    assert result["max_tokens"] == expected_cap
+    assert result["cap_criterion_met"] is cap_passes
+    assert result["token_budget_limited"] is not cap_passes
+    assert result["concurrency"] == 64
+    throughput_calls = [call for call in calls if call["samples"] == 8]
+    assert [call["concurrency"] for call in throughput_calls] == [32, 64]
+    assert all(len(call["indices"]) >= call["concurrency"] for call in throughput_calls)
+    assert all(call["max_tokens"] == expected_cap for call in throughput_calls)
