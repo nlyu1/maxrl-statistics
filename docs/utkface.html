@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Supervised and reward-based age prediction with ResNet-18: six experiments, policy summaries and greedy decoding.">
+
+<title>UTKFace: age prediction – MaxRL Statistics</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-ece42c8223ec2bf36298a08f122c9a68.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="utkface/plots.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">MaxRL Statistics</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./theory.html">
+<span class="menu-text">Theory</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./gradient-estimator.html">
+<span class="menu-text">Gradient Estimator</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./bag-of-words.html">
+<span class="menu-text">Bag of Words</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./corpus-regression.html">
+<span class="menu-text">Corpus Regression (WIP)</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./noisy-regression.html">
+<span class="menu-text">Noisy Regression</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./scalar-pretrain.html">
+<span class="menu-text">Scalar Pretrain (WIP)</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./code_regression.html">
+<span class="menu-text">Code Regression (WIP)</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link active" href="./utkface.html" aria-current="page">
+<span class="menu-text">UTKFace</span></a>
+  </li>
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+
+  <ul>
+  <li><a href="#task-and-examples" id="toc-task-and-examples" class="nav-link active" data-scroll-target="#task-and-examples">Task and examples</a></li>
+  <li><a href="#models-and-training" id="toc-models-and-training" class="nav-link" data-scroll-target="#models-and-training">Models and training</a>
+  <ul class="collapse">
+  <li><a href="#reported-metrics" id="toc-reported-metrics" class="nav-link" data-scroll-target="#reported-metrics">Reported metrics</a></li>
+  </ul></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul class="collapse">
+  <li><a href="#tailrl" id="toc-tailrl" class="nav-link" data-scroll-target="#tailrl">TailRL</a></li>
+  <li><a href="#other-objectives-and-rewards" id="toc-other-objectives-and-rewards" class="nav-link" data-scroll-target="#other-objectives-and-rewards">Other objectives and rewards</a></li>
+  </ul></li>
+  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a>
+  <ul class="collapse">
+  <li><a href="#full-data-comparison" id="toc-full-data-comparison" class="nav-link" data-scroll-target="#full-data-comparison">1. Full-data comparison</a></li>
+  <li><a href="#scalar-versus-categorical-supervision" id="toc-scalar-versus-categorical-supervision" class="nav-link" data-scroll-target="#scalar-versus-categorical-supervision">2. Scalar versus categorical supervision</a></li>
+  <li><a href="#limited-data-longer-training" id="toc-limited-data-longer-training" class="nav-link" data-scroll-target="#limited-data-longer-training">3. Limited data, longer training</a></li>
+  <li><a href="#sampled-versus-population-tailrl" id="toc-sampled-versus-population-tailrl" class="nav-link" data-scroll-target="#sampled-versus-population-tailrl">4. Sampled versus population TailRL</a></li>
+  <li><a href="#fixed-training-label-noise" id="toc-fixed-training-label-noise" class="nav-link" data-scroll-target="#fixed-training-label-noise">5. Fixed training-label noise</a></li>
+  <li><a href="#conditional-two-digit-policies" id="toc-conditional-two-digit-policies" class="nav-link" data-scroll-target="#conditional-two-digit-policies">6. Conditional two-digit policies</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content page-columns page-full" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">UTKFace: age prediction</h1>
+</div>
+
+<div>
+  <div class="description">
+    Supervised and reward-based age prediction with ResNet-18: six experiments, policy summaries and greedy decoding.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+
+
+
+  </div>
+
+
+
+</header>
+
+
+<section id="task-and-examples" class="level2">
+<h2 class="anchored" data-anchor-id="task-and-examples">Task and examples</h2>
+<p>Given a cropped face image <span class="math inline">\(x\)</span>, predict its annotated integer age <span class="math inline">\(y\in\{0,\ldots,99\}\)</span>. The cleaned UTKFace split contains <strong>18,462 training / 2,308 validation / 2,308 test</strong> images, stratified by age decade. Exact RGB duplicates are removed before splitting; identities and near-duplicates are not controlled.</p>
+<div class="utk-examples">
+<figure class="figure">
+<img src="utkface/examples/age-01.jpg" alt="UTKFace training example annotated as age 1" width="200" height="200" class="figure-img">
+<figcaption>
+Age 1
+</figcaption>
+</figure>
+<figure class="figure">
+<img src="utkface/examples/age-08.jpg" alt="UTKFace training example annotated as age 8" width="200" height="200" class="figure-img">
+<figcaption>
+Age 8
+</figcaption>
+</figure>
+<figure class="figure">
+<img src="utkface/examples/age-16.jpg" alt="UTKFace training example annotated as age 16" width="200" height="200" class="figure-img">
+<figcaption>
+Age 16
+</figcaption>
+</figure>
+<figure class="figure">
+<img src="utkface/examples/age-25.jpg" alt="UTKFace training example annotated as age 25" width="200" height="200" class="figure-img">
+<figcaption>
+Age 25
+</figcaption>
+</figure>
+<figure class="figure">
+<img src="utkface/examples/age-35.jpg" alt="UTKFace training example annotated as age 35" width="200" height="200" class="figure-img">
+<figcaption>
+Age 35
+</figcaption>
+</figure>
+<figure class="figure">
+<img src="utkface/examples/age-50.jpg" alt="UTKFace training example annotated as age 50" width="200" height="200" class="figure-img">
+<figcaption>
+Age 50
+</figcaption>
+</figure>
+<figure class="figure">
+<img src="utkface/examples/age-65.jpg" alt="UTKFace training example annotated as age 65" width="200" height="200" class="figure-img">
+<figcaption>
+Age 65
+</figcaption>
+</figure>
+<figure class="figure">
+<img src="utkface/examples/age-85.jpg" alt="UTKFace training example annotated as age 85" width="200" height="200" class="figure-img">
+<figcaption>
+Age 85
+</figcaption>
+</figure>
+</div>
+<p>Eight illustrative training images; the captions are dataset labels. <a href="utkface/examples.json">Example provenance</a>.</p>
+</section>
+<section id="models-and-training" class="level2">
+<h2 class="anchored" data-anchor-id="models-and-training">Models and training</h2>
+<p>All models <strong>fully fine-tune ImageNet-pretrained ResNet-18</strong>, including its backbone. Inputs are <span class="math inline">\(224\times224\)</span> RGB crops with ImageNet normalization; training adds random crops, horizontal flips and color jitter.</p>
+<div class="utk-table">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Component</th>
+<th>Setting</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Categorical policy</td>
+<td>Linear 100-logit head, <span class="math inline">\(\pi_\theta(a\mid x)=\operatorname{softmax}(z_\theta(x))_a\)</span></td>
+</tr>
+<tr class="even">
+<td>Scalar regression</td>
+<td>One linear output, <span class="math inline">\(\hat y=99\,\operatorname{sigmoid}(z_\theta(x))\)</span></td>
+</tr>
+<tr class="odd">
+<td>Two-digit policy</td>
+<td><span class="math inline">\(\pi(t,u\mid x)=\pi(t\mid x)\pi(u\mid x,t)\)</span>; 10-way tens head and a conditional units head, evaluated over all 100 joint ages</td>
+</tr>
+<tr class="even">
+<td>Optimization</td>
+<td>AdamW; <strong>batch size 64</strong>; weight decay <span class="math inline">\(10^{-4}\)</span>; gradient clipping at 5; bfloat16 backbone execution</td>
+</tr>
+<tr class="odd">
+<td>Schedule</td>
+<td>5% linear warmup, then cosine decay to 10% of the peak learning rate</td>
+</tr>
+<tr class="even">
+<td>Usual budget</td>
+<td>50 epochs; full-data comparisons use matched seeds 42/43/44. Exceptions are stated below.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Peak learning rates are selected per method using clean validation <strong>mean-age MAE</strong>. Checkpoints minimize the same metric; greedy results reuse those checkpoints. No test outcomes are used to select methods or rates.</p>
+<section id="reported-metrics" class="level3">
+<h3 class="anchored" data-anchor-id="reported-metrics">Reported metrics</h3>
+<p>Write <span class="math inline">\(\mu=\mathbb E_\pi[a]\)</span>, <span class="math inline">\(m=\operatorname{median}_\pi(a)\)</span> and <span class="math inline">\(g=\arg\max_a\pi(a\mid x)\)</span>.</p>
+<div class="utk-table">
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Definition</th>
+<th>Better</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Mean-age MAE</td>
+<td><span class="math inline">\(\mathbb E[|\mu-y|]\)</span>, in years</td>
+<td>Lower</td>
+</tr>
+<tr class="even">
+<td>Mean-age RMSE</td>
+<td><span class="math inline">\(\sqrt{\mathbb E[(\mu-y)^2]}\)</span>, in years</td>
+<td>Lower</td>
+</tr>
+<tr class="odd">
+<td>Median Spearman</td>
+<td>Rank correlation between <span class="math inline">\(m\)</span> and <span class="math inline">\(y\)</span></td>
+<td>Higher</td>
+</tr>
+<tr class="even">
+<td>Label NLL</td>
+<td><span class="math inline">\(\mathbb E[-\log\pi(y\mid x)]\)</span>, in nats</td>
+<td>Lower</td>
+</tr>
+<tr class="odd">
+<td>Mode MAE</td>
+<td><span class="math inline">\(\mathbb E[|g-y|]\)</span>, in years</td>
+<td>Lower</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Scalar models use their continuous prediction for all point metrics and have no label NLL. Here <strong>greedy decoding means the global mode over 100 ages</strong>, including the joint two-digit policy; it is not successive greedy tens/units decoding.</p>
+</section>
+</section>
+<section id="methods" class="level2">
+<h2 class="anchored" data-anchor-id="methods">Methods</h2>
+<section id="tailrl" class="level3">
+<h3 class="anchored" data-anchor-id="tailrl">TailRL</h3>
+<p>TailRL rewards probability mass inside <strong>every age-error tolerance</strong>, with a logarithmic penalty when a tolerance has little mass. For this discrete task its exact population loss is</p>
+<div class="utk-equation">
+<p><span class="math display">\[
+\mathcal L_{\mathrm{TailRL}}(x,y)
+=-\frac{1}{99}\sum_{d=0}^{98}
+\log\!\left(\sum_{a:\,|a-y|\le d}\pi_\theta(a\mid x)\right).
+\]</span></p>
+</div>
+<p>The tightest window asks for the exact age; wider windows give credit for nearby ages. <strong>Population TailRL</strong> sums all 100 age probabilities exactly. <strong>Sampled TailRL</strong> draws 64 ages per image, assigns <span class="math inline">\(r=1-|a-y|/99\)</span>, sorts the rewards, and accumulates reward gaps divided by their surviving sample counts. Centering these weights gives the detached advantages in <span class="math inline">\(-\frac1{64}\sum_i A_i\log\pi_\theta(a_i\mid x)\)</span>. The survival floor is zero.</p>
+</section>
+<section id="other-objectives-and-rewards" class="level3">
+<h3 class="anchored" data-anchor-id="other-objectives-and-rewards">Other objectives and rewards</h3>
+<ul>
+<li><strong>Categorical SL:</strong> CE fits the annotated age. Categorical MAE/MSE apply absolute/squared error to the <strong>policy mean</strong> <span class="math inline">\(\mu\)</span>, rather than averaging the error of sampled ages.</li>
+<li><strong>Scalar SL:</strong> MAE or MSE on the bounded continuous prediction. Regression losses normalize age errors by 99.</li>
+<li><strong>GRPO / RLOO:</strong> policy gradients with within-image reward standardization / a leave-one-out reward baseline. The MAE reward is <span class="math inline">\(1-|a-y|/99\)</span>; the MSE reward is <span class="math inline">\(1-((a-y)/99)^2\)</span>. Population variants sum the policy exactly; sampled variants use 64 actions.</li>
+<li><strong>Statistical MaxRL:</strong> maximize expected kernel reward through its logarithm: <span class="math inline">\(-\log\mathbb E_\pi[k(a-y)]\)</span>. The retained comparisons use width 2 years, with <span class="math inline">\(k(e)=e^{-|e|/2}\)</span> for MAE or <span class="math inline">\(k(e)=e^{-\frac12(e/2)^2}\)</span> for MSE.</li>
+</ul>
+</section>
+</section>
+<section id="experiments" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>All plots show <strong>validation curves</strong>. Each pair opens independently: policy summaries on the left, mode MAE on the right. Default moving means span 5 epochs, or 10 for 200-epoch runs; bands show between-seed sample SD, not confidence intervals. Choose raw curves or the full axis range in each block. For the noise experiment, select an SD to inspect its four policy metrics; its greedy block shows all four SDs together.</p>
+<p>The numerical notes below average each run’s metrics at its <strong>best mean-age-MAE checkpoint</strong>, across the stated seeds. They do not independently select the best greedy checkpoint.</p>
+<section id="full-data-comparison" class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="full-data-comparison">1. Full-data comparison</h3>
+<p><strong>Setting:</strong> 18,462 training images, 50 epochs, three matched seeds; eight methods. GRPO and RLOO each use their best available configuration by mean best validation MAE: sampled GRPO-MAE and population RLOO-MAE.</p>
+<div class="column-page">
+<div class="utk-plots" data-figure="01-main-full">
+<details data-view="summary">
+<summary>
+Policy summaries <span>MAE · RMSE · Spearman · NLL</span>
+</summary>
+</details>
+<details data-view="mode">
+<summary>
+Greedy decoding <span>Mode MAE</span>
+</summary>
+</details>
+</div>
+</div>
+<p><strong>Finding:</strong> Scalar MAE leads at <strong>4.67 years</strong>, followed by sampled TailRL (<strong>4.76</strong>) and population TailRL (<strong>4.82</strong>); statistical MAE is close behind. The same top three lead on mode MAE: <strong>4.67 / 4.86 / 5.01 years</strong>, respectively.</p>
+</section>
+<section id="scalar-versus-categorical-supervision" class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="scalar-versus-categorical-supervision">2. Scalar versus categorical supervision</h3>
+<p><strong>Setting:</strong> Full data, 50 epochs, three matched seeds. Scalar and categorical heads each optimize direct MAE or MSE; all four use peak LR <span class="math inline">\(10^{-3}\)</span>.</p>
+<div class="column-page">
+<div class="utk-plots" data-figure="02-sl-heads">
+<details data-view="summary">
+<summary>
+Policy summaries <span>MAE · RMSE · Spearman · NLL</span>
+</summary>
+</details>
+<details data-view="mode">
+<summary>
+Greedy decoding <span>Mode MAE</span>
+</summary>
+</details>
+</div>
+</div>
+<p><strong>Finding:</strong> Scalar MAE (<strong>4.67</strong>) and scalar MSE (<strong>4.77</strong>) outperform categorical MAE (<strong>4.86</strong>) and MSE (<strong>4.90</strong>) on mean-age MAE. Switching to the categorical modes widens the gap: their MAEs are <strong>5.30</strong> and <strong>5.60 years</strong>.</p>
+</section>
+<section id="limited-data-longer-training" class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="limited-data-longer-training">3. Limited data, longer training</h3>
+<p><strong>Setting:</strong> A fixed, decade-stratified subset of <strong>1,024 images for 200 epochs</strong>, seed 42. Eight completed categorical objectives are compared; scalar, sampled TailRL and RLOO runs are unavailable at this budget.</p>
+<div class="column-page">
+<div class="utk-plots" data-figure="03-main-1024">
+<details data-view="summary">
+<summary>
+Policy summaries <span>MAE · RMSE · Spearman · NLL</span>
+</summary>
+</details>
+<details data-view="mode">
+<summary>
+Greedy decoding <span>Mode MAE</span>
+</summary>
+</details>
+</div>
+</div>
+<p><strong>Finding:</strong> Categorical MAE (<strong>6.41</strong>) and MSE (<strong>6.47</strong>) lead on mean-age MAE, ahead of population TailRL (<strong>6.62</strong>). For mode MAE, TailRL (<strong>7.61</strong>) narrowly precedes categorical MAE (<strong>7.65</strong>), while categorical MSE falls to <strong>9.95 years</strong>. These are single-seed comparisons.</p>
+</section>
+<section id="sampled-versus-population-tailrl" class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="sampled-versus-population-tailrl">4. Sampled versus population TailRL</h3>
+<p><strong>Setting:</strong> Full data, 50 epochs, three matched seeds; TailRL’s two estimators versus scalar MAE and CE. Independently selected peak LRs are <span class="math inline">\(10^{-3}\)</span> for sampled TailRL and <span class="math inline">\(10^{-4}\)</span> for population TailRL.</p>
+<div class="column-page">
+<div class="utk-plots" data-figure="05-tail-focus">
+<details data-view="summary">
+<summary>
+Policy summaries <span>MAE · RMSE · Spearman · NLL</span>
+</summary>
+</details>
+<details data-view="mode">
+<summary>
+Greedy decoding <span>Mode MAE</span>
+</summary>
+</details>
+</div>
+</div>
+<p><strong>Finding:</strong> Both TailRL variants improve on CE; sampled TailRL is slightly ahead of population TailRL in mean-age MAE (<strong>4.76 vs 4.82</strong>) and mode MAE (<strong>4.86 vs 5.01</strong>). Scalar MAE remains strongest here. Because the learning rates differ, this does not isolate the effect of sampling alone.</p>
+</section>
+<section id="fixed-training-label-noise" class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="fixed-training-label-noise">5. Fixed training-label noise</h3>
+<p><strong>Setting:</strong> 4,096 images, 50 epochs, optimization seed 42. Add Gaussian label noise once per image with SD <strong>1, 3, 5 or 10 years</strong>, round and clip to 0–99; validation labels stay clean. All methods share noise seed 2026 and reuse their clean-subset learning rates. Plot labels use <span class="math inline">\(\eta=\text{noise RMS}/\text{clean-age SD}\)</span>. The RL comparator is population GRPO-MAE; no RLOO noise arm was run.</p>
+<div class="column-page">
+<div class="utk-plots" data-figure="06-fixed-noise">
+<details data-view="summary">
+<summary>
+Policy summaries <span>Four noise levels</span>
+</summary>
+</details>
+<details data-view="mode">
+<summary>
+Greedy decoding <span>Mode MAE · four noise levels</span>
+</summary>
+</details>
+</div>
+</div>
+<p><strong>Finding:</strong> Scalar MAE leads at SD 1/3/5, with population TailRL second. At SD 10 they nearly tie on mean-age MAE (<strong>TailRL 6.75, scalar 6.77</strong>); scalar MAE still leads on greedy MAE (<strong>6.77 vs 7.80</strong>). One optimization seed and one corruption field support a descriptive comparison.</p>
+</section>
+<section id="conditional-two-digit-policies" class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="conditional-two-digit-policies">6. Conditional two-digit policies</h3>
+<p><strong>Setting:</strong> Full data, 50 epochs, seed 42; eight objectives on the conditional tens/units head. The objectives use the exact 100-age joint distribution. Learning rates are tuned on 4,096 images and reused on full data, so comparisons with the single-head architecture are exploratory.</p>
+<div class="column-page">
+<div class="utk-plots" data-figure="07-digits">
+<details data-view="summary">
+<summary>
+Policy summaries <span>MAE · RMSE · Spearman · NLL</span>
+</summary>
+</details>
+<details data-view="mode">
+<summary>
+Greedy decoding <span>Joint-mode MAE</span>
+</summary>
+</details>
+</div>
+</div>
+<p><strong>Finding:</strong> Direct MAE (<strong>4.67</strong>) and MSE (<strong>4.73</strong>) lead on mean-age MAE, followed by population TailRL (<strong>4.78</strong>). TailRL leads on joint-mode MAE at <strong>4.88 years</strong>; statistical MSE follows at <strong>5.16</strong>. The best objective therefore depends on the decoding rule.</p>
+<p><a href="utkface/curves.js">Plot data and run provenance</a> · <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/utkface/run.py">Training implementation</a> · <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/utkface/SOURCES.md">Data and method sources</a></p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button,
+          { trigger: "manual",
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config);
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined;
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              }
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            }
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<script src="utkface/plotly.min.js" defer=""></script>
+<script src="utkface/curves.js" defer=""></script>
+<script src="utkface/plots.js" defer=""></script>
+
+
+
+
+</body></html>

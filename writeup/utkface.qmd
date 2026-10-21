@@ -1,0 +1,180 @@
+---
+title: "UTKFace: age prediction"
+description: "Supervised and reward-based age prediction with ResNet-18: six experiments, policy summaries and greedy decoding."
+format:
+  html:
+    css:
+      - styles.css
+      - utkface/plots.css
+    toc-depth: 3
+    include-after-body:
+      - text: |
+          <script src="utkface/plotly.min.js" defer></script>
+          <script src="utkface/curves.js" defer></script>
+          <script src="utkface/plots.js" defer></script>
+---
+
+## Task and examples
+
+Given a cropped face image $x$, predict its annotated integer age $y\in\{0,\ldots,99\}$. The cleaned UTKFace split contains **18,462 training / 2,308 validation / 2,308 test** images, stratified by age decade. Exact RGB duplicates are removed before splitting; identities and near-duplicates are not controlled.
+
+::: {.utk-examples}
+<figure><img src="utkface/examples/age-01.jpg" alt="UTKFace training example annotated as age 1" width="200" height="200"><figcaption>Age 1</figcaption></figure>
+<figure><img src="utkface/examples/age-08.jpg" alt="UTKFace training example annotated as age 8" width="200" height="200"><figcaption>Age 8</figcaption></figure>
+<figure><img src="utkface/examples/age-16.jpg" alt="UTKFace training example annotated as age 16" width="200" height="200"><figcaption>Age 16</figcaption></figure>
+<figure><img src="utkface/examples/age-25.jpg" alt="UTKFace training example annotated as age 25" width="200" height="200"><figcaption>Age 25</figcaption></figure>
+<figure><img src="utkface/examples/age-35.jpg" alt="UTKFace training example annotated as age 35" width="200" height="200"><figcaption>Age 35</figcaption></figure>
+<figure><img src="utkface/examples/age-50.jpg" alt="UTKFace training example annotated as age 50" width="200" height="200"><figcaption>Age 50</figcaption></figure>
+<figure><img src="utkface/examples/age-65.jpg" alt="UTKFace training example annotated as age 65" width="200" height="200"><figcaption>Age 65</figcaption></figure>
+<figure><img src="utkface/examples/age-85.jpg" alt="UTKFace training example annotated as age 85" width="200" height="200"><figcaption>Age 85</figcaption></figure>
+:::
+
+Eight illustrative training images; the captions are dataset labels. [Example provenance](utkface/examples.json).
+
+## Models and training
+
+All models **fully fine-tune ImageNet-pretrained ResNet-18**, including its backbone. Inputs are $224\times224$ RGB crops with ImageNet normalization; training adds random crops, horizontal flips and color jitter.
+
+::: {.utk-table}
+
+| Component | Setting |
+|---|---|
+| Categorical policy | Linear 100-logit head, $\pi_\theta(a\mid x)=\operatorname{softmax}(z_\theta(x))_a$ |
+| Scalar regression | One linear output, $\hat y=99\,\operatorname{sigmoid}(z_\theta(x))$ |
+| Two-digit policy | $\pi(t,u\mid x)=\pi(t\mid x)\pi(u\mid x,t)$; 10-way tens head and a conditional units head, evaluated over all 100 joint ages |
+| Optimization | AdamW; **batch size 64**; weight decay $10^{-4}$; gradient clipping at 5; bfloat16 backbone execution |
+| Schedule | 5% linear warmup, then cosine decay to 10% of the peak learning rate |
+| Usual budget | 50 epochs; full-data comparisons use matched seeds 42/43/44. Exceptions are stated below. |
+
+:::
+
+Peak learning rates are selected per method using clean validation **mean-age MAE**. Checkpoints minimize the same metric; greedy results reuse those checkpoints. No test outcomes are used to select methods or rates.
+
+### Reported metrics
+
+Write $\mu=\mathbb E_\pi[a]$, $m=\operatorname{median}_\pi(a)$ and $g=\arg\max_a\pi(a\mid x)$.
+
+::: {.utk-table}
+
+| Metric | Definition | Better |
+|---|---|---|
+| Mean-age MAE | $\mathbb E[|\mu-y|]$, in years | Lower |
+| Mean-age RMSE | $\sqrt{\mathbb E[(\mu-y)^2]}$, in years | Lower |
+| Median Spearman | Rank correlation between $m$ and $y$ | Higher |
+| Label NLL | $\mathbb E[-\log\pi(y\mid x)]$, in nats | Lower |
+| Mode MAE | $\mathbb E[|g-y|]$, in years | Lower |
+
+:::
+
+Scalar models use their continuous prediction for all point metrics and have no label NLL. Here **greedy decoding means the global mode over 100 ages**, including the joint two-digit policy; it is not successive greedy tens/units decoding.
+
+## Methods
+
+### TailRL
+
+TailRL rewards probability mass inside **every age-error tolerance**, with a logarithmic penalty when a tolerance has little mass. For this discrete task its exact population loss is
+
+::: {.utk-equation}
+
+$$
+\mathcal L_{\mathrm{TailRL}}(x,y)
+=-\frac{1}{99}\sum_{d=0}^{98}
+\log\!\left(\sum_{a:\,|a-y|\le d}\pi_\theta(a\mid x)\right).
+$$
+
+:::
+
+The tightest window asks for the exact age; wider windows give credit for nearby ages. **Population TailRL** sums all 100 age probabilities exactly. **Sampled TailRL** draws 64 ages per image, assigns $r=1-|a-y|/99$, sorts the rewards, and accumulates reward gaps divided by their surviving sample counts. Centering these weights gives the detached advantages in $-\frac1{64}\sum_i A_i\log\pi_\theta(a_i\mid x)$. The survival floor is zero.
+
+### Other objectives and rewards
+
+- **Categorical SL:** CE fits the annotated age. Categorical MAE/MSE apply absolute/squared error to the **policy mean** $\mu$, rather than averaging the error of sampled ages.
+- **Scalar SL:** MAE or MSE on the bounded continuous prediction. Regression losses normalize age errors by 99.
+- **GRPO / RLOO:** policy gradients with within-image reward standardization / a leave-one-out reward baseline. The MAE reward is $1-|a-y|/99$; the MSE reward is $1-((a-y)/99)^2$. Population variants sum the policy exactly; sampled variants use 64 actions.
+- **Statistical MaxRL:** maximize expected kernel reward through its logarithm: $-\log\mathbb E_\pi[k(a-y)]$. The retained comparisons use width 2 years, with $k(e)=e^{-|e|/2}$ for MAE or $k(e)=e^{-\frac12(e/2)^2}$ for MSE.
+
+## Experiments
+
+All plots show **validation curves**. Each pair opens independently: policy summaries on the left, mode MAE on the right. Default moving means span 5 epochs, or 10 for 200-epoch runs; bands show between-seed sample SD, not confidence intervals. Choose raw curves or the full axis range in each block. For the noise experiment, select an SD to inspect its four policy metrics; its greedy block shows all four SDs together.
+
+The numerical notes below average each run's metrics at its **best mean-age-MAE checkpoint**, across the stated seeds. They do not independently select the best greedy checkpoint.
+
+### 1. Full-data comparison
+
+**Setting:** 18,462 training images, 50 epochs, three matched seeds; eight methods. GRPO and RLOO each use their best available configuration by mean best validation MAE: sampled GRPO-MAE and population RLOO-MAE.
+
+::: {.column-page}
+<div class="utk-plots" data-figure="01-main-full">
+<details data-view="summary"><summary>Policy summaries <span>MAE · RMSE · Spearman · NLL</span></summary></details>
+<details data-view="mode"><summary>Greedy decoding <span>Mode MAE</span></summary></details>
+</div>
+:::
+
+**Finding:** Scalar MAE leads at **4.67 years**, followed by sampled TailRL (**4.76**) and population TailRL (**4.82**); statistical MAE is close behind. The same top three lead on mode MAE: **4.67 / 4.86 / 5.01 years**, respectively.
+
+### 2. Scalar versus categorical supervision
+
+**Setting:** Full data, 50 epochs, three matched seeds. Scalar and categorical heads each optimize direct MAE or MSE; all four use peak LR $10^{-3}$.
+
+::: {.column-page}
+<div class="utk-plots" data-figure="02-sl-heads">
+<details data-view="summary"><summary>Policy summaries <span>MAE · RMSE · Spearman · NLL</span></summary></details>
+<details data-view="mode"><summary>Greedy decoding <span>Mode MAE</span></summary></details>
+</div>
+:::
+
+**Finding:** Scalar MAE (**4.67**) and scalar MSE (**4.77**) outperform categorical MAE (**4.86**) and MSE (**4.90**) on mean-age MAE. Switching to the categorical modes widens the gap: their MAEs are **5.30** and **5.60 years**.
+
+### 3. Limited data, longer training
+
+**Setting:** A fixed, decade-stratified subset of **1,024 images for 200 epochs**, seed 42. Eight completed categorical objectives are compared; scalar, sampled TailRL and RLOO runs are unavailable at this budget.
+
+::: {.column-page}
+<div class="utk-plots" data-figure="03-main-1024">
+<details data-view="summary"><summary>Policy summaries <span>MAE · RMSE · Spearman · NLL</span></summary></details>
+<details data-view="mode"><summary>Greedy decoding <span>Mode MAE</span></summary></details>
+</div>
+:::
+
+**Finding:** Categorical MAE (**6.41**) and MSE (**6.47**) lead on mean-age MAE, ahead of population TailRL (**6.62**). For mode MAE, TailRL (**7.61**) narrowly precedes categorical MAE (**7.65**), while categorical MSE falls to **9.95 years**. These are single-seed comparisons.
+
+### 4. Sampled versus population TailRL
+
+**Setting:** Full data, 50 epochs, three matched seeds; TailRL's two estimators versus scalar MAE and CE. Independently selected peak LRs are $10^{-3}$ for sampled TailRL and $10^{-4}$ for population TailRL.
+
+::: {.column-page}
+<div class="utk-plots" data-figure="05-tail-focus">
+<details data-view="summary"><summary>Policy summaries <span>MAE · RMSE · Spearman · NLL</span></summary></details>
+<details data-view="mode"><summary>Greedy decoding <span>Mode MAE</span></summary></details>
+</div>
+:::
+
+**Finding:** Both TailRL variants improve on CE; sampled TailRL is slightly ahead of population TailRL in mean-age MAE (**4.76 vs 4.82**) and mode MAE (**4.86 vs 5.01**). Scalar MAE remains strongest here. Because the learning rates differ, this does not isolate the effect of sampling alone.
+
+### 5. Fixed training-label noise
+
+**Setting:** 4,096 images, 50 epochs, optimization seed 42. Add Gaussian label noise once per image with SD **1, 3, 5 or 10 years**, round and clip to 0–99; validation labels stay clean. All methods share noise seed 2026 and reuse their clean-subset learning rates. Plot labels use $\eta=\text{noise RMS}/\text{clean-age SD}$. The RL comparator is population GRPO-MAE; no RLOO noise arm was run.
+
+::: {.column-page}
+<div class="utk-plots" data-figure="06-fixed-noise">
+<details data-view="summary"><summary>Policy summaries <span>Four noise levels</span></summary></details>
+<details data-view="mode"><summary>Greedy decoding <span>Mode MAE · four noise levels</span></summary></details>
+</div>
+:::
+
+**Finding:** Scalar MAE leads at SD 1/3/5, with population TailRL second. At SD 10 they nearly tie on mean-age MAE (**TailRL 6.75, scalar 6.77**); scalar MAE still leads on greedy MAE (**6.77 vs 7.80**). One optimization seed and one corruption field support a descriptive comparison.
+
+### 6. Conditional two-digit policies
+
+**Setting:** Full data, 50 epochs, seed 42; eight objectives on the conditional tens/units head. The objectives use the exact 100-age joint distribution. Learning rates are tuned on 4,096 images and reused on full data, so comparisons with the single-head architecture are exploratory.
+
+::: {.column-page}
+<div class="utk-plots" data-figure="07-digits">
+<details data-view="summary"><summary>Policy summaries <span>MAE · RMSE · Spearman · NLL</span></summary></details>
+<details data-view="mode"><summary>Greedy decoding <span>Joint-mode MAE</span></summary></details>
+</div>
+:::
+
+**Finding:** Direct MAE (**4.67**) and MSE (**4.73**) lead on mean-age MAE, followed by population TailRL (**4.78**). TailRL leads on joint-mode MAE at **4.88 years**; statistical MSE follows at **5.16**. The best objective therefore depends on the decoding rule.
+
+[Plot data and run provenance](utkface/curves.js) · [Training implementation]({{< var repo_url >}}/src/experiments/utkface/run.py) · [Data and method sources]({{< var repo_url >}}/experiments/utkface/SOURCES.md)

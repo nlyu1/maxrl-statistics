@@ -1,0 +1,62 @@
+{
+  "dataFingerprint": "873be56dfe1904d383e5a8952d7b558d6957cc322c5d04a7a0c0a73ff81573f2",
+  "selection": "First manifest training record for each requested illustrative age; labels are dataset annotations.",
+  "examples": [
+    {
+      "file": "age-01.jpg",
+      "age": 1,
+      "source": "../utkface-data/UTKFace/1_0_0_20161219140623097.jpg.chip.jpg",
+      "sha256": "f8b20a967d09d50c3f865f542d3b5d55b8a1270a47b96a42c89b84d6cca7bd4f",
+      "split": "train"
+    },
+    {
+      "file": "age-08.jpg",
+      "age": 8,
+      "source": "../utkface-data/UTKFace/8_0_0_20170103200436055.jpg.chip.jpg",
+      "sha256": "a1c2399be76ae0b707d0475f8e6adb5106073af07bdc26daedeb7a8af2d20ccc",
+      "split": "train"
+    },
+    {
+      "file": "age-16.jpg",
+      "age": 16,
+      "source": "../utkface-data/UTKFace/16_0_0_20170102234641453.jpg.chip.jpg",
+      "sha256": "9eb4409ec47fbefb4a0918040e66d81a0c1f9e934fe2bde5fcea842f9b8fbf57",
+      "split": "train"
+    },
+    {
+      "file": "age-25.jpg",
+      "age": 25,
+      "source": "../utkface-data/UTKFace/25_0_0_20170102233320979.jpg.chip.jpg",
+      "sha256": "47d899b614f64506a6edcf2e234a2ad67ebe61b42c55b1fc0ca9f81349ffdabd",
+      "split": "train"
+    },
+    {
+      "file": "age-35.jpg",
+      "age": 35,
+      "source": "../utkface-data/UTKFace/35_0_0_20170104165411001.jpg.chip.jpg",
+      "sha256": "bd1930050af0b0cbfe7c342ec6748a91278d2ddb0bca3f9978180475a73624d0",
+      "split": "train"
+    },
+    {
+      "file": "age-50.jpg",
+      "age": 50,
+      "source": "../utkface-data/UTKFace/50_0_0_20170103183532811.jpg.chip.jpg",
+      "sha256": "92e3ebe4b134fb1d9f51b0a7c822b9163dc19be3c7e26be378f16871ed0e3ec5",
+      "split": "train"
+    },
+    {
+      "file": "age-65.jpg",
+      "age": 65,
+      "source": "../utkface-data/UTKFace/65_0_0_20170104184048158.jpg.chip.jpg",
+      "sha256": "65cbd6031c955224efc22fa0e4a40134c49020b0c9353f425d1d637dfcd7a26a",
+      "split": "train"
+    },
+    {
+      "file": "age-85.jpg",
+      "age": 85,
+      "source": "../utkface-data/UTKFace/85_0_0_20170110181953748.jpg.chip.jpg",
+      "sha256": "4136c028e93c4761b4bd29b482ea6dbeb66f075b80e1253565abcb16beca6edd",
+      "split": "train"
+    }
+  ]
+}

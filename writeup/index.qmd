@@ -19,4 +19,4 @@ Experiments:
 - [Noisy regression](noisy-regression.qmd) — learning a hidden linear rule from quantized examples, with interactive geometry, noise and prompt-format demonstrations.
 - [Scalar pretrain](scalar-pretrain.qmd) — scalar-observation LM pretraining with hidden token states. WIP.
 - [Code Regression](code_regression.qmd) — CDSS memory prediction with RegressLM CE pretraining, SL-MSE, RLOO, and MaxRL. WIP.
-- [Regression: DAG-reasoning](dag-reasoning.qmd) — reasoning advantage and rollout efficiency. Not started.
+- [UTKFace](utkface.qmd) — face-age prediction with supervised regression, TailRL and reward-based objectives; six interactive experiment comparisons.

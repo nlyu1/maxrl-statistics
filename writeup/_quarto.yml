@@ -5,6 +5,7 @@ project:
     - assets/**
     - noisy-regression/*.css
     - noisy-regression/*.js
+    - utkface/**
 
 website:
   title: "MaxRL Statistics"
@@ -24,8 +25,8 @@ website:
         text: Scalar Pretrain (WIP)
       - href: code_regression.qmd
         text: Code Regression (WIP)
-      - href: dag-reasoning.qmd
-        text: DAG Reasoning (Empty)
+      - href: utkface.qmd
+        text: UTKFace
 
 format:
   html:

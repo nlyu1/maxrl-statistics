@@ -1,0 +1,126 @@
+.utk-examples {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.utk-examples figure {
+  margin: 0;
+  text-align: center;
+}
+
+.utk-examples img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.3rem;
+}
+
+.utk-examples figcaption {
+  margin: 0.25rem 0 0;
+  color: var(--bs-secondary-color);
+  font-size: 0.85rem;
+}
+
+.utk-table,
+.utk-equation {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.utk-plots {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.utk-plots details {
+  min-width: 0;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.4rem;
+  background: var(--bs-body-bg);
+  overflow: hidden;
+}
+
+.utk-plots summary {
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.utk-plots summary span {
+  display: block;
+  margin: 0.25rem 0 0 1rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.utk-plots summary:focus-visible,
+.utk-controls :focus-visible {
+  outline: 3px solid var(--bs-link-color);
+  outline-offset: -3px;
+}
+
+.utk-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.6rem;
+  border-top: 1px solid var(--bs-border-color);
+  padding: 0.75rem;
+  font-size: 0.75rem;
+}
+
+.utk-controls label {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.utk-controls select,
+.utk-controls button {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.25rem;
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  padding: 0.3rem 0.4rem;
+  font: inherit;
+}
+
+.utk-controls button {
+  cursor: pointer;
+}
+
+.utk-plot {
+  width: 100%;
+}
+
+.utk-plot-note {
+  padding: 0 0.75rem 0.6rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.utk-plot-error {
+  padding: 1rem;
+  color: var(--bs-danger);
+}
+
+@media (max-width: 900px) {
+  .utk-plots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 440px) {
+  .utk-examples {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
