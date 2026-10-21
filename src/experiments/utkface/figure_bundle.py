@@ -251,29 +251,7 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
             std=std,
         )
         for r in chosen:
-            used[r["id"]] = {
-                key: r[key]
-                for key in (
-                    "id",
-                    "stage",
-                    "method",
-                    "head",
-                    "width",
-                    "size",
-                    "epochs",
-                    "seed",
-                    "lr",
-                    "snr",
-                    "noiseRmse",
-                    "noise",
-                    "std",
-                    "cohort",
-                    "fingerprint",
-                    "trainingFingerprint",
-                    "curves",
-                    "initial",
-                )
-            }
+            used[r["id"]] = r
         return {
             "key": method.key,
             "label": method.label,
@@ -411,7 +389,7 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
     add(
         slug="04-stat-widths",
         title="Statistical MaxRL: widths and estimators",
-        note="Full data, three seeds per setting. Five shared legend entries control both estimator rows. Solid: width 2; dashed: width 5. The same exact CE reference appears in both rows. Rates are independently validation-selected; this is not a matched-LR intervention.",
+        note="Full data, three seeds per setting. Five shared legend entries control both estimator rows. Solid: width 2; dashed: width 5. The same exact CE reference appears in both rows. Actual peak rates and source IDs are recorded for every run.",
         rows=width_rows,
     )
     focus_rows = [
@@ -424,10 +402,14 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
             ],
         },
     ]
+    tail_rates = {
+        g["key"]: sorted({used[identifier]["lr"] for identifier in g["ids"]})
+        for g in focus_rows[0]["groups"]
+    }
     add(
         slug="05-tail-focus",
         title="TailRL and supervised baselines",
-        note="Full data × 50 epochs, three matched seeds: sampled TailRL, population TailRL, scalar MAE and CE. TailRL peak LR: population 0.0001; 64 samples 0.001. Rates are independently validation-selected.",
+        note=f"Full data × 50 epochs, three matched seeds: sampled TailRL, population TailRL, scalar MAE and CE. TailRL peak LR: population {tail_rates['tailrl_population']}; 64 samples {tail_rates['tailrl']}.",
         rows=focus_rows,
         four_grid=True,
     )
@@ -493,6 +475,7 @@ def prepare(*, payload: dict, source_hash: str) -> dict:
         "sourceSha256": source_hash,
         "sourceCohort": runs[0]["cohort"],
         "dataFingerprint": runs[0]["fingerprint"],
+        "learningRateRevision": payload.get("learningRateRevision", {}),
         "curveColumns": payload["curveColumns"],
         "metrics": METRIC_LABELS,
         "selection": decisions,
@@ -683,13 +666,15 @@ def build(*, data: Path, output_dir: Path, epoch_zero_path: str) -> None:
         "UTKFace seven-figure bundle\n\nOpen viewer.html in a browser. It is self-contained and needs no network connection. "
         "Use the seven page links, Plotly legend clicks/double-clicks and native zoom/pan tools. "
         "The full-data curves aggregate seeds 42/43/44. Other panels state their actual coverage. "
-        "No new training or test-driven selection was performed.\n\n"
+        "The learning-rate revision and its incorporated reruns are recorded in bundle-data.json. "
+        "No additional training or test-driven selection occurs during rendering.\n\n"
         "Default moving means are five epochs, or ten for 200-epoch runs. Choose Raw to inspect unsmoothed curves. "
         "Bands are sample SD across optimization seeds, not confidence intervals. "
         "Plots show trained epochs only; epoch-zero stats remain in the data files. "
         "Default axes emphasize later training; Fit all data restores full training trajectories. "
         "Use native zoom/pan to inspect later training. Scalar label NLL is undefined. "
-        "epoch-zero.json retains reconstruction provenance; historical training and checkpoint selections are unchanged.\n\n"
+        "epoch-zero.json retains recorded or reconstructed initialization provenance. "
+        "Each replacement reselects its checkpoint by clean validation mean-age MAE.\n\n"
         "Approved coverage adaptations: SD 1/3/5/10; eight available categorical 1024x200 settings; "
         "TailRL-versus-supervised and digit figures show full data only. No 1024x200 digit runs exist. "
         "The Statistical MaxRL figure uses five shared legend entries across its two estimator rows. "
@@ -708,7 +693,9 @@ def build(*, data: Path, output_dir: Path, epoch_zero_path: str) -> None:
         "figureCount": len(bundle["figures"]),
         "runCount": len(bundle["runs"]),
         "newTrainingRuns": 0,
-        "epochZeroRuns": len(bundle["runs"]),
+        "incorporatedReruns": bundle["learningRateRevision"].get("reruns", 0),
+        "reusedEvaluations": bundle["learningRateRevision"].get("reused", 0),
+        "epochZeroRuns": sum(bool(r["initial"]) for r in bundle["runs"].values()),
         "epochZeroPlotted": False,
         "adaptations": bundle["adaptations"],
         "files": {
