@@ -715,11 +715,16 @@ def worker(
             path=directory / "completed.json", payload={"completed_at": time.time()}
         )
     finally:
-        logs = subprocess.run(
-            ["docker", "logs", container], check=False, capture_output=True, text=True
-        )
-        (directory / "vllm.log").write_text(logs.stdout + logs.stderr)
-        stop_container(root=root, container=container)
+        try:
+            logs = subprocess.run(
+                ["docker", "logs", container],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            (directory / "vllm.log").write_text(logs.stdout + logs.stderr)
+        finally:
+            stop_container(root=root, container=container)
 
 
 def report(*, root: Path) -> dict:

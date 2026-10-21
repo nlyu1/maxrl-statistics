@@ -1,3 +1,4 @@
+import errno
 import hashlib
 import http.client
 import json
@@ -19,6 +20,7 @@ from src.experiments.utkface.vlm_eval import (
     query_image,
     summarize_records,
     wait_for_server,
+    worker,
 )
 from src.experiments.utkface.vlm_queue import (
     DOWNLOAD_SCRIPT,
@@ -283,3 +285,53 @@ def test_gpu_exceptions_preserve_other_process_and_usage_checks(
     assert gpu["pids"] == [gpu_holder_exception.pid, *other_pids]
     if uuid == gpu_holder_exception.gpu_uuid:
         assert inventory[0]["ignored_pids"] == [gpu_holder_exception.pid]
+
+
+def test_worker_releases_container_when_log_storage_is_full(tmp_path, monkeypatch):
+    plan = SimpleNamespace(
+        models=(SimpleNamespace(identifier="model"),),
+        evaluations=(),
+        manifest=tmp_path / "manifest.json",
+        fingerprint="frozen",
+    )
+    stopped = []
+    original_write_text = Path.write_text
+
+    def write_text(path, *args, **kwargs):
+        if path.name == "vllm.log":
+            raise OSError(errno.ENOSPC, "No space left on device")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr("src.experiments.utkface.vlm_eval.load_plan", lambda **kw: plan)
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.read_manifest",
+        lambda **kw: {"fingerprint": "frozen"},
+    )
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.docker_command", lambda **kw: ["docker"]
+    )
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.subprocess.run",
+        lambda *args, **kw: SimpleNamespace(stdout="logs", stderr=""),
+    )
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.wait_for_server", lambda **kw: None
+    )
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.stop_container",
+        lambda **kw: stopped.append(kw["container"]),
+    )
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_eval.signal.signal", lambda *args: None
+    )
+    monkeypatch.setattr(Path, "write_text", write_text)
+    with pytest.raises(OSError) as caught:
+        worker(
+            root=tmp_path,
+            identifier="model",
+            gpu_uuid="test-gpu",
+            port=8000,
+            container="study-worker",
+        )
+    assert caught.value.errno == errno.ENOSPC
+    assert stopped == ["study-worker"]
