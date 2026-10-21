@@ -48,24 +48,40 @@ All models **fully fine-tune ImageNet-pretrained ResNet-18**, including its back
 
 :::
 
-The **October 22 shared-learning-rate revision** replaces 59 runs and reuses 163 unchanged evaluations. The new rates were fixed before these reruns, using objective/estimator families and the uncertainty of the earlier validation preflights. Replacements are determined by that fixed plan, rather than by which new test score is better. Checkpoints still minimize clean validation **mean-age MAE**; greedy results reuse those checkpoints.
+Checkpoints minimize clean validation **mean-age MAE**. All reported metrics, including greedy decoding, use the same selected checkpoint.
+
+<details>
+<summary>Learning rates for all methods</summary>
 
 ::: {.utk-table}
 
-| Objective | Full-data peak LR | 4,096-image / noisy-label peak LR |
-|---|---:|---:|
-| CE / binary MaxRL | $10^{-3}$ | $10^{-3}$ (CE) |
-| Direct MAE/MSE, scalar or categorical | $10^{-3}$ | $10^{-3}$ |
-| TailRL, population or sampled | $10^{-3}$ | $10^{-3}$ (population) |
-| Statistical MAE, widths 2/5 | $10^{-3}$ | $10^{-3}$ (population, width 2) |
-| Statistical MSE, widths 2/5 | $3\times10^{-4}$ | $10^{-3}$ (population, width 2) |
-| GRPO MAE | $3\times10^{-4}$ | $10^{-3}$ (population) |
-| GRPO MSE | $3\times10^{-4}$ | $3\times10^{-4}$ (population) |
-| RLOO MAE / MSE | $10^{-4}$ / $10^{-3}$ | Not run |
+| Method | Full data | 1,024 images | 4,096 images / noisy labels | Two-digit head |
+|--------------------------------|----------:|----------:|----------------:|------------:|
+| CE / population binary MaxRL | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ |
+| Sampled binary MaxRL | $10^{-3}$ | — | — | — |
+| Categorical MAE | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ | $3\times10^{-4}$ |
+| Categorical MSE | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ |
+| Scalar MAE / MSE | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ | — |
+| Population TailRL | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ |
+| Sampled TailRL | $10^{-3}$ | — | — | — |
+| Population statistical MAE | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ |
+| Sampled statistical MAE | $10^{-3}$ | — | — | — |
+| Population statistical MSE | $3\times10^{-4}$ | $10^{-3}$ | $10^{-3}$ | $10^{-3}$ |
+| Sampled statistical MSE | $3\times10^{-4}$ | — | — | — |
+| Population GRPO MAE | $3\times10^{-4}$ | $3\times10^{-4}$ | $10^{-3}$ | $3\times10^{-4}$ |
+| Sampled GRPO MAE | $3\times10^{-4}$ | — | — | — |
+| Population GRPO MSE | $3\times10^{-4}$ | $3\times10^{-4}$ | $3\times10^{-4}$ | $3\times10^{-4}$ |
+| Sampled GRPO MSE | $3\times10^{-4}$ | — | — | — |
+| Population RLOO MAE | $10^{-4}$ | — | — | — |
+| Sampled RLOO MAE | $10^{-4}$ | — | — | — |
+| Population RLOO MSE | $10^{-3}$ | — | — | — |
+| Sampled RLOO MSE | $10^{-3}$ | — | — | — |
 
 :::
 
-The 1,024-image categorical MSE runs also use $10^{-3}$. Fixed-LR and two-digit experiments retain their original protocols. The rerun trainer additionally records epoch-zero validation; its audited source change preserves the training loop and restores random state after the initial evaluation. Both source hashes remain in the plot provenance. This follow-up reuses the original split and test set; it is not a fresh held-out confirmation.
+These are peak rates for the cosine schedule. The two-digit rates apply to both full data and 4,096 images. Full-data statistical MaxRL uses widths 2 and 5; subset and two-digit arms use width 2. Sampled estimators use 64 actions per image. Dashes indicate unrun settings; the 1,024-image scalar runs use 50 epochs.
+
+</details>
 
 ### Reported metrics
 
@@ -127,7 +143,7 @@ The numerical notes below average each run's metrics at its **best mean-age-MAE 
 </div>
 :::
 
-**Finding:** Scalar MAE still leads on validation mean-age MAE at **4.67 years**. Population TailRL now follows at **4.73**, slightly ahead of sampled TailRL (**4.76**); their mode MAEs are nearly identical (**4.86 / 4.86**). Scalar MAE also remains the lowest observed full-data test MAE across the evaluated configurations: **4.632 ± 0.023 years**. GRPO/RLOO remain substantially worse.
+**Finding:** Scalar MAE leads on validation mean-age MAE at **4.67 years**. Population TailRL follows at **4.73**, slightly ahead of sampled TailRL (**4.76**); their mode MAEs are nearly identical (**4.86 / 4.86**). Scalar MAE also has the lowest observed full-data test MAE across the evaluated configurations: **4.632 ± 0.023 years**. GRPO/RLOO perform substantially worse.
 
 ### 2. Scalar versus categorical supervision
 
@@ -153,11 +169,11 @@ The numerical notes below average each run's metrics at its **best mean-age-MAE 
 </div>
 :::
 
-**Finding:** Categorical MSE now leads on validation mean-age MAE at **6.08 years**, ahead of categorical MAE (**6.41**) and population TailRL (**6.62**). Raising its LR from $3\times10^{-4}$ to $10^{-3}$ improves its test mean-age MAE from **6.371 to 6.100**. TailRL still leads on validation mode MAE (**7.61**), followed by categorical MAE (**7.65**); categorical MSE improves from **9.95 to 8.15**. These are single-seed comparisons.
+**Finding:** Categorical MSE leads on validation mean-age MAE at **6.08 years**, ahead of categorical MAE (**6.41**) and population TailRL (**6.62**). TailRL has the lowest validation mode MAE (**7.61**); categorical MAE reaches **7.65** and categorical MSE **8.15**. These are single-seed comparisons.
 
 ### 4. Sampled versus population TailRL
 
-**Setting:** Full data, 50 epochs, three matched seeds; TailRL's two estimators versus scalar MAE and CE. All four now use the same peak LR, $10^{-3}$.
+**Setting:** Full data, 50 epochs, three matched seeds; TailRL's two estimators versus scalar MAE and CE. All four use peak LR $10^{-3}$.
 
 ::: {.column-page}
 <div class="utk-plots" data-figure="05-tail-focus">
@@ -166,7 +182,7 @@ The numerical notes below average each run's metrics at its **best mean-age-MAE 
 </div>
 :::
 
-**Finding:** Both TailRL variants remain ahead of CE. At matched LR, population TailRL is slightly better on validation mean-age MAE (**4.73 vs 4.76**), while their validation mode MAEs nearly coincide (**4.864 vs 4.859**). The validation ranking reverses, but population TailRL's test mean-age MAE is essentially unchanged (**4.752 → 4.754**); sampled TailRL reaches **4.724**. Their test mode MAEs also nearly coincide (**4.922 vs 4.928**). These small gaps do not establish an estimator winner; scalar MAE remains strongest here.
+**Finding:** Both TailRL variants outperform CE. Population TailRL has slightly lower validation mean-age MAE (**4.73 vs 4.76**), while their validation mode MAEs nearly coincide (**4.864 vs 4.859**). Sampled TailRL has slightly lower test mean-age MAE (**4.724 vs 4.754**); their test mode MAEs are also close (**4.928 vs 4.922**). These small gaps do not establish an estimator winner; scalar MAE performs best here.
 
 ### 5. Fixed training-label noise
 
@@ -179,9 +195,9 @@ The numerical notes below average each run's metrics at its **best mean-age-MAE 
 </div>
 :::
 
-**Finding:** Among the five displayed methods, scalar MAE now leads on validation mean-age MAE at all four noise levels. At SD 10, population TailRL no longer nearly ties scalar MAE (**6.97 vs 6.77**); its test mean-age MAE worsens from **6.717 to 7.155**. Scalar MAE also retains the lowest mode MAE among the displayed methods.
+**Finding:** Among the five displayed methods, scalar MAE leads on validation mean-age MAE at all four noise levels. At SD 10, its MAE is **6.77 years**, compared with **6.97** for population TailRL. Scalar MAE also has the lowest mode MAE among the displayed methods.
 
-The [complete comparison](utkface/lr-comparison.md) includes all ten evaluated noise arms. At fixed SD 10, categorical MAE's lower LR improves test mean-age MAE from **9.425 to 6.396**; unchanged categorical MSE reaches **6.252**. Thus the earlier categorical-MAE failure is strongly rate-sensitive, and the mean-prediction results do not support a general TailRL robustness advantage. The categorical point means still hide larger mode errors: **7.769 / 8.200 years**, respectively. One optimization seed and one corruption field support a descriptive comparison.
+Across all ten evaluated noise arms, categorical MSE and MAE have test mean-age MAEs of **6.252 / 6.396 years** at SD 10, with larger mode errors of **8.200 / 7.769 years**, respectively. These results do not establish a general TailRL robustness advantage. The noise comparison uses one optimization seed and one corruption field per noise level.
 
 ### 6. Conditional two-digit policies
 
@@ -195,30 +211,5 @@ The [complete comparison](utkface/lr-comparison.md) includes all ten evaluated n
 :::
 
 **Finding:** Direct MAE (**4.67**) and MSE (**4.73**) lead on mean-age MAE, followed by population TailRL (**4.78**). TailRL leads on joint-mode MAE at **4.88 years**; statistical MSE follows at **5.16**. The best objective therefore depends on the decoding rule.
-
-## What changed with shared learning rates
-
-The full-data scalar baselines and all two-digit runs are unchanged. The clearest changes occur with limited or noisy data. The table reports **clean test mean-age MAE**, unlike the validation curves above; all checkpoints are selected by validation mean-age MAE.
-
-::: {.utk-table}
-
-| Configuration | Seeds | Previous | Shared rates |
-|---|---:|---:|---:|
-| Full-data population TailRL | 3 | 4.752 ± 0.037 | 4.754 ± 0.028 |
-| Full-data CE | 3 | 4.933 ± 0.030 | 4.858 ± 0.080 |
-| Full-data population statistical MAE, width 5 | 3 | 4.871 ± 0.118 | 4.796 ± 0.045 |
-| Full-data population statistical MSE, width 5 | 3 | 5.002 ± 0.228 | 5.060 ± 0.232 |
-| Categorical MAE, 4,096 images | 3 | 6.523 ± 1.355 | 5.505 ± 0.277 |
-| Categorical MSE, 1,024 images × 200 epochs | 1 | 6.371 | 6.100 |
-| Categorical MAE, fixed noise SD 10 | 1 | 9.425 | 6.396 |
-| Population TailRL, fixed noise SD 10 | 1 | 6.717 | 7.155 |
-
-:::
-
-Sharing rates substantially reduces categorical MAE's seed variability at 4,096 images. It also brings population and sampled statistical MAE at width 5 close in test MAE (**4.796 vs 4.793**). It does not improve every configuration: statistical MSE at width 5 and high-noise TailRL regress. With fresh noise at SD 10, CE, scalar MSE and scalar MAE are close on test MAE (**5.348 / 5.361 / 5.389**); a single seed cannot resolve this ordering reliably.
-
-Distribution metrics can move differently from point accuracy. Full-data population TailRL's test NLL rises from **3.214 to 3.832 nats** and its RMSE from **6.871 to 7.045 years**, despite almost unchanged MAE. Population statistical MAE at width 5 improves point MAE but worsens NLL (**13.023 → 14.557**). Population GRPO-MAE's NLL improves markedly (**60.694 → 33.385**), while remaining far worse than CE (**3.053**). Matching rates helps interpret estimator comparisons; it does not make their learned distributions equivalent. [All five metrics, with paired differences](utkface/lr-comparison.csv).
-
-These are descriptive changes, not claims of statistical significance. Three seeds on one split provide limited precision, and the single-seed noise results need replication before making robustness claims. [All previous/current values, ranks, rates and seed-level differences](utkface/lr-comparison.md).
 
 [Plot data and run provenance](utkface/curves.js) · [Training implementation]({{< var repo_url >}}/src/experiments/utkface/run.py) · [Data and method sources]({{< var repo_url >}}/experiments/utkface/SOURCES.md)
