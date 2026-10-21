@@ -1,0 +1,14 @@
+{
+  "comparisonCohort": "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6",
+  "sourceCohorts": [
+    "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6",
+    "34a1d1dc2eba029dabec712dfb9c4c13dbb5f0ac1fd404b33d0ca6d63772e188"
+  ],
+  "sourceChanges": {
+    "src/experiments/utkface/run.py": {
+      "old": "764ebad17ec97dc8bfc802f86bcdb98360fdfe8408df2d0ee61bee2804ab72ce",
+      "new": "8bb27dd5018ee180c5172232b80ff4dec08f37256606d387cbb74e5291e22a3d"
+    }
+  },
+  "basis": "Reviewed diff 928ddd9..b3da562: epoch-zero evaluation/logging and timing only. Training loop, optimizer, losses and data path are unchanged. Initial evaluation restores model mode and Python/NumPy/Torch/loader-generator random state."
+}

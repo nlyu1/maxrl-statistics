@@ -1,0 +1,35 @@
+{
+  "status": "completed",
+  "gpu_hours": 9.25118873430623,
+  "budget_gpu_hours": null,
+  "counts": {
+    "completed": 59
+  },
+  "stages": {
+    "main": {
+      "completed": 15
+    },
+    "matched_steps": {
+      "completed": 1
+    },
+    "noise": {
+      "completed": 32
+    },
+    "subset": {
+      "completed": 5
+    },
+    "subset_replication": {
+      "completed": 6
+    }
+  },
+  "active": [],
+  "updated_at": 1792616387.3862934,
+  "planning_gpu_hours": 12.0,
+  "gpu_hour_cap_enforced": false,
+  "max_concurrent": 6,
+  "queued_pending": 0,
+  "held_pending": 0,
+  "new_gpu_idle_checks": 2,
+  "new_gpu_idle_interval_seconds": 10.0,
+  "immediate_successful_gpu_reuse": true
+}

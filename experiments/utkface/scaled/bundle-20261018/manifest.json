@@ -1,41 +1,62 @@
 {
-  "generated": "2026-10-18T02:53:02.886344+08:00",
-  "dataSnapshot": "2026-10-17T00:44:42.960062+08:00",
-  "sourceSha256": "9723a6975898f985e9a2c5b8a52c5f41869176127a340e4a5dfbc72ed31e2038",
-  "sourceCohort": "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6",
-  "revision": "49e21845e73369fb71aa5f6bbd7c9b4159a2a19b",
+  "generated": "2026-10-22T05:21:00.793859+08:00",
+  "dataSnapshot": "2026-10-22T05:21:00.125522+08:00",
+  "sourceSha256": "935f553a28eec57827869fddaa8093f0e7513d6a9efb5c04a2c5b75f19c54c27",
+  "sourceCohort": "34a1d1dc2eba029dabec712dfb9c4c13dbb5f0ac1fd404b33d0ca6d63772e188",
+  "revision": "d60c5eb0540111fdcbcec0d8a8eb8e6fe34d4761",
   "figureCount": 7,
   "runCount": 87,
   "newTrainingRuns": 0,
+  "incorporatedReruns": 59,
+  "reusedEvaluations": 163,
   "epochZeroRuns": 87,
   "epochZeroPlotted": false,
   "adaptations": [
     "Use SD 3 instead of unavailable SD 2.",
-    "Use the eight tested categorical 1024×200 methods.",
+    "Use the eight tested categorical 1024\u00d7200 methods.",
     "Show full data only in the TailRL-versus-supervised figure.",
-    "Show full data only for digit policies; no 1024×200 digit runs exist."
+    "Show full data only for digit policies; no 1024\u00d7200 digit runs exist."
   ],
   "files": {
-    "01-main-full.pdf": "463f53de980f5c2266d82bfca5a4f39e6e0f68ba5ec807fa1ca4003ef5d7d117",
-    "01-main-full.png": "36ac1056cf406c6a99a7d21fd57ea02c85b818becab9410dfdc91bb7c7a12995",
-    "02-sl-heads.pdf": "30c11fc6826a9ddf8174b9e91b9efacc9a8f9ff1daaf7e14dc98deb1494347f5",
+    "01-main-full.pdf": "412383feb02efa85af9b5bd129a598811d227db6293ca19285e031a7669576a2",
+    "01-main-full.png": "d72fd69750bb0807acaaf44d20a1bbe218e95e235f504edec905b2ac06ba9bed",
+    "02-sl-heads.pdf": "76e3d0dde53df7a92e73e52675710d752589d52ab19c1079f3c2ab99918b32f0",
     "02-sl-heads.png": "09d72d6bbcc964b0d3f430680604bd836cb26d419b1df9d0ab270ca92804b8f5",
-    "03-main-1024.pdf": "afa2fdffea3f0d7bc040e6af861f795919c582d6115ef2cb51a223b295a329ec",
-    "03-main-1024.png": "383a97b4f643d5319373fb2ad2f87570a24fbd232e7b5bf25c4d745c7706c421",
-    "04-stat-widths.pdf": "f3c8f9b529b1656f32c46497873e50584fbfdc6cc66b34ecf7d12811ecdff5a5",
-    "04-stat-widths.png": "aa95b900ee34a7063dd7a5e70639b16eb5e3f9fd72f96b2c5bf0d9b01a1df565",
-    "05-tail-focus.pdf": "8c7823bc33fe673781129da04411e07a6d4a34000847a47c14e565616c440ebc",
-    "05-tail-focus.png": "9073b44b26a9d761768b0ad72ad2dd42c6d7c9815dcf66d2ba94d79e750554f5",
-    "06-fixed-noise.pdf": "a055789ea307be19c400c9b798c94c9918fd4010bfb6d239c3b1b6aa9d972c44",
-    "06-fixed-noise.png": "401e3aa5142f58947bb394681f6f0d1b5996ed75cf0f54c6084b0fbf7b85290c",
-    "07-digits.pdf": "3508c2bab5664f85355ab51d7597e4b6bc65908d69f2ab8a91cddb6e12df9290",
+    "03-main-1024.pdf": "9c8540ce065c31d3324e66b826c3e6669f93659687958a596fd4827d13ce25c6",
+    "03-main-1024.png": "31840c99f3ac4c0bb80b37a00c0a09517cd5888058572808a3e30f8b1d3eee49",
+    "04-stat-widths.pdf": "fb8bf454845cda5e1683d467ad9e38849bdf3d71a8a1338b86242a67908683a6",
+    "04-stat-widths.png": "648815cb7f4abb8b6afff1e8678f9a76bcdf7755fa9cb43b604e6155f2f6ed88",
+    "05-tail-focus.pdf": "a006fd62631e1e34bc46362bc6aaa41245a5b5c8f22e7dfc92261595c78b518c",
+    "05-tail-focus.png": "296cc4cedf41654c926b3164785978c333e49d51ecd0188dd4b2cf20d708e288",
+    "06-fixed-noise.pdf": "ec24708b4aa711ed8381dfa098c420cfe8297253873518d3621e7e4dfe64ae53",
+    "06-fixed-noise.png": "a60265da8c3f3b238ade9c3e8c614ffbd8e1ce0341ad3294671de3b733d25785",
+    "07-digits.pdf": "4e7a0b802583640b97308ee40c49c12b39b2ab571c2f26f79c08bed5e51ce3f3",
     "07-digits.png": "3456c4fc6aa28d4bd77cc8e55bb92f9957417bcb291110a295ccb7aa8985253f",
-    "README.txt": "fbdfc52506540c6f9e77c4f4a34c5c773c3827f2ffd23a9c4aefe5e94a901478",
-    "all-seven.pdf": "6d5bb4fd794ef362dfceab72dc5a7eec8c489aab528cd746245f8cb115efe3b3",
-    "bundle-data.json": "9c06f20b3e3d0c0ef9b20adef62039437a0fa3ef90981457db5a00e2b654814f",
-    "epoch-zero-validation.json": "27d3213980f79914f96fcb19ea582bc9f2d632718243534c1d5eee1d3b0262fa",
-    "epoch-zero.json": "445388a82228707f38ae80898072d40ac4850f02abd1460dc32b738e03a39745",
-    "interaction-validation.json": "e08c69c3de85ef58b7c2ba89e07211bbe7af2e57f124739cff672e16387744aa",
-    "viewer.html": "a5ef1afab9e703b5a5e134799e3249934559ae2b132497ee6c61b72678660e5c"
-  }
+    "README.txt": "2efe4edd068184f62d174d1009e2cee2759e1d3106eeed2a10967d8dbb50961d",
+    "all-seven.pdf": "b1bc4aba058faddb03f83aa5cc4e4c815ddfe22f45ac55a549f76cce49ca042b",
+    "bundle-data.json": "59ca3246e36c5ff43818095024825057b9e1e269b67daa27e0f1ccd7c3b76869",
+    "epoch-zero-validation.json": "95119be9789fea3ba1734fabaa18170b15f1eadbf29c317f4c98bd413b5931f4",
+    "epoch-zero.json": "c60f90680316744eb421f157f28da9de8d430c66a68f149bbed8495e304c3d45",
+    "interaction-validation.json": "830ea3b33502a09fa371f90263b1cc41996e73a9d7435397ffb617588dc1edaa",
+    "viewer.html": "acd46b35b85f5b5ee4b377bcb6ce3689a1f49f4e87f816559bfcc8d81ff00cc8"
+  },
+  "sourceCohorts": [
+    "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6",
+    "34a1d1dc2eba029dabec712dfb9c4c13dbb5f0ac1fd404b33d0ca6d63772e188"
+  ],
+  "cohortAudit": {
+    "comparisonCohort": "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6",
+    "sourceCohorts": [
+      "262ab4a570462b00b193afb7b5ec875731c7bc9c29f8875b2f960f23022215d6",
+      "34a1d1dc2eba029dabec712dfb9c4c13dbb5f0ac1fd404b33d0ca6d63772e188"
+    ],
+    "sourceChanges": {
+      "src/experiments/utkface/run.py": {
+        "old": "764ebad17ec97dc8bfc802f86bcdb98360fdfe8408df2d0ee61bee2804ab72ce",
+        "new": "8bb27dd5018ee180c5172232b80ff4dec08f37256606d387cbb74e5291e22a3d"
+      }
+    },
+    "basis": "Reviewed diff 928ddd9..b3da562: epoch-zero evaluation/logging and timing only. Training loop, optimizer, losses and data path are unchanged. Initial evaluation restores model mode and Python/NumPy/Torch/loader-generator random state."
+  },
+  "viewerRevision": "f43b75080cede295fe94cb83e8b4b4b998b8d9c0"
 }

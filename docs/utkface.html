@@ -190,6 +190,7 @@ window.Quarto = {
   <li><a href="#fixed-training-label-noise" id="toc-fixed-training-label-noise" class="nav-link" data-scroll-target="#fixed-training-label-noise">5. Fixed training-label noise</a></li>
   <li><a href="#conditional-two-digit-policies" id="toc-conditional-two-digit-policies" class="nav-link" data-scroll-target="#conditional-two-digit-policies">6. Conditional two-digit policies</a></li>
   </ul></li>
+  <li><a href="#what-changed-with-shared-learning-rates" id="toc-what-changed-with-shared-learning-rates" class="nav-link" data-scroll-target="#what-changed-with-shared-learning-rates">What changed with shared learning rates</a></li>
   </ul>
 </nav>
     </div>
@@ -318,7 +319,66 @@ Age 85
 </tbody>
 </table>
 </div>
-<p>Peak learning rates are selected per method using clean validation <strong>mean-age MAE</strong>. Checkpoints minimize the same metric; greedy results reuse those checkpoints. No test outcomes are used to select methods or rates.</p>
+<p>The <strong>October 22 shared-learning-rate revision</strong> replaces 59 runs and reuses 163 unchanged evaluations. The new rates were fixed before these reruns, using objective/estimator families and the uncertainty of the earlier validation preflights. Replacements are determined by that fixed plan, rather than by which new test score is better. Checkpoints still minimize clean validation <strong>mean-age MAE</strong>; greedy results reuse those checkpoints.</p>
+<div class="utk-table">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Objective</th>
+<th style="text-align: right;">Full-data peak LR</th>
+<th style="text-align: right;">4,096-image / noisy-label peak LR</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>CE / binary MaxRL</td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span> (CE)</td>
+</tr>
+<tr class="even">
+<td>Direct MAE/MSE, scalar or categorical</td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span></td>
+</tr>
+<tr class="odd">
+<td>TailRL, population or sampled</td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span> (population)</td>
+</tr>
+<tr class="even">
+<td>Statistical MAE, widths 2/5</td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span> (population, width 2)</td>
+</tr>
+<tr class="odd">
+<td>Statistical MSE, widths 2/5</td>
+<td style="text-align: right;"><span class="math inline">\(3\times10^{-4}\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span> (population, width 2)</td>
+</tr>
+<tr class="even">
+<td>GRPO MAE</td>
+<td style="text-align: right;"><span class="math inline">\(3\times10^{-4}\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(10^{-3}\)</span> (population)</td>
+</tr>
+<tr class="odd">
+<td>GRPO MSE</td>
+<td style="text-align: right;"><span class="math inline">\(3\times10^{-4}\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(3\times10^{-4}\)</span> (population)</td>
+</tr>
+<tr class="even">
+<td>RLOO MAE / MSE</td>
+<td style="text-align: right;"><span class="math inline">\(10^{-4}\)</span> / <span class="math inline">\(10^{-3}\)</span></td>
+<td style="text-align: right;">Not run</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The 1,024-image categorical MSE runs also use <span class="math inline">\(10^{-3}\)</span>. Fixed-LR and two-digit experiments retain their original protocols. The rerun trainer additionally records epoch-zero validation; its audited source change preserves the training loop and restores random state after the initial evaluation. Both source hashes remain in the plot provenance. This follow-up reuses the original split and test set; it is not a fresh held-out confirmation.</p>
 <section id="reported-metrics" class="level3">
 <h3 class="anchored" data-anchor-id="reported-metrics">Reported metrics</h3>
 <p>Write <span class="math inline">\(\mu=\mathbb E_\pi[a]\)</span>, <span class="math inline">\(m=\operatorname{median}_\pi(a)\)</span> and <span class="math inline">\(g=\arg\max_a\pi(a\mid x)\)</span>.</p>
@@ -408,7 +468,7 @@ Greedy decoding <span>Mode MAE</span>
 </details>
 </div>
 </div>
-<p><strong>Finding:</strong> Scalar MAE leads at <strong>4.67 years</strong>, followed by sampled TailRL (<strong>4.76</strong>) and population TailRL (<strong>4.82</strong>); statistical MAE is close behind. The same top three lead on mode MAE: <strong>4.67 / 4.86 / 5.01 years</strong>, respectively.</p>
+<p><strong>Finding:</strong> Scalar MAE still leads on validation mean-age MAE at <strong>4.67 years</strong>. Population TailRL now follows at <strong>4.73</strong>, slightly ahead of sampled TailRL (<strong>4.76</strong>); their mode MAEs are nearly identical (<strong>4.86 / 4.86</strong>). Scalar MAE also remains the lowest observed full-data test MAE across the evaluated configurations: <strong>4.632 ± 0.023 years</strong>. GRPO/RLOO remain substantially worse.</p>
 </section>
 <section id="scalar-versus-categorical-supervision" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="scalar-versus-categorical-supervision">2. Scalar versus categorical supervision</h3>
@@ -446,11 +506,11 @@ Greedy decoding <span>Mode MAE</span>
 </details>
 </div>
 </div>
-<p><strong>Finding:</strong> Categorical MAE (<strong>6.41</strong>) and MSE (<strong>6.47</strong>) lead on mean-age MAE, ahead of population TailRL (<strong>6.62</strong>). For mode MAE, TailRL (<strong>7.61</strong>) narrowly precedes categorical MAE (<strong>7.65</strong>), while categorical MSE falls to <strong>9.95 years</strong>. These are single-seed comparisons.</p>
+<p><strong>Finding:</strong> Categorical MSE now leads on validation mean-age MAE at <strong>6.08 years</strong>, ahead of categorical MAE (<strong>6.41</strong>) and population TailRL (<strong>6.62</strong>). Raising its LR from <span class="math inline">\(3\times10^{-4}\)</span> to <span class="math inline">\(10^{-3}\)</span> improves its test mean-age MAE from <strong>6.371 to 6.100</strong>. TailRL still leads on validation mode MAE (<strong>7.61</strong>), followed by categorical MAE (<strong>7.65</strong>); categorical MSE improves from <strong>9.95 to 8.15</strong>. These are single-seed comparisons.</p>
 </section>
 <section id="sampled-versus-population-tailrl" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="sampled-versus-population-tailrl">4. Sampled versus population TailRL</h3>
-<p><strong>Setting:</strong> Full data, 50 epochs, three matched seeds; TailRL’s two estimators versus scalar MAE and CE. Independently selected peak LRs are <span class="math inline">\(10^{-3}\)</span> for sampled TailRL and <span class="math inline">\(10^{-4}\)</span> for population TailRL.</p>
+<p><strong>Setting:</strong> Full data, 50 epochs, three matched seeds; TailRL’s two estimators versus scalar MAE and CE. All four now use the same peak LR, <span class="math inline">\(10^{-3}\)</span>.</p>
 <div class="column-page">
 <div class="utk-plots" data-figure="05-tail-focus">
 <details data-view="summary">
@@ -465,7 +525,7 @@ Greedy decoding <span>Mode MAE</span>
 </details>
 </div>
 </div>
-<p><strong>Finding:</strong> Both TailRL variants improve on CE; sampled TailRL is slightly ahead of population TailRL in mean-age MAE (<strong>4.76 vs 4.82</strong>) and mode MAE (<strong>4.86 vs 5.01</strong>). Scalar MAE remains strongest here. Because the learning rates differ, this does not isolate the effect of sampling alone.</p>
+<p><strong>Finding:</strong> Both TailRL variants remain ahead of CE. At matched LR, population TailRL is slightly better on validation mean-age MAE (<strong>4.73 vs 4.76</strong>), while their validation mode MAEs nearly coincide (<strong>4.864 vs 4.859</strong>). The validation ranking reverses, but population TailRL’s test mean-age MAE is essentially unchanged (<strong>4.752 → 4.754</strong>); sampled TailRL reaches <strong>4.724</strong>. Their test mode MAEs also nearly coincide (<strong>4.922 vs 4.928</strong>). These small gaps do not establish an estimator winner; scalar MAE remains strongest here.</p>
 </section>
 <section id="fixed-training-label-noise" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="fixed-training-label-noise">5. Fixed training-label noise</h3>
@@ -484,7 +544,8 @@ Greedy decoding <span>Mode MAE · four noise levels</span>
 </details>
 </div>
 </div>
-<p><strong>Finding:</strong> Scalar MAE leads at SD 1/3/5, with population TailRL second. At SD 10 they nearly tie on mean-age MAE (<strong>TailRL 6.75, scalar 6.77</strong>); scalar MAE still leads on greedy MAE (<strong>6.77 vs 7.80</strong>). One optimization seed and one corruption field support a descriptive comparison.</p>
+<p><strong>Finding:</strong> Among the five displayed methods, scalar MAE now leads on validation mean-age MAE at all four noise levels. At SD 10, population TailRL no longer nearly ties scalar MAE (<strong>6.97 vs 6.77</strong>); its test mean-age MAE worsens from <strong>6.717 to 7.155</strong>. Scalar MAE also retains the lowest mode MAE among the displayed methods.</p>
+<p>The <a href="./utkface/lr-comparison.html">complete comparison</a> includes all ten evaluated noise arms. At fixed SD 10, categorical MAE’s lower LR improves test mean-age MAE from <strong>9.425 to 6.396</strong>; unchanged categorical MSE reaches <strong>6.252</strong>. Thus the earlier categorical-MAE failure is strongly rate-sensitive, and the mean-prediction results do not support a general TailRL robustness advantage. The categorical point means still hide larger mode errors: <strong>7.769 / 8.200 years</strong>, respectively. One optimization seed and one corruption field support a descriptive comparison.</p>
 </section>
 <section id="conditional-two-digit-policies" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="conditional-two-digit-policies">6. Conditional two-digit policies</h3>
@@ -504,10 +565,85 @@ Greedy decoding <span>Joint-mode MAE</span>
 </div>
 </div>
 <p><strong>Finding:</strong> Direct MAE (<strong>4.67</strong>) and MSE (<strong>4.73</strong>) lead on mean-age MAE, followed by population TailRL (<strong>4.78</strong>). TailRL leads on joint-mode MAE at <strong>4.88 years</strong>; statistical MSE follows at <strong>5.16</strong>. The best objective therefore depends on the decoding rule.</p>
+</section>
+</section>
+<section id="what-changed-with-shared-learning-rates" class="level2">
+<h2 class="anchored" data-anchor-id="what-changed-with-shared-learning-rates">What changed with shared learning rates</h2>
+<p>The full-data scalar baselines and all two-digit runs are unchanged. The clearest changes occur with limited or noisy data. The table reports <strong>clean test mean-age MAE</strong>, unlike the validation curves above; all checkpoints are selected by validation mean-age MAE.</p>
+<div class="utk-table">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 26%">
+<col style="width: 26%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Configuration</th>
+<th style="text-align: right;">Seeds</th>
+<th style="text-align: right;">Previous</th>
+<th style="text-align: right;">Shared rates</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Full-data population TailRL</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">4.752 ± 0.037</td>
+<td style="text-align: right;">4.754 ± 0.028</td>
+</tr>
+<tr class="even">
+<td>Full-data CE</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">4.933 ± 0.030</td>
+<td style="text-align: right;">4.858 ± 0.080</td>
+</tr>
+<tr class="odd">
+<td>Full-data population statistical MAE, width 5</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">4.871 ± 0.118</td>
+<td style="text-align: right;">4.796 ± 0.045</td>
+</tr>
+<tr class="even">
+<td>Full-data population statistical MSE, width 5</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">5.002 ± 0.228</td>
+<td style="text-align: right;">5.060 ± 0.232</td>
+</tr>
+<tr class="odd">
+<td>Categorical MAE, 4,096 images</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">6.523 ± 1.355</td>
+<td style="text-align: right;">5.505 ± 0.277</td>
+</tr>
+<tr class="even">
+<td>Categorical MSE, 1,024 images × 200 epochs</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">6.371</td>
+<td style="text-align: right;">6.100</td>
+</tr>
+<tr class="odd">
+<td>Categorical MAE, fixed noise SD 10</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">9.425</td>
+<td style="text-align: right;">6.396</td>
+</tr>
+<tr class="even">
+<td>Population TailRL, fixed noise SD 10</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">6.717</td>
+<td style="text-align: right;">7.155</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Sharing rates substantially reduces categorical MAE’s seed variability at 4,096 images. It also brings population and sampled statistical MAE at width 5 close in test MAE (<strong>4.796 vs 4.793</strong>). It does not improve every configuration: statistical MSE at width 5 and high-noise TailRL regress. With fresh noise at SD 10, CE, scalar MSE and scalar MAE are close on test MAE (<strong>5.348 / 5.361 / 5.389</strong>); a single seed cannot resolve this ordering reliably.</p>
+<p>Distribution metrics can move differently from point accuracy. Full-data population TailRL’s test NLL rises from <strong>3.214 to 3.832 nats</strong> and its RMSE from <strong>6.871 to 7.045 years</strong>, despite almost unchanged MAE. Population statistical MAE at width 5 improves point MAE but worsens NLL (<strong>13.023 → 14.557</strong>). Population GRPO-MAE’s NLL improves markedly (<strong>60.694 → 33.385</strong>), while remaining far worse than CE (<strong>3.053</strong>). Matching rates helps interpret estimator comparisons; it does not make their learned distributions equivalent. <a href="utkface/lr-comparison.csv">All five metrics, with paired differences</a>.</p>
+<p>These are descriptive changes, not claims of statistical significance. Three seeds on one split provide limited precision, and the single-seed noise results need replication before making robustness claims. <a href="./utkface/lr-comparison.html">All previous/current values, ranks, rates and seed-level differences</a>.</p>
 <p><a href="utkface/curves.js">Plot data and run provenance</a> · <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/src/experiments/utkface/run.py">Training implementation</a> · <a href="https://github.com/nlyu1/maxrl-statistics/blob/main/experiments/utkface/SOURCES.md">Data and method sources</a></p>
 
 
-</section>
 </section>
 
 </main> <!-- /main -->

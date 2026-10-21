@@ -437,7 +437,7 @@ def comparison_tables(*, records: list[dict], output: Path) -> None:
                 f"| {value(row, 'mae_mode', 'new')} |"
             )
         lines.append("")
-    (output / "LR_COMPARISON.md").write_text("\n".join(lines) + "\n")
+    (output / "LR_COMPARISON.md").write_text("\n".join(lines).rstrip() + "\n")
     flat = []
     for record in records:
         flat.append({

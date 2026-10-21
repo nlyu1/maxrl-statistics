@@ -1,0 +1,24 @@
+{
+  "sourceDataSha256": "935f553a28eec57827869fddaa8093f0e7513d6a9efb5c04a2c5b75f19c54c27",
+  "sourceRuns": 87,
+  "epochZeroRecordsVerified": 87,
+  "trainedEpochsOnly": true,
+  "curvesMatchCanonicalSnapshot": true,
+  "writeupMatchesViewer": true,
+  "allThirteenPdfPagesVisuallyInspected": true,
+  "initialValidationTests": "5 passed",
+  "browserWriteupPlots": 12,
+  "browserWriteupErrors": 0,
+  "browserControlsVerified": [
+    "seed 43",
+    "raw curves",
+    "fixed noise SD 10"
+  ],
+  "browserViewerPages": 7,
+  "browserViewerErrors": 0,
+  "browserConsoleErrorsSavedHtml": 0,
+  "comparisonAppendixOpens": true,
+  "modePdfSha256": "daf2fbdd015d7fb246775846d8a8b8dc738b0a21f4add36f9e3861cbe8b03c5d",
+  "zipSha256": "f1b6b0443ad09baead84b309cccb56d7fbdd7a810472e8b2c71f7dc82e1a7842",
+  "downloadedBundleFileHashesVerified": 21
+}

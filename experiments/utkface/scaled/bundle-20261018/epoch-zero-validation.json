@@ -1,19 +1,21 @@
 {
-  "result": "passed",
-  "initializations": 7,
-  "historicalRunsCovered": 510,
-  "plottedRuns": 87,
-  "cleanValidationImages": 2308,
-  "precision": "bf16",
-  "device": "cpu",
-  "gpuHours": 0,
-  "evaluationSeconds": 580.3984229757916,
-  "unitTestsPassed": 7,
-  "interactionChecksPassed": 21,
-  "pdfPages": 7,
-  "pdfRenderedWith": "pdftoppm",
-  "browserRenderingVerified": false,
-  "historicalTrainingSourceAndCheckpointResultsUnchanged": true,
-  "pdfVisualInspectionVerified": true,
-  "epochZeroPlotted": false
+  "sourceDataSha256": "935f553a28eec57827869fddaa8093f0e7513d6a9efb5c04a2c5b75f19c54c27",
+  "sourceRuns": 87,
+  "epochZeroRecordsVerified": 87,
+  "trainedEpochsOnly": true,
+  "curvesMatchCanonicalSnapshot": true,
+  "writeupMatchesViewer": true,
+  "allThirteenPdfPagesVisuallyInspected": true,
+  "initialValidationTests": "5 passed",
+  "browserWriteupPlots": 12,
+  "browserWriteupErrors": 0,
+  "browserControlsVerified": [
+    "seed 43",
+    "raw curves",
+    "fixed noise SD 10"
+  ],
+  "browserViewerPages": 7,
+  "browserViewerErrors": 0,
+  "browserConsoleErrorsSavedHtml": 0,
+  "comparisonAppendixOpens": true
 }

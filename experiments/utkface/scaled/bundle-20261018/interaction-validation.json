@@ -1,7 +1,7 @@
 {
   "pages": 7,
   "sourceRuns": 87,
-  "sourceSha256": "9723a6975898f985e9a2c5b8a52c5f41869176127a340e4a5dfbc72ed31e2038",
+  "sourceSha256": "935f553a28eec57827869fddaa8093f0e7513d6a9efb5c04a2c5b75f19c54c27",
   "result": "passed",
   "checks": [
     "seven pages and navigation",
@@ -26,6 +26,8 @@
     "offline runtime",
     "all seven figures pass the installed Plotly schema"
   ],
-  "browserRenderingVerified": false,
-  "scope": "Isolated DOM and Plotly API interaction contract; static PNGs inspected separately."
+  "browserRenderingVerified": true,
+  "scope": "Isolated DOM/Plotly interaction contract plus real browser rendering of all seven pages; all thirteen PDF pages inspected.",
+  "browserPagesVerified": 7,
+  "browserConsoleErrors": 0
 }

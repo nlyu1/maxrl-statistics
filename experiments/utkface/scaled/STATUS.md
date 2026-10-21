@@ -1,5 +1,15 @@
 # UTKFace study: completed
 
+The **October 22 shared-learning-rate revision is complete**: 59 designated reruns and 163 reused evaluations. All 59 reruns finished at **04:59:47 GMT+8**, using **9.251 GPU-hours** including earlier unsuccessful attempts. There are no selected pending or failed reruns.
+
+**Current artifacts:** [updated seven-figure viewer](bundle-20261018/viewer.html) · [updated seven-page PDF](bundle-20261018/all-seven.pdf) · [previous/current comparisons and rankings](shared-lr-20261022/LR_COMPARISON.md) · [five-metric comparison CSV](shared-lr-20261022/lr-comparison.csv) · [replacement audit](shared-lr-20261022/refresh-audit.json) · [source-cohort audit](shared-lr-20261022/cohort-audit.json).
+
+The viewer and the six-page mode-MAE PDF now use this revision; their original figure coverage is retained. The UTKFace writeup and compiled HTML include the new rates, curves and interpretation. The complete current snapshot is [report-data.json](shared-lr-20261022/report-data.json). The original dashboard and final reports below retain the previous rate regime for provenance; they should not be read as the current rate comparison.
+
+Full-data test rankings are broadly stable, with scalar MAE still first. Categorical MSE now leads the 1024-image, 200-epoch mean-age comparison. Categorical MAE becomes substantially more stable at 4096 images and improves strongly under high noise. Full-data population TailRL's test MAE is almost unchanged, its NLL worsens, and its fixed-SD-10 test MAE increases from 6.717 to 7.155. Sharing rates improves comparability, not every metric or configuration. Noise results remain single-seed observations.
+
+## Previous rate regime: historical record
+
 All selected work finished **October 15, 2026 at 12:15:54 GMT+8**. The completed records were reconfirmed on **October 17**, and the interactive dashboard was refreshed at **00:44 GMT+8**. Trained-epoch metrics and curves are unchanged from the October 16 final audit. Both supervisors exited normally. There are no active attempts or selected pending jobs.
 
 **[Open the interactive report](dashboard.html)** · [Final interpretation](FINAL.md) · [All metrics and best epochs](FINAL_TABLES.md) · [Completion audit](final-audit.json).
