@@ -114,7 +114,7 @@
 }
 
 .page-columns > .utk-policy-section {
-  grid-column: page-start / page-end;
+  grid-column: page-start / body-end-outset;
 }
 
 .utk-policy-explorer {
