@@ -199,7 +199,7 @@ The numerical notes below average each run's metrics at its **best mean-age-MAE 
 
 Across all ten evaluated noise arms, categorical MSE and MAE have test mean-age MAEs of **6.252 / 6.396 years** at SD 10, with larger mode errors of **8.200 / 7.769 years**, respectively. These results do not establish a general TailRL robustness advantage. The noise comparison uses one optimization seed and one corruption field per noise level.
 
-::: {.column-page}
+<div class="column-page">
 <div class="utk-plots utk-policy-explorer">
 <details id="utkface-policy-examples">
 <summary>Example policy distributions <span>Policy centers · images and labels · all 100 ages</span></summary>
@@ -222,7 +222,7 @@ Across all ten evaluated noise arms, categorical MSE and MAE have test mean-age 
 <iframe data-src="utkface/policy-examples.html" title="UTKFace policy distributions under fixed label noise" loading="lazy"></iframe>
 </details>
 </div>
-:::
+</div>
 
 ### 6. Conditional two-digit policies
 
