@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator
 
 from src.experiments.utkface.policy_centering_analysis import CENTERS, COLORS
 from src.experiments.utkface.policy_examples import sha256
@@ -63,27 +64,32 @@ def checkpoint_epoch(*, audit: dict, std: int) -> int:
 
 
 def residual_scatter(
-    *, root: Path, points: dict[int, pl.DataFrame], audit: dict
-) -> None:
-    fig, axes = plt.subplots(4, 3, figsize=(13, 14.5), layout="constrained")
+    *, root: Path, points: dict[int, pl.DataFrame], audit: dict, zoom: bool
+) -> dict:
+    fig, axes = plt.subplots(4, 3, figsize=(13, 17.5), layout="constrained")
+    view = "Per-SD zoom" if zoom else "Full range per SD"
     fig.suptitle(
-        "TailRL: individual policy centers versus actual label corruption", fontsize=18
+        "TailRL: individual policy centers versus actual label corruption\n"
+        f"{view} · equal x/y units",
+        fontsize=17,
     )
-    all_x = np.concatenate([
-        (data["corrupted_training_label"] - data["original_label"]).to_numpy()
-        for data in points.values()
-    ])
-    x_limit = 5 * np.ceil((np.abs(all_x).max() + 1) / 5)
-    all_y = np.concatenate([
-        data[center].to_numpy() - data["original_label"].to_numpy()
-        for data in points.values()
-        for center in CENTERS
-    ])
-    y_limit = 5 * np.ceil((np.abs(all_y).max() + 1) / 5)
-    guides = np.linspace(-x_limit, x_limit, 200)
+    axes_audit = {}
     for row, (std, data) in enumerate(points.items()):
         original = data["original_label"].to_numpy()
         delta = data["corrupted_training_label"].to_numpy() - original
+        all_errors = np.concatenate([
+            data[center].to_numpy() - original for center in CENTERS
+        ])
+        error_extent = (
+            np.quantile(np.abs(all_errors), 0.99) if zoom else np.abs(all_errors).max()
+        )
+        extent = 1.05 * max(np.abs(delta).max(), error_extent)
+        ticks = MaxNLocator(nbins=6, steps=(1, 2, 5, 10), symmetric=True).tick_values(
+            -extent, extent
+        )
+        limit = float(np.abs(ticks).max())
+        guides = np.linspace(-limit, limit, 200)
+        axes_audit[str(std)] = {"limit": limit, "ticks": ticks.tolist(), "centers": {}}
         for column, center in enumerate(CENTERS):
             ax = axes[row, column]
             error = data[center].to_numpy() - original
@@ -107,7 +113,30 @@ def residual_scatter(
             )
             if len(dots.get_offsets()) != data.height:
                 raise ValueError("Every face must contribute exactly one scatter point")
-            ax.set(xlim=(-x_limit, x_limit), ylim=(-y_limit, y_limit))
+            ax.set(
+                xlim=(-limit, limit),
+                ylim=(-limit, limit),
+                xticks=ticks,
+                yticks=ticks,
+                aspect="equal",
+            )
+            outside = int(((np.abs(delta) > limit) | (np.abs(error) > limit)).sum())
+            if not zoom and outside:
+                raise ValueError("Full-range plots must display every observation")
+            axes_audit[str(std)]["centers"][center] = {
+                "visible": data.height - outside,
+                "outside": outside,
+            }
+            if zoom:
+                ax.text(
+                    0.03,
+                    0.96,
+                    f"{outside:,} / {data.height:,} outside window",
+                    transform=ax.transAxes,
+                    va="top",
+                    fontsize=9,
+                    color="#526176",
+                )
             ax.set_title(
                 f"SD {std} · {center.capitalize()} · epoch {checkpoint_epoch(audit=audit, std=std)}",
                 fontsize=11,
@@ -139,8 +168,18 @@ def residual_scatter(
         ),
     ]
     fig.legend(handles=handles, loc="outside lower center", ncol=1, frameon=False)
-    fig.savefig(root / "raw-residual-scatter.png", dpi=150, facecolor="white")
+    fig.canvas.draw()
+    for ax in axes.flat:
+        origin, unit = ax.transData.transform(((0, 0), (1, 1)))
+        pixel_units = np.abs(unit - origin)
+        if not np.isclose(pixel_units[0], pixel_units[1], rtol=1e-9):
+            raise ValueError("The y=x reference must be a 45-degree line")
+        if not np.array_equal(ax.get_xticks(), ax.get_yticks()):
+            raise ValueError("Both axes must have identical tick spacing")
+    filename = "raw-residual-scatter.png" if zoom else "raw-residual-scatter-full.png"
+    fig.savefig(root / filename, dpi=150, facecolor="white")
     plt.close(fig)
+    return axes_audit
 
 
 def label_scatter(*, root: Path, std: int, data: pl.DataFrame, audit: dict) -> None:
@@ -208,16 +247,28 @@ def image_html(*, root: Path, filename: str, caption: str) -> str:
     )
 
 
-def report_html(*, root: Path, points: dict[int, pl.DataFrame], audit: dict) -> None:
+def report_html(
+    *, root: Path, points: dict[int, pl.DataFrame], audit: dict, axes_audit: dict
+) -> None:
     residual = image_html(
         root=root,
         filename="raw-residual-scatter.png",
-        caption="All 4,096 training faces in every panel; all noise levels use identical axes. "
+        caption="Each SD has its own range, shared across mean, median, and mode. "
+        "Both axes have identical limits, tick spacing, and physical units, so y=x is 45 degrees. "
+        "The zoom extent covers all actual corruptions and the pooled 99th percentile of "
+        "absolute prediction error across the three centers, rounded outward. "
+        "Each panel states how many of its 4,096 points lie outside the zoom window. "
         "The vertical coordinate is each policy center minus the original annotation. "
         "The horizontal coordinate is the actual rounded/clipped training corruption. "
         "Purple: original-label center; orange: corrupted-label center; gray band: between. "
         "These lines are hypothesis references. No fitted regression, binning, subsampling, "
         "jitter, or age adjustment is applied. Coincident integer-valued points overlap.",
+    )
+    residual_full = image_html(
+        root=root,
+        filename="raw-residual-scatter-full.png",
+        caption="Full range: every observation is visible. Each SD has its own limits, "
+        "shared across all three centers. Both axes use equal units and identical ticks.",
     )
     tabs = []
     css = []
@@ -250,8 +301,11 @@ img{display:block;width:100%;height:auto}figcaption{padding:12px 16px;color:#4b5
 input[type=radio]{position:absolute;opacity:0}.choices{display:flex;gap:8px;flex-wrap:wrap}
 .choices label{cursor:pointer;padding:8px 20px;background:#e0e6ec;border-radius:6px}
 .view{display:none}input:focus-visible ~ .choices{outline:2px solid #146d69}
+.residual-view{display:none}
+#range-zoom:checked ~ .residual-views #residual-zoom,#range-full:checked ~ .residual-views #residual-full{display:block}
+#range-zoom:checked ~ .choices label[for="range-zoom"],#range-full:checked ~ .choices label[for="range-full"]{background:#146d69;color:white}
 __CSS__
-@media print{body{background:white}main{padding:0}.choices{display:none}.view{display:block}figure{break-inside:avoid}}
+@media print{body{background:white}main{padding:0}.choices{display:none}.view,.residual-view{display:block}figure{break-inside:avoid}}
 </style></head><body><main>
 <h1>TailRL: the individual observations</h1>
 <p>Mean, median, and mode from the saved fixed-noise checkpoints. Each point is one
@@ -262,7 +316,13 @@ whose policy CDF reaches 0.5; the mode is the highest-probability age.</p>
 at the corrupted label would sit on the orange diagonal. A center between the labels
 would fall inside the gray band. The broad clouds show why an aggregate association
 does not describe every image.</p>
-__RESIDUAL__
+<p>Choose the zoomed view for the main clouds, or the full range to inspect every point.
+Each SD uses its own square axes; one year has the same physical size on both axes.</p>
+<input type="radio" id="range-zoom" name="range" checked>
+<input type="radio" id="range-full" name="range">
+<div class="choices"><label for="range-zoom">Zoom to clouds</label><label for="range-full">Full range</label></div>
+<div class="residual-views"><section class="residual-view" id="residual-zoom">__RESIDUAL__</section>
+<section class="residual-view" id="residual-full">__RESIDUAL_FULL__</section></div>
 <h2>Original and corrupted labels versus the policy centers</h2>
 <p>Select a noise level to inspect the raw age coordinates. The same prediction is
 plotted against the original label above and the corrupted label below.</p>
@@ -278,6 +338,7 @@ No held-out synthetic noise probes are included in these plots.</p>
     for key, value in (
         ("__CSS__", "".join(css)),
         ("__RESIDUAL__", residual),
+        ("__RESIDUAL_FULL__", residual_full),
         ("__TABS__", "".join(tabs)),
         ("__CHOICES__", choices),
         ("__VIEWS__", "".join(views)),
@@ -297,7 +358,10 @@ No held-out synthetic noise probes are included in these plots.</p>
         "fitted_regressions": False,
         "jitter": False,
         "subsampling": False,
-        "figures": ["raw-residual-scatter.png"]
+        "residual_axes": axes_audit,
+        "equal_physical_x_y_units_verified": True,
+        "identical_x_y_ticks_verified": True,
+        "figures": ["raw-residual-scatter.png", "raw-residual-scatter-full.png"]
         + [f"raw-label-scatter-s{std}.png" for std in NOISE_LEVELS],
     }
     (root / "scatter-validation.json").write_text(json.dumps(validation, indent=2))
@@ -314,10 +378,15 @@ def main() -> None:
         "axes.spines.top": False,
         "axes.spines.right": False,
     })
-    residual_scatter(root=args.root, points=points, audit=audit)
+    axes_audit = {
+        "zoom": residual_scatter(root=args.root, points=points, audit=audit, zoom=True),
+        "full": residual_scatter(
+            root=args.root, points=points, audit=audit, zoom=False
+        ),
+    }
     for std, data in points.items():
         label_scatter(root=args.root, std=std, data=data, audit=audit)
-    report_html(root=args.root, points=points, audit=audit)
+    report_html(root=args.root, points=points, audit=audit, axes_audit=axes_audit)
 
 
 if __name__ == "__main__":
