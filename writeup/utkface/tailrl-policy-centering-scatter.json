@@ -64,7 +64,8 @@
               "slope": 0.5981588417601931,
               "intercept": -0.2470782556360642,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.1844515107764063
           },
           "median": {
             "visible": 4093,
@@ -73,7 +74,8 @@
               "slope": 0.6044598390085708,
               "intercept": -0.3290247631095089,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.18318028642226508
           },
           "mode": {
             "visible": 4091,
@@ -82,7 +84,8 @@
               "slope": 0.6491089008570766,
               "intercept": -0.4508161547008918,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.1801707925521547
           }
         }
       }
@@ -112,7 +115,8 @@
               "slope": 0.6144013199930963,
               "intercept": 0.44119078830794495,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.4098152906110512
           },
           "median": {
             "visible": 4077,
@@ -121,7 +125,8 @@
               "slope": 0.6172670482844714,
               "intercept": 0.41877205146405133,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.40678392535514585
           },
           "mode": {
             "visible": 4052,
@@ -130,7 +135,8 @@
               "slope": 0.610084287570572,
               "intercept": 0.35058550380514997,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.3725108484183326
           }
         }
       }
@@ -158,7 +164,8 @@
               "slope": 0.5265669372189025,
               "intercept": 0.10442183694146387,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.4626298625647842
           },
           "median": {
             "visible": 4084,
@@ -167,7 +174,8 @@
               "slope": 0.5299560950603892,
               "intercept": -0.020183033591715957,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.455307134816486
           },
           "mode": {
             "visible": 4078,
@@ -176,7 +184,8 @@
               "slope": 0.5390626347373295,
               "intercept": -0.6179085004806537,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.43226306273677895
           }
         }
       }
@@ -204,7 +213,8 @@
               "slope": 0.2519091920149304,
               "intercept": 1.474020654862819,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.29661072758171964
           },
           "median": {
             "visible": 4093,
@@ -213,7 +223,8 @@
               "slope": 0.25471895288662316,
               "intercept": 1.4216529826538222,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.2971083152519348
           },
           "mode": {
             "visible": 4088,
@@ -222,11 +233,17 @@
               "slope": 0.24148947585651245,
               "intercept": 0.7133954759723888,
               "point_count": 4096
-            }
+            },
+            "pearson_r": 0.24644295808803943
           }
         }
       }
     }
   ],
-  "limitation": "One optimization seed and one corruption field; original UTKFace annotations are reference labels, not independently verified true ages."
+  "limitation": "One optimization seed and one corruption field; original UTKFace annotations are reference labels, not independently verified true ages.",
+  "pearson_validation": {
+    "method": "Pearson product-moment correlation; all observations; no age adjustment",
+    "implementation": "scipy.stats.pearsonr, cross-checked with numpy.corrcoef",
+    "maximum_absolute_difference": 1.6653345369377348E-16
+  }
 }

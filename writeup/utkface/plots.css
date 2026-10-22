@@ -140,6 +140,21 @@
   line-height: 1.55;
 }
 
+.utk-policy-correlations {
+  max-width: calc(100% - 2rem);
+  margin: 0 1rem 1.5rem;
+  font-size: 0.85rem;
+}
+
+.utk-policy-correlations th,
+.utk-policy-correlations td {
+  text-align: center;
+}
+
+.utk-policy-correlations caption {
+  caption-side: top;
+}
+
 .utk-policy-explorer iframe {
   display: block;
   width: 100%;
