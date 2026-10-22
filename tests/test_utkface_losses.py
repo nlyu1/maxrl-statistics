@@ -74,6 +74,24 @@ def test_population_rloo_and_grpo_score_function(reward_kind: str) -> None:
     )
 
 
+@pytest.mark.parametrize("reward_kind", ["mae", "mse"])
+def test_population_grpo_concentrated_fp32_gradient(reward_kind: str) -> None:
+    logits = torch.zeros(4, 100, dtype=torch.float32)
+    logits[:, 40] = 16
+    logits.requires_grad_()
+    targets = torch.tensor([5, 39, 40, 90])
+    probs = logits.detach().double().softmax(-1)
+    errors = (torch.arange(100) - targets[:, None]).double() / 99
+    rewards = 1 - (errors.abs() if reward_kind == "mae" else errors.square())
+    centered = rewards - (probs * rewards).sum(-1, keepdim=True)
+    std = (probs * centered.square()).sum(-1, keepdim=True).sqrt()
+    config = loss_config(method=f"grpo_{reward_kind}_population")
+    assert (std > config.std_floor).all()
+    expected = -probs * centered / std / len(targets)
+    got = gradient(logits=logits, targets=targets, method=config.method)
+    torch.testing.assert_close(got.double(), expected, rtol=2e-5, atol=1e-9)
+
+
 def test_mse_is_squared_mean_error_not_expected_squared_error() -> None:
     logits = torch.zeros(1, 100, dtype=torch.float64, requires_grad=True)
     target = torch.tensor([50])

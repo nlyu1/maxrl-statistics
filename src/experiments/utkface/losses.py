@@ -74,15 +74,19 @@ def policy_loss(
         (errors / MAX_AGE).square() if "_mse" in method else errors.abs() / MAX_AGE
     )
     if method.endswith("_population"):
-        mean_reward = (probs * reward).sum(dim=-1)
         if method.startswith("rloo_"):
-            return -mean_reward.mean()
+            return -(probs * reward).sum(dim=-1).mean()
         if method.startswith("grpo_"):
-            variance = (probs * (reward - mean_reward[:, None]).square()).sum(dim=-1)
+            mode_reward = reward.gather(-1, probs.argmax(dim=-1, keepdim=True))
+            centered_reward = reward - mode_reward
+            mean_centered_reward = (probs * centered_reward).sum(dim=-1)
+            variance = (
+                probs * (centered_reward - mean_centered_reward[:, None]).square()
+            ).sum(dim=-1)
             std = variance.detach().sqrt()
             return -torch.where(
                 std >= config.std_floor,
-                mean_reward / std.clamp_min(config.std_floor),
+                mean_centered_reward / std.clamp_min(config.std_floor),
                 0.0,
             ).mean()
         raise ValueError(f"Unsupported population method: {method}")
