@@ -78,7 +78,7 @@ def sample_indices(
         for decade in generator.permutation(10):
             if buckets[decade] and len(selected) < count:
                 selected.append(buckets[decade].pop())
-    return sorted(selected, key=lambda index: (payload["records"][index]["age"], index))
+    return selected
 
 
 def examples(
@@ -109,15 +109,19 @@ def examples(
     return records, torch.stack(tensors)
 
 
-def corruption_fields(*, payload: dict, indices: list[int], seed: int) -> dict:
+def corruption_fields(
+    *, payload: dict, indices: list[int], train: set[int], seed: int
+) -> dict:
     ages = [record["age"] for record in payload["records"]]
     fields = {}
     for mode, std in CONDITIONS:
         config = NoiseConfig(mode=mode, std_years=std, seed=seed)
-        fields[f"{mode}:{std}"] = [
-            noisy_labels(ages=ages, config=config, epoch=epoch)[indices].tolist()
-            for epoch in range(1, 51 if mode == "fresh" else 2)
-        ]
+        fields[f"{mode}:{std}"] = []
+        for epoch in range(1, 51 if mode == "fresh" else 2):
+            labels = noisy_labels(ages=ages, config=config, epoch=epoch)
+            fields[f"{mode}:{std}"].append([
+                int(labels[index]) if index in train else None for index in indices
+            ])
     return fields
 
 
@@ -228,7 +232,10 @@ def build(
         "snapshot_sha256": sha256(path=snapshot_path),
         "examples": records,
         "corruptions": corruption_fields(
-            payload=payload, indices=selected, seed=first_config.noise.seed
+            payload=payload,
+            indices=selected,
+            train=set(train),
+            seed=first_config.noise.seed,
         ),
         "runs": [],
     }
