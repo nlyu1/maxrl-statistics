@@ -244,7 +244,7 @@ def report_html(*, root: Path, points: dict[int, pl.DataFrame], audit: dict) -> 
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TailRL raw per-image scatter plots</title><style>
 body{margin:0;background:#f4f6f8;color:#1d2938;font:16px/1.6 system-ui,sans-serif}
-main{max-width:1300px;margin:auto;padding:24px}h1{font-size:30px;line-height:1.25}
+main{max-width:1300px;margin:auto;padding:24px}h1{font-size:30px;line-height:1.25}code{overflow-wrap:anywhere}
 h2{font-size:22px;margin-top:30px}p{max-width:1100px}figure{background:white;margin:20px 0}
 img{display:block;width:100%;height:auto}figcaption{padding:12px 16px;color:#4b5c6f;font-size:14px}
 input[type=radio]{position:absolute;opacity:0}.choices{display:flex;gap:8px;flex-wrap:wrap}
