@@ -25,6 +25,23 @@ uv run --no-sync python -m src.experiments.utkface.vlm_queue \
   --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-followup" --detach
 ```
 
+## Thinking-on sampling revision, 2026-10-22
+
+The three thinking-on evaluations are rerun with Qwen's official general-task sampling parameters: temperature 1.0, top-p 0.95, top-k 20, min-p 0, presence penalty 1.5 and repetition penalty 1.0. All six parameters are explicit in requests and retained in new response/result metadata. The six completed Base/thinking-off evaluations remain in the prior follow-up root. Earlier thinking-on responses and pilots also remain there; they are not reused or mixed into the revised results.
+
+The revised root retains the identical pinned checkpoints, subset, prompt, eight samples, seeds, 4096/8192-token pilots, concurrency pilots and serving configuration. Stop the prior follow-up supervisor gracefully before pulling changed evaluation sources, and record response hashes before and after preparing the revision. Launch only the revised three-model queue. Its dispatch checks continue to reject allocated GPUs even when their instantaneous utilization is zero.
+
+```bash
+uv run --no-sync python -m src.experiments.utkface.vlm_eval thinking-rerun \
+  --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-thinking-recommended" \
+  --reference "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-followup" \
+  --cache-volume utkface-vlm-qwen35-persistent
+uv run --no-sync python -m src.experiments.utkface.vlm_queue \
+  --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-thinking-recommended" --detach
+```
+
+Reference: [Qwen3.5 recommended sampling](https://huggingface.co/Qwen/Qwen3.5-4B#best-practices). This revision changes sampling only; it does not add a separate reasoning-token budget or enlarge the authorized output caps.
+
 ## Original 20261020 protocol
 
 Prompt: `What is the person's age in years? Put your final answer in \boxed{}.`

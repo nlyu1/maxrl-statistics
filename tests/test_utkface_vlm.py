@@ -111,7 +111,12 @@ def test_missing_completion_is_an_error():
         summarize_records(records=[record(index=0, target=30, values=[30])], samples=2)
 
 
-def test_request_sends_pixels_without_age_filename_or_label(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "temperature,top_p,presence_penalty", [(0.7, 0.8, 0.0), (1.0, 0.95, 1.5)]
+)
+def test_request_sends_pixels_without_age_filename_or_label(
+    tmp_path, monkeypatch, temperature, top_p, presence_penalty
+):
     source = tmp_path / "37_0_0_123.jpg"
     source.write_bytes(b"image-pixels")
     captured = []
@@ -124,10 +129,10 @@ def test_request_sends_pixels_without_age_filename_or_label(tmp_path, monkeypatc
     plan = SimpleNamespace(
         manifest=tmp_path / "manifest.json",
         prompt="Estimate age in years.",
-        temperature=0.7,
-        top_p=0.8,
+        temperature=temperature,
+        top_p=top_p,
         top_k=20,
-        presence_penalty=0.0,
+        presence_penalty=presence_penalty,
         sampling_seed=20261020,
     )
     spec = SimpleNamespace(model_identifier="model", mode="thinking_on")
@@ -142,6 +147,13 @@ def test_request_sends_pixels_without_age_filename_or_label(tmp_path, monkeypatc
     )
     request = captured[0]
     assert request["n"] == 8
+    assert request["temperature"] == temperature
+    assert request["top_p"] == top_p
+    assert request["top_k"] == 20
+    assert request["min_p"] == 0.0
+    assert request["presence_penalty"] == presence_penalty
+    assert request["repetition_penalty"] == 1.0
+    assert result["sampling"]["presence_penalty"] == presence_penalty
     assert request["chat_template_kwargs"] == {"enable_thinking": True}
     assert request["messages"][0]["content"][0]["image_url"]["url"].startswith(
         "data:image/jpeg;base64,"

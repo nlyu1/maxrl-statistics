@@ -302,6 +302,46 @@ def prepare_followup(*, root: Path, reference: Path, cache_volume: str) -> None:
     )
 
 
+def sampling_parameters(*, plan: EvaluationPlan) -> dict:
+    return {
+        "temperature": plan.temperature,
+        "top_p": plan.top_p,
+        "top_k": plan.top_k,
+        "min_p": 0.0,
+        "presence_penalty": plan.presence_penalty,
+        "repetition_penalty": 1.0,
+    }
+
+
+def prepare_thinking_rerun(*, root: Path, reference: Path, cache_volume: str) -> None:
+    prepare_followup(root=root, reference=reference, cache_volume=cache_volume)
+    plan = EvaluationPlan.model_validate_json((root / "plan.json").read_text())
+    evaluations = tuple(spec for spec in plan.evaluations if spec.mode == "thinking_on")
+    identifiers = {spec.model_identifier for spec in evaluations}
+    if len(evaluations) != 3 or len(identifiers) != 3:
+        raise ValueError("Expected three distinct thinking-on model sizes")
+    plan = EvaluationPlan.model_validate({
+        **plan.model_dump(),
+        "evaluations": evaluations,
+        "models": tuple(model for model in plan.models if model.identifier in identifiers),
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 20,
+        "presence_penalty": 1.5,
+    })
+    write_json(path=root / "plan.json", payload=plan.model_dump(mode="json"))
+    provenance_path = root / "provenance.json"
+    provenance = json.loads(provenance_path.read_text())
+    provenance.update({
+        "sampling": sampling_parameters(plan=plan),
+        "sampling_source": "https://huggingface.co/Qwen/Qwen3.5-4B#best-practices",
+        "unchanged": "Pinned checkpoints, templates, 1024 evaluation images, 64 pilot images, eight samples, seeds, prompt, token-cap and concurrency pilots, serving configuration",
+        "superseded_evaluations": [spec.identifier for spec in evaluations],
+        "retention": "Reference responses stay in the reference root; no responses or tuning trials are copied into this rerun",
+    })
+    write_json(path=provenance_path, payload=provenance)
+
+
 def parse_age(*, content: str) -> float | None:
     final = content.rsplit("</think>", 1)[-1]
     boxes = re.findall(r"\\boxed\s*\{([^{}]*)\}", final)
@@ -453,10 +493,7 @@ def query_image(
             ],
             "n": samples,
             "max_tokens": max_tokens,
-            "temperature": plan.temperature,
-            "top_p": plan.top_p,
-            "top_k": plan.top_k,
-            "presence_penalty": plan.presence_penalty,
+            **sampling_parameters(plan=plan),
             "seed": plan.sampling_seed + index,
             "chat_template_kwargs": {"enable_thinking": spec.mode == "thinking_on"},
         },
@@ -467,6 +504,7 @@ def query_image(
         "index": index,
         "target": record["age"],
         "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
+        "sampling": sampling_parameters(plan=plan),
         "request_seconds": time.monotonic() - started,
         "response": response,
     }
@@ -891,6 +929,7 @@ def worker(
                 "evaluation": spec.model_dump(),
                 "model": model.model_dump(),
                 "fingerprint": plan.fingerprint,
+                "sampling": sampling_parameters(plan=plan),
                 "tuning": tuning,
                 "metrics": summarize_records(records=records, samples=plan.samples),
                 "successful_attempt_seconds": seconds,
@@ -973,6 +1012,8 @@ def report(*, root: Path) -> dict:
         "",
         f"Prompt: `{plan.prompt}`",
         "",
+        "Sampling: `" + json.dumps(sampling_parameters(plan=plan), sort_keys=True) + "`",
+        "",
         "| Configuration | Valid % | Pooled MAE | Pooled RMSE | Pooled Spearman | Mean-8 MAE | Median-8 MAE | Complete-8 images | Truncated |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
@@ -997,7 +1038,7 @@ def report(*, root: Path) -> dict:
         "",
         "Invalid answers remain in the raw responses and coverage counts; they are not silently imputed. JSON includes explicitly labeled worst-case invalid penalties. Truncation counts include length-limited completions even when a boxed number is present. Main prompts and sampling parameters are fixed; token caps and client concurrency are selected on disjoint pilot images using completion and throughput, without selecting on age accuracy.",
         "",
-        "Base models use their own weights/tokenizers/processors with the paired post-trained model's official chat template and thinking disabled. Thinking-on/off use identical post-trained weights and sampling parameters. Images are sent as bytes; filenames and labels are absent from model requests.",
+        "Base models use their own weights/tokenizers/processors with the paired post-trained model's official chat template and thinking disabled. Post-trained modes use pinned post-trained weights. Sampling parameters are recorded in the plan and new results. Images are sent as bytes; filenames and labels are absent from model requests.",
     ])
     (root / "REPORT.md").write_text("\n".join(lines) + "\n")
     return summary
@@ -1005,7 +1046,9 @@ def report(*, root: Path) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("prepare", "followup", "worker", "report"))
+    parser.add_argument(
+        "action", choices=("prepare", "followup", "thinking-rerun", "worker", "report")
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--image")
@@ -1024,6 +1067,12 @@ def main() -> None:
         if args.reference is None or args.cache_volume is None:
             parser.error("followup requires --reference and --cache-volume")
         prepare_followup(
+            root=args.root, reference=args.reference, cache_volume=args.cache_volume
+        )
+    elif args.action == "thinking-rerun":
+        if args.reference is None or args.cache_volume is None:
+            parser.error("thinking-rerun requires --reference and --cache-volume")
+        prepare_thinking_rerun(
             root=args.root, reference=args.reference, cache_volume=args.cache_volume
         )
     elif args.action == "worker":

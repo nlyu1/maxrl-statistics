@@ -410,7 +410,7 @@ def run_queue(*, root: Path) -> None:
             report(root=root)
             if state["status"] == "completed":
                 print(
-                    "All nine configurations completed; REPORT.md and summary.csv are ready",
+                    f"All {len(plan.evaluations)} configurations completed; REPORT.md and summary.csv are ready",
                     flush=True,
                 )
                 break
