@@ -143,6 +143,7 @@ def test_shared_policy_requires_completed_observation(
         json.dumps({
             "accepted": accepted,
             "elapsed_seconds": elapsed,
+        "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
             "gpus": [
                 {
                     "index": i,
@@ -168,6 +169,16 @@ def test_shared_policy_requires_completed_observation(
     loaded = load_shared_policy(root=tmp_path)
     assert loaded == policy
     assert shared_runtime(policy=loaded, identifier="4b_posttrained") is None
+    another_boot = json.loads(observed.read_text())
+    another_boot["boot_id"] = "different-boot"
+    observed.write_text(json.dumps(another_boot))
+    wrong_boot = policy.model_copy(update={
+        "observation_sha256": hashlib.sha256(observed.read_bytes()).hexdigest()
+    })
+    (tmp_path / "shared-serving.json").write_text(wrong_boot.model_dump_json())
+    with pytest.raises(ValueError, match="another server boot"):
+        load_shared_policy(root=tmp_path)
+    (tmp_path / "shared-serving.json").write_text(policy.model_dump_json())
     observed.write_text("changed")
     with pytest.raises(ValueError, match="observation changed"):
         load_shared_policy(root=tmp_path)

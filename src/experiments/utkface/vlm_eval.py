@@ -153,6 +153,8 @@ def load_shared_policy(*, root: Path) -> SharedServingPolicy | None:
     observed = json.loads(content)
     if not observed["accepted"] or observed["elapsed_seconds"] < 600:
         raise ValueError("Shared GPUs require a completed ten-minute idle observation")
+    if observed["boot_id"] != Path("/proc/sys/kernel/random/boot_id").read_text().strip():
+        raise ValueError("Shared-GPU idle observation belongs to another server boot")
     if {row["index"] for row in observed["gpus"]} != {1, 2, 3, 5, 9}:
         raise ValueError("Idle observation must cover all five authorized candidates")
     if any(row["max_utilization"] > 5 for row in observed["gpus"]):
