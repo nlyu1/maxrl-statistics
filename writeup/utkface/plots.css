@@ -113,6 +113,10 @@
   color: var(--bs-danger);
 }
 
+.page-columns > .utk-policy-section {
+  grid-column: page-start / page-end;
+}
+
 .utk-policy-explorer {
   grid-template-columns: minmax(0, 1fr);
 }
