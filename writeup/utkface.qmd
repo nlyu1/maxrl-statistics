@@ -202,7 +202,12 @@ Across all ten evaluated noise arms, categorical MSE and MAE have test mean-age 
 ::: {.column-page}
 <div class="utk-plots utk-policy-explorer">
 <details id="utkface-policy-examples">
-<summary>Example policy distributions <span>Images · original and corrupted labels · all 100 ages</span></summary>
+<summary>Example policy distributions <span>Policy centers · images and labels · all 100 ages</span></summary>
+<p class="utk-policy-note"><strong>Where are the TailRL policies centered?</strong> Each point below is one of the 4,096 training faces. Columns show the policy mean, median, and mode; rows show fixed noise SDs 1, 3, 5, and 10. The fitted trends show partial noise-following, with substantial variation across individual faces.</p>
+<figure class="utk-policy-centering" id="fig-utkface-policy-centering">
+<a href="utkface/tailrl-policy-centering-scatter.png" target="_blank" rel="noopener"><img src="utkface/tailrl-policy-centering-scatter.png" width="1950" height="2625" loading="lazy" alt="Twelve TailRL scatter panels comparing actual label corruption with prediction error for the policy mean, median, and mode at noise SDs 1, 3, 5, and 10. Red fitted lines have slopes between zero and one, while many individual centers lie outside the interval between the original and corrupted labels."></a>
+<figcaption>The horizontal axis is corrupted minus original label; the vertical axis is policy center minus original label, in years. Purple marks an original-label center, orange a corrupted-label center, and gray the interval between them. Red lines are ordinary least-squares fits with a free intercept; slopes use all 4,096 faces, including points outside the annotated zoom windows, without age adjustment. Each SD has its own range with equal x/y units. Checkpoints are selected by clean validation mean-age MAE (epochs 23, 22, 19, and 12). This is one optimization seed and one corruption field; original labels are UTKFace annotations. Click the image for full resolution. <a href="utkface/tailrl-policy-centering-scatter.json">Figure provenance and fit coefficients</a>.</figcaption>
+</figure>
 <p class="utk-policy-note">Compare population TailRL, CE, and population GRPO on the same 32 training and 16 held-out faces. Browse a batch or one face across fixed noise SDs 0, 1, 3, 5, and 10; SD 0 is the clean baseline. Checkpoints use clean validation mean-age MAE selection. <a href="utkface/policy-examples.html" target="_blank" rel="noopener">Open the full-size explorer</a>.</p>
 <iframe data-src="utkface/policy-examples.html" title="UTKFace policy distributions under fixed label noise" loading="lazy"></iframe>
 </details>
