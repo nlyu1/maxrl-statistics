@@ -248,7 +248,15 @@
     render();
   }
 
-  for (const pair of document.querySelectorAll(".utk-plots")) {
+  const examples = document.getElementById("utkface-policy-examples");
+  if (examples) {
+    examples.addEventListener("toggle", () => {
+      const frame = examples.querySelector("iframe");
+      if (examples.open && !frame.hasAttribute("src")) frame.src = frame.dataset.src;
+    });
+  }
+
+  for (const pair of document.querySelectorAll(".utk-plots[data-figure]")) {
     const spec = bundle?.figures.find((figure) => figure.id === pair.dataset.figure);
     for (const block of pair.querySelectorAll("details")) {
       block.addEventListener("toggle", () => {
