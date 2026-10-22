@@ -14,8 +14,12 @@ from src.experiments.utkface.scheduler import gpu_inventory, gpu_is_free, ready_
 from src.experiments.utkface.vlm_eval import (
     EvaluationPlan,
     GPUProcessException,
+    SharedGPURuntime,
+    SharedServingPolicy,
     load_plan,
+    load_shared_policy,
     report,
+    shared_runtime,
     stop_container,
 )
 
@@ -59,11 +63,20 @@ def process_matches_exception(*, exception: GPUProcessException) -> bool:
     )
 
 
-def gpu_inventory_for_plan(*, plan: EvaluationPlan) -> list[dict]:
+def gpu_inventory_for_plan(
+    *, plan: EvaluationPlan, shared_policy: SharedServingPolicy | None = None
+) -> list[dict]:
     inventory = gpu_inventory()
+    exceptions = list(plan.ignored_gpu_processes)
+    if shared_policy is not None:
+        exceptions.extend(
+            process
+            for grant in shared_policy.grants
+            for process in grant.resident_processes
+        )
     verified = {
         (exception.gpu_uuid, exception.pid)
-        for exception in plan.ignored_gpu_processes
+        for exception in exceptions
         if process_matches_exception(exception=exception)
     }
     return [
@@ -76,6 +89,61 @@ def gpu_inventory_for_plan(*, plan: EvaluationPlan) -> list[dict]:
         }
         for gpu in inventory
     ]
+
+
+def shared_gpu_is_ready(
+    *, gpu: dict, grant: SharedGPURuntime, policy: SharedServingPolicy
+) -> bool:
+    required = grant.total_memory_mib * grant.gpu_memory_utilization
+    return (
+        gpu["uuid"] == grant.gpu_uuid
+        and not gpu["pids"]
+        and gpu["utilization"] <= 5
+        and gpu["memory_mib"] <= grant.baseline_memory_mib + 256
+        and grant.total_memory_mib - gpu["memory_mib"]
+        >= required + policy.minimum_headroom_mib
+    )
+
+
+def resident_cpu_seconds(*, grant: SharedGPURuntime) -> dict[str, float]:
+    result = {}
+    for process in grant.resident_processes:
+        if not process_matches_exception(exception=process):
+            continue
+        try:
+            fields = (
+                Path(f"/proc/{process.pid}/stat").read_text().rsplit(")", 1)[1].split()
+            )
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        result[str(process.pid)] = (int(fields[11]) + int(fields[12])) / os.sysconf(
+            "SC_CLK_TCK"
+        )
+    return result
+
+
+def shared_stop_reason(
+    *,
+    gpu: dict,
+    grant: SharedGPURuntime,
+    policy: SharedServingPolicy,
+    attempt: dict,
+    now: float,
+) -> str:
+    if grant.total_memory_mib - gpu["memory_mib"] < policy.minimum_headroom_mib:
+        return "shared_gpu_memory_headroom"
+    current = resident_cpu_seconds(grant=grant)
+    previous = attempt.get("resident_cpu_seconds", {})
+    elapsed = now - attempt.get("resident_cpu_sampled_at", now)
+    attempt["resident_cpu_seconds"] = current
+    attempt["resident_cpu_sampled_at"] = now
+    if elapsed > 0 and any(
+        (value - previous[pid]) / elapsed > policy.maximum_resident_cpu_fraction
+        for pid, value in current.items()
+        if pid in previous
+    ):
+        return "resident_simulation_cpu_activity"
+    return ""
 
 
 def owned_worker(*, pid: int, root: Path) -> bool:
@@ -174,6 +242,7 @@ def start_downloads(*, root: Path, plan) -> str:
 
 def run_queue(*, root: Path) -> None:
     plan = load_plan(root=root)
+    sharing = load_shared_policy(root=root)
     with (root / "queue.lock").open("a") as supervisor:
         fcntl.flock(supervisor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         (root / "supervisor.pid").write_text(str(os.getpid()) + "\n")
@@ -202,6 +271,7 @@ def run_queue(*, root: Path) -> None:
         download_container = start_downloads(root=root, plan=plan)
         state["download_container"] = download_container
         first_idle, reusable, children, downloads = {}, set(), {}, {}
+        shared_first_idle = {}
         plan.dispatch_lock.parent.mkdir(parents=True, exist_ok=True)
         shutdown = False
 
@@ -213,7 +283,7 @@ def run_queue(*, root: Path) -> None:
         signal.signal(signal.SIGINT, interrupt)
         while True:
             now = time.time()
-            inventory = gpu_inventory_for_plan(plan=plan)
+            inventory = gpu_inventory_for_plan(plan=plan, shared_policy=sharing)
             by_uuid = {gpu["uuid"]: gpu for gpu in inventory}
             for identifier, record in state["jobs"].items():
                 if record["status"] != "running":
@@ -224,11 +294,22 @@ def run_queue(*, root: Path) -> None:
                 if alive:
                     gpu = by_uuid[attempt["gpu_uuid"]]
                     foreign = set(gpu["pids"]) - container_pids(container=container)
-                    if foreign and not attempt.get("preempted"):
+                    grant = shared_runtime(policy=sharing, identifier=identifier)
+                    reason = ""
+                    if grant is not None:
+                        reason = shared_stop_reason(
+                            gpu=gpu,
+                            grant=grant,
+                            policy=sharing,
+                            attempt=attempt,
+                            now=now,
+                        )
+                    if (foreign or reason) and not attempt.get("preempted"):
                         attempt.update({
                             "preempted": True,
                             "foreign_pids": sorted(foreign),
                             "preempted_at": now,
+                            "preemption_reason": reason or "foreign_gpu_process",
                         })
                         entry = state["gpu_interruptions"].setdefault(
                             attempt["gpu_uuid"], {"count": 0, "cooldown_until": 0}
@@ -321,16 +402,53 @@ def run_queue(*, root: Path) -> None:
                         if record["status"] == "pending" and identifier in downloads
                     ]
                     slots = max(0, plan.max_parallel_models - len(active))
-                    for identifier, gpu in zip(
-                        pending[:slots], free[:slots], strict=False
-                    ):
+                    for identifier in pending:
+                        if slots == 0:
+                            break
+                        grant = shared_runtime(policy=sharing, identifier=identifier)
+                        if grant is not None:
+                            gpu = by_uuid[grant.gpu_uuid]
+                            cooldown = (
+                                state["gpu_interruptions"]
+                                .get(gpu["uuid"], {})
+                                .get("cooldown_until", 0)
+                            )
+                            if (
+                                gpu["uuid"] in leased
+                                or now < cooldown
+                                or not shared_gpu_is_ready(
+                                    gpu=gpu, grant=grant, policy=sharing
+                                )
+                            ):
+                                shared_first_idle.pop(gpu["uuid"], None)
+                                continue
+                            shared_first_idle.setdefault(gpu["uuid"], now)
+                            if now - shared_first_idle[gpu["uuid"]] < 10:
+                                continue
+                        else:
+                            gpu = next(
+                                (item for item in free if item["uuid"] not in leased),
+                                None,
+                            )
+                            if gpu is None:
+                                continue
                         refreshed = next(
                             item
-                            for item in gpu_inventory_for_plan(plan=plan)
+                            for item in gpu_inventory_for_plan(
+                                plan=plan, shared_policy=sharing
+                            )
                             if item["uuid"] == gpu["uuid"]
                         )
-                        if not gpu_is_free(gpu=refreshed):
+                        ready = (
+                            shared_gpu_is_ready(
+                                gpu=refreshed, grant=grant, policy=sharing
+                            )
+                            if grant is not None
+                            else gpu_is_free(gpu=refreshed)
+                        )
+                        if not ready:
                             first_idle.pop(gpu["uuid"], None)
+                            shared_first_idle.pop(gpu["uuid"], None)
                             continue
                         record = state["jobs"][identifier]
                         attempt_index = len(record["attempts"]) + 1
@@ -379,13 +497,28 @@ def run_queue(*, root: Path) -> None:
                             "started_at": time.time(),
                             "command": command,
                             "idle_observed_seconds": now
-                            - first_idle.get(gpu["uuid"], now),
+                            - (
+                                shared_first_idle if grant is not None else first_idle
+                            ).get(gpu["uuid"], now),
+                            "shared_runtime": (
+                                grant.model_dump(mode="json")
+                                if grant is not None
+                                else None
+                            ),
                             "log": str(log_path),
                         }
+                        if grant is not None:
+                            attempt["resident_cpu_seconds"] = resident_cpu_seconds(
+                                grant=grant
+                            )
+                            attempt["resident_cpu_sampled_at"] = time.time()
                         record["attempts"].append(attempt)
                         record["status"] = "running"
                         children[identifier] = child
+                        leased.add(gpu["uuid"])
+                        slots -= 1
                         first_idle.pop(gpu["uuid"], None)
+                        shared_first_idle.pop(gpu["uuid"], None)
                         reusable.discard(gpu["uuid"])
                         print(
                             f"Launched {identifier} on GPU {gpu['index']} ({gpu['uuid']})",
