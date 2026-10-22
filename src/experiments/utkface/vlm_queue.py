@@ -156,13 +156,26 @@ def owned_worker(*, pid: int, root: Path) -> bool:
     return "src.experiments.utkface.vlm_eval worker" in command and str(root) in command
 
 
-def terminate_worker(*, pid: int, root: Path) -> None:
+def terminate_worker(*, pid: int, root: Path, force: bool) -> None:
     if owned_worker(pid=pid, root=root):
         if os.getpgid(pid) != pid:
             raise RuntimeError(
                 "Refusing to signal a worker outside its dedicated process group"
             )
-        os.killpg(pid, signal.SIGTERM)
+        os.killpg(pid, signal.SIGKILL if force else signal.SIGTERM)
+
+
+def request_worker_stop(*, attempt: dict, root: Path, now: float) -> None:
+    if "termination_requested_at" not in attempt:
+        attempt["termination_requested_at"] = now
+        terminate_worker(pid=attempt["pid"], root=root, force=False)
+    elif (
+        now - attempt["termination_requested_at"] >= 30
+        and "forced_termination_at" not in attempt
+    ):
+        stop_container(root=root, container=attempt["container"])
+        terminate_worker(pid=attempt["pid"], root=root, force=True)
+        attempt["forced_termination_at"] = now
 
 
 def container_pids(*, container: str) -> set[int]:
@@ -316,9 +329,8 @@ def run_queue(*, root: Path) -> None:
                         )
                         entry["count"] += 1
                         entry["cooldown_until"] = now + min(3600, 900 * entry["count"])
-                        terminate_worker(pid=pid, root=root)
-                    elif shutdown:
-                        terminate_worker(pid=pid, root=root)
+                    if attempt.get("preempted") or shutdown:
+                        request_worker_stop(attempt=attempt, root=root, now=now)
                     continue
                 child = children.pop(identifier, None)
                 if child is not None:
@@ -370,7 +382,9 @@ def run_queue(*, root: Path) -> None:
                 )
             if state["status"] == "failed" or shutdown:
                 for record in active:
-                    terminate_worker(pid=record["attempts"][-1]["pid"], root=root)
+                    request_worker_stop(
+                        attempt=record["attempts"][-1], root=root, now=now
+                    )
                 if not active:
                     if shutdown:
                         state["status"] = "stopped"

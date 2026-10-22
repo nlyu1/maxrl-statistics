@@ -5,6 +5,7 @@ import json
 import math
 import os
 import runpy
+import signal
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
@@ -35,8 +36,10 @@ from src.experiments.utkface.vlm_queue import (
     gpu_inventory_for_plan,
     owned_worker,
     process_matches_exception,
+    request_worker_stop,
     shared_gpu_is_ready,
     shared_stop_reason,
+    terminate_worker,
 )
 
 
@@ -317,6 +320,64 @@ def test_download_helper_is_valid_python_and_handles_json(tmp_path, monkeypatch)
 
 def test_process_ownership_rejects_unrelated_pid(tmp_path):
     assert not owned_worker(pid=os.getpid(), root=tmp_path)
+
+
+@pytest.mark.parametrize("force, expected", [(False, signal.SIGTERM), (True, signal.SIGKILL)])
+def test_worker_termination_signals_only_owned_process_group(
+    tmp_path, monkeypatch, force, expected
+):
+    calls = []
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.owned_worker", lambda **kwargs: True
+    )
+    monkeypatch.setattr("os.getpgid", lambda pid: pid)
+    monkeypatch.setattr("os.killpg", lambda pid, sig: calls.append((pid, sig)))
+    terminate_worker(pid=1234, root=tmp_path, force=force)
+    assert calls == [(1234, expected)]
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_worker_termination_rejects_unrelated_process(tmp_path, monkeypatch, force):
+    calls = []
+    monkeypatch.setattr("os.killpg", lambda *args: calls.append(args))
+    terminate_worker(pid=os.getpid(), root=tmp_path, force=force)
+    assert not calls
+
+
+def test_forced_worker_termination_rejects_shared_process_group(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.owned_worker", lambda **kwargs: True
+    )
+    monkeypatch.setattr("os.getpgid", lambda pid: pid + 1)
+    monkeypatch.setattr("os.killpg", lambda *args: calls.append(args))
+    with pytest.raises(RuntimeError, match="dedicated process group"):
+        terminate_worker(pid=1234, root=tmp_path, force=True)
+    assert not calls
+
+
+def test_stalled_worker_shutdown_escalates_once_after_grace(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.terminate_worker",
+        lambda **kwargs: calls.append(("signal", kwargs)),
+    )
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.stop_container",
+        lambda **kwargs: calls.append(("container", kwargs)),
+    )
+    attempt = {"pid": 1234, "container": "owned", "preempted": True}
+    for now in (100, 110, 129):
+        request_worker_stop(attempt=attempt, root=tmp_path, now=now)
+    assert calls == [("signal", {"pid": 1234, "root": tmp_path, "force": False})]
+    for now in (130, 140):
+        request_worker_stop(attempt=attempt, root=tmp_path, now=now)
+    assert calls[1:] == [
+        ("container", {"root": tmp_path, "container": "owned"}),
+        ("signal", {"pid": 1234, "root": tmp_path, "force": True}),
+    ]
+    assert attempt["termination_requested_at"] == 100
+    assert attempt["forced_termination_at"] == 130
 
 
 @pytest.mark.parametrize(
