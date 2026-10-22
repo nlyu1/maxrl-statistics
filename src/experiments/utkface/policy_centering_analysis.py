@@ -368,6 +368,101 @@ def analyze(*, root: Path) -> tuple[dict, dict, dict]:
     )
 
 
+def center_comparison_figure(*, root: Path, report: dict) -> None:
+    lookup = {(run["method"], run["std"]): run for run in report["runs"]}
+    levels = [1, 3, 5, 10]
+    full_levels = [0, *levels]
+    fig, axes = plt.subplots(
+        2, 3, figsize=(15, 9), layout="constrained", sharex="row", sharey="row"
+    )
+    top_maximum = 0
+    for column, center in enumerate(CENTERS):
+        top, bottom = axes[:, column]
+        for method in METHODS:
+            groups = [
+                lookup[method, std]["groups"]["train:all"]["centers"][center]
+                for std in full_levels
+            ]
+            for key, style, label in (
+                ("mae_clean", "o-", "original label"),
+                ("mae_noisy_probe", "s--", "noisy label"),
+            ):
+                values = [group[key] for group in groups]
+                top_maximum = max(top_maximum, max(values))
+                top.plot(
+                    full_levels,
+                    values,
+                    style,
+                    color=COLORS[method],
+                    label=f"{NAMES[method]}: {label}",
+                )
+            values = [group["slope_age_adjusted"] for group in groups[1:]]
+            bottom.plot(
+                levels,
+                values,
+                "o-",
+                color=COLORS[method],
+                label=f"{NAMES[method]}: own training noise",
+            )
+            if method == "tailrl_population":
+                for std, value in zip(levels, values, strict=True):
+                    bottom.annotate(
+                        f"{value:.2f}",
+                        (std, value),
+                        xytext=(0, 8),
+                        textcoords="offset points",
+                        ha="center",
+                        color=COLORS[method],
+                        fontsize=9,
+                    )
+        reference = np.array([
+            lookup["tailrl_population", std]["groups"]["train:all"]["centers"][center][
+                "negative_control_slope_q025_q50_q975"
+            ]
+            for std in levels
+        ])
+        bottom.fill_between(
+            levels,
+            reference[:, 0],
+            reference[:, 2],
+            color="#aeb7c5",
+            alpha=0.35,
+            label="Independent-field 95% reference range",
+        )
+        bottom.plot(
+            levels,
+            [
+                lookup["tailrl_population", std]["groups"]["test:all"]["centers"][
+                    center
+                ]["slope_age_adjusted"]
+                for std in levels
+            ],
+            "^:",
+            color="#747e8e",
+            label="TailRL: unused test-label probe",
+        )
+        bottom.axhline(0, color="#aeb7c5", lw=0.8)
+        bottom.axhline(1, color="#aeb7c5", lw=0.8)
+        top.set_title(center.capitalize(), fontsize=13)
+        top.set_xticks(full_levels)
+        bottom.set_xticks(levels)
+        bottom.set_ylim(-0.18, 1.12)
+        for ax in (top, bottom):
+            ax.set_xlabel("Training-noise SD (years)")
+            ax.grid(alpha=0.18)
+    axes[0, 0].set_ylabel("Training MAE to each label (years)")
+    axes[1, 0].set_ylabel("Age-adjusted noise association slope")
+    axes[0, 0].set_ylim(0, top_maximum * 1.1)
+    axes[0, 1].legend(fontsize=8, loc="upper left")
+    axes[1, 1].legend(fontsize=8, loc="upper right")
+    fig.suptitle(
+        "Mean, median, and mode: partial noise-following persists across all three centers\n4,096 training faces; validation-selected checkpoints; 0 = no noise association, 1 = one-for-one association",
+        fontsize=13,
+    )
+    fig.savefig(root / "mean-median-mode.png")
+    plt.close(fig)
+
+
 def figures(*, root: Path, report: dict, policies: dict, data: dict) -> list[dict]:
     plt.rcParams.update({
         "font.size": 10,
@@ -375,6 +470,7 @@ def figures(*, root: Path, report: dict, policies: dict, data: dict) -> list[dic
         "axes.spines.right": False,
         "savefig.dpi": 170,
     })
+    center_comparison_figure(root=root, report=report)
     lookup = {(r["method"], r["std"]): r for r in report["runs"]}
     levels = [1, 3, 5, 10]
     full_levels = [0, *levels]
@@ -679,15 +775,21 @@ def figures(*, root: Path, report: dict, policies: dict, data: dict) -> list[dic
             lw=1.8,
             label="TailRL mean",
         )
+        median = data["statistics"]["tailrl_population", std]["median"][index]
+        ax.axvline(median, color="#7b4a94", ls="-.", lw=1.2, label="TailRL median")
+        ax.axvline(
+            probs.argmax(), color="#747e8e", ls=(0, (1, 2)), lw=1.2, label="TailRL mode"
+        )
         ax.set(
-            title=f"{name}: original {ages[index]}, noisy {labels[index]}, mean {means[index]:.2f}, mode {probs.argmax()}",
+            title=f"{name}: original {ages[index]}, noisy {labels[index]} | mean {means[index]:.2f}, median {median}, mode {probs.argmax()}",
             xlabel="Age (years)",
             ylabel="Probability",
             xlim=(-1, 100),
+            ylim=(0, max(probs.max(), ce.max()) * 1.4),
         )
         ax.grid(axis="y", alpha=0.18)
         if row == 0:
-            ax.legend(fontsize=8.5, ncol=5)
+            ax.legend(fontsize=8.5, ncol=4, loc="upper right")
     fig.suptitle(
         "Examples at fixed SD 10: all four behaviors exist\nSelected to illustrate categories; their frequencies come from the full-cohort tables",
         fontsize=13,
@@ -705,17 +807,22 @@ def html_report(*, root: Path, report: dict) -> None:
     rows = []
     for run in selected:
         g = run["groups"]["train:all"]
-        c = g["centers"]["mean"]
-        rows.append(
-            f"<tr><td>{run['std']}</td><td>{run['epoch']}</td><td>{c['mae_clean']:.2f}</td><td>{c['mae_noisy_probe']:.2f}</td><td>{c['slope_age_adjusted']:.2f}</td><td>{100 * c['closer_clean']:.1f}%</td><td>{100 * c['between']:.1f}%</td><td>{g['std_policy']:.2f}</td></tr>"
-        )
+        for center in CENTERS:
+            c = g["centers"][center]
+            rows.append(
+                f"<tr><td>{run['std']}</td><td>{center.capitalize()}</td><td>{c['mae_clean']:.2f}</td><td>{c['mae_noisy_probe']:.2f}</td><td>{c['slope_age_adjusted']:.3f}</td><td>{100 * c['closer_clean']:.1f}%</td><td>{100 * c['closer_noisy']:.1f}%</td><td>{100 * c['equidistant']:.1f}%</td><td>{100 * c['between']:.1f}%</td></tr>"
+            )
     table = (
-        "<table><thead><tr><th>Noise SD</th><th>Epoch</th><th>MAE to original</th><th>MAE to noisy</th><th>Noise slope</th><th>Closer to original</th><th>Literally between</th><th>Policy SD</th></tr></thead><tbody>"
+        "<table><thead><tr><th>Noise SD</th><th>Center</th><th>MAE to original</th><th>MAE to noisy</th><th>Noise slope</th><th>Closer to original</th><th>Closer to noisy</th><th>Equidistant</th><th>Literally between</th></tr></thead><tbody>"
         + "".join(rows)
         + "</tbody></table>"
     )
     figures_html = []
     for filename, caption in (
+        (
+            "mean-median-mode.png",
+            "Mean, median, and mode compared directly: errors to both labels and association with the actual corruption. Every column uses the same axis scales.",
+        ),
         (
             "centering-evidence.png",
             "Point summaries, own-noise association, and counterevidence to a universal center.",
@@ -738,7 +845,8 @@ def html_report(*, root: Path, report: dict) -> None:
 <p><strong>The evidence supports partial, heterogeneous noise-following.</strong> Neither a universal original-label center nor a universal noisy-label center fits these checkpoints. An intermediate association describes the average response, but most per-image means are outside the interval between the two labels.</p>
 <p>Re-evaluated all 4,096 training faces and 2,308 held-out test faces for TailRL and CE at noise SD 0, 1, 3, 5, and 10. All policies use deterministic evaluation crops and bfloat16 CNN inference. Original test metrics were reproduced within 0.02 years/nats; exact counts, checkpoint hashes, and corruption fields were verified.</p>
 <div class="table">__TABLE__</div>
-<p>MAE and policy SD are in years. Closer/between percentages use only changed-label training images. The noise slope regresses policy mean minus original label against actual rounded/clipped corruption, after removing mean differences within each exact original age. A slope of 0 means no within-age association with the corruption; a slope of 1 means one-for-one association. It is not a per-image mixing weight and does not say that prediction errors vanish at slope 0.</p>
+<p>MAE is in years. For each center c (mean, median, or mode), the noise slope regresses c minus original label against actual rounded/clipped corruption, after removing mean differences within each exact original age. A slope of 0 means no within-age association with the corruption; a slope of 1 means one-for-one association. It is not a per-image mixing weight and does not say that prediction errors vanish at slope 0.</p>
+<p>Median means the first integer age where the policy CDF reaches 0.5; mode is the highest-probability age. Closer/between percentages use only changed-label training images. Between includes equality to either endpoint. Median and mode are discrete, so exact endpoint hits can partly explain their larger between fractions. Equidistant cases are listed separately rather than assigned to either label.</p>
 <h2>Evidence for and against the three hypotheses</h2>
 <ul><li><strong>Always centered on the original label: contradicted.</strong> Own-noise slopes are 0.58, 0.61, 0.51, and 0.24. At SD 5, independent corruption fields give a central 95% reference range of about [-0.032, 0.032], whereas the observed slope is 0.507. The clean-to-noisy checkpoint shift gives almost the same slope, 0.507; restricting to unclipped original ages 20-79 gives 0.505.</li>
 <li><strong>Always centered on the noisy label: also contradicted.</strong> The slopes are well below 1, especially at SD 10. There, original-label MAE is 6.19 years versus 8.33 for the noisy label, and 63.7% of changed-label means are closer to the original. But at SD 3 the noisy label is slightly closer on average, and at SD 5 its exact label has higher probability on 57.3% of changed-label faces.</li>
@@ -746,6 +854,7 @@ def html_report(*, root: Path, report: dict) -> None:
 <h2>What the distributions look like</h2>
 <p>They broaden with noise: mean training-policy SD increases from 1.52 years without corruption to 3.07, 3.79, 4.57, and 8.82 years. At SD 5, the mean 90% interval width is 14.63 years; its marginal original/noisy-label inclusion rates are 87.4% and 88.0%. At SD 10 the interval width is 28.69 years. Broad support can retain probability at both labels even when the mean leans toward one.</p>
 <p>Mean, median, and mode tell a broadly consistent story of partial noise-following. At SD 5 their within-age slopes are 0.507, 0.512, and 0.529. Yet likelihood can disagree with mean distance: the means slightly favor the original label overall, while the noisy label more often wins the exact-probability comparison. These distributions should not be called clean-centered, Gaussian, or calibrated posteriors from those facts alone.</p>
+<p>The median result matters: the association is not solely due to a few extreme policy tails shifting the mean. At SD 5 the median has MAE 4.107 years to the original label and 4.121 to the noisy label; at SD 10 these become 6.162 and 8.286 years. The median gives the same qualitative conclusion as the mean: partial noise-following, with a stronger original-label preference at SD 10.</p>
 <h2>A useful CE counterexample</h2>
 <p>At SD 1, CE almost memorizes the noisy labels (training noisy-label MAE 0.13 years; noise slope 0.98), while TailRL has noisy-label MAE 2.45 years and slope 0.58. At SD 3 and 5, however, TailRL follows more of the own-label noise than the selected CE checkpoint (slopes 0.61 vs 0.35, and 0.51 vs 0.28), while still having lower original-label MAE. Better accuracy and less noise-following are distinct properties. CE and TailRL are selected at different epochs, so this comparison does not isolate an objective-only causal effect.</p>
 <h2>Why this can happen</h2>
