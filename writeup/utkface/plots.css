@@ -167,6 +167,12 @@
   border-top: 1px solid var(--bs-border-color);
 }
 
+@media (min-width: 992px) {
+  .utk-policy-section {
+    padding-right: 1.5rem;
+  }
+}
+
 @media (max-width: 900px) {
   .utk-plots {
     grid-template-columns: minmax(0, 1fr);
