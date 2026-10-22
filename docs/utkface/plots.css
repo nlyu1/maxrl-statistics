@@ -33,7 +33,7 @@
 
 .utk-plots {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 1rem;
   margin: 1rem 0 1.5rem;
@@ -170,12 +170,6 @@
 @media (min-width: 992px) {
   .utk-policy-section {
     padding-right: 1.5rem;
-  }
-}
-
-@media (max-width: 900px) {
-  .utk-plots {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 

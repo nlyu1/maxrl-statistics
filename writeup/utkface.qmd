@@ -128,7 +128,7 @@ The tightest window asks for the exact age; wider windows give credit for nearby
 
 ## Experiments
 
-All plots show **validation curves**. Each pair opens independently: policy summaries on the left, mode MAE on the right. Default moving means span 5 epochs, or 10 for 200-epoch runs; bands show between-seed sample SD, not confidence intervals. Choose raw curves or the full axis range in each block. For the noise experiment, select an SD to inspect its four policy metrics; its greedy block shows all four SDs together.
+All plots show **validation curves**. Each pair opens independently: policy summaries first, followed by greedy decoding (mode MAE). Default moving means span 5 epochs, or 10 for 200-epoch runs; bands show between-seed sample SD, not confidence intervals. Choose raw curves or the full axis range in each block. For the noise experiment, select an SD to inspect its four policy metrics; its greedy block shows all four SDs together.
 
 The numerical notes below average each run's metrics at its **best mean-age-MAE checkpoint**, across the stated seeds. They do not independently select the best greedy checkpoint.
 
