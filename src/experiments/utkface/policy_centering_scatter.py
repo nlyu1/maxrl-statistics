@@ -19,6 +19,7 @@ from src.experiments.utkface.policy_examples import sha256
 NOISE_LEVELS = (1, 3, 5, 10)
 ORIGINAL_COLOR = "#7451a8"
 NOISY_COLOR = "#c16b16"
+FIT_COLOR = "#b52e49"
 
 
 def load_points(*, root: Path) -> tuple[dict[int, pl.DataFrame], dict]:
@@ -61,6 +62,32 @@ def checkpoint_epoch(*, audit: dict, std: int) -> int:
         for run in audit["runs"]
         if run["method"] == "tailrl_population" and run["std"] == std
     )
+
+
+def fitted_line(*, ax: plt.Axes, x: np.ndarray, y: np.ndarray, label_y: float) -> dict:
+    x_mean, y_mean = float(x.mean()), float(y.mean())
+    centered_x = x.astype(np.float64) - x_mean
+    variance = float(centered_x @ centered_x)
+    if variance <= 0:
+        raise ValueError(
+            "A fitted line requires variation in the horizontal coordinate"
+        )
+    slope = float(centered_x @ (y - y_mean) / variance)
+    intercept = y_mean - slope * x_mean
+    line_x = np.array(ax.get_xlim())
+    ax.plot(line_x, intercept + slope * line_x, color=FIT_COLOR, lw=1.8, zorder=4)
+    ax.text(
+        0.03,
+        label_y,
+        f"OLS slope = {slope:.3f}",
+        transform=ax.transAxes,
+        va="top",
+        fontsize=10,
+        color=FIT_COLOR,
+        zorder=5,
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 2},
+    )
+    return {"slope": slope, "intercept": intercept, "point_count": len(x)}
 
 
 def residual_scatter(
@@ -126,6 +153,9 @@ def residual_scatter(
             axes_audit[str(std)]["centers"][center] = {
                 "visible": data.height - outside,
                 "outside": outside,
+                "fit": fitted_line(
+                    ax=ax, x=delta, y=error, label_y=0.87 if zoom else 0.96
+                ),
             }
             if zoom:
                 ax.text(
@@ -166,6 +196,13 @@ def residual_scatter(
         Line2D(
             [], [], color="#b5bdc7", lw=7, label="Shaded region: center between labels"
         ),
+        Line2D(
+            [],
+            [],
+            color=FIT_COLOR,
+            lw=1.8,
+            label="OLS fit: free intercept, all 4,096 observations",
+        ),
     ]
     fig.legend(handles=handles, loc="outside lower center", ncol=1, frameon=False)
     fig.canvas.draw()
@@ -182,7 +219,7 @@ def residual_scatter(
     return axes_audit
 
 
-def label_scatter(*, root: Path, std: int, data: pl.DataFrame, audit: dict) -> None:
+def label_scatter(*, root: Path, std: int, data: pl.DataFrame, audit: dict) -> dict:
     fig, axes = plt.subplots(2, 3, figsize=(13, 8.8), layout="constrained")
     fig.suptitle(
         f"TailRL at fixed-noise SD {std}: raw labels versus policy centers\n"
@@ -194,10 +231,12 @@ def label_scatter(*, root: Path, std: int, data: pl.DataFrame, audit: dict) -> N
     delta = noisy - original
     colors = np.where(delta < 0, "#3574ad", np.where(delta > 0, "#ce691d", "#77818e"))
     order = np.random.default_rng(0).permutation(data.height)
+    fits = {}
     for row, (label, x) in enumerate((
         ("Original label", original),
         ("Corrupted label", noisy),
     )):
+        fits[label] = {}
         for column, center in enumerate(CENTERS):
             ax = axes[row, column]
             ax.plot([0, 99], [0, 99], color="#5d6570", ls="--", lw=1.1, zorder=1)
@@ -222,6 +261,9 @@ def label_scatter(*, root: Path, std: int, data: pl.DataFrame, audit: dict) -> N
                 yticks=(0, 20, 40, 60, 80, 99),
                 aspect="equal",
             )
+            fits[label][center] = fitted_line(
+                ax=ax, x=x, y=data[center].to_numpy(), label_y=0.96
+            )
             ax.grid(alpha=0.12)
             ax.set_axisbelow(True)
     handles = [
@@ -232,11 +274,15 @@ def label_scatter(*, root: Path, std: int, data: pl.DataFrame, audit: dict) -> N
             ("#77818e", "Rounded/clipped label unchanged"),
         )
     ]
+    handles.append(
+        Line2D([], [], color=FIT_COLOR, lw=1.8, label="OLS fit (free intercept)")
+    )
     fig.legend(
-        handles=handles, loc="outside lower center", ncol=3, frameon=False, fontsize=9
+        handles=handles, loc="outside lower center", ncol=2, frameon=False, fontsize=9
     )
     fig.savefig(root / f"raw-label-scatter-s{std}.png", dpi=150, facecolor="white")
     plt.close(fig)
+    return fits
 
 
 def image_html(*, root: Path, filename: str, caption: str) -> str:
@@ -248,7 +294,12 @@ def image_html(*, root: Path, filename: str, caption: str) -> str:
 
 
 def report_html(
-    *, root: Path, points: dict[int, pl.DataFrame], audit: dict, axes_audit: dict
+    *,
+    root: Path,
+    points: dict[int, pl.DataFrame],
+    audit: dict,
+    axes_audit: dict,
+    label_fits: dict,
 ) -> None:
     residual = image_html(
         root=root,
@@ -261,14 +312,17 @@ def report_html(
         "The vertical coordinate is each policy center minus the original annotation. "
         "The horizontal coordinate is the actual rounded/clipped training corruption. "
         "Purple: original-label center; orange: corrupted-label center; gray band: between. "
-        "These lines are hypothesis references. No fitted regression, binning, subsampling, "
-        "jitter, or age adjustment is applied. Coincident integer-valued points overlap.",
+        "Red: ordinary least-squares fit y = intercept + slope × x, with its slope labeled. "
+        "The fit uses all 4,096 observations, including those outside the zoom window, "
+        "and estimates a free intercept. No binning, subsampling, jitter, or age adjustment "
+        "is applied. Coincident integer-valued points overlap.",
     )
     residual_full = image_html(
         root=root,
         filename="raw-residual-scatter-full.png",
         caption="Full range: every observation is visible. Each SD has its own limits, "
-        "shared across all three centers. Both axes use equal units and identical ticks.",
+        "shared across all three centers. Both axes use equal units and identical ticks. "
+        "Red fitted lines and slopes are identical to the zoomed view because both use all observations.",
     )
     tabs = []
     css = []
@@ -287,7 +341,8 @@ def report_html(
             filename=f"raw-label-scatter-s{std}.png",
             caption="Top row: original annotation versus policy center. Bottom row: actual "
             "corrupted training label versus the same policy center. Dashed lines indicate "
-            "equality. Colors show the direction of corruption. Every panel uses all faces "
+            "equality. Red lines are ordinary least-squares fits with a free intercept and "
+            "their slopes are labeled. Point colors show the direction of corruption. Every panel uses all faces "
             "and the full 0–99-year label range.",
         )
         views.append(f'<section class="view" id="view{std}">{plot}</section>')
@@ -318,6 +373,9 @@ would fall inside the gray band. The broad clouds show why an aggregate associat
 does not describe every image.</p>
 <p>Choose the zoomed view for the main clouds, or the full range to inspect every point.
 Each SD uses its own square axes; one year has the same physical size on both axes.</p>
+<p>The red line in every panel is an ordinary least-squares fit through the sample centroid,
+with a free intercept. Its slope is printed in that panel. All 4,096 faces enter each fit,
+including points outside the zoom window. These are raw associations without age adjustment.</p>
 <input type="radio" id="range-zoom" name="range" checked>
 <input type="radio" id="range-full" name="range">
 <div class="choices"><label for="range-zoom">Zoom to clouds</label><label for="range-full">Full range</label></div>
@@ -355,10 +413,12 @@ No held-out synthetic noise probes are included in these plots.</p>
         "centers": list(CENTERS),
         "same_image_ids_across_noise_levels": True,
         "actual_corrupted_training_labels": True,
-        "fitted_regressions": False,
+        "fitted_regressions": True,
+        "fit_method": "ordinary least squares with free intercept; all observations; no age adjustment",
         "jitter": False,
         "subsampling": False,
         "residual_axes": axes_audit,
+        "label_fits": label_fits,
         "equal_physical_x_y_units_verified": True,
         "identical_x_y_ticks_verified": True,
         "figures": ["raw-residual-scatter.png", "raw-residual-scatter-full.png"]
@@ -384,9 +444,17 @@ def main() -> None:
             root=args.root, points=points, audit=audit, zoom=False
         ),
     }
-    for std, data in points.items():
-        label_scatter(root=args.root, std=std, data=data, audit=audit)
-    report_html(root=args.root, points=points, audit=audit, axes_audit=axes_audit)
+    label_fits = {
+        str(std): label_scatter(root=args.root, std=std, data=data, audit=audit)
+        for std, data in points.items()
+    }
+    report_html(
+        root=args.root,
+        points=points,
+        audit=audit,
+        axes_audit=axes_audit,
+        label_fits=label_fits,
+    )
 
 
 if __name__ == "__main__":
