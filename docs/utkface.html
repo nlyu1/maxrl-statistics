@@ -550,7 +550,7 @@ Learning rates for all methods
 </section>
 <section id="experiments" class="level2 page-columns page-full">
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
-<p>All plots show <strong>validation curves</strong>. Each pair opens independently: policy summaries on the left, mode MAE on the right. Default moving means span 5 epochs, or 10 for 200-epoch runs; bands show between-seed sample SD, not confidence intervals. Choose raw curves or the full axis range in each block. For the noise experiment, select an SD to inspect its four policy metrics; its greedy block shows all four SDs together.</p>
+<p>All plots show <strong>validation curves</strong>. Each pair opens independently: policy summaries first, followed by greedy decoding (mode MAE). Default moving means span 5 epochs, or 10 for 200-epoch runs; bands show between-seed sample SD, not confidence intervals. Choose raw curves or the full axis range in each block. For the noise experiment, select an SD to inspect its four policy metrics; its greedy block shows all four SDs together.</p>
 <p>The numerical notes below average each run’s metrics at its <strong>best mean-age-MAE checkpoint</strong>, across the stated seeds. They do not independently select the best greedy checkpoint.</p>
 <section id="full-data-comparison" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="full-data-comparison">1. Full-data comparison</h3>
