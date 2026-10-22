@@ -25,7 +25,7 @@ from src.experiments.utkface.model import build_model
 from src.experiments.utkface.noise import noise_summary, noisy_labels
 
 METHODS = ("tailrl_population", "ce", "grpo_mae_population", "grpo_mse_population")
-CONDITIONS = (("none", 0), *((m, s) for m in ("fixed", "fresh") for s in (1, 3, 5, 10)))
+CONDITIONS = (("none", 0), *(("fixed", std) for std in (1, 3, 5, 10)))
 
 
 def sha256(*, path: Path) -> str:
@@ -117,12 +117,38 @@ def corruption_fields(
     for mode, std in CONDITIONS:
         config = NoiseConfig(mode=mode, std_years=std, seed=seed)
         fields[f"{mode}:{std}"] = []
-        for epoch in range(1, 51 if mode == "fresh" else 2):
-            labels = noisy_labels(ages=ages, config=config, epoch=epoch)
-            fields[f"{mode}:{std}"].append([
-                int(labels[index]) if index in train else None for index in indices
-            ])
+        labels = noisy_labels(ages=ages, config=config, epoch=1)
+        fields[f"{mode}:{std}"].append([
+            int(labels[index]) if index in train else None for index in indices
+        ])
     return fields
+
+
+def write_viewer(*, data: dict, path: Path) -> None:
+    conditions = {f"{mode}:{std}" for mode, std in CONDITIONS}
+    runs = [
+        run
+        for run in data["runs"]
+        if (run["noise"]["mode"], run["noise"]["std_years"]) in CONDITIONS
+    ]
+    expected = {(mode, std, method) for mode, std in CONDITIONS for method in METHODS}
+    actual = {
+        (run["noise"]["mode"], run["noise"]["std_years"], run["method"]) for run in runs
+    }
+    if actual != expected or len(runs) != len(expected):
+        raise ValueError("Expected one checkpoint per method and fixed-noise setting")
+    report = {
+        **data,
+        "runs": runs,
+        "corruptions": {key: data["corruptions"][key] for key in sorted(conditions)},
+    }
+    template = Path(__file__).with_suffix(".html").read_text()
+    if template.count("__POLICY_DATA__") != 1:
+        raise ValueError("Expected exactly one report data placeholder")
+    encoded = json.dumps(report, separators=(",", ":"), allow_nan=False)
+    path.write_text(
+        template.replace("__POLICY_DATA__", encoded.replace("<", "\\u003c"))
+    )
 
 
 def infer(
@@ -329,12 +355,7 @@ def build(
         )
     encoded = json.dumps(data, separators=(",", ":"), allow_nan=False)
     (output_dir / "policy-examples.json").write_text(encoded + "\n")
-    template = Path(__file__).with_suffix(".html").read_text()
-    if template.count("__POLICY_DATA__") != 1:
-        raise ValueError("Expected exactly one report data placeholder")
-    (output_dir / "viewer.html").write_text(
-        template.replace("__POLICY_DATA__", encoded.replace("<", "\\u003c"))
-    )
+    write_viewer(data=data, path=output_dir / "viewer.html")
     audit = {
         key: value
         for key, value in data.items()

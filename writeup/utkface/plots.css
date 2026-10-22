@@ -113,6 +113,24 @@
   color: var(--bs-danger);
 }
 
+.utk-policy-explorer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.utk-policy-note {
+  margin: 0;
+  padding: 0 1rem 1rem;
+  font-size: 0.85rem;
+}
+
+.utk-policy-explorer iframe {
+  display: block;
+  width: 100%;
+  height: 70rem;
+  border: 0;
+  border-top: 1px solid var(--bs-border-color);
+}
+
 @media (max-width: 900px) {
   .utk-plots {
     grid-template-columns: minmax(0, 1fr);

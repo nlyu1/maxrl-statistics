@@ -199,6 +199,16 @@ The numerical notes below average each run's metrics at its **best mean-age-MAE 
 
 Across all ten evaluated noise arms, categorical MSE and MAE have test mean-age MAEs of **6.252 / 6.396 years** at SD 10, with larger mode errors of **8.200 / 7.769 years**, respectively. These results do not establish a general TailRL robustness advantage. The noise comparison uses one optimization seed and one corruption field per noise level.
 
+::: {.column-page}
+<div class="utk-plots utk-policy-explorer">
+<details id="utkface-policy-examples">
+<summary>Example policy distributions <span>Images · original and corrupted labels · all 100 ages</span></summary>
+<p class="utk-policy-note">Compare population TailRL, CE, and population GRPO on the same 32 training and 16 held-out faces. Browse a batch or one face across fixed noise SDs 0, 1, 3, 5, and 10; SD 0 is the clean baseline. Checkpoints use clean validation mean-age MAE selection. <a href="utkface/policy-examples.html" target="_blank" rel="noopener">Open the full-size explorer</a>.</p>
+<iframe data-src="utkface/policy-examples.html" title="UTKFace policy distributions under fixed label noise" loading="lazy"></iframe>
+</details>
+</div>
+:::
+
 ### 6. Conditional two-digit policies
 
 **Setting:** Full data, 50 epochs, seed 42; eight objectives on the conditional tens/units head. The objectives use the exact 100-age joint distribution. Learning rates are tuned on 4,096 images and reused on full data, so comparisons with the single-head architecture are exploratory.
