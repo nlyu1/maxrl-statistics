@@ -647,12 +647,100 @@ Greedy decoding <span>Mode MAE · four noise levels</span>
 </div>
 <p><strong>Finding:</strong> Among the five displayed methods, scalar MAE leads on validation mean-age MAE at all four noise levels. At SD 10, its MAE is <strong>6.77 years</strong>, compared with <strong>6.97</strong> for population TailRL. Scalar MAE also has the lowest mode MAE among the displayed methods.</p>
 <p>Across all ten evaluated noise arms, categorical MSE and MAE have test mean-age MAEs of <strong>6.252 / 6.396 years</strong> at SD 10, with larger mode errors of <strong>8.200 / 7.769 years</strong>, respectively. These results do not establish a general TailRL robustness advantage. The noise comparison uses one optimization seed and one corruption field per noise level.</p>
-<div class="column-page">
+<div class="utk-policy-section">
 <div class="utk-plots utk-policy-explorer">
 <details id="utkface-policy-examples">
 <summary>
-Example policy distributions <span>Images · original and corrupted labels · all 100 ages</span>
+Example policy distributions <span>Policy centers · images and labels · all 100 ages</span>
 </summary>
+<p class="utk-policy-note">
+<strong>Where are the TailRL policies centered?</strong> Each point below is one of the 4,096 training faces. Columns show the policy mean, median, and mode; rows show fixed noise SDs 1, 3, 5, and 10. The fitted trends show partial noise-following, with substantial variation across individual faces.
+</p>
+<figure class="utk-policy-centering figure" id="fig-utkface-policy-centering">
+<a href="utkface/tailrl-policy-centering-scatter.png" target="_blank" rel="noopener"><img src="utkface/tailrl-policy-centering-scatter.png" width="1950" height="2625" loading="lazy" alt="Twelve TailRL scatter panels comparing actual label corruption with prediction error for the policy mean, median, and mode at noise SDs 1, 3, 5, and 10. Red fitted lines have slopes between zero and one, while many individual centers lie outside the interval between the original and corrupted labels." class="figure-img"></a>
+<figcaption>
+The horizontal axis is corrupted minus original label; the vertical axis is policy center minus original label, in years. Purple marks an original-label center, orange a corrupted-label center, and gray the interval between them. Red lines are ordinary least-squares fits with a free intercept; slopes use all 4,096 faces, including points outside the annotated zoom windows, without age adjustment. Each SD has its own range with equal x/y units. Checkpoints are selected by clean validation mean-age MAE (epochs 23, 22, 19, and 12). This is one optimization seed and one corruption field; original labels are UTKFace annotations. Click the image for full resolution. <a href="utkface/tailrl-policy-centering-scatter.json">Figure provenance and fit coefficients</a>.
+</figcaption>
+</figure>
+<table class="table table-sm utk-policy-correlations" id="tbl-utkface-policy-centering-pearson">
+<caption>
+Pearson correlation between actual label corruption and policy-center error, using all 4,096 training faces, including points outside the zoom windows; no age adjustment.
+</caption>
+<thead>
+<tr>
+<th scope="col">
+Noise SD
+</th>
+<th scope="col">
+Policy mean
+</th>
+<th scope="col">
+Policy median
+</th>
+<th scope="col">
+Policy mode
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">
+1
+</th>
+<td>
+0.184
+</td>
+<td>
+0.183
+</td>
+<td>
+0.180
+</td>
+</tr>
+<tr>
+<th scope="row">
+3
+</th>
+<td>
+0.410
+</td>
+<td>
+0.407
+</td>
+<td>
+0.373
+</td>
+</tr>
+<tr>
+<th scope="row">
+5
+</th>
+<td>
+0.463
+</td>
+<td>
+0.455
+</td>
+<td>
+0.432
+</td>
+</tr>
+<tr>
+<th scope="row">
+10
+</th>
+<td>
+0.297
+</td>
+<td>
+0.297
+</td>
+<td>
+0.246
+</td>
+</tr>
+</tbody>
+</table>
 <p class="utk-policy-note">
 Compare population TailRL, CE, and population GRPO on the same 32 training and 16 held-out faces. Browse a batch or one face across fixed noise SDs 0, 1, 3, 5, and 10; SD 0 is the clean baseline. Checkpoints use clean validation mean-age MAE selection. <a href="utkface/policy-examples.html" target="_blank" rel="noopener">Open the full-size explorer</a>.
 </p>

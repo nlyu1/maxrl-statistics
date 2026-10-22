@@ -1,0 +1,249 @@
+{
+  "figure": "tailrl-policy-centering-scatter.png",
+  "figure_sha256": "f85e2b4d5fca3a9d9f8ce956c5dacfe1c9395259346fda74acf085506c551427",
+  "method": "tailrl_population",
+  "split": "train",
+  "images_per_panel": 4096,
+  "optimization_seed": 42,
+  "corruption": {
+    "mode": "fixed",
+    "distribution": "Gaussian, then rounded and clipped to ages 0 through 99",
+    "seed": 2026
+  },
+  "checkpoint_selection": "Minimum clean validation mean-age MAE",
+  "coordinates": {
+    "x": "actual corrupted training label minus original annotation",
+    "y": "policy center minus original annotation"
+  },
+  "centers": [
+    "mean",
+    "median",
+    "mode"
+  ],
+  "median_definition": "First integer age at which the policy CDF reaches 0.5",
+  "mode_definition": "Highest-probability age",
+  "fit": "ordinary least squares with free intercept; all observations; no age adjustment",
+  "zoom": "One shared range per SD across all three centers; covers all corruptions and pooled 99th percentile of absolute prediction error, rounded outward. Counts outside the window are annotated; every observation enters the fit.",
+  "inference_transform": "Resize(256), CenterCrop(224), ImageNet normalization",
+  "inference_precision": "bfloat16 CNN; float32 log-softmax",
+  "source_csv_sha256": "deec0ec7170b1d530e232311d055e6b2f826e424ec17d56592eb2446558fb73a",
+  "source_snapshot_sha256": "935f553a28eec57827869fddaa8093f0e7513d6a9efb5c04a2c5b75f19c54c27",
+  "training_fingerprint": "08a4ab67aebe5a3ed0a13bf2e67185f59dba78be09251d1df394b1e259415b56",
+  "analysis_commit": "0fe599bc8e0ac46733817773afe1364146a58df6",
+  "analysis_source": "https://github.com/nlyu1/maxrl-statistics/blob/0fe599bc8e0ac46733817773afe1364146a58df6/src/experiments/utkface/policy_centering_scatter.py",
+  "fit_validation": {
+    "fitted_panels": 48,
+    "max_coefficient_error_vs_lstsq": 6.247780071078068E-14,
+    "all_points_used_per_fit": 4096,
+    "zoom_full_fits_identical": true,
+    "synthetic_line_and_annotation_verified": true
+  },
+  "conditions": [
+    {
+      "noise_sd_years": 1.0,
+      "checkpoint_epoch": 23,
+      "checkpoint_id": "shared_lr_noise_fixed_s1_tailrl_population_seed42",
+      "checkpoint_sha256": "06c889a7364884bbd7ba78caed1eea10c69de78d4c1bb363cd63eefc302f4763",
+      "policy_artifact_sha256": "f3c99f6a1aa87b543f5febac2bc86a3430842b301f6ccd5b96eea464b4359848",
+      "zoom_axes_and_centers": {
+        "limit": 15.0,
+        "ticks": [
+          -15.0,
+          -10.0,
+          -5.0,
+          0.0,
+          5.0,
+          10.0,
+          15.0
+        ],
+        "centers": {
+          "mean": {
+            "visible": 4094,
+            "outside": 2,
+            "fit": {
+              "slope": 0.5981588417601931,
+              "intercept": -0.2470782556360642,
+              "point_count": 4096
+            },
+            "pearson_r": 0.1844515107764063
+          },
+          "median": {
+            "visible": 4093,
+            "outside": 3,
+            "fit": {
+              "slope": 0.6044598390085708,
+              "intercept": -0.3290247631095089,
+              "point_count": 4096
+            },
+            "pearson_r": 0.18318028642226508
+          },
+          "mode": {
+            "visible": 4091,
+            "outside": 5,
+            "fit": {
+              "slope": 0.6491089008570766,
+              "intercept": -0.4508161547008918,
+              "point_count": 4096
+            },
+            "pearson_r": 0.1801707925521547
+          }
+        }
+      }
+    },
+    {
+      "noise_sd_years": 3.0,
+      "checkpoint_epoch": 22,
+      "checkpoint_id": "shared_lr_noise_fixed_s3_tailrl_population_seed42",
+      "checkpoint_sha256": "8cbc7caf68069f0c4d6003e1a7c32207fe4934d386889702cc79a0dae0ef142c",
+      "policy_artifact_sha256": "a7c5b42a487c60ebede905fd10f8f2dff6ab3ebcb839aced3310e920a5548833",
+      "zoom_axes_and_centers": {
+        "limit": 15.0,
+        "ticks": [
+          -15.0,
+          -10.0,
+          -5.0,
+          0.0,
+          5.0,
+          10.0,
+          15.0
+        ],
+        "centers": {
+          "mean": {
+            "visible": 4071,
+            "outside": 25,
+            "fit": {
+              "slope": 0.6144013199930963,
+              "intercept": 0.44119078830794495,
+              "point_count": 4096
+            },
+            "pearson_r": 0.4098152906110512
+          },
+          "median": {
+            "visible": 4077,
+            "outside": 19,
+            "fit": {
+              "slope": 0.6172670482844714,
+              "intercept": 0.41877205146405133,
+              "point_count": 4096
+            },
+            "pearson_r": 0.40678392535514585
+          },
+          "mode": {
+            "visible": 4052,
+            "outside": 44,
+            "fit": {
+              "slope": 0.610084287570572,
+              "intercept": 0.35058550380514997,
+              "point_count": 4096
+            },
+            "pearson_r": 0.3725108484183326
+          }
+        }
+      }
+    },
+    {
+      "noise_sd_years": 5.0,
+      "checkpoint_epoch": 19,
+      "checkpoint_id": "shared_lr_noise_fixed_s5_tailrl_population_seed42",
+      "checkpoint_sha256": "dd1c8ed202c758f05631e28e4b461c9fd14f0e8ecfeee76a5a7b5c7dd21dfa8c",
+      "policy_artifact_sha256": "12fceff54d759a6113867777e6cda2dd5be2a8cd76a869a2bf00b5e16b046e24",
+      "zoom_axes_and_centers": {
+        "limit": 20.0,
+        "ticks": [
+          -20.0,
+          -10.0,
+          0.0,
+          10.0,
+          20.0
+        ],
+        "centers": {
+          "mean": {
+            "visible": 4086,
+            "outside": 10,
+            "fit": {
+              "slope": 0.5265669372189025,
+              "intercept": 0.10442183694146387,
+              "point_count": 4096
+            },
+            "pearson_r": 0.4626298625647842
+          },
+          "median": {
+            "visible": 4084,
+            "outside": 12,
+            "fit": {
+              "slope": 0.5299560950603892,
+              "intercept": -0.020183033591715957,
+              "point_count": 4096
+            },
+            "pearson_r": 0.455307134816486
+          },
+          "mode": {
+            "visible": 4078,
+            "outside": 18,
+            "fit": {
+              "slope": 0.5390626347373295,
+              "intercept": -0.6179085004806537,
+              "point_count": 4096
+            },
+            "pearson_r": 0.43226306273677895
+          }
+        }
+      }
+    },
+    {
+      "noise_sd_years": 10.0,
+      "checkpoint_epoch": 12,
+      "checkpoint_id": "shared_lr_noise_fixed_s10_tailrl_population_seed42",
+      "checkpoint_sha256": "eeb8a6ab11e5d8c7ab99be53e66514f5f0c956bcfb3c6b1085e87a0a170a9da3",
+      "policy_artifact_sha256": "fb46c8813735566adf18339ba9b2e8682da2bf1749a073a531685efd19f0a93a",
+      "zoom_axes_and_centers": {
+        "limit": 40.0,
+        "ticks": [
+          -40.0,
+          -20.0,
+          0.0,
+          20.0,
+          40.0
+        ],
+        "centers": {
+          "mean": {
+            "visible": 4093,
+            "outside": 3,
+            "fit": {
+              "slope": 0.2519091920149304,
+              "intercept": 1.474020654862819,
+              "point_count": 4096
+            },
+            "pearson_r": 0.29661072758171964
+          },
+          "median": {
+            "visible": 4093,
+            "outside": 3,
+            "fit": {
+              "slope": 0.25471895288662316,
+              "intercept": 1.4216529826538222,
+              "point_count": 4096
+            },
+            "pearson_r": 0.2971083152519348
+          },
+          "mode": {
+            "visible": 4088,
+            "outside": 8,
+            "fit": {
+              "slope": 0.24148947585651245,
+              "intercept": 0.7133954759723888,
+              "point_count": 4096
+            },
+            "pearson_r": 0.24644295808803943
+          }
+        }
+      }
+    }
+  ],
+  "limitation": "One optimization seed and one corruption field; original UTKFace annotations are reference labels, not independently verified true ages.",
+  "pearson_validation": {
+    "method": "Pearson product-moment correlation; all observations; no age adjustment",
+    "implementation": "scipy.stats.pearsonr, cross-checked with numpy.corrcoef",
+    "maximum_absolute_difference": 1.6653345369377348E-16
+  }
+}
