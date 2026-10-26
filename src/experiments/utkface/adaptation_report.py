@@ -1419,8 +1419,9 @@ figure{margin:22px 0;background:white;padding:14px;border:1px solid #d9e0ea}figu
 th,td{padding:7px 9px;border-bottom:1px solid #d9e0ea;text-align:right}th{position:sticky;top:0;background:#eaf1f8}td:nth-child(-n+7),th:nth-child(-n+7){text-align:left}
 .controls{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}select,input,button{padding:8px 10px;border:1px solid #aeb9c8;background:white}details,.metadata{background:white;border:1px solid #d9e0ea;padding:14px;margin:12px 0}.metadata p{margin:.35em 0}</style></head><body>
 <header><h1>UTKFace adaptation results</h1><p>Immutable archive snapshot: 193 completed jobs, 178 distinct training results and 15 feature banks. This HTML reports source facts and exact values.</p></header>
-<main><section class=cards>__CARDS__</section><h2>Archive integrity</h2>
-<p>All 193 result files, configurations and recorded source hashes were verified. Training results record the source commit; feature-bank code is verified against the archived source checkout. The manifest has 18,462 train, 2,308 validation and 2,308 test rows; every training result reports n=2,308 for both test endpoints.</p>
+<main><section class=cards>__CARDS__</section><h2>Training trajectories</h2>
+<p><a href="training-curves.html">View raw training curves and zoomed regions near the best performance</a>. These show every validation epoch; the tables below show clean test results at the selected and final checkpoints.</p><h2>Archive integrity</h2>
+<p>All 193 result files, configurations and recorded source hashes were verified. Training results record the source commit; feature-bank code is verified against the archived source checkout. Each fit uses the same 4,096-image training subset from a manifest containing 18,462 train, 2,308 validation and 2,308 test rows. Every training result reports n=2,308 for both test endpoints. Results use one model seed and one fixed corruption field.</p>
 <h2>Recipe and timing metadata</h2><div class=metadata>__METADATA__</div>
 <h2>Suite inventory · __PRIMARY__</h2><div class=table-wrap><table><thead><tr><th>Suite</th><th>N memberships</th><th>Min</th><th>Median</th><th>Max</th><th>Extreme job</th><th>Value</th><th>Direction</th></tr></thead><tbody>__SUITES__</tbody></table></div>
 <h2>Figures</h2>__FIGURES__<h2>Frozen-head source comparison · 75 runs</h2>
