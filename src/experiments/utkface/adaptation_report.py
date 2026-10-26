@@ -267,7 +267,11 @@ def collect(*, root: Path) -> tuple[list[dict], list[dict], list[dict], dict]:
                 "final_global_epoch": result["final_global_epoch"],
                 "best_test": result["best_test"],
                 "final_test": result["final_test"],
-                "initialization": result["initialization"],
+                "initialization": {
+                    key: value
+                    for key, value in result["initialization"].items()
+                    if key != "rows"
+                },
                 "initialization_source": result["initialization_source"],
                 "config": config,
                 "provenance": result["provenance"],
