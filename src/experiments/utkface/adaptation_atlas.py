@@ -457,10 +457,9 @@ def frozen_matrix(*, records: list[dict], output_dir: Path) -> str:
     fig.suptitle(
         "All 75 frozen-head fits · clean-test policy-mean MAE", fontweight="bold"
     )
-    fig.colorbar(
-        shown, ax=axes, label="MAE (years; lower is better)", fraction=0.02, pad=0.02
-    )
-    fig.subplots_adjust(left=0.055, right=0.89, bottom=0.22, top=0.84, wspace=0.12)
+    fig.subplots_adjust(left=0.055, right=0.90, bottom=0.22, top=0.84, wspace=0.12)
+    color_axis = fig.add_axes((0.92, 0.22, 0.012, 0.62))
+    fig.colorbar(shown, cax=color_axis, label="MAE (years; lower is better)")
     return save(fig, output_dir, "q3_all_frozen_heads.png")
 
 
@@ -503,6 +502,166 @@ def freeze_effect(*, records: list[dict], output_dir: Path) -> str:
     )
     fig.tight_layout(rect=(0, 0, 1, 0.89))
     return save(fig, output_dir, "q2_frozen_vs_trainable.png")
+
+
+def scratch_zoom(*, records: list[dict], output_dir: Path) -> str:
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8.5))
+    recipes = (
+        ("augmentation", "ImageNet · 1e-3 cosine", COLORS[0]),
+        ("scratch_cosine", "Scratch · 1e-3 cosine", COLORS[1]),
+        ("scratch_warmup_constant", "Scratch · 3e-4 constant", COLORS[2]),
+    )
+    for column, noise in enumerate(NOISES):
+        non_grpo = []
+        for i, (suite, label, color) in enumerate(recipes):
+            query = (
+                {"pipeline": "original", "backbone": "ImageNet end-to-end"}
+                if suite == "augmentation"
+                else {}
+            )
+            values = [
+                unique_record(
+                    records=records,
+                    membership=suite,
+                    noise_sd=noise,
+                    loss=loss,
+                    **query,
+                )["best_test"]["mae_mean"]
+                for loss in LOSSES
+            ]
+            non_grpo.extend(
+                v
+                for v, loss in zip(values, LOSSES, strict=True)
+                if loss != "grpo_mse_population"
+            )
+            for axis in axes[:, column]:
+                axis.bar(
+                    np.arange(5) + (i - 1) * 0.24,
+                    values,
+                    width=0.23,
+                    color=color,
+                    label=label,
+                )
+        axes[0, column].set_title(f"SD {noise:g} · full range", fontweight="bold")
+        axes[1, column].set_title("Zoom on the competitive range", fontsize=11)
+        axes[0, column].set_ylim(0, 16.7)
+        axes[1, column].set_ylim(min(non_grpo) - 0.15, max(non_grpo) + 0.15)
+        axes[1, column].text(
+            3,
+            max(non_grpo) + 0.07,
+            "GRPO off scale\nsee full range",
+            ha="center",
+            va="top",
+            fontsize=8,
+        )
+        for axis in axes[:, column]:
+            axis.set_xticks(
+                range(5), [LOSS_LABELS[k] for k in LOSSES], rotation=25, ha="right"
+            )
+            axis.grid(axis="y", alpha=0.2)
+    for axis in axes[:, 0]:
+        axis.set_ylabel("Selected clean-test policy-mean MAE")
+    fig.legend(
+        *axes[0, 0].get_legend_handles_labels(),
+        loc="upper center",
+        ncol=3,
+        bbox_to_anchor=(0.5, 1.015),
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return save(fig, output_dir, "q2_scratch_near_best.png")
+
+
+def post_comparisons(
+    *, records: list[dict], contrasts: list[dict], output_dir: Path
+) -> str:
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8.2))
+    parents = {0.0: 42, 5.0: 21, 10.0: 12}
+    for column, noise in enumerate(NOISES):
+        baseline = unique_record(
+            records=records,
+            membership="augmentation",
+            pipeline="original",
+            backbone="ImageNet end-to-end",
+            noise_sd=noise,
+            loss="mse",
+        )["best_test"]["mae_mean"]
+        values = [baseline]
+        for backbone, label, offset, color in (
+            ("SL@25 trainable", "Trainable", -0.12, COLORS[0]),
+            ("SL@25 frozen", "Frozen", 0.12, COLORS[1]),
+        ):
+            control = unique_record(
+                records=records,
+                suite="post_training",
+                backbone=backbone,
+                noise_sd=noise,
+                loss="mse",
+            )
+            for i, loss in enumerate(LOSSES[:4]):
+                r = unique_record(
+                    records=records,
+                    suite="post_training",
+                    backbone=backbone,
+                    noise_sd=noise,
+                    loss=loss,
+                )
+                value = r["best_test"]["mae_mean"]
+                values.append(value)
+                axes[0, column].plot(
+                    i + offset, value, "o", color=color, label=label if i == 0 else ""
+                )
+                axes[0, column].annotate(
+                    f"{value:.3f}",
+                    (i + offset, value),
+                    xytext=(0, -13 if offset < 0 else 7),
+                    textcoords="offset points",
+                    ha="center",
+                    fontsize=8,
+                )
+                if i == 0:
+                    axes[1, column].plot(i + offset, 0, "o", color=color)
+                else:
+                    interval = next(
+                        c
+                        for c in contrasts
+                        if c["first"] == r["identifier"]
+                        and c["second"] == control["identifier"]
+                    )
+                    delta, (low, high) = interval["delta"], interval["ci"]
+                    axes[1, column].errorbar(
+                        i + offset,
+                        delta,
+                        yerr=[[delta - low], [high - delta]],
+                        fmt="o",
+                        color=color,
+                        capsize=3,
+                    )
+        axes[0, column].axhline(
+            baseline, color="#444444", ls="--", lw=1, label="Original SL selected"
+        )
+        axes[0, column].set_ylim(min(values) - 0.12, max(values) + 0.12)
+        axes[0, column].set_title(
+            f"SD {noise:g} · parent best e{parents[noise]} · fork e25",
+            fontweight="bold",
+            fontsize=11,
+        )
+        axes[1, column].axhline(0, color="#777777", ls="--", lw=1)
+        axes[1, column].set_title("Difference versus matched MSE restart", fontsize=11)
+        for axis in axes[:, column]:
+            axis.set_xticks(
+                range(4), [LOSS_LABELS[k] for k in LOSSES[:4]], rotation=20, ha="right"
+            )
+            axis.grid(axis="y", alpha=0.2)
+    axes[0, 0].set_ylabel("Selected clean-test mean MAE")
+    axes[1, 0].set_ylabel("MAE difference · paired image 95% interval")
+    fig.legend(
+        *axes[0, 0].get_legend_handles_labels(),
+        loc="upper center",
+        ncol=3,
+        bbox_to_anchor=(0.5, 1.02),
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    return save(fig, output_dir, "q4_post_comparisons.png")
 
 
 def previous_figures(*, old: list[dict], summary: dict, output_dir: Path) -> list[str]:
@@ -835,7 +994,7 @@ def curve_movement(records: list[dict]) -> tuple[list[dict], str]:
             "noise_sd": r["noise_sd"],
             "loss": r["loss"],
             "median_absolute_adjacent_change_epochs_26_50": statistics.median(
-                    abs(b - a) for a, b in pairwise(late)
+                abs(b - a) for a, b in pairwise(late)
             ),
             "epochs_within_0_25_of_best": r["curve_summary"][
                 "epochs_within_0_25_of_best"
@@ -899,6 +1058,8 @@ def main() -> None:
     previous = previous_figures(old=old, summary=earlier, output_dir=output)
     matrix = frozen_matrix(records=current, output_dir=output)
     freeze = freeze_effect(records=current, output_dir=output)
+    scratch = scratch_zoom(records=current, output_dir=output)
+    post = post_comparisons(records=current, contrasts=contrasts, output_dir=output)
     operations, repeatability = benchmark_figures(
         reports=args.report_dir.parent, output_dir=output
     )
@@ -950,12 +1111,12 @@ def main() -> None:
         '<div class="box finding"><p><strong>Q1 · Input pipeline:</strong> the end-to-end SD10 TailRL–MSE gap changes from −0.265 years with augmentation to +0.968 years with fixed input. Original augmentation wins 10/15 end-to-end method/noise pairs. The comparison changes crop, flip and jitter together.</p></div>'
         + image_html(copied["augmentation_mae"])
         + '<div class="box finding"><p><strong>Q2 · Initialization and freezing:</strong> ImageNet end-to-end training beats scratch 1e-3 cosine in all 15 method/noise pairs. TailRL beats MSE in 3/3 scratch cosine conditions; MSE beats TailRL in 3/3 scratch 3e-4 constant conditions. End-to-end adaptation beats frozen ImageNet features in all 30 input/method/noise pairs.</p></div>'
-        + image_html(copied["scratch_initialization_mae"])
+        + image_html(scratch)
         + image_html(freeze)
         + '<div class="box finding"><p><strong>Q3 · Matched features:</strong> SL features beat CE features in all 25 head-loss/noise cells. On SL features, fresh MSE heads beat TailRL heads in all five noise conditions by 0.008–0.060 years. The new source matrix contains ImageNet, SL and CE features.</p></div>'
         + image_html(matrix)
         + '<div class="box finding"><p><strong>Q4 · Post-training:</strong> the selected original SL model remains ahead of all 24 continuations on test MAE. MSE restart controls beat matched TailRL continuations in all six backbone/noise cells. SL parent optima are at epochs 42/21/12 for clean/SD5/SD10; all continuations start at 25. The original baseline can select earlier epochs, so the matched MSE restart comparison is essential.</p></div>'
-        + image_html(copied["post_training_mae"])
+        + image_html(post)
         + image_html(copied["curves_post_trainable_mae"])
         + image_html(copied["curves_post_frozen_mae"])
     )
@@ -977,6 +1138,8 @@ def main() -> None:
     selected_previews = [
         matrix,
         freeze,
+        scratch,
+        post,
         *previous,
         *operations,
         copied["augmentation_mae"],
