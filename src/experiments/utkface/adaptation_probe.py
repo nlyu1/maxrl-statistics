@@ -153,14 +153,75 @@ def verify(*, plan: AdaptationPlan) -> dict:
     return summary
 
 
+def prepare_resume(*, plan: AdaptationPlan, output_dir: Path) -> AdaptationPlan:
+    job = next(
+        item for item in plan.jobs if item.identifier == "aug_original_full_cat_mse_sd0"
+    )
+    if not (job.output_dir / "result.json").is_file():
+        raise FileNotFoundError("Completed source probe is required")
+    output_dir.mkdir(parents=True, exist_ok=False)
+    for relative in ("result.json", "final.pt", "checkpoints/epoch_002.pt"):
+        path = job.output_dir / relative
+        if not path.resolve().is_relative_to(plan.output_dir.resolve()):
+            raise ValueError("Resume probe artifact escaped its workspace")
+        destination = path.with_name(f"{path.stem}-before-resume{path.suffix}")
+        if destination.exists():
+            raise FileExistsError(destination)
+        path.replace(destination)
+    resumed = plan.model_copy(
+        update={
+            "output_dir": output_dir,
+            "jobs": (job.model_copy(update={"dependencies": ()}),),
+            "max_jobs": 1,
+        }
+    )
+    write_json(path=output_dir / "plan.json", payload=resumed.model_dump(mode="json"))
+    return resumed
+
+
+def verify_resume(*, plan: AdaptationPlan) -> dict:
+    job = plan.jobs[0]
+    before = torch.load(
+        job.output_dir / "final-before-resume.pt", map_location="cpu", weights_only=True
+    )
+    after = torch.load(
+        job.output_dir / "final.pt", map_location="cpu", weights_only=True
+    )
+    maxima = []
+    for name, expected in before["model"].items():
+        actual = after["model"][name]
+        if not torch.allclose(actual, expected, rtol=1e-4, atol=1e-5):
+            raise AssertionError(f"Resumed parameter differs: {name}")
+        maxima.append(float((actual.double() - expected.double()).abs().max()))
+    old_result = json.loads((job.output_dir / "result-before-resume.json").read_text())
+    new_result = json.loads((job.output_dir / "result.json").read_text())
+    if [row["epoch"] for row in new_result["history"]] != [1, 2]:
+        raise AssertionError("Resumed history did not retain the correct epochs")
+    for old, new in zip(old_result["history"], new_result["history"], strict=True):
+        if old["learning_rates"] != new["learning_rates"]:
+            raise AssertionError("Resumed learning rates differ")
+    result = {"max_parameter_difference": max(maxima), "history_epochs": [1, 2]}
+    write_json(path=plan.output_dir / "verification.json", payload=result)
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--prepare-resume", action="store_true")
+    parser.add_argument("--verify-resume", action="store_true")
     args = parser.parse_args()
     source = AdaptationPlan.model_validate_json(args.plan.read_text())
-    if args.verify:
+    if args.verify_resume:
+        print(json.dumps(verify_resume(plan=source), indent=2))
+    elif args.prepare_resume:
+        if args.output_dir is None:
+            raise ValueError("Resume probe requires --output-dir")
+        prepared = prepare_resume(plan=source, output_dir=args.output_dir)
+        print(f"Prepared resume probe at {prepared.output_dir}")
+    elif args.verify:
         print(json.dumps(verify(plan=source), indent=2))
     else:
         if args.output_dir is None:
