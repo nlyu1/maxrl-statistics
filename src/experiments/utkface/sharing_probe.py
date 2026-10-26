@@ -193,6 +193,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--gpu", type=int)
     parser.add_argument("--epochs", type=int, default=4)
+    parser.add_argument("--max-concurrency", type=int, choices=(4, 8), default=4)
     parser.add_argument("--dispatch-lock", type=Path)
     args = parser.parse_args()
     if args.worker_config is not None:
@@ -232,6 +233,13 @@ def main() -> None:
             ("tailrl_population", 1),
             ("mse", 1),
         )
+        if args.max_concurrency == 8:
+            sequence = (
+                ("mse", 4),
+                ("mse", 8),
+                ("tailrl_population", 8),
+                ("tailrl_population", 4),
+            )
         summaries = []
         write_json(
             path=args.output_dir / "design.json",
