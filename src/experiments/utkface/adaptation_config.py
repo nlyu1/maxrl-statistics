@@ -38,6 +38,7 @@ class FeatureBankConfig(BaseConfig):
     initial_checkpoint: Path
     global_start_epoch: int = Field(ge=0)
     view_seed: int = Field(ge=0)
+    order_seed: int = Field(ge=0)
 
     @property
     def output_dir(self) -> Path:
