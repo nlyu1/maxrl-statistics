@@ -5,6 +5,7 @@ import html
 import json
 import shutil
 import statistics
+from itertools import pairwise
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -818,6 +819,54 @@ def image_html(path: str) -> str:
     return f'<figure><img alt="{html.escape(svg.stem)}" src="data:image/svg+xml;base64,{encoded}"></figure>'
 
 
+def curve_movement(records: list[dict]) -> tuple[list[dict], str]:
+    rows = []
+    for r in records:
+        if (
+            "augmentation" not in r["design_suites"]
+            or r["backbone"] != "ImageNet end-to-end"
+            or r["loss"] not in ("mse", "tailrl_population")
+        ):
+            continue
+        late = [p["validation"]["mae_mean"] for p in r["points"] if p["epoch"] >= 26]
+        rows.append({
+            "job": r["identifier"],
+            "pipeline": r["pipeline"],
+            "noise_sd": r["noise_sd"],
+            "loss": r["loss"],
+            "median_absolute_adjacent_change_epochs_26_50": statistics.median(
+                    abs(b - a) for a, b in pairwise(late)
+            ),
+            "epochs_within_0_25_of_best": r["curve_summary"][
+                "epochs_within_0_25_of_best"
+            ],
+            "best_epoch": r["best_epoch"],
+        })
+    rows.sort(key=lambda r: (r["pipeline"], r["noise_sd"], r["loss"]))
+    body = "".join(
+        "<tr>"
+        + "".join(
+            f"<td>{html.escape(str(v))}</td>"
+            for v in (
+                r["pipeline"],
+                r["noise_sd"],
+                LOSS_LABELS[r["loss"]],
+                f"{r['median_absolute_adjacent_change_epochs_26_50']:.3f}",
+                r["best_epoch"],
+                r["epochs_within_0_25_of_best"],
+            )
+        )
+        + "</tr>"
+        for r in rows
+    )
+    table = (
+        '<div class="box table"><p><strong>Within-run curve movement:</strong> median absolute change between adjacent validation epochs 26–50, in years. This describes changes between checkpoints, rather than variation across seeds.</p><table><tr><th>Pipeline</th><th>Noise SD</th><th>Loss</th><th>Median absolute step</th><th>Selected epoch</th><th>Training epochs within 0.25 of best</th></tr>'
+        + body
+        + "</table></div>"
+    )
+    return rows, table
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report-dir", type=Path, required=True)
@@ -853,6 +902,8 @@ def main() -> None:
     operations, repeatability = benchmark_figures(
         reports=args.report_dir.parent, output_dir=output
     )
+    movement, movement_table = curve_movement(current)
+    repeatability["within_run_curve_movement"] = movement
     write_json(output / "randomness-evidence.json", repeatability)
     for pipeline in ("original", "fixed"):
         panels = [
@@ -916,7 +967,7 @@ def main() -> None:
         ),
         "__QUESTIONS__": question_html,
         "__PREVIOUS__": "".join(image_html(p) for p in previous),
-        "__RANDOMNESS__": image_html(operations[1]),
+        "__RANDOMNESS__": image_html(operations[1]) + movement_table,
         "__OPERATIONS__": '<div class="box"><p>The observed median image-training epoch costs 11.03 seconds of training plus 4.22 seconds of validation. Cached head fitting costs 0.447 plus 0.043 seconds, excluding feature-bank construction. These timings come from mixed concurrency. The controlled sharing probes below compare four versus eight jobs/GPU: aggregate throughput rises about 19–20%, while each job takes longer and total memory roughly doubles from 9,000 to 18,000 MiB. Concurrency is limited per GPU and optionally by GPU count.</p></div>'
         + image_html(operations[0]),
     }
