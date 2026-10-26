@@ -66,6 +66,12 @@ def load_curves(*, root: Path, records: list[dict]) -> list[dict]:
             ],
             "curve_summary": {
                 "best_validation_mae": minimum,
+                "selected_epoch_train_loss": selected.get("train_loss"),
+                "last_five_train_loss": statistics.mean(
+                    row["train_loss"] for row in history[-5:]
+                ),
+                "selected_validation_entropy": selected["validation"].get("entropy"),
+                "final_validation_entropy": history[-1]["validation"].get("entropy"),
                 "last_validation_mae": points[-1]["validation"]["mae_mean"],
                 "last_five_validation_mae": statistics.mean(
                     row["validation"]["mae_mean"] for row in points[-5:]
