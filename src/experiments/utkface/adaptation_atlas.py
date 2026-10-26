@@ -332,6 +332,37 @@ def catalog(*, current: list[dict], old: list[dict]) -> list[dict]:
                 "The same epoch-25 SL parent is used for all four categorical losses. The frozen branch also freezes BatchNorm. CE-source fresh-head fits appear in Q3; CE-parent end-to-end continuations were not part of this final plan.",
                 fork=25,
             )
+    for noise in EXTENDED_NOISES:
+        membership = "augmentation" if noise in NOISES else "source_extensions"
+        for source, source_loss, label in (
+            ("cat_mse", "mse", "SL"),
+            ("ce", "ce", "CE"),
+        ):
+            parent = new(
+                membership=membership,
+                pipeline="original",
+                noise_sd=noise,
+                backbone="ImageNet end-to-end",
+                loss=source_loss,
+            )
+            entries = [(parent, f"Original {label} source model")] + [
+                (
+                    new(
+                        membership="frozen_heads",
+                        backbone_source=source,
+                        noise_sd=noise,
+                        loss=loss,
+                    ),
+                    "Fresh " + LOSS_LABELS[loss] + " head",
+                )
+                for loss in LOSSES
+            ]
+            add(
+                "q4",
+                f"SD {noise:g} · {label} best checkpoint · fresh-head post-training",
+                entries,
+                "This replaces the head on a frozen validation-selected source, then fits for 50 additional head epochs. Curves use separate stage-local epochs for source training and head refitting; this is a different optimization budget and initialization from the epoch-25 retained-head continuations.",
+            )
     for condition, sources in (
         ("clean", ("clean_mse", "clean_tail")),
         ("fixed_s10", ("fixed_mse", "fixed_tail")),
@@ -1115,7 +1146,7 @@ def main() -> None:
         + image_html(freeze)
         + '<div class="box finding"><p><strong>Q3 · Matched features:</strong> SL features beat CE features in all 25 head-loss/noise cells. On SL features, fresh MSE heads beat TailRL heads in all five noise conditions by 0.008–0.060 years. The new source matrix contains ImageNet, SL and CE features.</p></div>'
         + image_html(matrix)
-        + '<div class="box finding"><p><strong>Q4 · Post-training:</strong> the selected original SL model remains ahead of all 24 continuations on test MAE. MSE restart controls beat matched TailRL continuations in all six backbone/noise cells. SL parent optima are at epochs 42/21/12 for clean/SD5/SD10; all continuations start at 25. The original baseline can select earlier epochs, so the matched MSE restart comparison is essential.</p></div>'
+        + '<div class="box finding"><p><strong>Q4 · Post-training:</strong> the selected original SL model remains ahead of all 24 epoch-25 continuations on test MAE. MSE restart controls beat matched TailRL continuations in all six backbone/noise cells. SL parent optima are at epochs 42/21/12 for clean/SD5/SD10; all continuations start at 25. The original baseline can select earlier epochs, so the matched MSE restart comparison is essential. Fresh-head refitting is a separate procedure: at SD10, CE improves from 7.307 to 6.719 with a TailRL head or 6.671 with an MSE head; SL improves from 6.598 to 6.344 or 6.284. These refits add 50 head epochs and reset the head. Both procedures have separate views in the explorer.</p></div>'
         + image_html(post)
         + image_html(copied["curves_post_trainable_mae"])
         + image_html(copied["curves_post_frozen_mae"])
