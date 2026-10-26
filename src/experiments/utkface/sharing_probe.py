@@ -19,37 +19,37 @@ from src.experiments.utkface.scheduler import gpu_inventory, gpu_is_free
 def worker(*, config_path: Path, start_path: Path) -> None:
     config = RunConfig.model_validate_json(config_path.read_text())
     directory = config_path.parent
-    with distributed_context(device=config.device) as context:
-        with torch.cuda.device(context.device):
-            torch.empty(1, device=context.device)
-            write_json(path=directory / "ready.json", payload={"pid": os.getpid()})
-            deadline = time.monotonic() + 180
-            while not start_path.exists():
-                if time.monotonic() > deadline:
-                    raise TimeoutError("Cohort did not start")
-                time.sleep(0.1)
-            torch.cuda.reset_peak_memory_stats(context.device)
-            started = time.monotonic()
-            result = train(config=config, context=context)
-            torch.cuda.synchronize(context.device)
-            history = json.loads((config.output_dir / "history.json").read_text())
-            write_json(
-                path=directory / "probe-result.json",
-                payload={
-                    "pid": os.getpid(),
-                    "wall_seconds": time.monotonic() - started,
-                    "epoch_seconds": [row["seconds"] for row in history],
-                    "steady_epoch_seconds": mean(row["seconds"] for row in history[1:]),
-                    "peak_allocated_mib": torch.cuda.max_memory_allocated(
-                        context.device
-                    )
-                    / 2**20,
-                    "peak_reserved_mib": torch.cuda.max_memory_reserved(context.device)
-                    / 2**20,
-                    "validation": result["validation"],
-                    "test_evaluated": False,
-                },
-            )
+    with (
+        distributed_context(device=config.device) as context,
+        torch.cuda.device(context.device),
+    ):
+        torch.empty(1, device=context.device)
+        write_json(path=directory / "ready.json", payload={"pid": os.getpid()})
+        deadline = time.monotonic() + 180
+        while not start_path.exists():
+            if time.monotonic() > deadline:
+                raise TimeoutError("Cohort did not start")
+            time.sleep(0.1)
+        torch.cuda.reset_peak_memory_stats(context.device)
+        started = time.monotonic()
+        result = train(config=config, context=context)
+        torch.cuda.synchronize(context.device)
+        history = json.loads((config.output_dir / "history.json").read_text())
+        write_json(
+            path=directory / "probe-result.json",
+            payload={
+                "pid": os.getpid(),
+                "wall_seconds": time.monotonic() - started,
+                "epoch_seconds": [row["seconds"] for row in history],
+                "steady_epoch_seconds": mean(row["seconds"] for row in history[1:]),
+                "peak_allocated_mib": torch.cuda.max_memory_allocated(context.device)
+                / 2**20,
+                "peak_reserved_mib": torch.cuda.max_memory_reserved(context.device)
+                / 2**20,
+                "validation": result["validation"],
+                "test_evaluated": False,
+            },
+        )
 
 
 def cohort(
@@ -66,6 +66,12 @@ def cohort(
     directory.mkdir()
     start_path = directory / "start"
     selected = next(gpu for gpu in gpu_inventory() if gpu["index"] == gpu_index)
+    release_deadline = time.monotonic() + 15
+    while not selected["pids"] and not gpu_is_free(gpu=selected):
+        if time.monotonic() > release_deadline:
+            break
+        time.sleep(1)
+        selected = next(gpu for gpu in gpu_inventory() if gpu["index"] == gpu_index)
     if not gpu_is_free(gpu=selected):
         raise RuntimeError(f"GPU became occupied before cohort launch: {selected}")
     processes = []
