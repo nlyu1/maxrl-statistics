@@ -86,7 +86,9 @@ def validate_plan(*, plan: AdaptationPlan) -> None:
     if len(outputs) != len(set(outputs)):
         raise ValueError("Adaptation jobs must have distinct output directories")
     if plan.output_dir.resolve() in outputs:
-        raise ValueError("A job output directory cannot equal the plan output directory")
+        raise ValueError(
+            "A job output directory cannot equal the plan output directory"
+        )
     for job in plan.jobs:
         if not job.config_path.is_file():
             raise FileNotFoundError(f"Missing job config: {job.config_path}")
@@ -142,7 +144,20 @@ def complete_artifact(*, job: AdaptationJob) -> Path | None:
         payload = read_json(path=path)
     except (OSError, ValueError):
         return None
-    return path if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        return None
+    expected = job_configuration(job=job).model_dump(mode="json")
+    if payload.get("config") != expected:
+        return None
+    if job.kind == "train":
+        if payload.get("status") != "complete":
+            return None
+        required = ("best.pt", "final.pt", "history.json")
+    else:
+        if payload.get("schema") != "utkface-feature-bank":
+            return None
+        required = ("bank.pt",)
+    return path if all((job.output_dir / name).is_file() for name in required) else None
 
 
 def event(*, root: Path, event_type: str, **fields) -> None:
@@ -234,9 +249,7 @@ def terminate_owned_group(
     try:
         if os.getpgid(identity["pid"]) != attempt["process_group"]:
             return False
-        os.killpg(
-            attempt["process_group"], signal.SIGKILL if force else signal.SIGTERM
-        )
+        os.killpg(attempt["process_group"], signal.SIGKILL if force else signal.SIGTERM)
     except ProcessLookupError:
         return False
     except PermissionError:
@@ -260,14 +273,10 @@ def terminate_owned_group(
     return True
 
 
-def request_termination(
-    *, attempt: dict, reason: str, force: bool, root: Path
-) -> None:
+def request_termination(*, attempt: dict, reason: str, force: bool, root: Path) -> None:
     attempt.setdefault("termination_requested_at", now())
     attempt.setdefault("termination_reason", reason)
-    terminate_owned_group(
-        attempt=attempt, force=force, reason=reason, root=root
-    )
+    terminate_owned_group(attempt=attempt, force=force, reason=reason, root=root)
     if force:
         attempt.setdefault("forced_termination_at", now())
 
@@ -282,10 +291,7 @@ def command_matches_worker(*, pid: int, attempt: dict) -> bool:
         if attempt["kind"] == "train"
         else "src.experiments.utkface.feature_bank"
     )
-    return (
-        module.encode() in arguments
-        and attempt["config_path"].encode() in arguments
-    )
+    return module.encode() in arguments and attempt["config_path"].encode() in arguments
 
 
 def register_worker(*, attempt: dict, root: Path) -> bool:
@@ -377,23 +383,20 @@ def attempt_configuration(
 ) -> Path:
     model = job_configuration(job=job)
     if model.run.manifest.resolve() != plan.manifest.resolve():
-        raise ValueError(
-            f"Job {job.identifier} config manifest differs from the plan"
-        )
+        raise ValueError(f"Job {job.identifier} config manifest differs from the plan")
     if model.run.output_dir.resolve() != job.output_dir.resolve():
         raise ValueError(
             f"Job {job.identifier} config output_dir differs from the plan"
         )
-    run = model.run.model_copy(update={
-        "device": "cuda:0",
-        "output_dir": job.output_dir,
-    })
+    run = model.run.model_copy(
+        update={
+            "device": "cuda:0",
+            "output_dir": job.output_dir,
+        }
+    )
     configured = model.model_copy(update={"run": run})
     attempt_directory = (
-        plan.output_dir
-        / "attempts"
-        / job.identifier
-        / f"attempt{attempt_number}"
+        plan.output_dir / "attempts" / job.identifier / f"attempt{attempt_number}"
     )
     attempt_directory.mkdir(parents=True, exist_ok=True)
     path = attempt_directory / "config.json"
@@ -445,9 +448,7 @@ def launch_job(
     started_at_ns = time.time_ns()
     started_at = started_at_ns / 1_000_000_000
     environment = sanitized_environment(gpu_uuid=gpu["uuid"])
-    environment["OMP_NUM_THREADS"] = str(
-        job_configuration(job=job).run.cpu_threads
-    )
+    environment["OMP_NUM_THREADS"] = str(job_configuration(job=job).run.cpu_threads)
     previous = record["attempts"][-1] if record["attempts"] else None
     with log_path.open("w") as log:
         child = subprocess.Popen(
@@ -544,17 +545,14 @@ def ready_jobs(*, state: dict, plan: AdaptationPlan) -> list[AdaptationJob]:
     candidates = []
     for job in plan.jobs:
         record = state["jobs"][job.identifier]
-        if (
-            record["status"] == "pending"
-            and all(successes.get(dependency, False) for dependency in job.dependencies)
+        if record["status"] == "pending" and all(
+            successes.get(dependency, False) for dependency in job.dependencies
         ):
             candidates.append(job)
     return sorted(candidates, key=lambda job: (job.priority, job.identifier))
 
 
-def foreign_gpu_pids(
-    *, gpu: dict, attempts: list[dict]
-) -> list[int]:
+def foreign_gpu_pids(*, gpu: dict, attempts: list[dict]) -> list[int]:
     if not attempts or not any(
         attempt.get("worker_identity") is not None for attempt in attempts
     ):
@@ -718,8 +716,7 @@ def monitor_foreign(
         count = cooldowns.get(uuid, {}).get("count", 0) + 1
         cooldowns[uuid] = {
             "count": count,
-            "cooldown_until": current
-            + min(3600.0, GPU_COOLDOWN_SECONDS * count),
+            "cooldown_until": current + min(3600.0, GPU_COOLDOWN_SECONDS * count),
         }
         reusable.discard(uuid)
         event(
@@ -783,9 +780,7 @@ def eligible_gpus(
             attempts
             and len(attempts) < plan.per_gpu_jobs
             and current
-            >= state.get("gpu_cooldowns", {})
-            .get(uuid, {})
-            .get("cooldown_until", 0)
+            >= state.get("gpu_cooldowns", {}).get(uuid, {}).get("cooldown_until", 0)
             and not foreign_gpu_pids(gpu=gpu, attempts=attempts)
         ):
             candidates.append({**gpu, "admission": "owned_slot"})
@@ -800,9 +795,7 @@ def eligible_gpus(
     )
 
 
-def final_gpu_admission(
-    *, candidate: dict, state: dict, plan: AdaptationPlan
-) -> dict:
+def final_gpu_admission(*, candidate: dict, state: dict, plan: AdaptationPlan) -> dict:
     current = next(
         (gpu for gpu in gpu_inventory() if gpu["uuid"] == candidate["uuid"]),
         None,
@@ -827,7 +820,8 @@ def final_gpu_admission(
                 f"GPU gained foreign processes during admission: {foreign}"
             )
         cooldown = (
-            state.get("gpu_cooldowns", {})
+            state
+            .get("gpu_cooldowns", {})
             .get(current["uuid"], {})
             .get("cooldown_until", 0)
         )
@@ -885,9 +879,7 @@ def schedule(
                 candidates.remove(gpu)
                 continue
             try:
-                selected = final_gpu_admission(
-                    candidate=gpu, state=state, plan=plan
-                )
+                selected = final_gpu_admission(candidate=gpu, state=state, plan=plan)
             except GpuAdmissionRejected:
                 candidates.remove(gpu)
                 if gpu["admission"] == "idle":
@@ -928,9 +920,7 @@ def schedule(
         first_idle.pop(selected["uuid"], None)
 
 
-def wait_for_progress(
-    *, active: list[tuple[str, dict]], timeout: float
-) -> None:
+def wait_for_progress(*, active: list[tuple[str, dict]], timeout: float) -> None:
     descriptors = []
     try:
         for _, record in active:
@@ -965,9 +955,9 @@ def compact_status(*, state: dict, plan: AdaptationPlan) -> dict:
             "gpu_uuid": record["attempts"][-1]["gpu_uuid"],
             "run_device": "cuda:0",
             "pid": record["attempts"][-1]["pid"],
-            "worker_pid": (
-                record["attempts"][-1].get("worker_identity") or {}
-            ).get("pid"),
+            "worker_pid": (record["attempts"][-1].get("worker_identity") or {}).get(
+                "pid"
+            ),
             "minutes": (current - record["attempts"][-1]["started_at"]) / 60,
         }
         for identifier, record in active_state(state=state)
@@ -1064,9 +1054,7 @@ def load_state(*, plan: AdaptationPlan, root: Path) -> dict:
             record["attempts"][-1]["resumed_after_supervisor_restart"] = True
     state.setdefault("gpu_cooldowns", {})
     if state["status"] in {"completed", "failed"}:
-        if any(
-            record["status"] not in TERMINAL for record in state["jobs"].values()
-        ):
+        if any(record["status"] not in TERMINAL for record in state["jobs"].values()):
             raise ValueError("Terminal adaptation queue contains a nonterminal job")
         if state["status"] == "completed" and any(
             record["status"] != "completed" for record in state["jobs"].values()
@@ -1074,7 +1062,9 @@ def load_state(*, plan: AdaptationPlan, root: Path) -> dict:
             raise ValueError("Completed adaptation queue contains an unsuccessful job")
         return state
     if state["status"] not in {"running", "stopping", "stopped"}:
-        raise ValueError(f"Saved adaptation queue has invalid status: {state['status']}")
+        raise ValueError(
+            f"Saved adaptation queue has invalid status: {state['status']}"
+        )
     if state["status"] != "running":
         state["status"] = "running"
     return state
@@ -1083,11 +1073,7 @@ def load_state(*, plan: AdaptationPlan, root: Path) -> dict:
 def finish_if_terminal(*, state: dict, plan: AdaptationPlan) -> bool:
     statuses = {record["status"] for record in state["jobs"].values()}
     if statuses <= TERMINAL:
-        state["status"] = (
-            "completed"
-            if statuses == {"completed"}
-            else "failed"
-        )
+        state["status"] = "completed" if statuses == {"completed"} else "failed"
         return True
     return False
 
