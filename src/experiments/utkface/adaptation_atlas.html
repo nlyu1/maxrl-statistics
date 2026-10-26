@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>UTKFace research questions and comparison atlas</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#18283b;font:15px/1.5 system-ui,sans-serif}header{padding:28px max(24px,5vw);background:#132e48;color:white}header h1{margin:0;font-size:30px}main{max-width:1600px;margin:auto;padding:24px}h2{font-size:21px;margin-top:30px}.box,.plot,.note{background:white;border:1px solid #d6e0e9;border-radius:6px;padding:16px;margin:14px 0}.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.controls label{display:flex;flex-direction:column;font-size:12px;color:#4d6072}select,button{font:14px system-ui;padding:8px;border:1px solid #9eb2c2;background:white;color:#18283b;border-radius:4px;max-width:100%}#comparison{max-width:850px}.plot{padding:6px}#learning{min-height:480px}#endpoints{min-height:350px}#paired{min-height:220px}.table{overflow:auto}table{border-collapse:collapse;white-space:nowrap;width:100%;font-size:12px}th,td{padding:7px;border-bottom:1px solid #dae3eb;text-align:right}th:first-child,td:first-child{text-align:left}th{background:#edf3f8}.muted{color:#52687a;font-size:13px}.finding{border-left:4px solid #3976a6;padding-left:14px}summary{cursor:pointer;font-weight:600}figure{margin:22px 0}figure img{width:100%;height:auto}nav{display:flex;gap:16px;flex-wrap:wrap}a{color:#155c9a}header a{color:#d7eaff}
+</style><script>__PLOTLY__</script></head>
+<body><header><h1>UTKFace: research questions and comparison atlas</h1><p>Every current fit, earlier feature audit, raw trajectory and near-best region.</p><nav><a href="#explorer">Explore comparisons</a><a href="#questions">Question-by-question results</a><a href="#randomness">Randomness</a><a href="#previous">Earlier finding</a><a href="#operations">Timing and GPU sharing</a></nav></header>
+<main>
+<div class="box"><p>Current sweep: 178 distinct fits, 4,096 training images, 2,308 validation images and 2,308 test images. The earlier audit contributes eight frozen-head refits and four source-model histories. All checkpoint selection uses clean validation mean MAE. Test results are available at selected and final checkpoints for the current sweep; the earlier head audit records selected-checkpoint test metrics.</p><p id="coverage"></p></div>
+<section id="explorer"><h2>All settings and comparisons</h2><div class="box controls">
+<label>Research question<select id="question"></select></label><label>Comparison<select id="comparison"></select></label>
+<label>Point statistic<select id="statistic"><option value="mean">Policy mean</option><option value="median">Policy median</option><option value="mode">Policy mode</option></select></label>
+<label>Metric<select id="metric"><option value="mae">MAE</option><option value="rmse">RMSE</option><option value="spearman">Spearman</option></select></label>
+<label><span>Display trend</span><span><input type="checkbox" id="trend"> Overlay centered 5-epoch median</span></label>
+<button id="export">Export visible learning curves as SVG</button></div>
+<p class="muted">The raw curves always remain visible. The optional rolling median describes neighboring checkpoints; it is not a confidence interval and does not change checkpoint selection. Old refit histories contain mean MAE/RMSE, so unavailable statistic/metric combinations are disabled.</p>
+<div id="comparison-note" class="note"></div><div id="learning" class="plot"></div><div id="endpoints" class="plot"></div><div id="paired" class="plot"></div>
+<div class="box table"><table id="metadata"></table></div></section>
+<section id="questions"><h2>Results organized around the research questions</h2>__QUESTIONS__</section>
+<section id="randomness"><h2>What the raggedness measures</h2>
+<div class="box"><p>Evaluation inputs and the validation set are fixed. Evaluation calls model.eval(), uses center crops, and computes exact policy mean/median/mode metrics. Learning-curve fluctuations describe different model checkpoints, with both weights and BatchNorm running statistics changing during training. The configured CUDA path allows nondeterministic algorithms; deterministic inputs do not guarantee identical training repeats.</p>
+<p>The archived sharing probes repeat nominally identical four-epoch training configurations. Their spread measures short-run training repeatability under that probe protocol. It is not the standard error of the new 50-epoch study. Paired test-image bootstrap intervals condition on already trained models and their selected checkpoints; they do not measure training-seed or corruption-field uncertainty.</p>
+<p>A useful replication varies training randomness across paired method arms and independently varies corruption fields. Multiple head losses fitted on one backbone, neighboring epochs, and many test-image bootstrap draws do not create independent backbone replications.</p></div>__RANDOMNESS__</section>
+<section id="previous"><h2>Earlier SL-versus-TailRL feature finding</h2><div class="box">
+<p>The earlier audit directly compared SL-trained and TailRL-trained backbones on clean data and fixed SD10. The new 75-head sweep compares ImageNet, SL and CE backbones across five noise conditions. The earlier direct SL/Tail representation result and the new SL/CE source comparison answer related but distinct questions.</p>
+<p>The earlier SD10 Tail-head advantage on SL features was 0.064 years. In the new sweep the MSE head wins on SL features at all five noise levels by 0.008–0.060 years. Protocol differences include newly trained source checkpoints, fixed versus augmented head inputs, and head initialization/order seeds (earlier 20261025, new 42/2026). These are different protocols, rather than repeated measurements of an identical fit.</p>
+<p>For the earlier checkpoints, refitted readouts and ridge probes support a representation difference. Label-dependent shape gradients remain a proposed cause that requires an encoder-gradient intervention. Refitting changes head initialization, optimization budget and feature/input protocol together; its gain does not isolate freezing alone.</p></div>__PREVIOUS__</section>
+<section id="operations"><h2>Timing, caching and GPU sharing</h2>__OPERATIONS__</section>
+<p class="muted">Generated from retained experiment artifacts. Curves are validation curves; test was not evaluated at every epoch. One model seed and one corruption field are used in the current study. No new training was launched to build this atlas.</p>
+</main>
+<script id="atlas-data" type="application/json">__DATA__</script>
+<script>
+const D=JSON.parse(document.getElementById('atlas-data').textContent), $=id=>document.getElementById(id), runs=new Map(D.runs.map(r=>[r.id,r]));
+const palette=['#276fbf','#198754','#d1495b','#7b4ab5','#ef8354','#555555'];
+function option(select,value,label){const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o)}
+function field(){return $('metric').value+'_'+$('statistic').value}
+function current(){return D.comparisons.find(c=>c.id===$('comparison').value)}
+function values(r,k){const i=D.fields.indexOf(k);return r.points.map(p=>p.v[i])}
+function median(a){const b=a.filter(Number.isFinite).sort((x,y)=>x-y),n=b.length;return n?(n%2?b[Math.floor(n/2)]:(b[n/2-1]+b[n/2])/2):null}
+function smooth(a){return a.map((_,i)=>median(a.slice(Math.max(0,i-2),Math.min(a.length,i+3))))}
+function finite(a){return a.filter(Number.isFinite)}
+function allowed(c,k){return c.entries.every(e=>values(runs.get(e.id),k).some(Number.isFinite))}
+function syncMetrics(){const c=current();for(const o of $('statistic').options)o.disabled=!allowed(c,$('metric').value+'_'+o.value);for(const o of $('metric').options)o.disabled=!allowed(c,o.value+'_'+$('statistic').value);if(!allowed(c,field())){$('statistic').value='mean';$('metric').value='mae';syncMetrics()}}
+function fmt(x){return Number.isFinite(x)?x.toFixed(4):'—'}
+function cell(row,value){const td=document.createElement('td');td.textContent=value;row.append(td)}
+function draw(){const c=current();if(!c)return;syncMetrics();const k=field(),isHigh=k.startsWith('spearman'),lineTraces=[],allValues=[],nearEpochs=[],allEpochs=[];
+  c.entries.forEach((e,i)=>{const r=runs.get(e.id),x=r.points.map(p=>p.epoch),y=values(r,k),color=e.color||palette[i%palette.length],selected=x.indexOf(r.best_epoch);allValues.push(...finite(y));allEpochs.push(...x);
+    for(const suffix of ['', '2']){lineTraces.push({x,y,type:'scatter',mode:'lines',name:e.label,line:{color,width:$('trend').checked?1:2,dash:e.dash||'solid'},opacity:$('trend').checked?.4:1,legendgroup:r.id,showlegend:suffix==='',xaxis:'x'+suffix,yaxis:'y'+suffix,hovertemplate:e.label+'<br>epoch %{x}<br>%{y:.4f}<extra></extra>'});
+      if($('trend').checked)lineTraces.push({x,y:smooth(y),type:'scatter',mode:'lines',line:{color,width:2.7},name:e.label+' rolling median',legendgroup:r.id,showlegend:false,xaxis:'x'+suffix,yaxis:'y'+suffix});
+      if(selected>=0)lineTraces.push({x:[x[selected]],y:[y[selected]],type:'scatter',mode:'markers',marker:{symbol:'star',size:12,color,line:{color:'white',width:1}},legendgroup:r.id,showlegend:false,xaxis:'x'+suffix,yaxis:'y'+suffix,name:e.label+' selected by validation mean MAE'});
+    }});
+  const b=isHigh?Math.max(...allValues):Math.min(...allValues),span=isHigh?.08:(k.startsWith('rmse')?2:1.3);
+  c.entries.forEach(e=>{const r=runs.get(e.id);values(r,k).forEach((v,i)=>{if(Number.isFinite(v)&&(isHigh?v>=b-span:v<=b+span))nearEpochs.push(r.points[i].epoch)})});
+  const unit=k.startsWith('spearman')?'correlation':'years',axisTitle=$('metric').selectedOptions[0].text+' of '+$('statistic').value+' ('+unit+')';
+  const layout={title:{text:c.title,font:{size:17}},height:490,margin:{l:72,r:25,t:100,b:62},legend:{orientation:'h',y:1.16,groupclick:'togglegroup'},paper_bgcolor:'white',plot_bgcolor:'white',hovermode:'closest',xaxis:{domain:[0,.46],title:'Global epoch',range:[Math.min(...allEpochs),Math.max(...allEpochs)]},yaxis:{title:axisTitle},xaxis2:{domain:[.56,1],title:'Global epoch',range:[Math.max(Math.min(...allEpochs),Math.min(...nearEpochs)-2),Math.max(...allEpochs)]},yaxis2:{anchor:'x2',title:axisTitle,range:isHigh?[b-span,Math.min(1,b+.008)]:[b-.08,b+span]},annotations:[{text:'Full trajectory',x:.22,y:1.05,xref:'paper',yref:'paper',showarrow:false},{text:'Near-best region · raw selected checkpoints starred',x:.79,y:1.05,xref:'paper',yref:'paper',showarrow:false}]};
+  if(c.fork!==undefined)layout.shapes=[{type:'line',x0:c.fork,x1:c.fork,y0:0,y1:1,xref:'x',yref:'paper',line:{dash:'dot',color:'#888'}},{type:'line',x0:c.fork,x1:c.fork,y0:0,y1:1,xref:'x2',yref:'paper',line:{dash:'dot',color:'#888'}}];
+  Plotly.react('learning',lineTraces,layout,{responsive:true,toImageButtonOptions:{format:'svg',filename:c.id+'_'+k,width:1700,height:650}});
+  const labels=c.entries.map(e=>e.label),selected=c.entries.map(e=>runs.get(e.id).best[k]??null),last=c.entries.map(e=>runs.get(e.id).final?.[k]??null);
+  Plotly.react('endpoints',[{x:labels,y:selected,type:'scatter',mode:'markers',name:'Test at validation-selected checkpoint',marker:{size:12,color:'#276fbf',symbol:'diamond'}},{x:labels,y:last,type:'scatter',mode:'markers',name:'Test at final checkpoint',marker:{size:12,color:'#d1495b',symbol:'circle-open'}}],{height:350,title:{text:'Clean test endpoints · '+axisTitle,font:{size:16}},margin:{l:72,r:25,t:65,b:90},yaxis:{title:axisTitle},legend:{orientation:'h',y:1.16}},{responsive:true,toImageButtonOptions:{format:'svg',filename:c.id+'_test_'+k}});
+  const ids=new Set(c.entries.map(e=>e.id)),lookup=new Map(c.entries.map(e=>[e.id,e.label])),ci=D.contrasts.filter(v=>ids.has(v.first)&&ids.has(v.second));
+  $('paired').style.display=k==='mae_mean'&&ci.length?'block':'none';
+  if(k==='mae_mean'&&ci.length)Plotly.react('paired',[{x:ci.map(v=>v.delta),y:ci.map(v=>lookup.get(v.first)+' − '+lookup.get(v.second)),type:'scatter',mode:'markers',marker:{size:10,color:'#198754'},error_x:{type:'data',symmetric:false,array:ci.map(v=>v.ci[1]-v.delta),arrayminus:ci.map(v=>v.delta-v.ci[0])}}],{height:Math.max(230,ci.length*35+100),title:{text:'Paired test-image bootstrap 95% intervals · MAE difference',font:{size:16}},margin:{l:310,r:25,t:55,b:55},xaxis:{title:'First − second (years); negative favors first'},shapes:[{type:'line',x0:0,x1:0,y0:0,y1:1,xref:'x',yref:'paper',line:{color:'#777',dash:'dot'}}]},{responsive:true});
+  $('comparison-note').textContent=c.note+' Stars use validation mean MAE for every metric. Bootstrap intervals condition on these fitted models; no training-seed interval is implied.';
+  const table=$('metadata');table.replaceChildren();const head=document.createElement('tr');['Run','Best epoch','Best validation mean MAE','Selected test '+k,'Final test '+k,'Init / features','Inputs','Peak head LR'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.append(th)});table.append(head);
+  c.entries.forEach(e=>{const r=runs.get(e.id),row=document.createElement('tr');[e.label,r.best_epoch,fmt(Math.min(...finite(values(r,'mae_mean')))),fmt(r.best[k]),fmt(r.final?.[k]),r.backbone,r.pipeline,r.lr].forEach(v=>cell(row,v));table.append(row)});
+  history.replaceState(null,'','#'+c.id);
+}
+function comparisons(preferred){const q=$('question').value;$('comparison').replaceChildren();D.comparisons.filter(c=>c.question===q).forEach(c=>option($('comparison'),c.id,c.title));if(preferred&&D.comparisons.some(c=>c.id===preferred&&c.question===q))$('comparison').value=preferred;draw()}
+for(const q of D.questions)option($('question'),q.id,q.label);
+const initial=D.comparisons.find(c=>c.id===location.hash.slice(1));if(initial)$('question').value=initial.question;
+$('coverage').textContent=D.coverage;
+$('question').addEventListener('change',()=>comparisons());['comparison','statistic','metric','trend'].forEach(id=>$(id).addEventListener('change',draw));
+$('export').addEventListener('click',()=>Plotly.downloadImage('learning',{format:'svg',filename:current().id+'_'+field(),width:1700,height:650}));comparisons(initial?.id);
+</script></body></html>
