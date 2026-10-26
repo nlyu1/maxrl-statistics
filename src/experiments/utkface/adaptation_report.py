@@ -678,6 +678,7 @@ def save(fig: plt.Figure, output_dir: Path, name: str) -> str:
     path, temporary = output_dir / name, (output_dir / name).with_suffix(".tmp.png")
     fig.savefig(temporary, dpi=220, bbox_inches="tight", facecolor="white")
     temporary.replace(path)
+    fig.savefig(path.with_suffix(".svg"), bbox_inches="tight", facecolor="white")
     plt.close(fig)
     return str(path)
 
