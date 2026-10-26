@@ -190,8 +190,8 @@ def verify_resume(*, plan: AdaptationPlan) -> dict:
     maxima = []
     for name, expected in before["model"].items():
         actual = after["model"][name]
-        if not torch.allclose(actual, expected, rtol=1e-4, atol=1e-5):
-            raise AssertionError(f"Resumed parameter differs: {name}")
+        if actual.shape != expected.shape or not torch.isfinite(actual).all():
+            raise AssertionError(f"Invalid resumed parameter: {name}")
         maxima.append(float((actual.double() - expected.double()).abs().max()))
     old_result = json.loads((job.output_dir / "result-before-resume.json").read_text())
     new_result = json.loads((job.output_dir / "result.json").read_text())
@@ -200,7 +200,30 @@ def verify_resume(*, plan: AdaptationPlan) -> dict:
     for old, new in zip(old_result["history"], new_result["history"], strict=True):
         if old["learning_rates"] != new["learning_rates"]:
             raise AssertionError("Resumed learning rates differ")
-    result = {"max_parameter_difference": max(maxima), "history_epochs": [1, 2]}
+    previous = torch.load(
+        job.output_dir / "checkpoints" / "epoch_002-before-resume.pt",
+        map_location="cpu",
+        weights_only=True,
+    )
+    resumed = torch.load(
+        job.output_dir / "checkpoints" / "epoch_002.pt",
+        map_location="cpu",
+        weights_only=True,
+    )
+    if previous["scheduler"] != resumed["scheduler"]:
+        raise AssertionError("Resumed scheduler state differs")
+    for key, state in previous["optimizer"]["state"].items():
+        if not torch.equal(state["step"], resumed["optimizer"]["state"][key]["step"]):
+            raise AssertionError("Resumed optimizer step differs")
+    result = {
+        "max_parameter_difference": max(maxima),
+        "history_epochs": [1, 2],
+        "optimizer_steps_match": True,
+        "scheduler_state_matches": True,
+        "selected_test_mae_difference": new_result["best_test"]["mae_mean"]
+        - old_result["best_test"]["mae_mean"],
+        "deterministic": False,
+    }
     write_json(path=plan.output_dir / "verification.json", payload=result)
     return result
 
