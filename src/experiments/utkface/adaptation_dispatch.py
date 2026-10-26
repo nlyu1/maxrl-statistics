@@ -771,7 +771,9 @@ def eligible_gpus(
         now=current,
     )
     for gpu in idle:
-        if gpu["uuid"] not in active_by_uuid:
+        if gpu["uuid"] not in active_by_uuid and (
+            plan.max_gpus == 0 or len(active_by_uuid) < plan.max_gpus
+        ):
             candidates.append({**gpu, "admission": "idle"})
     for gpu in inventory:
         uuid = gpu["uuid"]
@@ -829,10 +831,20 @@ def final_gpu_admission(*, candidate: dict, state: dict, plan: AdaptationPlan) -
             raise GpuAdmissionRejected(
                 f"GPU is cooling down after preemption: {current['uuid']}"
             )
-    elif not gpu_is_free(gpu=current):
-        raise GpuAdmissionRejected(
-            f"New GPU is no longer idle during admission: {current['uuid']}"
-        )
+    else:
+        active_gpus = {
+            attempt["gpu_uuid"]
+            for _, record in active_state(state=state)
+            for attempt in (record["attempts"][-1],)
+        }
+        if plan.max_gpus > 0 and len(active_gpus) >= plan.max_gpus:
+            raise GpuAdmissionRejected(
+                f"Active GPU limit reached during admission: {plan.max_gpus}"
+            )
+        if not gpu_is_free(gpu=current):
+            raise GpuAdmissionRejected(
+                f"New GPU is no longer idle during admission: {current['uuid']}"
+            )
     return {**current, "admission": candidate["admission"]}
 
 
@@ -847,9 +859,6 @@ def schedule(
     root: Path,
 ) -> None:
     propagate_dependencies(state=state, plan=plan)
-    active_count = len(active_state(state=state))
-    if active_count >= plan.max_jobs:
-        return
     jobs = ready_jobs(state=state, plan=plan)
     candidates = eligible_gpus(
         inventory=inventory,
@@ -859,7 +868,7 @@ def schedule(
         reusable=reusable,
     )
     for job in jobs:
-        if active_count >= plan.max_jobs or not candidates:
+        if not candidates:
             break
         selected = None
         for gpu in list(candidates):
@@ -915,7 +924,6 @@ def schedule(
                 error=str(error),
             )
             continue
-        active_count = len(active_state(state=state))
         reusable.discard(selected["uuid"])
         first_idle.pop(selected["uuid"], None)
 
@@ -962,12 +970,18 @@ def compact_status(*, state: dict, plan: AdaptationPlan) -> dict:
         }
         for identifier, record in active_state(state=state)
     ]
+    active_gpus = {
+        attempt["gpu_uuid"]
+        for _, record in active_state(state=state)
+        for attempt in (record["attempts"][-1],)
+    }
     return {
         "status": state["status"],
         "counts": dict(counts),
         "active": active,
         "active_jobs": len(active),
-        "max_jobs": plan.max_jobs,
+        "active_gpus": len(active_gpus),
+        "max_gpus": plan.max_gpus,
         "per_gpu_jobs": plan.per_gpu_jobs,
         "attempt_limit": MAX_ATTEMPTS,
         "gpu_cooldowns": state.get("gpu_cooldowns", {}),

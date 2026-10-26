@@ -16,6 +16,8 @@ For debugging, prefer `uv run python -c ...` snippets or short one-off scripts i
 ## GPU & Precision Usage
 Use GPU code deliberately. Moving tensors and modules with `.to(device)` is not enough; wrap execution in `torch.cuda.device(device)`, `torch.device(device)`, and `torch.autocast(device_type=..., dtype=torch.bfloat16)` contexts. Default training and benchmarking to bfloat16 rather than float32.
 
+Limit experiment concurrency by the number of claimed GPUs and/or jobs per GPU. Do not impose a global task-count limit across GPUs.
+
 ## Coding Style & Naming Conventions
 Use Python 3.12, 4-space indentation, full-path imports, and minimal (empty) `__init__.py` files. Prefer immutable Pydantic configs and `pydantic.dataclasses.dataclass(kw_only=True)` for runtime containers. Use keyword-only APIs, avoid permissive unions like `Type | None`, and prefer informative tensor typing, including Jaxtyping where useful. Do not define `__all__` in files; it's a no-op. Do not silently delete commented-out blocks without explicitly flagging.
 

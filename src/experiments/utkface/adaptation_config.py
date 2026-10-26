@@ -59,6 +59,6 @@ class AdaptationPlan(BaseConfig):
     manifest: Path
     jobs: tuple[AdaptationJob, ...]
     per_gpu_jobs: int = Field(ge=1, le=8)
-    max_jobs: int = Field(ge=1, le=80)
+    max_gpus: int = Field(default=0, ge=0)
     poll_seconds: float = Field(gt=0, le=30)
     dispatch_lock: Path

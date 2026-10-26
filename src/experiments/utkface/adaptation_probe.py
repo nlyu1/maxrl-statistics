@@ -85,7 +85,7 @@ def create_probe(*, source: AdaptationPlan, output_dir: Path) -> AdaptationPlan:
             "output_dir": output_dir,
             "jobs": tuple(jobs),
             "per_gpu_jobs": 4,
-            "max_jobs": 4,
+            "max_gpus": 1,
         }
     )
     write_json(path=output_dir / "plan.json", payload=plan.model_dump(mode="json"))
@@ -172,7 +172,8 @@ def prepare_resume(*, plan: AdaptationPlan, output_dir: Path) -> AdaptationPlan:
         update={
             "output_dir": output_dir,
             "jobs": (job.model_copy(update={"dependencies": ()}),),
-            "max_jobs": 1,
+            "per_gpu_jobs": 1,
+            "max_gpus": 1,
         }
     )
     write_json(path=output_dir / "plan.json", payload=resumed.model_dump(mode="json"))

@@ -27,8 +27,12 @@ def create_plan(
     manifest: Path,
     output_dir: Path,
     per_gpu_jobs: int,
-    max_jobs: int,
+    max_gpus: int = 0,
 ) -> AdaptationPlan:
+    if not 1 <= per_gpu_jobs <= 8:
+        raise ValueError("per_gpu_jobs must be between 1 and 8")
+    if max_gpus < 0:
+        raise ValueError("max_gpus must be nonnegative")
     output_dir.mkdir(parents=True, exist_ok=False)
     configs = output_dir / "configs"
     configs.mkdir()
@@ -305,7 +309,7 @@ def create_plan(
         manifest=manifest,
         jobs=tuple(jobs.values()),
         per_gpu_jobs=per_gpu_jobs,
-        max_jobs=max_jobs,
+        max_gpus=max_gpus,
         poll_seconds=2,
         dispatch_lock=Path("/tmp/utkface-extension-20261014/global-dispatch.lock"),
     )
@@ -350,13 +354,13 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--per-gpu-jobs", type=int, choices=(4, 8), required=True)
-    parser.add_argument("--max-jobs", type=int, default=32)
+    parser.add_argument("--max-gpus", type=int, default=0)
     args = parser.parse_args()
     plan = create_plan(
         manifest=args.manifest,
         output_dir=args.output_dir,
         per_gpu_jobs=args.per_gpu_jobs,
-        max_jobs=args.max_jobs,
+        max_gpus=args.max_gpus,
     )
     print(f"Created {len(plan.jobs)} jobs at {plan.output_dir}")
 
