@@ -1237,6 +1237,20 @@ def train_job(config: AdaptationConfig) -> dict:
                 run_provenance=run_provenance,
             )
             model.load_state_dict(saved["model"], strict=True)
+            milestone = output_dir / "model-milestones" / f"epoch_{latest_epoch:03d}.pt"
+            if (
+                latest_epoch in config.control.model_milestones
+                and not milestone.exists()
+            ):
+                save_native_model(
+                    path=milestone,
+                    model=model,
+                    config=config,
+                    epoch=latest_epoch,
+                    validation=saved["validation"],
+                    manifest_fingerprint=manifest["fingerprint"],
+                    run_provenance=run_provenance,
+                )
         else:
             archive_stale_artifacts(output_dir=output_dir)
             history = []
