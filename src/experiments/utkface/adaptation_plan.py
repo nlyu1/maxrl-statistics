@@ -7,6 +7,7 @@ from src.experiments.utkface.adaptation_config import (
     AdaptationJob,
     AdaptationPlan,
     FeatureBankConfig,
+    TrainingControl,
 )
 from src.experiments.utkface.config import NoiseConfig, canonical_config
 from src.experiments.utkface.run import write_json
@@ -174,6 +175,13 @@ def create_plan(
             checkpoint_every=5,
             backbone_learning_rate=1e-4 if start else run.learning_rate,
             schedule_kind="warmup_constant" if constant else "cosine",
+            control=TrainingControl(
+                schedule_epochs=run.epochs,
+                extend_checkpoint=unused,
+                extend_epoch=0,
+                keep_latest_checkpoints=1000,
+                model_milestones=(),
+            ),
         )
         dependencies = tuple(dict.fromkeys(filter(None, (source, bank_job))))
         return register(
@@ -310,6 +318,7 @@ def create_plan(
         jobs=tuple(jobs.values()),
         per_gpu_jobs=per_gpu_jobs,
         max_gpus=max_gpus,
+        min_free_gib=40,
         poll_seconds=2,
         dispatch_lock=Path("/tmp/utkface-extension-20261014/global-dispatch.lock"),
     )

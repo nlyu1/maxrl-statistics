@@ -22,7 +22,6 @@ from src.experiments.utkface.data import (
 
 Pipeline = Literal["original", "fixed"]
 Split = Literal["train", "val", "test"]
-MAX_GLOBAL_EPOCH = 50
 
 _NORMALIZE = transforms.Normalize(
     mean=(0.485, 0.456, 0.406),
@@ -71,8 +70,8 @@ def _isolated_seed(seed: int) -> Iterator[None]:
 def epoch_order(*, count: int, epoch: int, order_seed: int) -> Tensor:
     if count < 0:
         raise ValueError("count must be nonnegative")
-    if not 1 <= epoch <= MAX_GLOBAL_EPOCH:
-        raise ValueError(f"global training epoch must be in [1, {MAX_GLOBAL_EPOCH}]")
+    if epoch < 1:
+        raise ValueError("Global training epoch must be positive")
     if order_seed < 0:
         raise ValueError("order_seed must be nonnegative")
     generator = torch.Generator(device="cpu").manual_seed(
@@ -146,8 +145,8 @@ def build_image_loader(
     view_seed: int,
     order_seed: int,
 ) -> DataLoader:
-    if split == "train" and not 1 <= epoch <= MAX_GLOBAL_EPOCH:
-        raise ValueError(f"Training epoch must be in [1, {MAX_GLOBAL_EPOCH}]")
+    if split == "train" and epoch < 1:
+        raise ValueError("Training epoch must be positive")
     if split != "train" and epoch != 0:
         raise ValueError("Validation and test loaders use epoch=0")
     if view_seed < 0 or order_seed < 0:

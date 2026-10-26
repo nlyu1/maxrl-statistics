@@ -198,6 +198,7 @@ def provenance(
         "order_seed": config.order_seed,
         "schedule_kind": config.schedule_kind,
         "precision": config.run.precision,
+        "extension_source": extension_origin(config=config),
         "environment": {
             "python": platform.python_version(),
             "torch": str(torch.__version__),
@@ -428,7 +429,7 @@ def warmup_constant_scheduler(
 def build_scheduler(
     *, config: AdaptationConfig, optimizer: AdamW, steps_per_epoch: int
 ) -> LambdaLR | None:
-    total_steps = steps_per_epoch * config.run.epochs
+    total_steps = steps_per_epoch * config.control.schedule_epochs
     if config.schedule_kind == "warmup_constant":
         return warmup_constant_scheduler(
             optimizer=optimizer,
@@ -496,6 +497,7 @@ def save_native_model(
     manifest_fingerprint: str,
     run_provenance: dict,
 ) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".pt.tmp")
     checkpoint_model = {
         name: value.detach().cpu().clone() for name, value in model.state_dict().items()
@@ -651,6 +653,96 @@ def regular_checkpoints(*, output_dir: Path) -> list[tuple[int, Path]]:
         if match is not None:
             result.append((int(match.group(1)), path))
     return sorted(result)
+
+
+def extension_origin(*, config: AdaptationConfig) -> dict | None:
+    if not config.control.extend_epoch:
+        return None
+    path = config.control.extend_checkpoint
+    saved = torch.load(path, map_location="cpu", weights_only=True)
+    return {
+        "checkpoint": str(path),
+        "sha256": file_sha256(path=path),
+        "epoch": saved["epoch"],
+        "config": saved["config"],
+        "provenance": saved["provenance"],
+        "model_sha256": saved["model_sha256"],
+        "optimizer_and_rng_retained": True,
+    }
+
+
+def prepare_extension_checkpoint(
+    *, config: AdaptationConfig, run_provenance: dict, initialization_source: dict
+) -> None:
+    path = config.control.extend_checkpoint
+    saved = torch.load(path, map_location="cpu", weights_only=True)
+    source_config = saved["config"]
+    source = {**source_config, "run": {**source_config["run"]}}
+    target = config_payload(config=config)
+    target = {**target, "run": {**target["run"]}}
+    source_control = source.pop("control", None)
+    target.pop("control")
+    schedule_epochs = (
+        source_control["schedule_epochs"] if source_control else source["run"]["epochs"]
+    )
+    if schedule_epochs != config.control.schedule_epochs:
+        raise ValueError("Extension changes the completed warmup schedule")
+    if (
+        source["schedule_kind"] != "warmup_constant"
+        or source["initialization"] != "scratch"
+    ):
+        raise ValueError(
+            "Only scratch constant-LR checkpoints can extend their horizon"
+        )
+    for key in ("output_dir", "epochs", "device", "evaluate_test"):
+        source["run"][key] = target["run"][key]
+    for key in ("initial_checkpoint", "feature_bank"):
+        source[key] = target[key]
+    if source != target:
+        raise ValueError(
+            "Extension changes training settings beyond horizon/evaluation/output"
+        )
+    epoch = config.control.extend_epoch
+    if saved["epoch"] != epoch or [row["epoch"] for row in saved["history"]] != list(
+        range(1, epoch + 1)
+    ):
+        raise ValueError("Extension checkpoint has an incomplete prefix history")
+    if (
+        saved["checkpoint_scope"] != "full"
+        or saved["initialization_source"] != initialization_source
+    ):
+        raise ValueError("Extension checkpoint initialization or scope differs")
+    if (
+        saved["provenance"]["manifest_fingerprint"]
+        != run_provenance["manifest_fingerprint"]
+    ):
+        raise ValueError("Extension checkpoint uses another manifest")
+    if not all(key in saved for key in ("optimizer", "scheduler", "rng", "best_model")):
+        raise ValueError(
+            "Extension requires optimizer, scheduler, RNG and best-model state"
+        )
+    checkpoint = config.run.output_dir / "checkpoints" / f"epoch_{epoch:03d}.pt"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    if checkpoint.exists():
+        raise FileExistsError(checkpoint)
+    migrated = {
+        **saved,
+        "config": config_payload(config=config),
+        "provenance": run_provenance,
+        "extension_origin": run_provenance["extension_source"],
+    }
+    temporary = checkpoint.with_suffix(".pt.tmp")
+    torch.save(migrated, temporary)
+    temporary.replace(checkpoint)
+
+
+def prune_regular_checkpoints(*, config: AdaptationConfig) -> None:
+    checkpoints = regular_checkpoints(output_dir=config.run.output_dir)
+    directory = (config.run.output_dir / "checkpoints").resolve()
+    for _, path in checkpoints[: -config.control.keep_latest_checkpoints]:
+        if path.resolve().parent != directory or path.is_symlink():
+            raise ValueError("Checkpoint retention encountered a path outside its run")
+        path.unlink()
 
 
 def archive_stale_artifacts(*, output_dir: Path) -> None:
@@ -1109,6 +1201,13 @@ def train_job(config: AdaptationConfig) -> dict:
         torch.cuda.reset_peak_memory_stats(device)
 
         checkpoints = regular_checkpoints(output_dir=output_dir)
+        if not checkpoints and config.control.extend_epoch:
+            prepare_extension_checkpoint(
+                config=config,
+                run_provenance=run_provenance,
+                initialization_source=initialization_source,
+            )
+            checkpoints = regular_checkpoints(output_dir=output_dir)
         if checkpoints:
             latest_epoch, latest_path = checkpoints[-1]
             saved = load_full_checkpoint(
@@ -1261,6 +1360,17 @@ def train_job(config: AdaptationConfig) -> dict:
                     best_model=best_model,
                     initialization_source=initialization_source,
                     bank_metadata=bank["metadata"] if bank is not None else None,
+                    run_provenance=run_provenance,
+                )
+                prune_regular_checkpoints(config=config)
+            if epoch in config.control.model_milestones:
+                save_native_model(
+                    path=output_dir / "model-milestones" / f"epoch_{epoch:03d}.pt",
+                    model=model,
+                    config=config,
+                    epoch=epoch,
+                    validation=row["validation"],
+                    manifest_fingerprint=manifest["fingerprint"],
                     run_provenance=run_provenance,
                 )
 

@@ -7,6 +7,14 @@ from src.config.base import BaseConfig
 from src.experiments.utkface.config import RunConfig
 
 
+class TrainingControl(BaseConfig):
+    schedule_epochs: int = Field(ge=1)
+    extend_checkpoint: Path
+    extend_epoch: int = Field(ge=0)
+    keep_latest_checkpoints: int = Field(ge=1)
+    model_milestones: tuple[int, ...]
+
+
 class AdaptationConfig(BaseConfig):
     run: RunConfig
     pipeline: Literal["original", "fixed"]
@@ -21,6 +29,7 @@ class AdaptationConfig(BaseConfig):
     checkpoint_every: int = Field(ge=1)
     backbone_learning_rate: float = Field(gt=0)
     schedule_kind: Literal["cosine", "warmup_constant"]
+    control: TrainingControl
 
     @model_validator(mode="after")
     def validate_bank(self) -> "AdaptationConfig":
@@ -28,6 +37,19 @@ class AdaptationConfig(BaseConfig):
             raise ValueError("Frozen jobs require a feature bank")
         if self.global_start_epoch and self.initialization != "checkpoint":
             raise ValueError("Continuations require checkpoint initialization")
+        if self.control.extend_epoch:
+            if (
+                self.schedule_kind != "warmup_constant"
+                or self.initialization != "scratch"
+                or self.global_start_epoch
+            ):
+                raise ValueError(
+                    "Horizon extensions require a scratch constant-LR trajectory"
+                )
+            if self.control.extend_epoch >= self.run.epochs:
+                raise ValueError("Extension epoch must precede the target horizon")
+        if self.control.schedule_epochs > self.run.epochs:
+            raise ValueError("Schedule reference cannot exceed the run horizon")
         return self
 
 
@@ -60,5 +82,6 @@ class AdaptationPlan(BaseConfig):
     jobs: tuple[AdaptationJob, ...]
     per_gpu_jobs: int = Field(ge=1, le=8)
     max_gpus: int = Field(default=0, ge=0)
+    min_free_gib: float = Field(ge=0)
     poll_seconds: float = Field(gt=0, le=30)
     dispatch_lock: Path

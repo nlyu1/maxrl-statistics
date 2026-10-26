@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import select
+import shutil
 import signal
 import subprocess
 import time
@@ -20,7 +21,7 @@ from src.experiments.utkface.run import write_json
 from src.experiments.utkface.scheduler import gpu_inventory, gpu_is_free, ready_gpus
 
 TERMINAL = {"completed", "failed", "skipped", "stopped"}
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS = 24
 STARTUP_TIMEOUT_SECONDS = 180.0
 TERMINATION_GRACE_SECONDS = 30.0
 GPU_COOLDOWN_SECONDS = 900.0
@@ -858,6 +859,19 @@ def schedule(
     children: dict[str, subprocess.Popen],
     root: Path,
 ) -> None:
+    free_gib = shutil.disk_usage(plan.output_dir).free / 2**30
+    if free_gib < plan.min_free_gib:
+        previous = state.get("disk_wait", {})
+        if now() - previous.get("last_reported_at", 0) >= 300:
+            event(
+                root=root,
+                event_type="waiting_for_disk",
+                free_gib=free_gib,
+                required_gib=plan.min_free_gib,
+            )
+            state["disk_wait"] = {"free_gib": free_gib, "last_reported_at": now()}
+        return
+    state.pop("disk_wait", None)
     propagate_dependencies(state=state, plan=plan)
     jobs = ready_jobs(state=state, plan=plan)
     candidates = eligible_gpus(
@@ -983,6 +997,8 @@ def compact_status(*, state: dict, plan: AdaptationPlan) -> dict:
         "active_gpus": len(active_gpus),
         "max_gpus": plan.max_gpus,
         "per_gpu_jobs": plan.per_gpu_jobs,
+        "min_free_gib": plan.min_free_gib,
+        "disk_wait": state.get("disk_wait"),
         "attempt_limit": MAX_ATTEMPTS,
         "gpu_cooldowns": state.get("gpu_cooldowns", {}),
         "updated_at": state.get("updated_at"),

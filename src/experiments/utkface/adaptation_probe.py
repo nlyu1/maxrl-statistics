@@ -68,6 +68,11 @@ def create_probe(*, source: AdaptationPlan, output_dir: Path) -> AdaptationPlan:
         config["global_start_epoch"] = 1 if config["global_start_epoch"] else 0
         if original.kind == "train":
             config["checkpoint_every"] = 1
+            config["control"].update({
+                "schedule_epochs": config["run"]["epochs"],
+                "extend_epoch": 0,
+                "model_milestones": [],
+            })
         config_path = output_dir / "configs" / f"{original.identifier}.json"
         write_json(path=config_path, payload=config)
         jobs.append(
@@ -86,6 +91,7 @@ def create_probe(*, source: AdaptationPlan, output_dir: Path) -> AdaptationPlan:
             "jobs": tuple(jobs),
             "per_gpu_jobs": 4,
             "max_gpus": 1,
+            "min_free_gib": 1,
         }
     )
     write_json(path=output_dir / "plan.json", payload=plan.model_dump(mode="json"))
