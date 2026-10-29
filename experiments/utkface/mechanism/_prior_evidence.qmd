@@ -28,6 +28,10 @@ The larger source-feature matrix supplies related evidence: SL-trained frozen fe
 
 Feature similarity provides a complementary description. At fixed SD-10, noisy-versus-own-clean layer-4 CKA is approximately **0.860** for scalar MAE, **0.892** for scalar MSE, **0.837** for categorical mean-MSE, **0.583** for TailRL and **0.522** for CE in the earlier audit. The corresponding fresh-noise CE model performs well despite a low own-clean CKA. A common prediction readout therefore supplies the task-level comparison; CKA describes how the representations differ.
 
+Useful age adaptation can involve substantial change from ImageNet. In the retained full-data 50-epoch study, three-seed mean relative backbone parameter displacements at validation-selected checkpoints are **1.407 for scalar MAE**, **1.974 for TailRL** and **1.207 for the historical cross-entropy-equivalent arm**. The ratio measures the parameter difference relative to the pretrained backbone norm, excluding the final head and BatchNorm running statistics. Scalar MAE moves less than TailRL; the cross-entropy arm stays closer on average and has higher age error.
+
+Feature similarity supplies a separate description of the selected checkpoints. For seed 42, on the same 128 validation faces, layer-4 CKA to ImageNet is **0.363 for scalar MAE**, **0.435 for TailRL** and **0.427 for the cross-entropy arm**. The strongest age predictor in this comparison substantially changes the pretrained feature geometry. These observations use each model's selected epoch. The common fixed-epoch age readouts directly assess useful adaptation, while noisy-versus-own-clean CKA uses an already age-adapted reference. [The provenance review](notes/backbone-drift-scope.txt) records the aggregation, checkpoint identities and feature-metric scope.
+
 ### Training horizon is an observed part of the advantage
 
 In the retained constant-rate scratch runs, scalar MAE selects epochs **491, 465 and 495** for clean, SD-5 and SD-10 labels. TailRL selects **121, 35 and 27**. Under the cosine recipe, scalar MAE selects **451, 409 and 490**, while TailRL selects **64, 48 and 30**.
