@@ -35,6 +35,8 @@ The comparisons use the implemented objectives: scalar MAE/MSE, categorical mean
 
 {{< include _long_horizon.qmd >}}
 
+{{< include _results.qmd >}}
+
 {{< include _prior_evidence.qmd >}}
 
 {{< include _design.qmd >}}

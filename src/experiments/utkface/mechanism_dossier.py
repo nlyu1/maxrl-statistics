@@ -24,6 +24,7 @@ SOURCE_NAMES = (
     "report.qmd",
     "_explanation.qmd",
     "_long_horizon.qmd",
+    "_results.qmd",
     "_prior_evidence.qmd",
     "_design.qmd",
     "_hypotheses.qmd",
