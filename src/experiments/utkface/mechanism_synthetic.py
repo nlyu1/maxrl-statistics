@@ -116,21 +116,22 @@ def fit_model(*, design: np.ndarray, targets: np.ndarray, tied: bool,
                 variance_basis = ((p @ BASIS.square()) - (p @ BASIS).square()).clamp_min(0)
                 diagonal = torch.cat((diagonal, (variance_basis.T @ x.square() / len(x) + penalty).flatten()))
 
-        def product(vector: np.ndarray) -> np.ndarray:
+        def product(vector: np.ndarray, *, probabilities: torch.Tensor = p) -> np.ndarray:
             nonlocal hvp_evaluations
             hvp_evaluations += 1
             direction = torch.from_numpy(vector)
             logits_direction = (x @ direction[:width])[:, None] * AGES
             if not tied:
                 logits_direction += x @ (BASIS @ direction[width:].reshape(NUM_BINS - 2, width)).T
-            weighted = p * (logits_direction - (p * logits_direction).sum(-1, keepdim=True)) / len(x)
+            weighted = probabilities * (logits_direction - (probabilities * logits_direction).sum(-1, keepdim=True)) / len(x)
             answer = x.T @ (weighted @ AGES)
             if not tied:
                 answer = torch.cat((answer, (BASIS.T @ (weighted.T @ x)).flatten()))
             return (answer + ridge * direction).numpy()
 
         operator = LinearOperator((raw_count, raw_count), matvec=product, dtype=np.float64)
-        preconditioner = LinearOperator(operator.shape, matvec=lambda v: v / diagonal.numpy(), dtype=np.float64)
+        diagonal_values = diagonal.numpy()
+        preconditioner = LinearOperator(operator.shape, matvec=lambda v, bound_diagonal=diagonal_values: v / bound_diagonal, dtype=np.float64)
         direction, status = cg(operator, -gradient, M=preconditioner, rtol=1e-10, atol=1e-14, maxiter=400)
         cg_statuses.append(int(status))
         slope = float(gradient @ direction)
