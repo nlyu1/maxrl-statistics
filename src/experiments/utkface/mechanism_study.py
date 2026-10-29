@@ -37,6 +37,12 @@ HEAD_METHODS = {
     "binomial_ce_affine": ("categorical", "ce"),
     "binomial_tailrl_free": ("categorical", "tailrl_population"),
     "binomial_tailrl_affine": ("categorical", "tailrl_population"),
+    "categorical_ce_binomial_init_fp32": ("categorical", "ce"),
+    "categorical_tailrl_binomial_init_fp32": ("categorical", "tailrl_population"),
+    "categorical_ce_random_fp32": ("categorical", "ce"),
+    "categorical_tailrl_random_fp32": ("categorical", "tailrl_population"),
+    "binomial_ce_free_fp32": ("categorical", "ce"),
+    "binomial_tailrl_free_fp32": ("categorical", "tailrl_population"),
     "head_tailrl_backbone_mse": ("categorical", "tailrl_population"),
     "head_mse_backbone_tailrl": ("categorical", "mse"),
 }
@@ -155,6 +161,10 @@ def create(
                     "categorical_tailrl - head_tailrl_backbone_mse",
                 ],
                 "score_contrasts": [
+                    "categorical_ce_binomial_init_fp32 - categorical_ce_random_fp32",
+                    "categorical_tailrl_binomial_init_fp32 - categorical_tailrl_random_fp32",
+                    "categorical_ce_binomial_init_fp32 - binomial_ce_free_fp32",
+                    "categorical_tailrl_binomial_init_fp32 - binomial_tailrl_free_fp32",
                     "binomial_ce_free - binomial_ce",
                     "binomial_tailrl_free - binomial_tailrl",
                     "binomial_ce_free - binomial_ce_affine",

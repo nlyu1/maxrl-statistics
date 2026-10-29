@@ -8,6 +8,7 @@ from src.experiments.utkface.adaptation_config import AdaptationConfig
 
 MechanismLoss = Literal["mse", "mae", "ce", "tailrl_population"]
 BinomialMode = Literal["fixed", "free", "affine"]
+HeadPrecision = Literal["bf16", "fp32"]
 
 
 class MechanismVariant(StrEnum):
@@ -24,6 +25,12 @@ class MechanismVariant(StrEnum):
     BINOMIAL_CE_AFFINE = "binomial_ce_affine"
     HEAD_TAILRL_BACKBONE_MSE = "head_tailrl_backbone_mse"
     HEAD_MSE_BACKBONE_TAILRL = "head_mse_backbone_tailrl"
+    CATEGORICAL_CE_BINOMIAL_INIT_FP32 = "categorical_ce_binomial_init_fp32"
+    CATEGORICAL_TAILRL_BINOMIAL_INIT_FP32 = "categorical_tailrl_binomial_init_fp32"
+    CATEGORICAL_CE_RANDOM_FP32 = "categorical_ce_random_fp32"
+    CATEGORICAL_TAILRL_RANDOM_FP32 = "categorical_tailrl_random_fp32"
+    BINOMIAL_CE_FREE_FP32 = "binomial_ce_free_fp32"
+    BINOMIAL_TAILRL_FREE_FP32 = "binomial_tailrl_free_fp32"
 
 
 OBJECTIVES: dict[MechanismVariant, tuple[MechanismLoss, MechanismLoss]] = {
@@ -40,6 +47,21 @@ OBJECTIVES: dict[MechanismVariant, tuple[MechanismLoss, MechanismLoss]] = {
     MechanismVariant.BINOMIAL_CE_AFFINE: ("ce", "ce"),
     MechanismVariant.HEAD_TAILRL_BACKBONE_MSE: ("tailrl_population", "mse"),
     MechanismVariant.HEAD_MSE_BACKBONE_TAILRL: ("mse", "tailrl_population"),
+    MechanismVariant.CATEGORICAL_CE_BINOMIAL_INIT_FP32: ("ce", "ce"),
+    MechanismVariant.CATEGORICAL_TAILRL_BINOMIAL_INIT_FP32: (
+        "tailrl_population",
+        "tailrl_population",
+    ),
+    MechanismVariant.CATEGORICAL_CE_RANDOM_FP32: ("ce", "ce"),
+    MechanismVariant.CATEGORICAL_TAILRL_RANDOM_FP32: (
+        "tailrl_population",
+        "tailrl_population",
+    ),
+    MechanismVariant.BINOMIAL_CE_FREE_FP32: ("ce", "ce"),
+    MechanismVariant.BINOMIAL_TAILRL_FREE_FP32: (
+        "tailrl_population",
+        "tailrl_population",
+    ),
 }
 
 BINOMIAL_MODES: dict[MechanismVariant, BinomialMode] = {
@@ -49,6 +71,19 @@ BINOMIAL_MODES: dict[MechanismVariant, BinomialMode] = {
     MechanismVariant.BINOMIAL_CE_FREE: "free",
     MechanismVariant.BINOMIAL_TAILRL_AFFINE: "affine",
     MechanismVariant.BINOMIAL_CE_AFFINE: "affine",
+    MechanismVariant.BINOMIAL_CE_FREE_FP32: "free",
+    MechanismVariant.BINOMIAL_TAILRL_FREE_FP32: "free",
+}
+
+FUSED_BINOMIAL_VARIANTS = {
+    MechanismVariant.CATEGORICAL_CE_BINOMIAL_INIT_FP32,
+    MechanismVariant.CATEGORICAL_TAILRL_BINOMIAL_INIT_FP32,
+}
+FP32_VARIANTS = FUSED_BINOMIAL_VARIANTS | {
+    MechanismVariant.CATEGORICAL_CE_RANDOM_FP32,
+    MechanismVariant.CATEGORICAL_TAILRL_RANDOM_FP32,
+    MechanismVariant.BINOMIAL_CE_FREE_FP32,
+    MechanismVariant.BINOMIAL_TAILRL_FREE_FP32,
 }
 
 
@@ -71,6 +106,33 @@ class MechanismConfig(BaseConfig):
     @property
     def binomial_mode(self) -> BinomialMode:
         return BINOMIAL_MODES[self.variant]
+
+    @property
+    def head_precision(self) -> HeadPrecision:
+        return "fp32" if self.variant in FP32_VARIANTS else "bf16"
+
+    @property
+    def categorical_binomial_init(self) -> bool:
+        return self.variant in FUSED_BINOMIAL_VARIANTS
+
+    @property
+    def head_initialization(
+        self,
+    ) -> Literal[
+        "scalar_random",
+        "score_zero_residual",
+        "categorical_binomial_fused",
+        "categorical_random",
+    ]:
+        if self.scalar:
+            return "scalar_random"
+        if self.binomial:
+            return "score_zero_residual"
+        return (
+            "categorical_binomial_fused"
+            if self.categorical_binomial_init
+            else "categorical_random"
+        )
 
     @property
     def head_method(self) -> MechanismLoss:

@@ -26,6 +26,12 @@ LABELS = {
     "binomial_ce_affine": "CE: shared score + age-affine residual",
     "binomial_tailrl_free": "TailRL: shared score + free residual",
     "binomial_tailrl_affine": "TailRL: shared score + age-affine residual",
+    "categorical_ce_binomial_init_fp32": "CE: ordinary head, ordinal start (FP32)",
+    "categorical_tailrl_binomial_init_fp32": "TailRL: ordinary head, ordinal start (FP32)",
+    "categorical_ce_random_fp32": "CE: ordinary head, random start (FP32)",
+    "categorical_tailrl_random_fp32": "TailRL: ordinary head, random start (FP32)",
+    "binomial_ce_free_fp32": "CE: score + free residual (FP32)",
+    "binomial_tailrl_free_fp32": "TailRL: score + free residual (FP32)",
 }
 COLORS = dict(
     zip(
@@ -44,6 +50,12 @@ COLORS = dict(
             "#cc79a7",
             "#009e73",
             "#882255",
+            "#332288",
+            "#88ccee",
+            "#44aa99",
+            "#117733",
+            "#ddcc77",
+            "#aa4499",
         ),
         strict=True,
     )
@@ -83,6 +95,16 @@ GROUPS = {
         "head_tailrl_backbone_mse",
         "categorical_tailrl",
     ),
+    "initialization-controls-ce": (
+        "categorical_ce_binomial_init_fp32",
+        "categorical_ce_random_fp32",
+        "binomial_ce_free_fp32",
+    ),
+    "initialization-controls-tail": (
+        "categorical_tailrl_binomial_init_fp32",
+        "categorical_tailrl_random_fp32",
+        "binomial_tailrl_free_fp32",
+    ),
 }
 CONTRASTS = (
     ("head_mse_backbone_tailrl", "categorical_mse"),
@@ -97,6 +119,10 @@ CONTRASTS = (
     ("binomial_tailrl_free", "binomial_tailrl_affine"),
     ("binomial_ce_affine", "binomial_ce"),
     ("binomial_tailrl_affine", "binomial_tailrl"),
+    ("categorical_ce_binomial_init_fp32", "categorical_ce_random_fp32"),
+    ("categorical_tailrl_binomial_init_fp32", "categorical_tailrl_random_fp32"),
+    ("categorical_ce_binomial_init_fp32", "binomial_ce_free_fp32"),
+    ("categorical_tailrl_binomial_init_fp32", "binomial_tailrl_free_fp32"),
 )
 
 
@@ -292,6 +318,8 @@ def pairing_audit(*, runs: list[dict]) -> dict:
             "source_sha256": digest(provenance.get("source_sha256", {})),
             "head_family": "scalar"
             if run["variant"].startswith("scalar_")
+            else "categorical_binomial_init"
+            if "_binomial_init_" in run["variant"]
             else "binomial"
             if run["variant"].startswith("binomial_")
             else "categorical",
@@ -361,7 +389,12 @@ def pairing_audit(*, runs: list[dict]) -> dict:
                 "passed": len({row[field] for row in group}) == 1
                 and all(row[field] is not None for row in group),
             })
-        for family in ("categorical", "scalar", "binomial"):
+        for family in (
+            "categorical",
+            "categorical_binomial_init",
+            "scalar",
+            "binomial",
+        ):
             heads = [
                 row["head_initial_sha256"]
                 for row in group
@@ -377,7 +410,10 @@ def pairing_audit(*, runs: list[dict]) -> dict:
                     "passed": len(set(heads)) == 1 and heads[0] is not None,
                 })
         for field, families in (
-            ("score_initial_sha256", {"scalar", "binomial"}),
+            (
+                "score_initial_sha256",
+                {"scalar", "binomial", "categorical_binomial_init"},
+            ),
             ("residual_initial_sha256", {"binomial"}),
         ):
             values = [row[field] for row in group if row["head_family"] in families]

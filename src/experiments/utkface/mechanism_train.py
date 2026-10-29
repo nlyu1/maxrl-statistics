@@ -4,6 +4,7 @@ import json
 import os
 import platform
 import time
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 
 import torch
@@ -38,6 +39,7 @@ from src.experiments.utkface.data import read_manifest, training_indices
 from src.experiments.utkface.losses import MAX_AGE, NUM_BINS, policy_loss, scalar_loss
 from src.experiments.utkface.mechanism_config import (
     BinomialMode,
+    HeadPrecision,
     MechanismConfig,
     MechanismLoss,
 )
@@ -86,14 +88,44 @@ class BinomialHead(ScalarHead):
             return self.log_coefficients.float() + bins * scores + self.gate * residual
 
 
+def head_context(
+    *, features: Tensor, precision: HeadPrecision
+) -> AbstractContextManager:
+    return (
+        torch.autocast(device_type=features.device.type, enabled=False)
+        if precision == "fp32"
+        else nullcontext()
+    )
+
+
+def fused_binomial_head(*, head: BinomialHead) -> nn.Linear:
+    fused = nn.Linear(
+        head.linear.in_features,
+        NUM_BINS,
+        device=head.linear.weight.device,
+        dtype=head.linear.weight.dtype,
+    )
+    with torch.no_grad():
+        fused.weight.copy_(head.bins[:, None] * head.linear.weight)
+        fused.bias.copy_(head.log_coefficients + head.bins * head.linear.bias[0])
+    return fused
+
+
 class ResearchModel(nn.Module):
-    def __init__(self, *, encoder: nn.Module, fc: nn.Module) -> None:
+    def __init__(
+        self, *, encoder: nn.Module, fc: nn.Module, head_precision: HeadPrecision
+    ) -> None:
         super().__init__()
         self.encoder = encoder
         self.fc = fc
+        self.head_precision = head_precision
 
     def forward(self, images: Tensor) -> Tensor:
-        return self.fc(self.encoder(images))
+        features = self.encoder(images)
+        with head_context(features=features, precision=self.head_precision):
+            return self.fc(
+                features.float() if self.head_precision == "fp32" else features
+            )
 
 
 def build_research_model(*, config: MechanismConfig) -> ResearchModel:
@@ -111,9 +143,11 @@ def build_research_model(*, config: MechanismConfig) -> ResearchModel:
             fc = ScalarHead(features=features)
         elif config.binomial:
             fc = BinomialHead(features=features, mode=config.binomial_mode)
+        elif config.categorical_binomial_init:
+            fc = fused_binomial_head(head=BinomialHead(features=features, mode="free"))
         else:
             fc = nn.Linear(features, NUM_BINS)
-    return ResearchModel(encoder=encoder, fc=fc)
+    return ResearchModel(encoder=encoder, fc=fc, head_precision=config.head_precision)
 
 
 def routed_losses(
@@ -151,6 +185,14 @@ def provenance(
     clean_labels = torch.tensor(
         [record["age"] for record in manifest["records"]], dtype=torch.int64
     )
+    fused_source = {}
+    if config.categorical_binomial_init:
+        with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+            torch.random.default_generator.manual_seed(config.head_seed)
+            scalar = ScalarHead(features=model.fc.in_features)
+            fused_source["score_initial_sha256"] = model_sha256(
+                state=scalar.linear.state_dict()
+            )
     source = {
         "mechanism_config": config.model_dump(mode="json"),
         "manifest_fingerprint": manifest["fingerprint"],
@@ -163,6 +205,11 @@ def provenance(
         ),
         "encoder_initial_sha256": model_sha256(state=model.encoder.state_dict()),
         "head_initial_sha256": model_sha256(state=model.fc.state_dict()),
+        "head_precision": config.head_precision,
+        "float32_matmul_precision": torch.get_float32_matmul_precision(),
+        "encoder_precision": config.adaptation.run.precision,
+        "head_initialization": config.head_initialization,
+        **fused_source,
         **(
             {"score_initial_sha256": model_sha256(state=model.fc.linear.state_dict())}
             if config.scalar or config.binomial
@@ -175,7 +222,11 @@ def provenance(
                 ),
                 "binomial_residual_mode": config.binomial_mode,
                 "binomial_residual_gate": model.fc.gate,
-                "binomial_branch_precision": "bf16_linear_then_float32_projection_and_sum",
+                "binomial_branch_precision": (
+                    "float32_linears_projection_and_sum"
+                    if config.head_precision == "fp32"
+                    else "bf16_linear_then_float32_projection_and_sum"
+                ),
             }
             if config.binomial
             else {}
@@ -396,31 +447,36 @@ def train_epoch(
             batch_images = images.to(device, non_blocking=True)
             batch_labels = labels[indices].to(device, non_blocking=True)
             features = model.encoder(batch_images)
-            if config.scalar:
-                head_value = scalar_loss(
-                    predictions=model.fc(features),
-                    targets=batch_labels,
-                    config=head_config,
-                )
-                backbone_value = head_value
-                objective = head_value
-            elif config.binomial:
-                head_value = policy_loss(
-                    logits=model.fc(features), targets=batch_labels, config=head_config
-                )
-                backbone_value = head_value
-                objective = head_value
-            else:
-                if not isinstance(model.fc, nn.Linear):
-                    raise TypeError("Categorical routes require a linear head")
-                head_value, backbone_value = routed_losses(
-                    features=features,
-                    head=model.fc,
-                    targets=batch_labels,
-                    head_loss=head_config,
-                    backbone_loss=backbone_config,
-                )
-                objective = head_value + backbone_value
+            with head_context(features=features, precision=config.head_precision):
+                if config.head_precision == "fp32":
+                    features = features.float()
+                if config.scalar:
+                    head_value = scalar_loss(
+                        predictions=model.fc(features),
+                        targets=batch_labels,
+                        config=head_config,
+                    )
+                    backbone_value = head_value
+                    objective = head_value
+                elif config.binomial:
+                    head_value = policy_loss(
+                        logits=model.fc(features),
+                        targets=batch_labels,
+                        config=head_config,
+                    )
+                    backbone_value = head_value
+                    objective = head_value
+                else:
+                    if not isinstance(model.fc, nn.Linear):
+                        raise TypeError("Categorical routes require a linear head")
+                    head_value, backbone_value = routed_losses(
+                        features=features,
+                        head=model.fc,
+                        targets=batch_labels,
+                        head_loss=head_config,
+                        backbone_loss=backbone_config,
+                    )
+                    objective = head_value + backbone_value
         if not torch.isfinite(objective):
             raise FloatingPointError(
                 f"Nonfinite training loss at epoch={epoch}, step={step}"
@@ -532,6 +588,8 @@ def train_job(*, config: MechanismConfig) -> dict:
     torch.set_num_threads(config.adaptation.run.cpu_threads)
     torch.use_deterministic_algorithms(config.adaptation.run.deterministic)
     torch.backends.cudnn.benchmark = not config.adaptation.run.deterministic
+    if config.head_precision == "fp32":
+        torch.set_float32_matmul_precision("highest")
     output_dir = config.adaptation.run.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = config.model_dump(mode="json")
@@ -973,6 +1031,7 @@ def verify_routed_gradients() -> dict:
         template = ResearchModel(
             encoder=nn.Sequential(nn.Linear(7, 11), nn.Tanh()),
             fc=nn.Linear(11, NUM_BINS),
+            head_precision="bf16",
         ).double()
         features = torch.randn(8, 7, dtype=torch.float64)
         targets = torch.tensor([0, 2, 17, 33, 49, 64, 88, MAX_AGE])
@@ -1012,6 +1071,93 @@ def verify_routed_gradients() -> dict:
     return differences
 
 
+def verify_fp32_controls() -> dict:
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(1703)
+        free = BinomialHead(features=512, mode="free")
+        fused = fused_binomial_head(head=free)
+        torch.random.default_generator.manual_seed(1703)
+        old_random = nn.Linear(512, NUM_BINS)
+        torch.random.default_generator.manual_seed(1703)
+        new_random = nn.Linear(512, NUM_BINS)
+        if model_sha256(state=old_random.state_dict()) != model_sha256(
+            state=new_random.state_dict()
+        ):
+            raise AssertionError(
+                "FP32 random categorical initialization differs from the original"
+            )
+        inputs = torch.randn(8, 512).bfloat16().float()
+        free_model = ResearchModel(
+            encoder=nn.Identity(), fc=free, head_precision="fp32"
+        )
+        fused_model = ResearchModel(
+            encoder=nn.Identity(), fc=fused, head_precision="fp32"
+        )
+        with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+            free_logits = free_model(inputs)
+            fused_logits = fused_model(inputs)
+        if free_logits.dtype != torch.float32 or fused_logits.dtype != torch.float32:
+            raise AssertionError("FP32 heads inherited the encoder autocast precision")
+        torch.testing.assert_close(fused_logits, free_logits, rtol=3e-6, atol=3e-5)
+        bins = free.bins
+        free_mean, fused_mean = (
+            (values.softmax(-1) * bins).sum(-1)
+            for values in (free_logits, fused_logits)
+        )
+        torch.testing.assert_close(fused_mean, free_mean, rtol=3e-6, atol=2e-4)
+        targets = torch.tensor([0, 2, 17, 33, 49, 64, 88, MAX_AGE])
+        gradient_errors = {}
+        for method in ("ce", "tailrl_population"):
+            config = LossConfig(
+                method=method,
+                kernel_scale_years=5,
+                num_rollouts=64,
+                survival_floor=0,
+                std_floor=1e-4,
+            )
+            free_inputs = inputs.detach().clone().requires_grad_()
+            fused_inputs = inputs.detach().clone().requires_grad_()
+            with (
+                torch.autocast(device_type="cpu", dtype=torch.bfloat16),
+                head_context(features=free_inputs, precision="fp32"),
+            ):
+                free_value = policy_loss(
+                    logits=free_model(free_inputs), targets=targets, config=config
+                )
+                head_value, backbone_value = routed_losses(
+                    features=fused_inputs,
+                    head=fused,
+                    targets=targets,
+                    head_loss=config,
+                    backbone_loss=config,
+                )
+            free_gradient = torch.autograd.grad(free_value, free_inputs)[0]
+            fused_gradient = torch.autograd.grad(
+                head_value + backbone_value, fused_inputs
+            )[0]
+            torch.testing.assert_close(head_value, free_value, rtol=3e-6, atol=3e-5)
+            torch.testing.assert_close(
+                fused_gradient, free_gradient, rtol=3e-4, atol=2e-5
+            )
+            gradient_errors[method] = (
+                (fused_gradient - free_gradient).abs().max().item()
+            )
+        return {
+            "head_dtype": str(free_logits.dtype),
+            "fused_random_state_matches_original": True,
+            "initial_logits_max_absolute_error": (fused_logits - free_logits)
+            .abs()
+            .max()
+            .item(),
+            "initial_mean_max_absolute_error": (fused_mean - free_mean)
+            .abs()
+            .max()
+            .item(),
+            "initial_feature_gradient_max_absolute_errors": gradient_errors,
+            "tolerance_scope": "FP32 rounding from reassociating (age * weight) @ features versus age * (weight @ features); logits rtol=3e-6/atol=3e-5, means rtol=3e-6/atol=2e-4, feature gradients rtol=3e-4/atol=2e-5.",
+        }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -1024,6 +1170,7 @@ def main() -> None:
                 {
                     "binomial_identity": verify_binomial_identity(),
                     "routed_gradient_max_absolute_error": verify_routed_gradients(),
+                    "fp32_initialization_controls": verify_fp32_controls(),
                 },
                 indent=2,
             )
