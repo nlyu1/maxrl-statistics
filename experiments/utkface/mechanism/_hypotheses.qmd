@@ -28,3 +28,23 @@ The retained earlier scratch results motivate three observations to check in the
 Common readouts distinguish two outcomes. A remaining difference with the same ridge procedure identifies a change in age information accessible to that procedure. Recovery of the native-head gap by refitting identifies a contribution from the stored readout and its coadaptation with the encoder. Corruption-following slopes and age bands provide a further observation of fitting the particular supplied field. Agreement across these measurements supports the corresponding location of the effect.
 
 The retained checkpoints and complete trajectories allow every prediction to be evaluated at its stated horizon. The final report will update this register with all completed outcomes, including revisions to the explanation.
+
+### Challenger follow-up after the 36 initialization fits
+
+The completed float32 cohort supports the clean CE starting-function prediction: the ordinary binomial-initialized head improves selected MAE by 0.653 years relative to the ordinary random head, with gains in all three blocks. The additional free-score path has a small average difference with mixed block signs. The conditional normalized-score experiment therefore stays outside the executed fit set. The early-closeness prediction is revised: fused and free coordinates produce large, reversing early differences despite similar endpoint averages.
+
+The independent challenger sharpens the next question to the numerical assignment of that starting function. The proposed control swaps rows only within symmetric pairs $\{a,99-a\}$. Since $\log {99\choose a}=\log {99\choose99-a}$, these swaps preserve each age's base binomial coefficient. Whole-row permutation also preserves the initial probability multiset, entropy, head norm, rank and full attainable categorical family. Actual target labels and the ages used to evaluate the mean stay fixed.
+
+The mapping is frozen without examining labels or outcomes: an isolated CPU generator uses seed $2026102937+\text{head\_seed}$ and chooses exactly 25 of the 50 symmetric pairs to swap. The same block mapping is used for clean and SD-10 fits. This gives six fits under the existing 50-epoch protocol. Clean CE is the primary comparison against the retained ordered and random ordinary heads; SD-10 is secondary.
+
+Write $\pi$ for the involution and $\mu_F=\sum_a a p_F(a)$. The swapped starting function has $z_a^P=\log {99\choose a}+\pi(a)s$, hence
+
+$$
+\nabla_h L_{\rm CE}^{P}(x,y)
+=w[\mu_F(x)-\pi(y)],
+\qquad
+\nabla_h L_{\rm CE}^{F}(x,y)
+=w[\mu_F(x)-y].
+$$
+
+Both initial corrections share one feature direction, while the swapped correction uses the altered numerical code. The signed prediction is lower clean selected error for the ordered assignment. A repeated improvement would support coherent numerical assignment beyond the retained base coefficient, entropy and rank. Similar performance would redirect the explanation toward the broader starting-state package. The swaps retain distance from the midpoint, and changes in example weighting, correction sign and clipping remain part of the intervention. Its interpretation concerns the complete numerical-assignment change under the declared optimizer.
