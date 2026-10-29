@@ -70,6 +70,62 @@ $$
 
 All three variants own the same parameters and start with $R=0$. The fixed gate $\gamma=0$ retains one score. A free residual permits class-specific changes. An age-affine residual projects $R$ onto the span of $1$ and $a$, preserving the same scalar mean function class while adding a redundant path for location updates. The initial distributions, score gradients and feature gradients agree across these variants. Registered parameters are matched; effective freedom is the experimental intervention.
 
+### A variance-dependent prediction for scalar losses
+
+There is a precise setting in which the loss weights can be compared. Suppose independent observations have a correctly specified mean $\mu(x)=D\operatorname{sigmoid}(\beta_*^\top x)$, a fixed-dimensional augmented predictor $x$, conditional variance $v(x)>0$, and a consistent regular estimating-equation solution. Put $\mu'=Dq(1-q)$ and consider
+
+$$
+\psi_b=x\,b(x)\,[Y-\mu(x)].
+$$
+
+Under the usual finite-moment and nonsingularity conditions, its first-order coefficient covariance is $A_b^{-1}B_bA_b^{-\top}/n$, where
+
+$$
+A_b=\mathbb E[b\mu'xx^\top],\qquad B_b=\mathbb E[b^2vxx^\top].
+$$
+
+The optimal weight within these regular mean estimating equations is $b_*=\mu'/v$. To see this directly, define $t=x\mu'/\sqrt v$, $r=xb\sqrt v$ and $I=\mathbb E[tt^\top]$. Since $\mathbb E[rt^\top]=A_b$,
+
+$$
+\mathbb E[(r-A_bI^{-1}t)(r-A_bI^{-1}t)^\top]
+=B_b-A_bI^{-1}A_b^\top\succeq0.
+$$
+
+Multiplication by $A_b^{-1}$ and its transpose gives the covariance lower bound $I^{-1}/n$, attained by $b_*$. This is an estimating-equation argument for the specified mean model.
+
+Binomial labels have $v=Dq(1-q)=\mu'$, giving $b_*=1$, exactly the binomial-CE correction. Endpoint labels $Y=D\operatorname{Ber}(q)$ have $v=D^2q(1-q)=D\mu'$, giving the same correction up to a constant. At endpoint labels, binomial CE equals $D$ times binary logistic likelihood. With $H=\mathbb E[q(1-q)xx^\top]$, the respective coefficient covariances are
+
+$$
+\frac{H^{-1}}{Dn}\quad\text{and}\quad\frac{H^{-1}}{n}.
+$$
+
+The endpoint experiment therefore has 99 times larger first-order coefficient variance for the same score and sample size. Scalar MSE instead uses $b$ proportional to $\mu'$ and attains this weighting bound when $v$ is constant. These formulas supply a variance-dependent prediction about scalar loss weighting. They apply to the regular, correctly specified, fixed-dimensional limit with penalties vanishing sufficiently quickly. The synthetic study's fixed penalties and the learned image encoder define additional finite-sample interventions measured separately in the experiments.
+
+### The coordinate metric of a structured head
+
+Identical initial predictions can lead to different next functions. Let $a_c$ be the centered age vector and let $K_{ij}$ be the inner product of augmented features for two images. For head-only Euclidean SGD, modulo a common logit shift, the effective logit-update kernels are
+
+$$
+\begin{array}{c|c}
+\text{head coordinates}&\text{logit kernel}\hline
+\text{ordinary affine categorical}&K_{ij}I\\
+\text{fixed age score}&K_{ij}a_ca_c^\top\\
+\text{age score plus free residual}&K_{ij}(a_ca_c^\top+I)\\
+\text{age score plus affine residual}&K_{ij}(a_ca_c^\top+P_{\operatorname{span}(1,a_c)})
+\end{array}
+$$
+
+Adam, clipping and floating-point arithmetic determine the actual updates in the image experiment. The kernels identify the coordinate mechanism available at a common state; the matched-function interventions measure its practical contribution under the declared optimizer.
+
+An action-space residual basis $B$ satisfying $B^\top 1=B^\top a=0$ still changes the softmax mean. For a residual coefficient $\Gamma_{kj}$,
+
+$$
+\frac{\partial\mu(x)}{\partial\Gamma_{kj}}
+=x_j\operatorname{Cov}_{p(\cdot\mid x)}(A,B_k(A)).
+$$
+
+Thus free residual coordinates add mean flexibility together with distributional flexibility. The Euclidean projection used by the synthetic design gives an identifiable coordinate system and penalty, while the covariance gives its prediction-space effect.
+
 ### Point-loss weighting and reference-label noise
 
 Scalar MAE gives the numerical residual a bounded sign weight. Scalar MSE weights it proportionally to its magnitude. For a deterministic integer reference age $y$, adding symmetric Gaussian noise and then rounding and clipping to $[0,D]$ preserves $y$ as a median. The conditional mean follows
