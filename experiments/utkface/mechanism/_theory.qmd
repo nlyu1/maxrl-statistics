@@ -135,6 +135,29 @@ $$
 
 exactly the scalar ridge prediction using age targets $Ya$. Common preprocessing and an identically treated intercept preserve this identity. The softmax mean map, categorical objectives and nonlinear encoder learning supply the additional ingredients evaluated by the image interventions.
 
+### A centered anchor for numerical age assignment
+
+Let $\pi$ swap rows within chosen symmetric pairs $\{a,D-a\}$ of the ordinary binomial-initialized head. The base coefficient stays attached to its original age, and the initial feature correction becomes
+
+$$
+\nabla_h L_{\rm CE}^{P}=[D\operatorname{sigmoid}(u)-\pi(y)]w.
+$$
+
+At a common feature vector with score $u=0$, the two policies coincide exactly:
+
+$$
+p_F(a)=p_P(a)={D\choose a}2^{-D}.
+$$
+
+They therefore give the same point prediction, entropy and target CE at that anchor. For an unswapped target, the feature correction also agrees. For a swapped target, $\pi(y)=D-y$ gives
+
+$$
+\nabla_h L_{\rm CE}^{P}=(y-D/2)w
+=-\nabla_h L_{\rm CE}^{F}.
+$$
+
+Every target retains its individual correction magnitude while the chosen pairs change sign. Numerical age assignment can therefore organize the encoder's correction field even at a common prediction and common loss value. Actual image scores vary; the paired training intervention evaluates the complete assignment change under those scores and the declared optimizer.
+
 ### Point-loss weighting and reference-label noise
 
 Scalar MAE gives the numerical residual a bounded sign weight. Scalar MSE weights it proportionally to its magnitude. For a deterministic integer reference age $y$, adding symmetric Gaussian noise and then rounding and clipping to $[0,D]$ preserves $y$ as a median. The conditional mean follows
