@@ -3,11 +3,13 @@ import csv
 import json
 import os
 import re
+import shutil
 import subprocess
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+from uuid import uuid4
 
 from src.experiments.utkface.adaptation_train import file_sha256
 from src.experiments.utkface.mechanism_dossier import (
@@ -69,15 +71,35 @@ def inspect_html(*, directory: Path, path: Path) -> dict:
             )
             continue
         if uri.path:
-            target = directory / unquote(uri.path)
+            relative = Path(unquote(uri.path))
+            target = directory / relative
             require(
-                condition=target.resolve().is_relative_to(directory)
+                condition=tag == "a",
+                path=path,
+                expectation=f"an embedded rendering resource: {uri.path}",
+            )
+            require(
+                condition=not relative.is_absolute()
+                and target.resolve().is_relative_to(directory)
                 and target.is_file()
                 and not target.is_symlink(),
                 path=path,
                 expectation=f"a retained local data, note or zoom-image target: {uri.path}",
             )
             local_files.add(target.resolve().relative_to(directory).as_posix())
+            if uri.fragment and target.suffix.lower() == ".html":
+                linked = document
+                if target.resolve() != path.resolve():
+                    linked = HtmlInventory()
+                    linked.feed(target.read_text(encoding="utf-8"))
+                    linked.close()
+                identifier = unquote(uri.fragment)
+                require(
+                    condition=identifier in linked.identifiers,
+                    path=path,
+                    expectation=f"an available linked HTML anchor: {uri.path}#{identifier}",
+                )
+                anchors.add(f"{uri.path}#{identifier}")
         elif uri.fragment:
             identifier = unquote(uri.fragment)
             require(
@@ -115,8 +137,31 @@ def verify_files(*, directory: Path, files: list[dict]) -> None:
         )
 
 
-def render(*, dossier_dir: Path, quarto: Path) -> dict:
-    directory = dossier_dir.resolve()
+def verify_checksums(*, directory: Path, files: list[dict]) -> list[dict]:
+    with (directory / "SHA256SUMS.tsv").open(encoding="utf-8", newline="") as stream:
+        checksums = list(csv.DictReader(stream, delimiter="\t"))
+    require(
+        condition={row["path"] for row in checksums}
+        == {row["path"] for row in files} | {"dossier-manifest.json"},
+        path=directory,
+        expectation="a checksum index covering every assembled file and the manifest",
+    )
+    verify_files(directory=directory, files=checksums)
+    verify_files(directory=directory, files=files)
+    return checksums
+
+
+def verify_render_log(*, log: str, returncode: int, path: Path) -> None:
+    require(
+        condition=returncode == 0
+        and re.search(r"\bwarn(?:ing)?s?\b", log, flags=re.IGNORECASE) is None,
+        path=path,
+        expectation="successful Quarto rendering with zero warnings",
+    )
+
+
+def render(*, dossier_dir: Path, output_dir: Path, quarto: Path) -> dict:
+    directory, output = dossier_dir.resolve(), output_dir.resolve()
     manifest_path = directory / "dossier-manifest.json"
     manifest = load(path=manifest_path)
     require(
@@ -126,34 +171,57 @@ def render(*, dossier_dir: Path, quarto: Path) -> dict:
         path=manifest_path,
         expectation="a complete scientific dossier awaiting its first verified render",
     )
-    with (directory / "SHA256SUMS.tsv").open(encoding="utf-8", newline="") as stream:
-        checksums = list(csv.DictReader(stream, delimiter="\t"))
+    if output.exists():
+        raise FileExistsError(output)
     require(
-        condition={row["path"] for row in checksums}
-        == {row["path"] for row in manifest["files"]} | {manifest_path.name},
+        condition=not output.is_relative_to(directory)
+        and not directory.is_relative_to(output),
+        path=output,
+        expectation="a separate output outside the source dossier tree",
+    )
+    checksums = verify_checksums(directory=directory, files=manifest["files"])
+    input_paths = list(directory.rglob("*"))
+    require(
+        condition=not any(path.is_symlink() for path in input_paths)
+        and {
+            path.relative_to(directory).as_posix()
+            for path in input_paths
+            if path.is_file()
+        }
+        == {row["path"] for row in checksums} | {"SHA256SUMS.tsv"},
         path=directory,
-        expectation="a checksum index covering every assembled file and the manifest",
+        expectation="the exact assembled file set without untracked files or symlinks",
     )
-    verify_files(directory=directory, files=checksums)
-    verify_files(directory=directory, files=manifest["files"])
-    source = (
-        directory
-        / "source"
-        / manifest["source_snapshot"]["git_commit"]
-        / RENDERER_SOURCE
-    )
-    require(
-        condition=source.is_file()
-        and file_sha256(path=source) == file_sha256(path=Path(__file__)),
-        path=source,
-        expectation="the executing renderer preserved in the frozen source snapshot",
-    )
+    repository = Path(__file__).resolve().parents[3]
+    sources = {}
+    for relative in (
+        RENDERER_SOURCE,
+        Path("src/experiments/utkface/mechanism_dossier.py"),
+        Path("src/experiments/utkface/adaptation_train.py"),
+        Path("src/experiments/utkface/run.py"),
+    ):
+        source = (
+            directory / "source" / manifest["source_snapshot"]["git_commit"] / relative
+        )
+        expected = file_sha256(path=repository / relative)
+        require(
+            condition=source.is_file() and file_sha256(path=source) == expected,
+            path=source,
+            expectation="the renderer and its imported project helpers preserved in the source snapshot",
+        )
+        sources[relative.as_posix()] = expected
     require(
         condition=quarto.is_file(),
         path=quarto,
         expectation="the requested Quarto executable",
     )
     version = subprocess.check_output([str(quarto), "--version"], text=True).strip()
+    assembly, assembly_sha256 = directory, file_sha256(path=manifest_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = output.with_name(f".{output.name}.rendering-{uuid4().hex}")
+    shutil.copytree(assembly, staging)
+    directory, manifest_path = staging, staging / "dossier-manifest.json"
+    verify_checksums(directory=directory, files=manifest["files"])
     command = [
         str(quarto),
         "render",
@@ -175,11 +243,8 @@ def render(*, dossier_dir: Path, quarto: Path) -> dict:
     )
     log = result.stdout + result.stderr
     (directory / "render.log").write_text(log, encoding="utf-8")
-    require(
-        condition=result.returncode == 0
-        and re.search(r"\bwarning\b", log, flags=re.IGNORECASE) is None,
-        path=directory / "render.log",
-        expectation="successful Quarto rendering with zero warnings",
+    verify_render_log(
+        log=log, returncode=result.returncode, path=directory / "render.log"
     )
     html = directory / "report.html"
     validation = {
@@ -187,8 +252,11 @@ def render(*, dossier_dir: Path, quarto: Path) -> dict:
         "created_utc": datetime.now(UTC).isoformat(),
         "quarto_version": version,
         "command": command,
-        "assembly_manifest_sha256": file_sha256(path=manifest_path),
+        "assembly_manifest_sha256": assembly_sha256,
+        "assembly_directory": str(assembly),
+        "output_directory": str(output),
         "renderer_sha256": file_sha256(path=Path(__file__)),
+        "project_source_sha256": sources,
         "html_sha256": file_sha256(path=html),
         "html_checks": inspect_html(directory=directory, path=html),
         "code_execution": False,
@@ -198,13 +266,19 @@ def render(*, dossier_dir: Path, quarto: Path) -> dict:
     write_json(path=directory / "render-validation.json", payload=validation)
     paths = {row["path"] for row in manifest["files"]}
     for path in sorted(directory.rglob("*")):
+        require(
+            condition=not path.is_symlink()
+            and path.resolve().is_relative_to(directory),
+            path=path,
+            expectation="rendering artifacts contained in the dossier without symlinks",
+        )
         if path.is_dir() or path in {manifest_path, directory / "SHA256SUMS.tsv"}:
             continue
         relative = path.relative_to(directory).as_posix()
         if relative in paths:
             continue
         require(
-            condition=not path.is_symlink() and path.stat().st_size <= MAX_FILE_BYTES,
+            condition=path.is_file() and path.stat().st_size <= MAX_FILE_BYTES,
             path=path,
             expectation="a bounded regular rendering artifact",
         )
@@ -222,16 +296,23 @@ def render(*, dossier_dir: Path, quarto: Path) -> dict:
     )
     write_json(path=manifest_path, payload=manifest)
     write_checksums(directory=directory, files=manifest["files"])
-    verify_files(directory=directory, files=manifest["files"])
+    verify_checksums(directory=directory, files=manifest["files"])
+    verify_files(directory=assembly, files=checksums)
+    if output.exists():
+        raise FileExistsError(output)
+    staging.rename(output)
     return validation
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dossier-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--quarto", type=Path, required=True)
     args = parser.parse_args()
-    result = render(dossier_dir=args.dossier_dir, quarto=args.quarto)
+    result = render(
+        dossier_dir=args.dossier_dir, output_dir=args.output_dir, quarto=args.quarto
+    )
     print(json.dumps(result))
 
 
