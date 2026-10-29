@@ -158,6 +158,23 @@ $$
 
 Every target retains its individual correction magnitude while the chosen pairs change sign. Numerical age assignment can therefore organize the encoder's correction field even at a common prediction and common loss value. Actual image scores vary; the paired training intervention evaluates the complete assignment change under those scores and the declared optimizer.
 
+The conditional expectations identify the initial numerical tasks explicitly: the ordered correction uses $\mu_F-\mathbb E[Y\mid h]$, and the swapped correction uses $\mu_F-\mathbb E[\pi(Y)\mid h]$. The full ordinary heads retain the same attainable family during fitting; these identities describe their starting feature-correction fields.
+
+There is also an exact point-alignment comparison at the centered anchor. Hold the head fixed and take an independent feature step $h_\eta=h-\eta\nabla_hL_{\mathrm{CE}}$. Define the physical-age point loss $E_y=\tfrac12(\mu-y)^2$ and
+
+$$
+\kappa=\operatorname{Cov}_{A\sim\operatorname{Bin}(99,1/2)}[A,\pi(A)].
+$$
+
+For the swapped head,
+
+$$
+\left.\frac{dE_y}{d\eta}\right|_{\eta=0}
+=-\kappa\,\|w\|^2(49.5-y)[49.5-\pi(y)].
+$$
+
+The ordered head has $\kappa=99/4$, giving a strictly point-improving direction for all 100 integer target ages when $w\ne0$. With 25 swapped pairs and $\kappa\ne0$, the control has 50 point-improving and 50 point-worsening directions; the sign of $\kappa$ determines which set improves. An independent CPU audit computes the three retained codes' covariances as exact rational numbers and checks five finite steps from $10^{-3}$ through $10^{-7}$. All 2,000 target-step records pass the stated checks: every step decreases CE, and the smallest-step point derivatives recover the analytical alignment counts. Shared minibatches, encoder Jacobians, head updates, clipping and Adam determine the actual neural parameter updates; the audit concerns the stated held-head feature step.
+
 ### Point-loss weighting and reference-label noise
 
 Scalar MAE gives the numerical residual a bounded sign weight. Scalar MSE weights it proportionally to its magnitude. For a deterministic integer reference age $y$, adding symmetric Gaussian noise and then rounding and clipping to $[0,D]$ preserves $y$ as a median. The conditional mean follows
