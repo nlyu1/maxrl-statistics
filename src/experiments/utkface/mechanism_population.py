@@ -201,8 +201,8 @@ def binomial_equivalence() -> dict:
                         "mean_gradient_absolute_error": float(
                             (categorical_mean_gradient - scalar_mean_gradient).abs()
                         ),
-                        "near_mae_kink": method == "mae" and distance <= 1e-5,
-                        "saturated_score": abs(score) >= 20,
+                        "near_mae_kink": bool(method == "mae" and distance <= 1e-5),
+                        "saturated_score": bool(abs(score) >= 20),
                     })
         mean_error = max(row["mean_absolute_error"] for row in rows)
         gradient_error = max(row["gradient_absolute_error"] for row in rows)
@@ -221,8 +221,10 @@ def binomial_equivalence() -> dict:
             ),
             "mean_tolerance": mean_tolerance,
             "gradient_tolerance": gradient_tolerance,
-            "passed": mean_error <= mean_tolerance
-            and gradient_error <= gradient_tolerance,
+            "passed": bool(
+                mean_error <= mean_tolerance
+                and gradient_error <= gradient_tolerance
+            ),
         })
     return {
         "identity": "a_k=log binom(99,k)+k*s implies E_q[k]=99*sigmoid(s)",
@@ -264,9 +266,11 @@ def optimality_certificate(
         "dual_feasibility_violation": max(0.0, -float(reduced.min())),
         "complementarity_maximum": float(np.max(probabilities * np.abs(reduced))),
         "tolerance": tolerance,
-        "certified": sum_error <= 1e-10
-        and nonnegative_violation <= 1e-12
-        and gap <= tolerance,
+        "certified": bool(
+            sum_error <= 1e-10
+            and nonnegative_violation <= 1e-12
+            and gap <= tolerance
+        ),
         "certificate_scope": "For this convex objective, the full-simplex Frank-Wolfe gap upper-bounds the objective suboptimality. It does not by itself bound policy-mean error when the minimizer is ill-conditioned or nonunique.",
     }
 
@@ -390,7 +394,7 @@ def solve_population(
         "starts": reports,
         "chosen_start": chosen,
         "certified_starts": len(certified),
-        "all_starts_certified": len(certified) == len(reports),
+        "all_starts_certified": bool(len(certified) == len(reports)),
         "objective_range_across_starts": max(values) - min(values),
         "mean_range_across_starts": max(means) - min(means),
         "maximum_l1_distance_to_chosen": max(
@@ -469,20 +473,22 @@ def objective_autograd_audit(*, problem: PopulationProblem) -> dict:
     step = 1e-6
     plus, _ = problem.value_gradient(probabilities=probabilities + step * direction)
     minus, _ = problem.value_gradient(probabilities=probabilities - step * direction)
-    finite_difference_error = abs(
-        (plus - minus) / (2 * step) - tail_gradient @ direction
+    finite_difference_error = float(
+        abs((plus - minus) / (2 * step) - tail_gradient @ direction)
     )
     return {
         "dtype": "float64",
         "repository_checks": rows,
         "tail_simplex_directional_gradient_error": float(finite_difference_error),
         "finite_difference_step": step,
-        "passed": all(
-            row["loss_absolute_error"] <= 1e-10
-            and row["logit_gradient_maximum_absolute_error"] <= 1e-10
-            for row in rows
-        )
-        and finite_difference_error <= 1e-8,
+        "passed": bool(
+            all(
+                row["loss_absolute_error"] <= 1e-10
+                and row["logit_gradient_maximum_absolute_error"] <= 1e-10
+                for row in rows
+            )
+            and finite_difference_error <= 1e-8
+        ),
     }
 
 
@@ -607,8 +613,10 @@ def wrong_way_tail_audit() -> dict:
         "tail_loss_after": float(after_value),
         "mean_after": float(after_mean),
         "gradient_step": step,
-        "verified_wrong_way_step": float(after_value) < float(value.detach())
-        and float(after_mean) > float(policy_mean.detach()),
+        "verified_wrong_way_step": bool(
+            float(after_value) < float(value.detach())
+            and float(after_mean) > float(policy_mean.detach())
+        ),
         "scope": "A local optimization counterexample; it is not a population optimum or a generalization result.",
     }
 
@@ -774,11 +782,13 @@ def noise_gradient_audit(
         "policy_mean": noisy["mean"],
         "methods": methods,
         "repository_autograd_checks": checks,
-        "repository_checks_performed": verify,
-        "repository_checks_passed": all(
-            row["loss_absolute_error"] <= 1e-10
-            and row["gradient_maximum_absolute_error"] <= 1e-10
-            for row in checks
+        "repository_checks_performed": bool(verify),
+        "repository_checks_passed": bool(
+            all(
+                row["loss_absolute_error"] <= 1e-10
+                and row["gradient_maximum_absolute_error"] <= 1e-10
+                for row in checks
+            )
         )
         if verify
         else None,

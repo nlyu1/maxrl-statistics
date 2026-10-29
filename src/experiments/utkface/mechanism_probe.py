@@ -40,7 +40,18 @@ from src.experiments.utkface.metrics import median_spearman
 from src.experiments.utkface.noise import noise_summary, noisy_labels
 from src.experiments.utkface.run import write_json
 
-Checkpoint = Literal["best", "final"]
+Checkpoint = Literal[
+    "best", "final", "epoch_025", "epoch_050", "epoch_100", "epoch_200", "epoch_500"
+]
+CHECKPOINTS: tuple[Checkpoint, ...] = (
+    "best",
+    "final",
+    "epoch_025",
+    "epoch_050",
+    "epoch_100",
+    "epoch_200",
+    "epoch_500",
+)
 SPLITS: tuple[Split, ...] = ("train", "val", "test")
 RIDGE_ALPHAS = tuple(10.0**exponent for exponent in range(-4, 5))
 TARGETS = ("supplied_labels", "oracle_clean_labels")
@@ -139,14 +150,29 @@ def load_source(
         raise ValueError(
             f"Source run must be complete and config-matched: {identifier}"
         )
-    path = run.output_dir / f"{checkpoint}.pt"
+    milestone = checkpoint.startswith("epoch_")
+    if milestone:
+        expected_epoch = int(checkpoint.removeprefix("epoch_"))
+        if expected_epoch not in config.adaptation.control.model_milestones:
+            raise ValueError(f"Checkpoint milestone was not declared: {checkpoint}")
+        path = run.output_dir / "model-milestones" / f"{checkpoint}.pt"
+        matching_history = [
+            row for row in result["history"] if row["epoch"] == expected_epoch
+        ]
+        if len(matching_history) != 1:
+            raise ValueError(f"Milestone requires one matching history row: {path}")
+        expected_validation = matching_history[0]["validation"]
+    else:
+        expected_epoch = result[f"{checkpoint}_epoch"]
+        expected_validation = result[f"{checkpoint}_validation"]
+        path = run.output_dir / f"{checkpoint}.pt"
     saved = torch.load(path, map_location="cpu", weights_only=True)
     provenance = saved["provenance"]
     if (
         saved["config"] != payload
         or saved["model_sha256"] != model_sha256(state=saved["model"])
-        or saved["model_sha256"] != result[f"{checkpoint}_model_sha256"]
-        or saved["epoch"] != result[f"{checkpoint}_epoch"]
+        or saved["epoch"] != expected_epoch
+        or saved["validation"] != expected_validation
         or saved["provenance"] != result["provenance"]
         or provenance["mechanism_config"] != payload
         or provenance["fingerprint"]
@@ -155,6 +181,11 @@ def load_source(
         })
     ):
         raise ValueError(f"Source checkpoint/provenance mismatch: {path}")
+    if (
+        not milestone
+        and saved["model_sha256"] != result[f"{checkpoint}_model_sha256"]
+    ):
+        raise ValueError(f"Selected/final model hash differs from its result: {path}")
     if checkpoint == "final" and saved["epoch"] != run.epochs:
         raise ValueError(
             f"Final checkpoint has not reached the configured epoch: {path}"
@@ -306,59 +337,60 @@ def collect_features(
         model.load_state_dict(saved["model"], strict=True)
         splits = {}
         loader_orders = {}
-        with torch.cuda.device(device), torch.device(device), torch.inference_mode():
+        with torch.cuda.device(device), torch.inference_mode():
             model = model.to(device)
             for split in SPLITS:
-                loader = build_image_loader(
-                    run=extraction_run,
-                    pipeline="fixed",
-                    split=split,
-                    epoch=1 if split == "train" else 0,
-                    view_seed=PROBE_VIEW_SEED,
-                    order_seed=PROBE_ORDER_SEED,
-                )
-                expected_order = (
-                    indices["train"][
-                        epoch_order(
-                            count=len(indices["train"]),
-                            epoch=1,
-                            order_seed=PROBE_ORDER_SEED,
-                        )
-                    ]
-                    if split == "train"
-                    else torch.tensor(
-                        manifest["splits"][split], dtype=torch.int64, device="cpu"
+                with torch.device("cpu"):
+                    loader = build_image_loader(
+                        run=extraction_run,
+                        pipeline="fixed",
+                        split=split,
+                        epoch=1 if split == "train" else 0,
+                        view_seed=PROBE_VIEW_SEED,
+                        order_seed=PROBE_ORDER_SEED,
                     )
-                )
-                observed, features, outputs, ages = [], [], [], []
-                for images, batch_ages, batch_indices in loader:
-                    with (
-                        torch.device(device),
-                        torch.autocast(device_type="cuda", dtype=torch.bfloat16),
-                    ):
-                        batch_features = model.encoder(
-                            images.to(device, non_blocking=True)
+                    expected_order = (
+                        indices["train"][
+                            epoch_order(
+                                count=len(indices["train"]),
+                                epoch=1,
+                                order_seed=PROBE_ORDER_SEED,
+                            )
+                        ]
+                        if split == "train"
+                        else torch.tensor(
+                            manifest["splits"][split], dtype=torch.int64, device="cpu"
                         )
-                        batch_outputs = model.fc(batch_features)
-                    observed.append(batch_indices.cpu())
-                    ages.append(batch_ages.cpu())
-                    features.append(batch_features.float().cpu())
-                    outputs.append(batch_outputs.float().cpu())
-                del loader
-                observed_indices = torch.cat(observed)
-                if not torch.equal(observed_indices, expected_order):
-                    raise ValueError(
-                        f"Extraction omitted or reordered images in {split}"
                     )
-                order = observed_indices.argsort()
-                splits[split] = FeatureSplit(
-                    indices=observed_indices[order],
-                    clean_ages=torch.cat(ages)[order].long(),
-                    supplied_labels=labels[observed_indices[order]],
-                    features=torch.cat(features)[order],
-                    native_outputs=torch.cat(outputs)[order],
-                )
-                loader_orders[split] = tensor_sha256(values=observed_indices)
+                    observed, features, outputs, ages = [], [], [], []
+                    for images, batch_ages, batch_indices in loader:
+                        with (
+                            torch.device(device),
+                            torch.autocast(device_type="cuda", dtype=torch.bfloat16),
+                        ):
+                            batch_features = model.encoder(
+                                images.to(device, non_blocking=True)
+                            )
+                            batch_outputs = model.fc(batch_features)
+                        observed.append(batch_indices.cpu())
+                        ages.append(batch_ages.cpu())
+                        features.append(batch_features.float().cpu())
+                        outputs.append(batch_outputs.float().cpu())
+                    del loader
+                    observed_indices = torch.cat(observed)
+                    if not torch.equal(observed_indices, expected_order):
+                        raise ValueError(
+                            f"Extraction omitted or reordered images in {split}"
+                        )
+                    order = observed_indices.argsort()
+                    splits[split] = FeatureSplit(
+                        indices=observed_indices[order],
+                        clean_ages=torch.cat(ages)[order].long(),
+                        supplied_labels=labels[observed_indices[order]],
+                        features=torch.cat(features)[order],
+                        native_outputs=torch.cat(outputs)[order],
+                    )
+                    loader_orders[split] = tensor_sha256(values=observed_indices)
         del model
         cleanup_cuda(device=device)
         audit = {
@@ -647,8 +679,8 @@ def probe(
         raise ValueError("Select distinct, nonempty variants")
     if not checkpoints or len(set(checkpoints)) != len(checkpoints):
         raise ValueError("Select distinct, nonempty checkpoints")
-    if any(checkpoint not in {"best", "final"} for checkpoint in checkpoints):
-        raise ValueError("Only best and final checkpoints are supported")
+    if any(checkpoint not in CHECKPOINTS for checkpoint in checkpoints):
+        raise ValueError(f"Checkpoint choices must be among {CHECKPOINTS}")
     plan_path = root / "plan.json"
     plan = json.loads(plan_path.read_text())
     if plan["schema"] != "utkface-mechanism-study-v1":
@@ -794,7 +826,7 @@ def main() -> None:
         default=[variant.value for variant in DEFAULT_VARIANTS],
     )
     parser.add_argument(
-        "--checkpoints", nargs="+", choices=("best", "final"), default=["final"]
+        "--checkpoints", nargs="+", choices=CHECKPOINTS, default=["final"]
     )
     args = parser.parse_args()
     probe(
