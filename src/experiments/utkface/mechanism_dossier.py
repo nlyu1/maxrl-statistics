@@ -77,7 +77,9 @@ def population_certificate_summary(*, population: dict) -> dict:
         "uncertified": len(rows) - certified,
         "max_frank_wolfe_gap": worst["full_simplex_frank_wolfe_gap"],
         "max_gap_case": worst_case,
-        "certificate_scope": worst["certificate_scope"],
+        "legacy_certificate_scope": worst["certificate_scope"],
+        "current_mean_bound": "abs(policy_mean - target_mean) <= 99 * G for the unrestricted complete equal-radius objective with zero survival floor",
+        "mean_bound_source": "_theory.qmd: A direct numerical mean certificate",
     }
 
 
@@ -419,7 +421,10 @@ def evidence_index(*, index: list[dict], source: dict, notes: list[str]) -> str:
             f"The largest full-simplex Frank–Wolfe gap is `{summary['max_frank_wolfe_gap']}` "
             f"for `{summary['max_gap_case']}`. The original global flag remains "
             f"`{str(population['all_population_candidates_certified']).lower()}`. "
-            "Candidate-solver certification is distinct from the theorem and calibration audit."
+            "Candidate-solver certification is distinct from the theorem and calibration audit. "
+            "The loss-specific proof gives $|\\mu-m|\\le99G$ under its full-simplex assumptions; "
+            "at the largest recorded gap this bound exceeds the age range. "
+            "The manifest labels the saved certificate's older generic scope text as historical."
         ),
         "",
         "Independent review notes:",
