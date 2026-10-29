@@ -46,6 +46,7 @@ def create(
     *, root: Path, manifest: Path, epochs: int, train_limit: int, smoke: bool
 ) -> None:
     root.mkdir(parents=True, exist_ok=False)
+    (root / "configs").mkdir()
     jobs = []
     for block, seeds in enumerate(BLOCKS[:1] if smoke else BLOCKS):
         for noise in (10,) if smoke else (0, 10):
