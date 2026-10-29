@@ -3,6 +3,7 @@ title: "Numerical supervision, readout flexibility, and the learning horizon"
 subtitle: "An experimentally challenged explanation of scalar age-regression generalization"
 date: 2026-10-29
 lang: en
+lightbox: true
 format:
   html:
     theme: cosmo
