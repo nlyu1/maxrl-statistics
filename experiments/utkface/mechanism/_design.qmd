@@ -1,0 +1,64 @@
+## Experimental design and evidence scope
+
+The research sequence starts with the retained UTKFace results, then tests explanations with paired interventions. Each experimental comparison uses the validation-selected clean mean-MAE checkpoint as its primary endpoint and the common final epoch as a separate endpoint. Validation selects the checkpoint; the test set measures its performance afterward. The historical test set has supported several rounds of research, so these results describe evidence on this benchmark and motivate replication on a new dataset.
+
+### Paired image-training interventions
+
+The first cohort contains 78 fits: 13 methods, clean labels or one fixed SD-10 corruption field, and three independent joint training/corruption blocks. All methods within a block share the initial encoder, training subset, image order, augmentation views, corruption field and evaluation indices. The three blocks vary model, head, order, augmentation and corruption seeds together. Their variation measures combined training and corruption uncertainty. The pairing permits direct method contrasts within each block.
+
+The training subset contains 4,096 images. Validation and test each contain 2,308 images. The encoder is ResNet-18 initialized from ImageNet. Training lasts 50 epochs with Adam, peak learning rate $3\times10^{-4}$, constant learning rate after 2.5 warmup epochs, and weight decay zero. The encoder and head have separate gradient-norm clipping at five. Encoder execution uses bfloat16 autocast. Actual Adam parameter-displacement RMS is sampled every five steps, and clipping frequency is retained for both parameter groups.
+
+The methods are:
+
+| Intervention | Methods | Identified comparison |
+|:--|:--|:--|
+| Point parameterization | Scalar MSE, scalar MAE, categorical mean-MSE | Scalar loss weighting and the scalar versus categorical mean map |
+| Categorical objectives | Categorical CE, population TailRL | Objective-specific categorical corrections |
+| Shared age score | Binomial CE, binomial TailRL | Ordered one-score models under two objectives |
+| Added output coordinates | Fixed, age-affine and free residual binomial heads | One-score restriction, redundant location coordinates and full affine-logit flexibility |
+| Gradient routing | MSE head/TailRL encoder; TailRL head/MSE encoder | The head objective, encoder objective and their interaction |
+
+The three residual modes own identical parameter sets and start from the same binomial function with a zero residual. The fixed mode supplies explicit zero residual gradients. The age-affine projection preserves the one-score function class while changing its coordinates and optimization. The free residual expands the available affine-logit functions. The registered parameter count therefore stays fixed while effective function freedom changes.
+
+A second cohort contains 36 fits: six heads, two label conditions and the same three blocks. The six heads cross CE or TailRL with an ordinary categorical head initialized to binomial logits, an ordinary randomly initialized categorical head, or the redundant scalar-plus-free-residual binomial head. All six use float32 heads and losses with a bfloat16 encoder. The fused and redundant ordinal heads begin with the same function, up to explicitly checked float32 arithmetic error. These comparisons separate an ordinal initialization package from redundant parameter coordinates under Adam. The random and ordinal starts differ in their initial distribution, including age alignment, mean, concentration and entropy; the initialization comparison measures that complete package.
+
+A third cohort is specified for 500-epoch training from scratch: 11 methods, two label conditions and three blocks, totaling 66 fits. It includes the point, categorical and residual-head methods. Its schedule keeps the same 2.5-epoch warmup, peak rate and constant subsequent rate. Checkpoints at epochs 25, 50, 100, 200 and 500 permit matched-horizon comparisons. This cohort tests whether the mechanism observed during ImageNet fine-tuning also describes sustained representation learning from random initialization.
+
+### Common readouts and corruption following
+
+Each selected checkpoint exports deterministic image features for the same train, validation and test images. The shared readout is ridge regression on standardized 512-dimensional encoder features. Its nine regularization values range from $10^{-4}$ through $10^4$; clean validation MSE selects the value. The primary readout uses the supplied training labels. A separate diagnostic readout uses clean reference labels as an experimental oracle.
+
+The ImageNet and initialization cohorts are probed at epochs 25 and 50. The scratch cohort is probed at epochs 50, 200 and 500. Comparing a common readout at a common epoch measures age information accessible to this particular readout procedure. Comparing native and refitted predictions measures how much performance a new readout recovers from each encoder.
+
+For the native head, retained training predictions supply clean-reference error, supplied-label error, entropy and policy variance where a policy exists. The corruption-following slope is
+
+$$
+\frac{\operatorname{Cov}(\widehat\mu-Y_{\rm clean},\;Y_{\rm supplied}-Y_{\rm clean})}
+{\operatorname{Var}(Y_{\rm supplied}-Y_{\rm clean})}.
+$$
+
+The age-adjusted slope first demeans both quantities within each exact reference age. Separate age bands examine boundary behavior. Unused corruption fields supply conditional randomization references for the same fixed images and predictions. Their quantiles describe those references; training-block variation remains the source of repeated-training uncertainty. Clean-label conditions have zero corruption variance and an undefined slope, recorded explicitly.
+
+### Certified synthetic estimation experiment
+
+The synthetic experiment fixes $X\in\mathbb R^{12}$ with independent standard-normal coordinates and conditional mean
+
+$$
+\mu_*(X)=99\operatorname{sigmoid}(0.7X_1+0.4X_2-0.3X_3).
+$$
+
+It varies the conditional label law between a binomial distribution and a distribution on ages zero and 99 with this same mean. Training sizes are 128, 512 and 2,048, with five paired seeds. The tied one-score CE model is compared with affine categorical logits consisting of that score plus 98 residual action directions orthogonal in Euclidean coordinates to the constant and age vectors. A residual direction changes the predicted mean through $\operatorname{Cov}_p(A,B_k(A))$; these coordinates therefore add mean flexibility as well as distributional flexibility.
+
+The score ridge is initially $0.001$ and the full-head residual ridge takes values $0.001$, $0.1$ and $10$. This specifies an anisotropic prior in logit space: the squared norm of the centered age vector is 83,325. Equal numerical score and residual penalties have different strengths per unit logit displacement. Validation observed-label MSE selects candidates before a fresh 20,000-image oracle stream measures excess conditional-mean MSE. This oracle metric evaluates estimation of the known conditional mean.
+
+All fits use float64 CPU optimization, L-BFGS followed by preconditioned Newton-CG polishing. Positive ridge gives a strongly convex objective and an objective-gap bound from the final gradient norm. The retained run contains the fitted coefficients, data and source hashes, validation selections frozen before oracle generation, and convergence diagnostics for every fit.
+
+An independent challenger adds a matched three-candidate scalar regularization comparison, with score ridges $0.001$, $1$ and $10$. It reuses the full-head fits and their validation data, freezes each family's selection, and evaluates a separate fresh oracle stream. This tests whether scalar shrinkage can reproduce the small endpoint-law improvement seen with the flexible head. Each candidate set defines its own estimator family; the comparison identifies performance attainable within those declared sets.
+
+### Interpretation rules
+
+The report presents individual paired differences and their mean with sample standard deviation. Three joint blocks support repeated effect signs and approximate magnitudes; five synthetic blocks support the corresponding controlled estimation comparison. Practical equivalence requires an explicit bound and adequate precision. Equal learning rates describe the chosen optimization protocol; actual updates and clipping quantify how objectives interact with that protocol.
+
+The hypothesis sequence records predictions, observations, challenges and resulting revisions. A representation claim requires common-readout evidence. A direction-specific gradient claim requires a direction intervention with appropriate weighting and update-size controls. The final explanation adopts the level directly established by the intervention: prediction family, initialization, loss weighting, coordinates, or their joint training behavior.
+
+Each training cohort runs from a frozen Git checkout. Strict resume checks retain configuration, source, environment and initialization provenance. Dataset, checkpoint, feature and report artifacts stay outside the source repository. Source changes reach the server through committed GitHub revisions. At most four GPUs and eight training jobs per GPU are used throughout this research sequence.
