@@ -1,0 +1,42 @@
+{
+  "schema": "utkface-mechanism-workflow-v1",
+  "artifact_root": "/home/zitongw2/.local/state/maxrl-statistics",
+  "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-workflow-phase-b-20261029",
+  "max_gpus": 4,
+  "jobs_per_gpu": 8,
+  "poll_seconds": 5,
+  "idle_memory_mib": 100,
+  "idle_utilization": 5,
+  "dispatch_lock": "/tmp/utkface-extension-20261014/global-dispatch.lock",
+  "environment": {
+    "UV_PROJECT_ENVIRONMENT": "/home/zitongw2/maxrl-statistics/.venv",
+    "TMPDIR": "/tmp/utkface-lr-tmp"
+  },
+  "stages": [
+    {
+      "name": "scratch500_study",
+      "kind": "study",
+      "root": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-scratch500-20261029",
+      "launch": true,
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-e8b7ebe",
+      "commit": "e8b7ebe7ef44ae69ca8a6e1b60f50f400fc14c84"
+    },
+    {
+      "name": "scratch500_report",
+      "kind": "report",
+      "root": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-scratch500-20261029",
+      "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/scratch500",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable"
+    },
+    {
+      "name": "scratch500_probes",
+      "kind": "probes",
+      "root": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-scratch500-20261029",
+      "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-scratch500-20261029",
+      "checkpoints": ["epoch_050", "epoch_200", "final"],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-e8b7ebe",
+      "commit": "e8b7ebe7ef44ae69ca8a6e1b60f50f400fc14c84"
+    }
+  ]
+}
