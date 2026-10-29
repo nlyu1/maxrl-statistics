@@ -33,6 +33,7 @@ from src.experiments.utkface.mechanism_config import MechanismConfig, MechanismV
 from src.experiments.utkface.mechanism_train import (
     MECHANISM_SOURCE_FILES,
     build_research_model,
+    head_context,
     save_checkpoint,
     tensor_sha256,
 )
@@ -181,10 +182,7 @@ def load_source(
         })
     ):
         raise ValueError(f"Source checkpoint/provenance mismatch: {path}")
-    if (
-        not milestone
-        and saved["model_sha256"] != result[f"{checkpoint}_model_sha256"]
-    ):
+    if not milestone and saved["model_sha256"] != result[f"{checkpoint}_model_sha256"]:
         raise ValueError(f"Selected/final model hash differs from its result: {path}")
     if checkpoint == "final" and saved["epoch"] != run.epochs:
         raise ValueError(
@@ -371,7 +369,14 @@ def collect_features(
                             batch_features = model.encoder(
                                 images.to(device, non_blocking=True)
                             )
-                            batch_outputs = model.fc(batch_features)
+                            with head_context(
+                                features=batch_features, precision=config.head_precision
+                            ):
+                                batch_outputs = model.fc(
+                                    batch_features.float()
+                                    if config.head_precision == "fp32"
+                                    else batch_features
+                                )
                         observed.append(batch_indices.cpu())
                         ages.append(batch_ages.cpu())
                         features.append(batch_features.float().cpu())
