@@ -99,7 +99,7 @@ $$
 \frac{H^{-1}}{Dn}\quad\text{and}\quad\frac{H^{-1}}{n}.
 $$
 
-The endpoint experiment therefore has 99 times larger first-order coefficient variance for the same score and sample size. Scalar MSE instead uses $b$ proportional to $\mu'$ and attains this weighting bound when $v$ is constant. These formulas supply a variance-dependent prediction about scalar loss weighting. They apply to the regular, correctly specified, fixed-dimensional limit with penalties vanishing sufficiently quickly. The synthetic study's fixed penalties and the learned image encoder define additional finite-sample interventions measured separately in the experiments.
+The endpoint experiment therefore has 99 times larger first-order coefficient variance for the same score and sample size. Scalar MSE instead uses $b$ proportional to $\mu'$ and attains this weighting bound when $v$ is constant. These formulas supply a variance-dependent prediction about scalar loss weighting. They apply to the regular, correctly specified, fixed-dimensional limit with penalties vanishing sufficiently quickly, for example $\lambda_n=o(n^{-1/2})$ in an average-loss ridge objective. The synthetic study's fixed penalties and the learned image encoder define additional finite-sample interventions measured separately in the experiments.
 
 ### The coordinate metric of a structured head
 
@@ -125,6 +125,15 @@ $$
 $$
 
 Thus free residual coordinates add mean flexibility together with distributional flexibility. The Euclidean projection used by the synthetic design gives an identifiable coordinate system and penalty, while the covariance gives its prediction-space effect.
+
+For comparison, linear ridge readouts supply an exact sharing identity. With fixed design $X$, one-hot label matrix $Y$, common ridge $\lambda$ and age vector $a$, the multi-output solution is $\widehat B=(X^\top X+\lambda I)^{-1}X^\top Y$. Its age projection on held-out design $X_*$ is
+
+$$
+X_*\widehat B a
+=X_*(X^\top X+\lambda I)^{-1}X^\top(Ya),
+$$
+
+exactly the scalar ridge prediction using age targets $Ya$. Common preprocessing and an identically treated intercept preserve this identity. The softmax mean map, categorical objectives and nonlinear encoder learning supply the additional ingredients evaluated by the image interventions.
 
 ### Point-loss weighting and reference-label noise
 
