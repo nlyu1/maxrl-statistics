@@ -729,6 +729,43 @@ def point_figure(*, rows: list[dict], metric: str, split: str, paired: bool):
     return figure
 
 
+def assignment_figure(*, runs: list[dict]):
+    assignments = {}
+    for run in runs:
+        provenance = run["result"]["provenance"]
+        if "symmetric_age_assignment" in provenance:
+            assignment = provenance["symmetric_age_assignment"]
+            previous = assignments.setdefault(run["block"], assignment)
+            if previous != assignment:
+                raise ValueError("Clean and noisy runs use different age assignments")
+    if not assignments:
+        raise ValueError("An age-assignment figure requires saved mappings")
+    figure, axes = plt.subplots(
+        1, len(assignments), figsize=(5 * len(assignments), 4.8),
+        squeeze=False, sharex=True, sharey=True,
+    )
+    ages = np.arange(100)
+    correction = 49.5 - ages
+    for axis, (block, assignment) in zip(axes[0], sorted(assignments.items()), strict=True):
+        swapped = 49.5 - np.asarray(assignment["mapping"])
+        if not np.array_equal(np.abs(correction), np.abs(swapped)):
+            raise ValueError("Symmetric assignments must preserve centered correction magnitudes")
+        axis.plot(ages, correction, color="#222222", label="Ordered code", linewidth=2)
+        axis.plot(ages, swapped, color="#b7410e", linewidth=0.7, alpha=0.4)
+        axis.scatter(ages, swapped, color="#b7410e", s=13, label="Symmetric-swap code")
+        axis.axhline(0, color="black", linewidth=0.5)
+        axis.set(
+            title=f"Block {block + 1} · mapping seed {assignment['seed']}",
+            xlabel="Actual target age (years)",
+            ylabel="CE score correction at s = 0",
+        )
+        axis.grid(alpha=0.2)
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    figure.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.91), ncol=2)
+    figure.suptitle("Same centered policy and correction magnitudes; different numerical assignment")
+    return figure
+
+
 def report(
     *,
     root: Path,
@@ -748,6 +785,12 @@ def report(
     )
     output.mkdir(parents=True, exist_ok=True)
     files, frames = [], {}
+    if "age_assignment_control" in plan:
+        files += save(
+            figure=assignment_figure(runs=runs), output=output,
+            name="centered-age-corrections", formats=formats,
+            note="Analytic initialization identity at score s=0: the policy, target CE and individual gradient magnitudes agree, while 25 symmetric pairs change correction sign. Actual image scores vary. Full mappings and seeds are retained in training provenance.",
+        )
     for name, rows, keys in (
         (
             "endpoints",

@@ -1,0 +1,54 @@
+## What the retained experiments establish
+
+The retained experiments locate scalar MAE's clearest advantage in full representation learning with a substantial training horizon. They also identify settings in which a richer categorical readout is useful. These observations motivate a theory of numerical learning and regularization with explicit conditions.
+
+All these results use the UTKFace reference annotations. The common manifest contains 18,462 training images, 2,308 validation images and 2,308 test images. Later mechanism studies use the same 4,096-image training subset. Exact RGB duplicates were removed in the dataset preparation; the evidence conditions on the retained split, identities and annotation set. Most later historical studies use one model seed and one fixed corruption field. The three-seed full-data comparison and the new paired studies supply separate repeated-training evidence.
+
+| Retained setting | Relevant observation | What the observation identifies |
+|:--|:--|:--|
+| Full-data ImageNet adaptation, 50 epochs, three seeds | Mean test MAE: scalar MAE **4.632 ± 0.023**, categorical mean-MSE **4.817 ± 0.191**, TailRL **4.754 ± 0.028**, CE **4.858 ± 0.080** | A repeated scalar-MAE advantage in this training recipe |
+| Frozen ImageNet features, fixed inputs, 4,096 examples | Scalar MAE **9.086**, TailRL **7.871**, categorical mean-MSE **8.317** | Useful flexibility in the categorical readout when encoder adaptation is unavailable |
+| Fixed SD-10 corruption, earlier 4,096-image recipe | Scalar MAE **6.734**, categorical mean-MSE **6.252**, TailRL **7.155**, CE **7.161** | Strong direct-regression performance under this fixed-field recipe |
+| Fresh SD-10 corruption, earlier recipe | Scalar MAE **5.389**, scalar MSE **5.361**, categorical mean-MSE **5.719**, TailRL **5.482**, CE **5.348** | A useful change in repeated-label supervision, with CE competitive for mean prediction |
+| Augmentation intervention under fixed SD-10 | TailRL minus categorical MSE: **−0.265** years with augmentation, **+0.968** with fixed inputs | A reversal caused by the tested crop/flip/jitter input package |
+| Short scratch training | TailRL wins all three cosine-recipe comparisons with MSE; MSE wins all three warmup-constant-recipe comparisons | A schedule/rate-dependent finite-horizon ranking |
+| Default 500-epoch scratch recipes | Scalar MAE has lower selected MAE than categorical MSE and TailRL in all six clean/SD-5/SD-10 by schedule cells | Scalar MAE's useful long training horizon in the retained recipes |
+| Validation-selected learning rates for long scratch | Scalar MAE leads five of six corresponding selected-rate cells | A broad retained advantage after the declared learning-rate selection procedure |
+
+The full-data ± values are sample standard deviations across three optimization seeds. The remaining rows summarize the specific retained models and protocols; their cells share training sources, corruption fields and held-out faces. The detailed evidence ledger records artifact paths, hashes, configurations, sample sizes and every supporting comparison.
+
+### Representation and readout both contribute
+
+The retained matched-head experiment freezes the encoder before fitting a new categorical readout. With fixed SD-10 labels and the same TailRL head-training procedure, MSE-trained features give MAE **6.160** and TailRL-trained features give **6.460**. Refitting the TailRL encoder's head improves its original **7.155** result to **6.460**. This separates a recoverable readout contribution from a remaining difference under the common head procedure in that source pair.
+
+The larger source-feature matrix supplies related evidence: SL-trained frozen features outperform CE-trained features in all 25 common head-loss/noise cells. These cells share selected source encoders, so they measure the usefulness of those sources across readout procedures. The new fixed-epoch, three-block probes extend this design with replicated training and corruption blocks.
+
+Feature similarity provides a complementary description. At fixed SD-10, noisy-versus-own-clean layer-4 CKA is approximately **0.860** for scalar MAE, **0.892** for scalar MSE, **0.837** for categorical mean-MSE, **0.583** for TailRL and **0.522** for CE in the earlier audit. The corresponding fresh-noise CE model performs well despite a low own-clean CKA. A common prediction readout therefore supplies the task-level comparison; CKA describes how the representations differ.
+
+### Training horizon is an observed part of the advantage
+
+In the retained constant-rate scratch runs, scalar MAE selects epochs **491, 465 and 495** for clean, SD-5 and SD-10 labels. TailRL selects **121, 35 and 27**. Under the cosine recipe, scalar MAE selects **451, 409 and 490**, while TailRL selects **64, 48 and 30**.
+
+The SD-10 constant-rate TailRL run illustrates the trajectory. Its training objective falls from **0.2402** to **0.00533** and validation policy entropy from **3.471** to **1.173**, while test MAE rises from the selected **7.258** to final **9.068**. The cosine run shows the same broad pattern. Categorical mean-MSE also has noisy selected-versus-final deterioration. These observations establish a fitting/generalization divergence and motivate the repeated 500-epoch cohort, common readouts and corruption-following measurements.
+
+The earlier learning-rate screen selects each method's rate by average validation performance across the three noise conditions at 50 epochs. Long training then evaluates that declared selection procedure. Its evidence concerns these choices and training horizons; a new 500-epoch rate search would define a different procedure.
+
+### Objective and evaluation utility
+
+The exact population TailRL objective averages logarithmic probabilities of age-radius windows. Its gradients are evaluated directly. The retained exact GRPO and RLOO variants define separate expected-reward objectives and show very concentrated policies early in training. Their behavior motivates analysis of those actual objectives and their preferred policy variance.
+
+For example, expected squared action error has the identity
+
+$$
+\mathbb E_{A\sim p}[(A-y)^2]=(\mu_p-y)^2+\operatorname{Var}_p(A).
+$$
+
+Direct mean-MSE evaluates the first term. A sampled action, policy mean, policy median and policy mode are different decisions. The report uses mean-age MAE for its primary policy comparison and records secondary distributional metrics separately. This fixes the utility under discussion before comparing methods.
+
+### Audit corrections and uncertainty
+
+The corrected fixed-state MSE gradient audit uses the actual MSE objective and recovers an expected gradient shift of at most **$1.42\times10^{-15}$** under centered symmetric target perturbations. That agrees with its affine dependence on the numerical target. TailRL's measured noise directions lie around the median of norm-matched random curvature controls, approximately the **47th–53rd percentiles**. These checks direct the mechanistic experiments toward the learning rule, representation/readout interaction and fitting trajectory.
+
+The historical decay study also measures the effective intervention. At learning rate $3\times10^{-4}$, some nominal decay values produce changes that round away in float32. Selection over the tested grid narrows several gaps, and repeated executions show training variation. Those measurements motivate recording actual parameter displacements and using paired training blocks in the new cohorts.
+
+The historical exception catalogue covers 609 unique physical models across heterogeneous settings; its views and reused fits describe coverage rather than independent replications. Conditional test-image bootstrap intervals describe held-out-image variation given the fitted models. The new studies report sample variation over joint training/corruption blocks. This distinction keeps the evidence matched to the uncertainty it measures.
