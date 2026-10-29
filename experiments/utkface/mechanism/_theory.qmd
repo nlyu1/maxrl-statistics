@@ -140,7 +140,7 @@ exactly the scalar ridge prediction using age targets $Ya$. Common preprocessing
 Let $\pi$ swap rows within chosen symmetric pairs $\{a,D-a\}$ of the ordinary binomial-initialized head. The base coefficient stays attached to its original age, and the initial feature correction becomes
 
 $$
-\nabla_h L_{\rm CE}^{P}=[D\operatorname{sigmoid}(u)-\pi(y)]w.
+\nabla_h L_{\mathrm{CE}}^{P}=[D\operatorname{sigmoid}(u)-\pi(y)]w.
 $$
 
 At a common feature vector with score $u=0$, the two policies coincide exactly:
@@ -152,8 +152,8 @@ $$
 They therefore give the same point prediction, entropy and target CE at that anchor. For an unswapped target, the feature correction also agrees. For a swapped target, $\pi(y)=D-y$ gives
 
 $$
-\nabla_h L_{\rm CE}^{P}=(y-D/2)w
-=-\nabla_h L_{\rm CE}^{F}.
+\nabla_h L_{\mathrm{CE}}^{P}=(y-D/2)w
+=-\nabla_h L_{\mathrm{CE}}^{F}.
 $$
 
 Every target retains its individual correction magnitude while the chosen pairs change sign. Numerical age assignment can therefore organize the encoder's correction field even at a common prediction and common loss value. Actual image scores vary; the paired training intervention evaluates the complete assignment change under those scores and the declared optimizer.

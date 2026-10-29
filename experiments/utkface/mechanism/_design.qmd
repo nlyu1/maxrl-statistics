@@ -33,8 +33,8 @@ The ImageNet and initialization cohorts are probed at epochs 25 and 50. The scra
 For the native head, retained training predictions supply clean-reference error, supplied-label error, entropy and policy variance where a policy exists. The corruption-following slope is
 
 $$
-\frac{\operatorname{Cov}(\widehat\mu-Y_{\rm clean},\;Y_{\rm supplied}-Y_{\rm clean})}
-{\operatorname{Var}(Y_{\rm supplied}-Y_{\rm clean})}.
+\frac{\operatorname{Cov}(\widehat\mu-Y_{\mathrm{clean}},\;Y_{\mathrm{supplied}}-Y_{\mathrm{clean}})}
+{\operatorname{Var}(Y_{\mathrm{supplied}}-Y_{\mathrm{clean}})}.
 $$
 
 The age-adjusted slope first demeans both quantities within each exact reference age. Separate age bands examine boundary behavior. Unused corruption fields supply conditional randomization references for the same fixed images and predictions. Their quantiles describe those references; training-block variation remains the source of repeated-training uncertainty. Clean-label conditions have zero corruption variance and an undefined slope, recorded explicitly.

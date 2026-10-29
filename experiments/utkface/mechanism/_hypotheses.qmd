@@ -40,10 +40,10 @@ The mapping is frozen without examining labels or outcomes: an isolated CPU gene
 Write $\pi$ for the involution and $\mu_F=\sum_a a p_F(a)$. The swapped starting function has $z_a^P=\log {99\choose a}+\pi(a)s$, hence
 
 $$
-\nabla_h L_{\rm CE}^{P}(x,y)
+\nabla_h L_{\mathrm{CE}}^{P}(x,y)
 =w[\mu_F(x)-\pi(y)],
 \qquad
-\nabla_h L_{\rm CE}^{F}(x,y)
+\nabla_h L_{\mathrm{CE}}^{F}(x,y)
 =w[\mu_F(x)-y].
 $$
 
