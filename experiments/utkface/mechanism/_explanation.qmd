@@ -33,6 +33,8 @@ The shared direction now receives the numerical residual of the altered age code
 
 At the centered score $s=0$, the two heads give identical probabilities, target CE and individual feature-gradient magnitudes. The selected symmetric pairs reverse correction sign. This gives a precise local illustration of how numerical assignment organizes the encoder's learning signal. The actual image experiment evaluates the full assignment change at varying scores, with shared minibatches, encoder Jacobians, clipping and Adam.
 
+![The centered initial CE score corrections for the three frozen assignment maps. Ordered assignment links correction sign to physical age; each swapped symmetric pair reverses it while preserving the individual magnitude at this anchor. The plots enumerate possible target ages.](evidence/age-assignment/centered-age-corrections.png){#fig-centered-assignment width=100%}
+
 ### The gain transfers to a full categorical learner
 
 An ordinary float32 categorical CE head with ordered binomial initialization reaches clean selected MAE **5.398**, compared with **6.050** for the same architecture under ordinary random initialization. The three paired gains are **0.755, 0.704 and 0.499 years**. Every categorical output remains available during training.
@@ -53,6 +55,10 @@ The stronger assignment control preserves the base shape and low-rank structure 
 All underlying block comparisons favor the ordered assignment, including the epoch-25 common probes. The swapped start has better aggregate initial validation MAE and NLL, so the observed advantage develops during learning. The swapped package retains some improvements over ordinary random initialization, consistent with useful structure remaining in its symmetric base prior and folded age information.
 
 The identified intervention is numerical assignment under the declared update rule. Its consequences include target-dependent correction signs, relative weights, probabilities and clipping. The centered identity explains an available local mechanism; the training comparison measures the complete intervention.
+
+![Native CE prediction under matched float32 head arithmetic. F is the ordered ordinary head, R the random ordinary head, U the scalar-plus-free-residual head and P the symmetric-swap ordinary head. Validation selects the blue checkpoint; red gives the common final epoch. Small dots are the three joint blocks and bars show mean ± sample standard deviation.](evidence/initialization-combined/native-ce.png){#fig-initialization-native width=100%}
+
+![Age prediction from the same standardized ridge procedure applied to the trained encoders, frozen at epochs 25 and 50. Supplied-label ridge is the primary probe; oracle-clean ridge uses additional reference training labels as a diagnostic. The two coincide under clean training labels. Individual blocks and mean ± sample standard deviation are shown.](evidence/initialization-combined/common-ridge.png){#fig-initialization-ridge width=100%}
 
 ### Scalar sharing and flexible point prediction have a tradeoff
 
@@ -79,6 +85,10 @@ For CE, the free residual has higher selected error than the affine control in e
 The certified synthetic experiment isolates an estimation component with fixed features and a known realizable mean. Under binomial labels, weak residual regularization adds mean-MSE costs of **13.334, 3.065 and 0.521 years²** at training sizes **128, 512 and 2,048**. Strong residual shrinkage approaches the shared-score result. All fitted problems satisfy explicit convex convergence certificates, and a separate NumPy/SciPy implementation reproduces all 180 retained fits' objectives, gradients, predictions and validation choices.
 
 An independent challenger then gives the scalar score its own three-candidate regularization search. Under the high-variance endpoint law at $n=128$, conditional-mean MSE is **212.15** for the original fixed scalar ridge, **206.45** for the selected full estimator and **136.08** for the selected scalar ridge. The latter improves excess mean risk by **34.08%** relative to the selected full procedure, or total observed-label squared risk by **3.04%** after including irreducible noise. This is a useful scalar regularization competitor within the declared candidate sets. Full models can also approach scalar solutions under suitable regularization.
+
+![Certified fixed-feature estimation under the two designed label laws. The residual penalty varies categorical flexibility while the score penalty remains fixed. The oracle evaluates the known conditional mean on fresh inputs after validation selection.](evidence/synthetic-figures/residual-regularization.png){#fig-residual-regularization width=100%}
+
+![The challenger-designed scalar regularization search. Each family has three declared validation candidates; the candidate sets control different penalties. Fresh oracle inputs evaluate the frozen choices.](evidence/synthetic-figures/scalar-regularization.png){#fig-scalar-regularization width=100%}
 
 ### The fitted readout and encoder coadapt
 

@@ -36,7 +36,7 @@ The completed float32 cohort supports the clean CE starting-function prediction:
 
 The independent challenger sharpens the next question to the numerical assignment of that starting function. The proposed control swaps rows only within symmetric pairs $\{a,99-a\}$. Since $\log {99\choose a}=\log {99\choose99-a}$, these swaps preserve each age's base binomial coefficient. Whole-row permutation also preserves the initial probability multiset, entropy, head norm, rank and full attainable categorical family. Actual target labels and the ages used to evaluate the mean stay fixed.
 
-The mapping is frozen without examining labels or outcomes: an isolated CPU generator uses seed $2026102937+\text{head\_seed}$ and chooses exactly 25 of the 50 symmetric pairs to swap. The same block mapping is used for clean and SD-10 fits. This gives six fits under the existing 50-epoch protocol. Clean CE is the primary comparison against the retained ordered and random ordinary heads; SD-10 is secondary.
+The mapping is frozen from a label-independent randomization: an isolated CPU generator uses seed $2026102937+\text{head\_seed}$ and chooses exactly 25 of the 50 symmetric pairs to swap. The same block mapping is used for clean and SD-10 fits. This gives six fits under the existing 50-epoch protocol. Clean CE is the primary comparison against the retained ordered and random ordinary heads; SD-10 is secondary.
 
 Write $\pi$ for the involution and $\mu_F=\sum_a a p_F(a)$. The swapped starting function has $z_a^P=\log {99\choose a}+\pi(a)s$, hence
 

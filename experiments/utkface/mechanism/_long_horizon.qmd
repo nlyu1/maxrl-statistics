@@ -1,0 +1,3 @@
+## Repeated long-horizon training
+
+The 66-fit scratch-initialized cohort is running under the frozen protocol. Its 500-epoch outcomes, 198 fixed-epoch common readouts and corruption audits will supply this section after completion. The final evidence builder requires all these artifacts before producing a complete dossier.

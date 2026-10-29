@@ -1,0 +1,45 @@
+---
+title: "Numerical supervision, readout flexibility, and the learning horizon"
+subtitle: "An experimentally challenged explanation of scalar age-regression generalization"
+date: 2026-10-29
+lang: en
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    embed-resources: true
+    html-math-method: mathml
+    code-fold: true
+    fig-cap-location: bottom
+    link-external-newwindow: true
+    fontsize: 1.05em
+    linestretch: 1.5
+execute:
+  enabled: false
+---
+
+Scalar supervision gives an adaptable image encoder a shared numerical task: move its age prediction toward a conditional mean or median. The experiments identify useful components of that task through changes to numerical assignment, starting function, loss weighting, categorical freedom and head–encoder coupling. Their combined evidence supports **task-aligned numerical learning with controlled readout adaptation** as an explanation for the observed generalization pattern.
+
+The clearest intervention changes the numerical age assignment of an ordinary categorical head while preserving its initial entropy, probability multiset, base binomial coefficients, rank, norm and full attainable family. Coherent assignment improves validation-selected test MAE by **0.733 years clean** and **1.183 years under fixed SD-10 corruption**, with all three paired blocks favorable. Common ridge readouts preserve this ordering, connecting the intervention to useful age information in the learned encoder. Related controls establish contributions from loss weights, regularization and the joint evolution of encoder and head.
+
+Scalar MAE combines this numerical organization with a median-directed, sign-weighted objective. Its historical advantage is concentrated in sustained representation learning. The long-horizon replication evaluates that temporal prediction alongside matched head-structure interventions. The report distinguishes directly measured intervention effects, exact mathematical identities, and the scope within which they support the explanation.
+
+The main explanation comes first. The following sections provide the long-horizon results, the retained evidence that motivated the investigation, methods, the hypothesis/challenge history, derivations and a reproducibility index. Figures show individual paired blocks and descriptive sample standard deviations. Each oracle-clean readout is marked as a diagnostic using additional reference training labels.
+
+The comparisons use the implemented objectives: scalar MAE/MSE, categorical mean-MSE, categorical cross-entropy and exact population TailRL. TailRL here is the equally weighted log-probability risk over all age-radius windows, differentiated exactly. The retained GRPO/RLOO procedures optimize separate expected-reward objectives. This objective-level description ties the explanation to the training rules actually evaluated.
+
+{{< include _explanation.qmd >}}
+
+{{< include _long_horizon.qmd >}}
+
+{{< include _prior_evidence.qmd >}}
+
+{{< include _design.qmd >}}
+
+{{< include _hypotheses.qmd >}}
+
+{{< include _theory.qmd >}}
+
+{{< include _evidence.qmd >}}
