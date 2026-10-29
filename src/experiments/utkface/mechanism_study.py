@@ -43,14 +43,27 @@ def read(path: Path) -> dict:
 
 
 def create(
-    *, root: Path, manifest: Path, epochs: int, train_limit: int, smoke: bool
+    *,
+    root: Path,
+    manifest: Path,
+    epochs: int,
+    train_limit: int,
+    smoke: bool,
+    initialization: str,
+    variants: tuple[str, ...],
 ) -> None:
+    if (
+        initialization not in {"imagenet", "scratch"}
+        or not variants
+        or set(variants) - set(VARIANTS)
+    ):
+        raise ValueError("Specify a supported initialization and mechanism variants")
     root.mkdir(parents=True, exist_ok=False)
     (root / "configs").mkdir()
     jobs = []
     for block, seeds in enumerate(BLOCKS[:1] if smoke else BLOCKS):
         for noise in (10,) if smoke else (0, 10):
-            for variant in VARIANTS:
+            for variant in variants:
                 identifier = f"b{block}_sd{noise}_{variant}"
                 output = root / "runs" / identifier
                 head, method = HEAD_METHODS[variant]
@@ -66,6 +79,7 @@ def create(
                         ),
                         "seed": seeds["model"],
                         "epochs": epochs,
+                        "pretrained": initialization == "imagenet",
                         "train_limit": train_limit,
                         "learning_rate": 3e-4,
                         "weight_decay": 0.0,
@@ -81,7 +95,7 @@ def create(
                 adaptation = AdaptationConfig(
                     run=run,
                     pipeline="original",
-                    initialization="imagenet",
+                    initialization=initialization,
                     initial_checkpoint=unused,
                     backbone_frozen=False,
                     use_feature_bank=False,
@@ -93,11 +107,13 @@ def create(
                     backbone_learning_rate=run.learning_rate,
                     schedule_kind="warmup_constant",
                     control=TrainingControl(
-                        schedule_epochs=epochs,
+                        schedule_epochs=min(epochs, 50),
                         extend_checkpoint=unused,
                         extend_epoch=0,
                         keep_latest_checkpoints=1,
-                        model_milestones=tuple(e for e in (25, 50) if e <= epochs),
+                        model_milestones=tuple(
+                            e for e in (25, 50, 100, 200, 500) if e <= epochs
+                        ),
                     ),
                 )
                 config = MechanismConfig(
@@ -118,6 +134,9 @@ def create(
         payload={
             "schema": "utkface-mechanism-study-v1",
             "phase": "smoke" if smoke else "scientific",
+            "initialization": initialization,
+            "epochs": epochs,
+            "warmup_epochs": min(epochs, 50) * 0.05,
             "created_at": time.time(),
             "git_commit": subprocess.check_output(
                 ["git", "rev-parse", "HEAD"], text=True
@@ -344,6 +363,10 @@ def main() -> None:
     parser.add_argument("--status", action="store_true")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--train-limit", type=int, default=4096)
+    parser.add_argument(
+        "--initialization", choices=("imagenet", "scratch"), default="imagenet"
+    )
+    parser.add_argument("--variants", nargs="+", choices=VARIANTS, default=VARIANTS)
     parser.add_argument("--max-gpus", type=int, default=4)
     parser.add_argument("--jobs-per-gpu", type=int, default=8)
     args = parser.parse_args()
@@ -356,6 +379,8 @@ def main() -> None:
             epochs=args.epochs,
             train_limit=args.train_limit,
             smoke=args.smoke,
+            initialization=args.initialization,
+            variants=tuple(args.variants),
         )
     elif args.status:
         status(root=args.root)
