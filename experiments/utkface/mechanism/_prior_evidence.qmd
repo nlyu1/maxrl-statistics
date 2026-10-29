@@ -65,7 +65,7 @@ The exact population TailRL objective averages logarithmic probabilities of age-
 
 These averages use three optimization seeds. The retained GRPO trajectory already has entropy **0.200** at epoch one and **0.089** at epoch five. Longer GRPO-MSE runs and the associated learning-rate extensions retain mean-age errors around **12–17 years** in the earlier recipes. Exact action summation therefore retains the performance gap, and the measured concentration trajectory accompanies the expected-reward fitting rule.
 
-Exact RLOO differentiates the expected reward directly. Above its standard-deviation floor, population GRPO divides each example's expected-reward gradient by its detached reward standard deviation; the floor branch supplies zero correction. This policy- and target-dependent weighting is part of the implemented GRPO update. The concentration measurements describe its trajectory, while the controlled mechanism experiments in this report concern the declared point, CE and TailRL learning rules.
+Exact RLOO differentiates the expected reward directly. At or above its standard-deviation floor, population GRPO divides each example's expected-reward gradient by its detached reward standard deviation; below the floor it supplies zero correction. This policy- and target-dependent weighting is part of the implemented GRPO update. The concentration measurements describe its trajectory, while the controlled mechanism experiments in this report concern the declared point, CE and TailRL learning rules.
 
 For example, expected squared action error has the identity
 
