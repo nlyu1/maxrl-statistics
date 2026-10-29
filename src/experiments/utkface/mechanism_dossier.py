@@ -499,6 +499,17 @@ def frozen_code(*, repository: Path, commits: list[str], output: Path) -> list[d
     return inventory
 
 
+def write_checksums(*, directory: Path, files: list[dict]) -> None:
+    manifest = directory / "dossier-manifest.json"
+    rows = files + [{"path": manifest.name, "bytes": manifest.stat().st_size, "sha256": file_sha256(path=manifest)}]
+    with (directory / "SHA256SUMS.tsv").open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(
+            stream, fieldnames=("sha256", "bytes", "path"), delimiter="\t", extrasaction="ignore", lineterminator="\n"
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def build(*, reports_root: Path, notes_dir: Path, output_dir: Path, source_dir: Path) -> dict:
     reports_root, notes_dir, output_dir, source_dir = (
         path.resolve() for path in (reports_root, notes_dir, output_dir, source_dir)
@@ -668,19 +679,7 @@ def build(*, reports_root: Path, notes_dir: Path, output_dir: Path, source_dir: 
         "hash_scope": "SHA256SUMS.tsv covers copied files, generated index and manifest; the checksum table excludes itself.",
     }
     write_json(path=staging / "dossier-manifest.json", payload=manifest)
-    checksum_rows = inventory + [
-        {
-            "path": "dossier-manifest.json",
-            "bytes": (staging / "dossier-manifest.json").stat().st_size,
-            "sha256": file_sha256(path=staging / "dossier-manifest.json"),
-        }
-    ]
-    with (staging / "SHA256SUMS.tsv").open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(
-            stream, fieldnames=("sha256", "bytes", "path"), delimiter="\t", extrasaction="ignore", lineterminator="\n"
-        )
-        writer.writeheader()
-        writer.writerows(checksum_rows)
+    write_checksums(directory=staging, files=inventory)
     if output_dir.exists():
         raise FileExistsError(output_dir)
     staging.rename(output_dir)
