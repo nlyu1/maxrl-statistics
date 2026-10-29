@@ -18,6 +18,8 @@ $$
 
 At a fixed head, every image communicates its numerical correction along the same learned vector $w$ in pooled feature space. The image-dependent backbone Jacobian maps that correction into parameter space.
 
+MAE's score coefficient has magnitude at most $1/4$ and uses the residual sign. The head norm and encoder Jacobian also enter the parameter update. Categorical CE and finite-risk TailRL each have logit-gradient $\ell_1$ norm at most two: CE subtracts two probability vectors, and each TailRL radius subtracts the policy conditioned on its window from the full policy. The comparisons concern the numerical statistic, residual weighting and resulting optimizer response.
+
 For a categorical head, $z=Wh+b$, $p=\operatorname{softmax}(z)$ and $\mu=\sum_a a p_a$. Put $v_a=p_a(a-\mu)$. Direct mean-MSE has
 
 $$
@@ -134,6 +136,54 @@ X_*\widehat B a
 $$
 
 exactly the scalar ridge prediction using age targets $Ya$. Common preprocessing and an identically treated intercept preserve this identity. The softmax mean map, categorical objectives and nonlinear encoder learning supply the additional ingredients evaluated by the image interventions.
+
+### The statistic carried by a numerical code
+
+The shared channel's numerical meaning can be characterized exactly. For positive base weights $b_a$ and any real age code $c_a$, the fixed one-score family
+
+$$
+p_s(a)=b_a\exp\{c_as-A_c(s)\},\qquad
+A_c(s)=\log\sum_a b_a e^{c_as}
+$$
+
+has conditional CE derivative
+
+$$
+R_c'(s;q)=\mathbb E_{p_s}[c(A)]-\mathbb E_q[c(Y)].
+$$
+
+For a nonconstant code and a pointwise optimized scalar score, its coded policy mean equals the supplied coded-label mean, with limiting optima at the code endpoints. A shared neural score introduces its own fitting constraints. A decoder satisfying $\mathbb E_qY=f(\mathbb E_qc(Y))$ for **every** label law exists exactly when $c_a=\alpha+\gamma a$ with $\gamma\ne0$. Sufficiency follows by taking expectations. For necessity with a nonconstant code, choose ages $i,j$ attaining the smallest and largest code values, so $c_i<c_j$. A point mass at any age $a$ has the same code mean as
+
+$$
+\lambda_a\delta_i+(1-\lambda_a)\delta_j,
+\qquad
+\lambda_a=\frac{c_j-c_a}{c_j-c_i}.
+$$
+
+Universal recovery forces $a=\lambda_ai+(1-\lambda_a)j$, which rearranges to a nonconstant affine code. For a constant code every point mass shares one coded mean while the physical-age means span the entire grid. The result concerns arbitrary label mixtures and recovery of their **mean**; restricted label families and median targets supply different questions.
+
+Each permutation preserves individual labels through its known inverse. The characterization concerns the statistic retained after averaging. Local point alignment has its own conditions: with code $c_a=a^2$ and the centered binomial base, $\mathbb E[c(A)]=2475$ and $\operatorname{Cov}(A,c(A))=2450.25$. Since $49^2<2475<50^2$, its infinitesimal held-head CE feature directions improve squared point error for all 100 integer target ages when $w\ne0$. This supplies a constructive distinction between local alignment and universal mean recovery.
+
+For permutations of the equally spaced age grid, the affine possibilities are identity and global reversal. Reversal gives $p_{\mathrm{rev},s}=p_{\mathrm{ordered},-s}$ for the binomial base. Its physical-age mean is $D\operatorname{sigmoid}(-s)$, and its feature correction uses the opposite score direction with the same age-mean target. Numerical coherence here includes this change of sign convention.
+
+The retained partial swaps give concrete cancellation examples. Let $C=49.5$, choose an unswapped lower-half age $u$ and a swapped lower-half age $v$, and assign probabilities
+
+$$
+q_L(u)=\frac{C-v}{99-u-v},\qquad
+q_L(v)=\frac{C-u}{99-u-v}.
+$$
+
+Then $\mathbb E_{q_L}\pi(Y)=C$ while $\mathbb E_{q_L}Y<C$. Reflecting this law around $C$ keeps its coded mean equal to $C$ and makes its physical-age mean larger than $C$. The fixed permuted-score CE optimum is $s=0$ for both laws, giving physical-age prediction $C$.
+
+| Retained head seed | $u$ | $v$ | Lower-law age mean | Coded mean |
+|--:|--:|--:|--:|--:|
+| 1731 | 49 | 48 | $48.75$ | $49.5$ |
+| 1947 | 49 | 48 | $48.75$ | $49.5$ |
+| 2163 | 47 | 49 | $48\tfrac23$ | $49.5$ |
+
+An exact-rational CPU audit checks all three retained maps, the reflected laws and the global-reversal control. At the centered state, the swapped conditional expected feature correction is zero; the ordered and reversed physical-mean updates point toward the target mean. These are designed conditional laws that expose which statistic the initial channel averages.
+
+The ordinary full head retains a nonzero bias gradient $p_0-q_L$ at this same state. For these witnesses a sufficiently small bias-only Euclidean step moves the physical mean toward the target, and subsequent updates can leave the one-score family. The construction identifies an initial encoder-signal difference within the measured assignment intervention. The [complete derivation](notes/numerical-code-theory.txt), [executed audit](notes/numerical-code-audit.json) and [independent challenge](notes/numerical-code-challenge.txt) record its assumptions and checks.
 
 ### A centered anchor for numerical age assignment
 

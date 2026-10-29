@@ -6,6 +6,8 @@ This hypothesis has a concrete intervention behind it. We changed the numerical 
 
 These are three paired joint blocks on one reused split. The conclusion concerns the registered training and readout procedures; individual block results accompany every main comparison.
 
+The objectives supply numerical structure in different ways. Point losses directly organize fitting around an age mean or median. TailRL uses overlapping numerical age-radius windows and fits their probabilities. Categorical CE fits label probabilities; ordered binomial initialization gives its initial encoder correction an age-mean residual. Both the loss definition and the starting function can therefore supply a numerical task for feature learning.
+
 ### What numerical sharing gives the encoder
 
 Let $h$ be the pooled image representation and $s=w^\top h+b$ a shared score. A binomial starting function has
@@ -32,6 +34,8 @@ $$
 $$
 
 The shared direction now receives the numerical residual of the altered age code. Both fields are one dimensional. Their distinction is the meaning assigned to the target in that field.
+
+A working-score calculation makes this distinction explicit. A one-score CE family averages its label code. Universal recovery of the physical-age mean from that single coded mean characterizes nonconstant affine age codes, including global reversal with an opposite score convention. The saved partial swaps admit designed label laws with the same coded mean and different physical-age means. At the centered state their expected coded correction cancels while the ordered correction retains the age-mean residual. The ordinary full head retains a repair gradient; this calculation describes the initial encoder channel within the complete training intervention.
 
 At the centered score $s=0$, the two heads give identical probabilities, target CE and individual feature-gradient magnitudes. The selected symmetric pairs reverse correction sign. This gives a precise local illustration of how numerical assignment organizes the encoder's learning signal. The actual image experiment evaluates the full assignment change at varying scores, with shared minibatches, encoder Jacobians, clipping and Adam.
 
