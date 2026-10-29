@@ -7,6 +7,7 @@ All these results use the UTKFace reference annotations. The common manifest con
 | Retained setting | Relevant observation | What the observation identifies |
 |:--|:--|:--|
 | Full-data ImageNet adaptation, 50 epochs, three seeds | Mean test MAE: scalar MAE **4.632 ± 0.023**, categorical mean-MSE **4.817 ± 0.191**, TailRL **4.754 ± 0.028**, CE **4.858 ± 0.080** | A repeated scalar-MAE advantage in this training recipe |
+| Clean 1,024-image training, 50 epochs, one seed | Categorical mean-MSE **6.060**, categorical MAE **6.087**, scalar MAE **6.177**, scalar MSE **6.367**, TailRL **6.403**, CE **7.329** | Useful direct point fitting at the smallest retained sample size, with the categorical point heads leading the scalar heads |
 | Frozen ImageNet features, fixed inputs, 4,096 examples | Scalar MAE **9.086**, TailRL **7.871**, categorical mean-MSE **8.317** | Useful flexibility in the categorical readout when encoder adaptation is unavailable |
 | Fixed SD-10 corruption, earlier 4,096-image recipe | Scalar MAE **6.734**, categorical mean-MSE **6.252**, TailRL **7.155**, CE **7.161** | Strong direct-regression performance under this fixed-field recipe |
 | Fresh SD-10 corruption, earlier recipe | Scalar MAE **5.389**, scalar MSE **5.361**, categorical mean-MSE **5.719**, TailRL **5.482**, CE **5.348** | A useful change in repeated-label supervision, with CE competitive for mean prediction |
@@ -16,6 +17,8 @@ All these results use the UTKFace reference annotations. The common manifest con
 | Validation-selected learning rates for long scratch | Scalar MAE leads five of six corresponding selected-rate cells | A broad retained advantage after the declared learning-rate selection procedure |
 
 The full-data ± values are sample standard deviations across three optimization seeds. The remaining rows summarize the specific retained models and protocols; their cells share training sources, corruption fields and held-out faces. The detailed evidence ledger records artifact paths, hashes, configurations, sample sizes and every supporting comparison.
+
+At 1,024 images and 200 epochs, the retained categorical mean-MSE, TailRL and CE results are **6.100**, **6.565** and **7.280**. Scalar fits are available at the 50-epoch budget, so the direct scalar comparison uses that common budget.
 
 ### Representation and readout both contribute
 
@@ -33,9 +36,36 @@ The SD-10 constant-rate TailRL run illustrates the trajectory. Its training obje
 
 The earlier learning-rate screen selects each method's rate by average validation performance across the three noise conditions at 50 epochs. Long training then evaluates that declared selection procedure. Its evidence concerns these choices and training horizons; a new 500-epoch rate search would define a different procedure.
 
+### Validation-selected weight decay
+
+The retained decay study contains 128 configurations: 116 new fits and 12 reused controls. Four methods, clean/SD-3/SD-5/SD-10 labels and decays $0,10^{-5},10^{-4},10^{-3}$ are crossed under ImageNet-50 and scratch-500 recipes. The same 4,096-image subset, model seed 42 and noise seed 2026 are used. Each method's global decay is chosen by its average clean-validation MAE across the four label conditions. The resulting test MAEs, averaged with equal weight over those conditions, are:
+
+| Method | ImageNet, 50 epochs | Scratch, 500 epochs |
+|:--|--:|--:|
+| Scalar MAE | 5.893 | 5.951 |
+| Categorical mean-MSE | 6.082 | 6.213 |
+| TailRL | 6.050 | 6.331 |
+| CE | 6.517 | 6.923 |
+
+With separate validation choices per noise level, TailRL minus scalar MAE averages **0.068 years** for ImageNet and **0.231 years** for scratch. The respective conditional paired-test-image intervals are **[−0.048, 0.190]** and **[0.099, 0.368]**. These intervals resample the same held-out faces jointly across noise conditions, conditional on the fitted models and choices. Variation across independently trained models and corruption fields requires separate replication.
+
+The useful-horizon pattern persists within this grid. Global-decay-selected scalar epochs are **45/44/44/42** for ImageNet and **480/489/490/480** for scratch; TailRL selects **36/16/8/4** and **50/38/48/27**, in clean/SD-3/SD-5/SD-10 order.
+
+Controlled float32 AdamW updates establish the strength of the intervention. At learning rate $3\times10^{-4}$, decay $10^{-5}$ gives the same controlled parameter values as zero decay because its shrink factor rounds to one. The largest tested decay supplies approximately **0.093%** component-only shrinkage over 50 epochs and **0.95%** over 500. This is evidence about a weak-decay grid. Differences between complete zero-decay and $10^{-5}$ executions also measure permitted training variation. The synthetic residual-penalty experiment separately controls freedom in logit coordinates.
+
 ### Objective and evaluation utility
 
-The exact population TailRL objective averages logarithmic probabilities of age-radius windows. Its gradients are evaluated directly. The retained exact GRPO and RLOO variants define separate expected-reward objectives and show very concentrated policies early in training. Their behavior motivates analysis of those actual objectives and their preferred policy variance.
+The exact population TailRL objective averages logarithmic probabilities of age-radius windows. Its gradients are evaluated directly. The retained full-data, 50-epoch expected-reward comparisons give:
+
+| Method | Selected test mean-age MAE, mean ± seed SD | Selected test policy entropy |
+|:--|--:|--:|
+| Exact GRPO-MAE | 6.486 ± 0.142 | 0.054 |
+| Exact RLOO-MAE | 6.603 ± 0.336 | 0.081 |
+| Exact population TailRL | 4.754 ± 0.028 | 2.152 |
+
+These averages use three optimization seeds. The retained GRPO trajectory already has entropy **0.200** at epoch one and **0.089** at epoch five. Longer GRPO-MSE runs and the associated learning-rate extensions retain mean-age errors around **12–17 years** in the earlier recipes. Exact action summation therefore retains the performance gap, and the measured concentration trajectory accompanies the expected-reward fitting rule.
+
+Exact RLOO differentiates the expected reward directly. Above its standard-deviation floor, population GRPO divides each example's expected-reward gradient by its detached reward standard deviation; the floor branch supplies zero correction. This policy- and target-dependent weighting is part of the implemented GRPO update. The concentration measurements describe its trajectory, while the controlled mechanism experiments in this report concern the declared point, CE and TailRL learning rules.
 
 For example, expected squared action error has the identity
 
@@ -45,11 +75,11 @@ $$
 
 Direct mean-MSE evaluates the first term. A sampled action, policy mean, policy median and policy mode are different decisions. The report uses mean-age MAE for its primary policy comparison and records secondary distributional metrics separately. This fixes the utility under discussion before comparing methods.
 
+The full-data distributional comparison illustrates the metric dependence: test NLL is **3.053** for CE, **3.832** for TailRL and **8.099** for categorical mean-MSE. In the six default long-scratch cells, TailRL's RMSE is higher than categorical mean-MSE's, including the cosine cells where its mean-age MAE is lower. The explanation therefore concerns the specified point decision and error criterion.
+
 ### Audit corrections and uncertainty
 
 The corrected fixed-state MSE gradient audit uses the actual MSE objective and recovers an expected gradient shift of at most **$1.42\times10^{-15}$** under centered symmetric target perturbations. That agrees with its affine dependence on the numerical target. TailRL's measured noise directions lie around the median of norm-matched random curvature controls, approximately the **47th–53rd percentiles**. These checks direct the mechanistic experiments toward the learning rule, representation/readout interaction and fitting trajectory.
-
-The historical decay study also measures the effective intervention. At learning rate $3\times10^{-4}$, some nominal decay values produce changes that round away in float32. Selection over the tested grid narrows several gaps, and repeated executions show training variation. Those measurements motivate recording actual parameter displacements and using paired training blocks in the new cohorts.
 
 The historical exception catalogue covers 609 unique physical models across heterogeneous settings; its views and reused fits describe coverage. Conditional test-image bootstrap intervals describe held-out-image variation given the fitted models. The new studies report sample variation over joint training/corruption blocks. This distinction keeps the evidence matched to the uncertainty it measures.
 

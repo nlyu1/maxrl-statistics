@@ -48,9 +48,14 @@ NOTE_NAMES = (
     "theory-synthesis-v2.txt",
     "final-explanation-challenge.txt",
     "final-long-horizon-review.txt",
+    "horizon-report-review.txt",
+    "report-scope-audit.txt",
+    "mae-mechanism-scope.txt",
+    "mae-loss-comparison.json",
 )
 REPORT_SUFFIXES = {".tsv", ".json", ".png", ".svg", ".pdf"}
 MAX_FILE_BYTES = 256 * 1024**2
+DECISION_MATRIX_SHA256 = "047827c43d7051e2379665447ebfee61e64d8fcce150f2f06bccbe6cf7bc6cbe"
 
 
 def require(*, condition: bool, path: Path, expectation: str) -> None:
@@ -84,6 +89,120 @@ def population_certificate_summary(*, population: dict) -> dict:
         "legacy_certificate_scope": worst["certificate_scope"],
         "current_mean_bound": "abs(policy_mean - target_mean) <= 99 * G for the unrestricted complete equal-radius objective with zero survival floor",
         "mean_bound_source": "_theory.qmd: A direct numerical mean certificate",
+    }
+
+
+def validate_horizon(*, root: Path, scratch: dict) -> dict:
+    directory = root / "scratch500-horizon"
+    path = directory / "report.json"
+    horizon = load(path=path)
+    require(
+        condition=horizon["schema"] == "utkface-mechanism-horizon-report-v1"
+        and horizon["scientific_complete"] is True
+        and horizon["completed_fits"] == 66
+        and horizon["completed_probe_sources"] == horizon["noise_audits"] == 198
+        and horizon["n_blocks"] == 3
+        and horizon["source_commit"] == COHORTS["scratch500"][4]
+        and Path(horizon["training_root"]).resolve() == Path(scratch["training_root"]).resolve(),
+        path=path,
+        expectation="complete E8 horizon summary of 66 fits/198 probes and noise audits, with three blocks",
+    )
+    hashes = horizon["input_sha256"]
+    matrices = [name for name in hashes if Path(name).name == "long-horizon-decision-matrix.txt"]
+    require(
+        condition=len(matrices) == 1 and hashes[matrices[0]] == DECISION_MATRIX_SHA256,
+        path=path,
+        expectation="the exact retained blind decision-matrix hash",
+    )
+    for name, expected in hashes.items():
+        require(
+            condition=file_sha256(path=Path(name)) == expected,
+            path=Path(name),
+            expectation="unchanged horizon input hash",
+        )
+    for name in ("scratch500", "scratch500-probes"):
+        dependency = (root / name / "report.json").resolve()
+        require(
+            condition=hashes.get(str(dependency)) == file_sha256(path=dependency),
+            path=path,
+            expectation=f"a source-matched dependency on {dependency}",
+        )
+    names = {
+        name: f"{name.replace('_', '-')}.tsv"
+        for name in ("individual", "summary", "paired_individual", "paired_summary")
+    }
+    require(
+        condition=set(horizon["tables"]) == set(names),
+        path=path,
+        expectation="exactly the four required horizon tables",
+    )
+    jobs = load(path=Path(scratch["raw_plan"]))["jobs"]
+    planned = {job["identifier"]: (job["variant"], job["block"], job["noise_sd"]) for job in jobs}
+    variants = {cell[0] for cell in planned.values()}
+    expected_cells = {(variant, block, noise) for variant in variants for block in range(3) for noise in (0, 10)}
+    require(
+        condition=len(variants) == 11
+        and len(planned) == len(set(planned.values())) == 66
+        and set(planned.values()) == expected_cells,
+        path=Path(scratch["raw_plan"]),
+        expectation="all 11×2×3 frozen study cells",
+    )
+    observed = set()
+    for name, filename in names.items():
+        table = directory / filename
+        artifact = horizon["tables"][name]
+        require(
+            condition=Path(artifact["path"]).resolve() == table.resolve()
+            and file_sha256(path=table) == artifact["sha256"],
+            path=table,
+            expectation="the exact required table path and hash",
+        )
+        count = 0
+        with table.open(newline="", encoding="utf-8") as stream:
+            for record in csv.DictReader(stream, delimiter="\t"):
+                count += 1
+                if name == "individual":
+                    cell = (record["variant"], int(record["block"]), float(record["noise_sd"]))
+                    require(
+                        condition=planned[record["identifier"]] == cell,
+                        path=table,
+                        expectation="source-matched method/block/noise identities",
+                    )
+                    observed.add(cell)
+                elif name in {"summary", "paired_summary"}:
+                    require(
+                        condition=int(record["n_rows"]) == 3
+                        and 0 <= int(record["n_defined"]) <= 3
+                        and int(record["n_undefined"]) == 3 - int(record["n_defined"]),
+                        path=table,
+                        expectation="three retained blocks and explicit defined/undefined counts in every summary cell",
+                    )
+        require(
+            condition=count == artifact["rows"] and count > 0,
+            path=table,
+            expectation="the declared positive table row count",
+        )
+    require(
+        condition=observed == expected_cells,
+        path=directory / names["individual"],
+        expectation="individual statistics covering all 66 frozen study cells",
+    )
+    return {
+        "name": "scratch500-horizon",
+        "derived": True,
+        "new_fits": 0,
+        "input_fits": 66,
+        "probes": 198,
+        "underlying_cohort": "scratch500",
+        "underlying_training_root": horizon["training_root"],
+        "source_commit": horizon["analysis_git_commit"],
+        "training_source_commit": horizon["source_commit"],
+        "source_sha256": horizon["analysis_source_sha256"],
+        "raw_report": str(path),
+        "decision_matrix_sha256": DECISION_MATRIX_SHA256,
+        "coverage_cells": len(observed),
+        "variants": sorted(variants),
+        "required_files": ["report.json", *names.values()],
     }
 
 
@@ -148,6 +267,9 @@ def validate_reports(*, root: Path) -> tuple[list[Path], list[dict]]:
             "raw_probe_reports": coverage["input_reports"],
             "raw_noise_reports": probe["noise_input_reports"],
         })
+    horizon = validate_horizon(root=root, scratch=next(item for item in index if item["name"] == "scratch500"))
+    index.append(horizon)
+    directories.append(root / horizon["name"])
     combined_path = root / "initialization-combined" / "report.json"
     combined = load(path=combined_path)
     require(
@@ -385,7 +507,9 @@ def evidence_index(*, index: list[dict], source: dict, notes: list[str]) -> str:
             f"evidence/{name}/report.json" if name not in {"calibration", "population-v2"} else f"evidence/{name}.json"
         )
         fits = str(item.get("fits", "—"))
-        if item.get("reused_fits", 0):
+        if item.get("derived", False):
+            fits = f"derived from {item['input_fits']} fits (0 new fits)"
+        elif item.get("reused_fits", 0):
             fits += f" total ({item['reused_fits']} retained + {item['new_fits']} new)"
         elif name == "synthetic":
             fits += " original (also retained in the scalar-ridge audit)"
@@ -541,6 +665,11 @@ def build(*, reports_root: Path, notes_dir: Path, output_dir: Path, source_dir: 
     for name in NOTE_NAMES:
         if not (notes_dir / name).is_file():
             raise FileNotFoundError(notes_dir / name)
+    require(
+        condition=file_sha256(path=notes_dir / "long-horizon-decision-matrix.txt") == DECISION_MATRIX_SHA256,
+        path=notes_dir / "long-horizon-decision-matrix.txt",
+        expectation="the exact retained blind decision matrix in the copied notes",
+    )
     notes = sorted(path for path in notes_dir.iterdir() if path.is_file() and path.suffix in {".txt", ".json"})
     require(
         condition=not any(
