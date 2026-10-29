@@ -1,0 +1,133 @@
+{
+  "schema": "utkface-mechanism-workflow-v1",
+  "artifact_root": "/home/zitongw2/.local/state/maxrl-statistics",
+  "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-workflow-scratch-analysis-20261029",
+  "max_gpus": 4,
+  "jobs_per_gpu": 8,
+  "poll_seconds": 5,
+  "idle_memory_mib": 100,
+  "idle_utilization": 5,
+  "dispatch_lock": "/tmp/utkface-extension-20261014/global-dispatch.lock",
+  "environment": {
+    "UV_PROJECT_ENVIRONMENT": "/home/zitongw2/maxrl-statistics/.venv",
+    "TMPDIR": "/tmp/utkface-lr-tmp",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "stages": [
+    {
+      "name": "await_scratch_training_and_probes",
+      "kind": "command",
+      "argv": [
+        "-c",
+        "from pathlib import Path\nimport hashlib,json,time\nsource=Path(\"/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-workflow-phase-b-20261029/workflow.json\")\noutput=Path(\"/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-workflow-scratch-analysis-20261029/source-completed.json\")\nwhile True:\n    content=source.read_bytes()\n    state=json.loads(content)\n    status=state['status']\n    if status=='failed':\n        raise RuntimeError('Scratch workflow failed; inspect its retained state and logs')\n    if status=='complete':\n        output.write_text(json.dumps({'source_workflow':str(source),'source_state_sha256':hashlib.sha256(content).hexdigest(),'completed_at':time.time()},indent=2)+'\\n')\n        break\n    if status not in {'running','waiting_study','waiting_workers','launched_worker','launched_command','completed_stage','yielding_gpu'}:\n        raise ValueError(f'Unexpected source workflow state: {status}')\n    time.sleep(30)"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-workflow-scratch-analysis-20261029/source-completed.json"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    },
+    {
+      "name": "scratch_noise_g0",
+      "kind": "command",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-scratch500-20261029/g0",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g0",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g0/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g0/summary.tsv"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    },
+    {
+      "name": "scratch_noise_g1",
+      "kind": "command",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-scratch500-20261029/g1",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g1",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g1/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g1/summary.tsv"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    },
+    {
+      "name": "scratch_noise_g2",
+      "kind": "command",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-scratch500-20261029/g2",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g2",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g2/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g2/summary.tsv"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    },
+    {
+      "name": "scratch_noise_g3",
+      "kind": "command",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-scratch500-20261029/g3",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g3",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g3/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029/g3/summary.tsv"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    },
+    {
+      "name": "scratch_probe_report",
+      "kind": "command",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_probe_report",
+        "--probe-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-scratch500-20261029",
+        "--noise-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-scratch500-20261029",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/scratch500-probes"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/scratch500-probes/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/scratch500-probes/summary.tsv"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    }
+  ]
+}
