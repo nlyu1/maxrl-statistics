@@ -28,7 +28,7 @@ A long-horizon cohort is specified for 500-epoch training from scratch: 11 metho
 
 ### Common readouts and corruption following
 
-Each selected checkpoint exports deterministic image features for the same train, validation and test images. The shared readout is ridge regression on standardized 512-dimensional encoder features. Its nine regularization values range from $10^{-4}$ through $10^4$; clean validation MSE selects the value. The primary readout uses the supplied training labels. A separate diagnostic readout uses clean reference labels as an experimental oracle.
+Each retained fixed-epoch checkpoint exports fixed-center-crop features for the same train, validation and test images. The shared readout is ridge regression on standardized 512-dimensional encoder features. Its nine regularization values range from $10^{-4}$ through $10^4$; clean validation MSE selects the value. The primary readout uses the supplied training labels. A separate diagnostic readout uses clean reference labels as an experimental oracle.
 
 The ImageNet and initialization cohorts are probed at epochs 25 and 50. The scratch cohort is probed at epochs 50, 200 and 500. Comparing a common readout at a common epoch measures age information accessible to this particular readout procedure. Comparing native and refitted predictions measures how much performance a new readout recovers from each encoder.
 

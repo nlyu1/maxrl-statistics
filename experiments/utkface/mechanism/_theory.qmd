@@ -26,9 +26,9 @@ $$
 \nabla_h L_{\mathrm{MSE}}=\frac{2(\mu-y)}{D^2}W^\top v.
 $$
 
-Here $v$ changes with the image's policy. Both heads receive the numerical label; the scalar head supplies a particularly strong form of sharing for its numerical correction. Conditional on one input and fixed parameters, centered additive label noise preserves the expected MSE gradient, and its gradient covariance has rank at most one.
+Here $v$ changes with the image's policy. Both heads receive the numerical label; the scalar head supplies a particularly strong form of sharing for its numerical correction. At one common fixed model state and input, averaging a fresh conditionally zero-mean label perturbation preserves the MSE gradient. The corresponding conditional gradient covariance has rank at most one.
 
-Categorical CE has $\nabla_z L=p-e_y$. Its expected correction learns the full conditional label law. With label corruption, the shape of that law changes as well as any change in its mean. These are distinct supervision requirements even when the evaluation uses one point prediction. The [central mean subspace](https://doi.org/10.1214/aos/1021379861) formalizes the distinction between retaining a conditional mean and retaining a full conditional distribution; the sufficiency of a shared score in a particular feature representation remains an empirical question.
+Categorical CE has $\nabla_z L=p-e_y$. With unrestricted conditional probabilities, CE elicits the full conditional label law. With label corruption, the shape of that law changes as well as any change in its mean. These are distinct supervision requirements even when the evaluation uses one point prediction. The [central mean subspace](https://doi.org/10.1214/aos/1021379861) formalizes the distinction between retaining a conditional mean and retaining a full conditional distribution; the sufficiency of a shared score in a particular feature representation remains an empirical question.
 
 ### A working CE likelihood with the scalar mean
 
@@ -93,7 +93,7 @@ $$
 
 Multiplication by $A_b^{-1}$ and its transpose gives the covariance lower bound $I^{-1}/n$, attained by $b_*$. This is an estimating-equation argument for the specified mean model.
 
-Binomial labels have $v=Dq(1-q)=\mu'$, giving $b_*=1$, exactly the binomial-CE correction. Endpoint labels $Y=D\operatorname{Ber}(q)$ have $v=D^2q(1-q)=D\mu'$, giving the same correction up to a constant. At endpoint labels, binomial CE equals $D$ times binary logistic likelihood. With $H=\mathbb E[q(1-q)xx^\top]$, the respective coefficient covariances are
+Binomial labels have $v=Dq(1-q)=\mu'$, giving $b_*=1$, exactly the binomial-CE correction. Endpoint labels $Y=D\operatorname{Ber}(q)$ have $v=D^2q(1-q)=D\mu'$, giving the same correction up to a constant. At endpoint labels, binomial CE equals $D$ times binary logistic negative log likelihood. With $H=\mathbb E[q(1-q)xx^\top]$, the respective coefficient covariances are
 
 $$
 \frac{H^{-1}}{Dn}\quad\text{and}\quad\frac{H^{-1}}{n}.
@@ -173,7 +173,7 @@ $$
 =-\kappa\,\|w\|^2(49.5-y)[49.5-\pi(y)].
 $$
 
-The ordered head has $\kappa=99/4$, giving a strictly point-improving direction for all 100 integer target ages when $w\ne0$. With 25 swapped pairs and $\kappa\ne0$, the control has 50 point-improving and 50 point-worsening directions; the sign of $\kappa$ determines which set improves. An independent CPU audit computes the three retained codes' covariances as exact rational numbers and checks five finite steps from $10^{-3}$ through $10^{-7}$. All 2,000 target-step records pass the stated checks: every step decreases CE, and the smallest-step point derivatives recover the analytical alignment counts. Shared minibatches, encoder Jacobians, head updates, clipping and Adam determine the actual neural parameter updates; the audit concerns the stated held-head feature step.
+The ordered head has $\kappa=99/4$, giving a strictly point-improving direction for all 100 integer target ages when $w\ne0$. With 25 swapped pairs, $\kappa\ne0$ and $w\ne0$, the control has 50 point-improving and 50 point-worsening directions; the sign of $\kappa$ determines which set improves. An independent CPU audit computes the three retained codes' covariances as exact rational numbers and checks five finite steps from $10^{-3}$ through $10^{-7}$. All 2,000 target-step records pass the stated checks: every step decreases CE, and the smallest-step point derivatives recover the analytical alignment counts. Shared minibatches, encoder Jacobians, head updates, clipping and Adam determine the actual neural parameter updates; the audit concerns the stated held-head feature step.
 
 ### Point-loss weighting and reference-label noise
 
@@ -280,7 +280,9 @@ $$
 
 The implementation audits checked 18 positive/sparse constructions. The largest tangent identity error was $1.36\times10^{-15}$ and the largest exact-orbit risk error was $9.99\times10^{-15}$. Five independent inverse-KKT constructions recovered the mean within $7.11\times10^{-14}$ years. The inverse construction chooses $p$ first and solves the stationary equations for $q$, providing a check independent of the original nonlinear population solver.
 
-Two scope controls establish why the assumptions matter. Doubling only the radius-zero weight gives a certified optimum whose mean differs by $-1/201$ years from its target. Restricting TailRL to the binomial family also changes its available path: for $q=0.75\delta_0+0.25\delta_{99}$ and binomial mean $24.75$, its score derivative is $-4.5106882579$, while binomial CE and mean-MSE have zero derivatives. The experiments therefore evaluate binomial TailRL as a separate restricted-model intervention.
+The separate direct population audit retained 25 candidates and passed every repository-autograd check. Fourteen candidates met the full-simplex Frank–Wolfe tolerance of $10^{-8}$: 12 of 13 finite-support laws and two of 12 rounded/clipped corruption laws. Eleven candidates remain approximate at that tolerance, with maximum recorded gap **7.2258** for `rounded_clipped_sd1_original0`. These candidates are retained as optimization diagnostics. The mean-calibration result rests on the exact CDF proof, supported separately by the tangent/orbit and inverse-KKT checks. The gap-based mean bound is informative at the precision each candidate actually attains.
+
+Two scope controls establish why the assumptions matter. On the three-age grid $\{0,1,2\}$, doubling only the radius-zero weight gives a certified optimum $p=(1/2,1/3,1/6)$ for $q=(35,19,13)/67$, with mean difference $-1/201$ years. Restricting TailRL to the binomial family also changes its available path: on the 100-age grid, for $q=0.75\delta_0+0.25\delta_{99}$ and binomial mean $24.75$, its score derivative is $-4.5106882579$, while binomial CE and mean-MSE have zero derivatives. The experiments therefore evaluate binomial TailRL as a separate restricted-model intervention.
 
 ## How the routing experiment assigns a learning effect
 

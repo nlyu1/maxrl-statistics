@@ -1,8 +1,10 @@
 ## The supported explanation
 
-The useful inductive bias is a coherent numerical age task for the encoder, together with control over how the fitted head and encoder continue adapting. Scalar point learning supplies that organization throughout training: it predicts one age statistic through a shared score and corrects errors in that statistic. A structured categorical starting function can supply the same useful numerical organization while retaining a full classifier. The readout, loss weights, available flexibility and useful training horizon determine the resulting held-out point prediction.
+The completed controls identify coherent numerical age assignment and head–encoder coadaptation as useful parts of the learning rule in this ImageNet fine-tuning regime. Scalar point learning supplies a persistent numerical task: it predicts one age statistic through a shared score and corrects errors in that statistic. A structured categorical starting function can supply useful numerical organization while retaining a full classifier. The readout, loss weights, available flexibility and useful training horizon determine the resulting held-out point prediction. These controls establish numerical-structure and update effects; MAE's removal of residual-magnitude weighting supplies a further property motivating its use for a point decision.
 
 This hypothesis has a concrete intervention behind it. We changed the numerical age assignment of a full categorical head while preserving its base binomial coefficients, initial probability multiset, entropy, head norm, rank and attainable family. The coherent assignment improved selected test MAE by **0.733 years clean** and **1.183 years under SD-10**, with every paired block agreeing. The gain also survived fitting a common readout to the resulting encoders. Numerical assignment therefore contributes beyond the preserved properties in this training regime.
+
+These are three paired joint blocks on one reused split. The conclusion concerns the registered training and readout procedures; individual block results accompany every main comparison.
 
 ### What numerical sharing gives the encoder
 
@@ -64,7 +66,7 @@ The identified intervention is numerical assignment under the declared update ru
 
 A shared age score supplies a strong organization for feature learning. A categorical mean can also provide a useful nonlinear readout of the same features. In the first 50-epoch cohort, categorical mean-MSE has lower selected MAE than scalar MSE in all three clean and all three noisy blocks, averaging advantages of **0.203** and **0.149 years**. Conversely, the epoch-50 clean scalar-MSE features give better common-ridge prediction by **0.209 years** on average. The stored readout and linear feature accessibility measure different properties.
 
-Frozen ImageNet features make the approximation tradeoff especially visible: the retained scalar-MAE head has MAE **9.086**, while TailRL reaches **7.871**. End-to-end adaptation gives the encoder the opportunity to organize its features around a numerical age score. A flexible readout is useful when the available representation needs a richer mapping to age.
+Frozen ImageNet features give a useful boundary for the fitted readout recipes: the retained scalar-MAE head has MAE **9.086**, while TailRL reaches **7.871**. The richer categorical mapping, objective and finite optimization all form this comparison. End-to-end adaptation gives the encoder an additional way to organize its features around a numerical age score.
 
 The within-score loss comparison further identifies the role of weights. Scalar MSE and binomial CE use the same sigmoid mean family and score initialization. Clean binomial CE improves selected MAE by **0.338 years** and final common-ridge MAE by **0.506 years**. Their scalar derivatives are
 
@@ -74,13 +76,15 @@ $$
 \partial_s L_{\mathrm{MAE}}=\operatorname{sign}(\mu-y)q(1-q).
 $$
 
-These weights change the minibatch correction and the optimizer's response. The quasi-score derivation gives a precise variance-dependent comparison in a correctly specified fixed-dimensional mean model: CE weighting is efficient for the two designed binomial/endpoint laws, whereas squared-error weighting is efficient under constant conditional variance. The image results measure the complete learned-representation training rule.
+These weights change the minibatch correction and the optimizer's response. The quasi-score derivation gives a precise variance-dependent comparison in a correctly specified fixed-dimensional mean model: CE weighting is asymptotically optimal within the regular mean estimating equations for the two designed binomial/endpoint laws. Squared-error weighting attains that bound under constant conditional variance. The image results measure the complete learned-representation training rule.
 
 ### Regularization controls the cost of additional categorical fitting
 
 The free-versus-affine residual intervention starts from the same function with matched registered parameters. The affine projection retains the shared-score mean class and a redundant location-update path. The free residual adds non-affine categorical directions, changing both mean flexibility and distributional flexibility.
 
-For CE, the free residual has higher selected error than the affine control in every block under both label regimes. At epoch 50, the corresponding common-ridge costs average **0.561 years clean**, **0.312 years with noisy supplied-label ridge** and **0.443 years with the noisy oracle diagnostic**. For TailRL under SD-10, the final common-readout costs are **0.302** and **0.466 years**, again with all block signs agreeing. The clean TailRL comparisons have a different ordering, locating a real bias/flexibility tradeoff.
+The comparison changes the available directions and the gradients presented to Adam. It identifies that constraint/update intervention under the declared training procedure.
+
+For CE, the free residual has higher selected error than the affine control in every block under both label regimes. At epoch 50, the corresponding common-ridge costs average **0.561 years clean**, **0.312 years with noisy supplied-label ridge** and **0.443 years with the noisy oracle diagnostic**. For TailRL under SD-10, the final common-readout costs are **0.302** and **0.466 years**, again with all block signs agreeing. The clean TailRL comparisons have a different ordering: the benefit of retaining the affine structure depends on the objective and label regime.
 
 The certified synthetic experiment isolates an estimation component with fixed features and a known realizable mean. Under binomial labels, weak residual regularization adds mean-MSE costs of **13.334, 3.065 and 0.521 years²** at training sizes **128, 512 and 2,048**. Strong residual shrinkage approaches the shared-score result. All fitted problems satisfy explicit convex convergence certificates, and a separate NumPy/SciPy implementation reproduces all 180 retained fits' objectives, gradients, predictions and validation choices.
 
@@ -112,8 +116,8 @@ The own-field audit supplies a further distinction. Final within-age corruption-
 
 ### Why the scalar-MAE advantage is concentrated in particular regimes
 
-Scalar MAE combines a shared numerical score with a sign-weighted point objective that targets the evaluation statistic's conditional median. In the retained long scratch experiments, its useful learning horizon extends far beyond the selected epochs of ordinary TailRL. The new repeated 500-epoch cohort tests the transfer of that horizon and head-structure pattern from random initialization.
+Scalar MAE combines a shared numerical score with a sign-weighted point objective that elicits a conditional median of the supplied-label law. Its residual coefficient is independent of error magnitude. These are exact properties of the recipe. The completed controls establish related numerical-structure and update effects; the historical scalar-MAE advantage supplies the temporal prediction tested by the repeated 500-epoch cohort from random initialization.
 
-The theoretical targets also clarify the comparison. Scalar MSE, categorical CE and the exact unrestricted equal-radius population TailRL objective all recover the conditional mean under their respective realizability conditions; scalar MAE recovers a conditional median. Rounding and clipping symmetric noise preserve a deterministic integer reference age as a median, while moving its corrupted-label mean inward near the boundaries. These target properties and the observed numerical learning effects provide complementary reasons for the strength of scalar point training.
+The theoretical targets also clarify the comparison. Scalar MSE, categorical CE and the exact unrestricted equal-radius population TailRL objective all recover the conditional mean under their respective realizability conditions. For fresh symmetric noise around a deterministic integer reference age, rounding and clipping retain that age as a supplied-label median, while moving the corrupted-label mean inward near the boundaries. A single fixed noisy label can still be fitted. This target property motivates MAE for the stated label law; the image interventions directly establish the contributions of numerical assignment and the implemented learning rule.
 
 The resulting prediction is conditional and constructive: numerical sharing is useful when the encoder can learn an age representation that supports the chosen point statistic; sufficient readout flexibility helps when that mapping is harder; appropriate weighting, regularization and training horizon keep the learned structure useful. The controlled initialization, constraint, common-readout and synthetic interventions identify these contributions directly. The long-horizon replication supplies the remaining temporal comparison.
