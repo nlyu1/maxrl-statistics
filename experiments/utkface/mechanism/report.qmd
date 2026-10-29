@@ -1,7 +1,7 @@
 ---
 title: "Numerical supervision, readout flexibility, and the learning horizon"
 subtitle: "An experimentally challenged explanation of scalar age-regression generalization"
-date: 2026-10-29
+date: 2026-10-30
 lang: en
 lightbox: true
 format:
@@ -25,7 +25,9 @@ Scalar supervision gives an adaptable image encoder a shared numerical task: mov
 
 The clearest intervention changes the numerical age assignment of an ordinary categorical head while preserving its initial entropy, probability multiset, base binomial coefficients, rank, norm and full attainable family. Coherent assignment improves validation-selected test MAE by **0.733 years clean** and **1.183 years under fixed SD-10 corruption**, with all three paired blocks favorable. Common ridge readouts preserve this ordering, connecting the intervention to useful age information in the learned encoder. Related controls establish contributions from loss weights, regularization and the joint evolution of encoder and head.
 
-Scalar MAE combines this numerical organization with a median-directed, sign-weighted objective. Its historical advantage is concentrated in sustained representation learning. The long-horizon replication evaluates that temporal prediction alongside matched head-structure interventions. The report distinguishes directly measured intervention effects, exact mathematical identities, and the scope within which they support the explanation.
+Scalar MAE combines this numerical organization with a median-directed, sign-weighted objective. The repeated 500-epoch cohort corroborates its useful learning horizon: under fixed SD-10, native prediction and both common readouts improve from epoch 50 to 500 in every block, while ordinary TailRL's worsen. Their validation-selected noisy errors have a small average difference and mixed paired signs; the common final horizon favors scalar MAE by **2.166 years**. One-score binomial CE and TailRL also give competitive predictors, extending the useful numerical-sharing principle across objectives.
+
+The new controlled studies contain **186 completed image fits**, **438 fixed-epoch probe sources with corruption audits**, and **180 unique certified fixed-feature synthetic fits**. Independent reviews check the numerical results, mathematical claims, source/data pairing and hypothesis revisions. The report distinguishes directly measured intervention effects, exact identities and the conditions within which they support the explanation.
 
 The main explanation comes first. The following sections provide the long-horizon results, the retained evidence that motivated the investigation, methods, the hypothesis/challenge history, derivations and a reproducibility index. Figures show individual paired blocks and descriptive sample standard deviations. Each oracle-clean readout is marked as a diagnostic using additional reference training labels.
 

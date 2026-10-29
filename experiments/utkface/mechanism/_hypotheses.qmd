@@ -13,7 +13,7 @@ The investigation treats an explanation as a prediction about an intervention. T
 | The useful age structure acts through the initial function | Float32 ordinary categorical heads with binomial versus random initialization | Clean CE gains 0.653 years selected MAE and 1.684 years under the final common ridge, with all block signs favorable. The ordinary full head obtains the initialization benefit. |
 | A persistent, strongly loaded age coordinate improves optimization | Float32 fused versus scalar-plus-residual heads with the same starting function and full categorical family | The native clean-CE endpoint difference is small and mixed, while early transients and common-readout outcomes differ. The normalized native-gain control stays outside the executed fit set under its declared gate. |
 | Coherent numerical assignment contributes beyond preserved entropy, rank and base coefficients | Six symmetric row-swap fits with fixed mappings and common epoch-25/50 readouts | Ordered assignment improves selected MAE by 0.733 years clean and 1.183 under SD-10, with every block favorable; all common-readout comparisons retain the ordering. |
-| Long-horizon differences reflect different fitting trajectories | Repeated 500-epoch scratch fits, retained fixed epochs, common readouts and corruption-following slopes | Pending the repeated long-horizon cohort. |
+| Long-horizon differences reflect different fitting trajectories | Repeated 500-epoch scratch fits, retained fixed epochs, common readouts and corruption-following slopes | Scalar MAE continues improving ridge accessibility in every block under both label regimes. Ordinary TailRL's noisy native/ridge errors increase during further fitting. The noisy free-versus-affine relative cost grows in every block; one-score CE and TailRL also sustain useful learning. |
 
 ### Prospective initialization predictions
 
@@ -29,7 +29,7 @@ The retained earlier scratch results motivate three observations to check in the
 
 Common readouts distinguish two outcomes. A remaining difference with the same ridge procedure identifies a change in age information accessible to that procedure. Recovery of the native-head gap by refitting identifies a contribution from the stored readout and its coadaptation with the encoder. Corruption-following slopes and age bands provide a further observation of fitting the particular supplied field. Agreement across these measurements supports the corresponding location of the effect.
 
-The retained checkpoints and complete trajectories allow every prediction to be evaluated at its stated horizon. The final report will update this register with all completed outcomes, including revisions to the explanation.
+The retained checkpoints and complete trajectories evaluate every prediction at its stated horizon. The completed decision table below records the outcomes and resulting refinements, while preserving the prospective statements as their historical register.
 
 Before inspecting completed scratch outcomes, the independent reviewer fixes the paired analysis in [the long-horizon decision matrix](notes/long-horizon-decision-matrix.txt). For each label condition it reports the three block differences in selected MAE, final MAE and selected epoch. Additional validation improvement is the best score through epoch 50 minus the best score through epoch 500. Fixed-epoch native and common-readout changes use the declared 50→200, 200→500 and 50→500 intervals. Later checkpoint selection receives support as useful continued learning when these held-out trajectories agree.
 
@@ -54,3 +54,18 @@ $$
 $$
 
 Both initial corrections share one feature direction, while the swapped correction uses the altered numerical code. The signed prediction is lower clean selected error for the ordered assignment. A repeated improvement would support coherent numerical assignment beyond the retained base coefficient, entropy and rank. Similar performance would redirect the explanation toward the broader starting-state package. The swaps retain distance from the midpoint, and changes in example weighting, correction sign and clipping remain part of the intervention. Its interpretation concerns the complete numerical-assignment change under the declared optimizer.
+
+### Completed long-horizon decisions
+
+All 66 fits and 198 common-readout/noise sources are complete. The [independent final review](notes/final-long-horizon-review.txt) checks the prespecified paired outcomes against the retained raw records.
+
+| Registered prediction or planned comparison | Completed evidence | Resulting explanation |
+|:--|:--|:--|
+| P1: scalar MAE has a useful horizon extending beyond ordinary TailRL | Later MAE selection in every block, additional best-validation gains, and improving 50→500 common ridge under both label regimes; ordinary TailRL ridge worsens in every block | Sustained numerical learning supplies more age access under the common procedure. |
+| P2: continued TailRL fitting can accompany worsening held-out point prediction | Under SD-10, train loss falls from 0.1764 to 0.00293 while native and both common-readout errors rise in every block over 50→500 | The fitting/decision divergence transfers in the registered noisy interval. Clean native fixed-interval changes retain their mixed signs and different timing. |
+| P3: noisy free TailRL has a larger late affine-relative cost and less continued accessible learning | Final native/supplied/oracle costs and their 50→500 growth are positive in every block; the free head's absolute ridge changes have mixed signs | The matched constraint improves later learning relative to the free update rule. |
+| D: validation-selected scalar-MAE versus ordinary-Tail accuracy | Clean selected difference −0.561 ± 0.131 years; SD-10 difference −0.003 ± 0.051 with mixed block signs; noisy final difference −2.166 ± 0.515 | Selected decisions and final-horizon performance give distinct comparisons. |
+| D: CE and clean-Tail free-versus-affine transfer | Positive final common-ridge costs and growing gaps in every block in these scratch conditions | The useful constraint extends across objectives in this training recipe; the earlier ImageNet clean-Tail ordering remains part of the evidence. |
+| D: all 11 training rules | One-score binomial CE/Tail and scalar MSE also yield useful sustained predictors; binomial noisy selected means are below scalar MAE's | Numerical sharing and the implemented loss/update rule provide the broader account. MAE's exact properties and specific empirical effects supply its particular contribution. |
+
+The temporal result sharpens the supported hypothesis. Scalar MAE supplies a repeated useful learning horizon relative to ordinary TailRL, while the broader scalar/one-score group demonstrates useful numerical organization across losses. Strong own-field following can coexist with improving held-out age access. The completed interventions identify the numerical learning rule and its head–encoder trajectory as the explanatory level.

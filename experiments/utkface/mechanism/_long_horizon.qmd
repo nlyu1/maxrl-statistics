@@ -1,3 +1,82 @@
-## Repeated long-horizon training
+## Repeated long-horizon training {#sec-long}
 
-The 66-fit scratch-initialized cohort is running under the frozen protocol. Its 500-epoch outcomes, 198 fixed-epoch common readouts and corruption audits will supply this section after completion. The final evidence builder requires all these artifacts before producing a complete dossier.
+The completed cohort contains **66 fits: 11 methods × clean/fixed SD-10 labels × three paired blocks**, trained from random initialization for 500 epochs. All **198 fixed-epoch sources** at epochs 50, 200 and 500 have their common readouts and corruption audits. The source, configuration, cohort and artifact checks precede the analysis. The [frozen decision matrix](notes/long-horizon-decision-matrix.txt) specifies the comparisons and interpretation branches before completed outcomes.
+
+The central result is useful sustained numerical learning. Scalar MAE continues improving age prediction under the common readout, while ordinary TailRL's later fitting has a different trajectory. The one-score binomial CE and TailRL heads also yield useful long-run predictors. Thus the repeated experiment strengthens the explanation around numerical organization, the fitted head and useful learning time.
+
+### Additional training improves accessible age information
+
+Scalar MAE selects epochs **398/500/462** under clean labels, compared with ordinary TailRL's **43/131/28**. Under SD-10 the corresponding epochs are **417/500/496** and **25/40/20**. Relative to TailRL, scalar MAE gains an additional **0.782 ± 0.113 years** of best-validation improvement after epoch 50 under clean labels and **0.326 ± 0.147 years** under SD-10. Each paired block favors the later scalar learning opportunity.
+
+The fixed-time readouts corroborate that opportunity. The table gives mean test MAE in years across the three blocks. Native values here are recomputed by the common center-crop probe; the selected/final table later uses archived evaluations. Each temporal comparison uses one consistent procedure.
+
+| Labels | Training rule | Readout | Epoch 50 | Epoch 200 | Epoch 500 |
+|:--|:--|:--|--:|--:|--:|
+| Clean | Scalar MAE | Native | 6.507 | 5.787 | 5.381 |
+| Clean | Ordinary TailRL | Native | 6.253 | 6.352 | 6.245 |
+| Clean | Scalar MAE | Supplied-label ridge | 6.300 | 5.833 | 5.559 |
+| Clean | Ordinary TailRL | Supplied-label ridge | 6.546 | 6.667 | 6.740 |
+| SD-10 | Scalar MAE | Native | 8.576 | 7.869 | 7.160 |
+| SD-10 | Ordinary TailRL | Native | 8.237 | 9.602 | 9.326 |
+| SD-10 | Scalar MAE | Supplied-label ridge | 8.049 | 7.882 | 7.510 |
+| SD-10 | Ordinary TailRL | Supplied-label ridge | 8.079 | 8.389 | 8.456 |
+| SD-10 | Scalar MAE | Oracle-clean ridge | 7.592 | 7.040 | 6.931 |
+| SD-10 | Ordinary TailRL | Oracle-clean ridge | 7.314 | 7.535 | 7.627 |
+
+From epoch 50 to 500, clean supplied-label ridge improves by **0.740 years** for scalar MAE and worsens by **0.194 years** for ordinary TailRL, with the respective signs repeating in every block. Under SD-10, scalar MAE improves by **0.538 years** with supplied-label ridge and **0.661 years** with the oracle-clean diagnostic; TailRL worsens by **0.377** and **0.313 years**. Every block agrees on these four noisy readout directions. Scalar MAE's noisy native prediction also improves in every block, while ordinary TailRL's worsens in every block.
+
+These observations support P1's useful-horizon prediction through held-out accessibility and prediction changes as well as later validation selection. The clean ordinary-Tail native 50→500 changes have mixed signs. The common ridge procedure gives a clearer clean accessibility distinction, and the subintervals retain the nonmonotonic native trajectory.
+
+![Fixed-time learning from random initialization. Columns separate clean and fixed SD-10 labels; rows separate native prediction and the common supplied-label ridge procedure. The scalar-MAE and ordinary-Tail comparison tests the temporal prediction; the one-score binomial CE/Tail heads supply the planned structural context. Individual block trajectories and mean ± sample SD are shown.](evidence/scratch500-horizon/learning-horizon.png){#fig-long-learning width=100%}
+
+### Supplied-label fitting and useful age learning can coexist
+
+Under SD-10, ordinary TailRL's training objective falls from **0.1764 at epoch 50** to **0.00293 at epoch 500**, while its fixed-time native test MAE rises from **8.237 to 9.326**. Its policy entropy falls from **3.212 to 0.226**, supplied-label training MAE falls from **6.721 to 0.236**, and reference-clean training MAE rises from **6.657 to 7.641**. The within-exact-age own-field slope rises from **0.493 to 0.992**. This is the predicted fitting/decision divergence, P2, in the registered noisy interval.
+
+Scalar MAE also increasingly follows its supplied field: its slope rises from **0.330 to 0.973**, and supplied-label training MAE falls from **8.519 to 1.997**. Over that same interval its native and common-readout test errors improve. Useful held-out age learning therefore continues alongside strong empirical field following. The learning-rule comparison concerns how this fitting develops useful age access and a point predictor.
+
+The complete diagnostics retain clean/reference and supplied-label training errors, all age bands, raw and within-age slopes, entropy and policy variance where defined. The unused-field references condition on the fitted predictions and faces. Variation across the three paired blocks supplies the repeated-training evidence.
+
+### The matched head constraint changes later learning
+
+The noisy free-versus-affine TailRL comparison transfers the registered P3 prediction to random initialization. At epoch 500 the free-minus-affine costs are positive in all three blocks for native prediction and both common readouts. The gap also grows from epoch 50 to 500 in every block under all three readouts.
+
+| SD-10 TailRL readout | Free minus affine at epoch 500, years | Growth of that gap, epochs 50→500, years |
+|:--|--:|--:|
+| Native | 2.222 ± 0.336 | 0.827 ± 0.910 |
+| Supplied-label ridge | 0.985 ± 0.286 | 0.677 ± 0.323 |
+| Oracle-clean ridge | 0.743 ± 0.269 | 0.247 ± 0.201 |
+
+The supplied-label final costs are **0.793, 0.848 and 1.313 years** across blocks; their paired gap growth is **0.413, 0.581 and 1.038 years**. The additional clean-label diagnostic gives the same repeated relative ordering.
+
+The absolute trajectories locate this effect. The free head's supplied-label ridge changes from **8.375 to 8.351** and its oracle-clean ridge from **7.844 to 7.718**, with mixed block signs. The affine comparator improves from **8.068 to 7.367** and **7.348 to 6.975**. The result is a repeated relative cost and less continued accessible learning under the free rule. The native free trajectory is also nonmonotonic: **9.590 → 8.632 → 9.214** at the three retained epochs, compared with **8.195 → 7.668 → 6.992** for the affine head. Both the shared starting function and the subsequent head/encoder updates matter.
+
+![The registered noisy free-versus-affine TailRL comparison from random initialization. All three fixed epochs, paired blocks and readout procedures are retained. The common-readout panels display the repeated relative cost together with each method's absolute trajectory; oracle-clean ridge uses additional reference training labels.](evidence/scratch500-horizon/tail-free-affine.png){#fig-long-tail-constraint width=100%}
+
+The planned descriptive comparisons extend this observation. Epoch-500 free-minus-affine supplied-label ridge costs are **1.216 ± 0.137 years for clean CE**, **0.916 ± 0.183 for noisy CE**, and **1.104 ± 0.077 for clean TailRL**. These costs and their 50→500 growth are positive in every block. The constraint therefore helps both objectives in this scratch-training recipe; the earlier ImageNet clean-Tail comparisons retain their different ordering.
+
+The final noisy own-field slopes are **0.977 for free TailRL** and **0.982 for affine TailRL**, alongside supplied-label training MAEs **0.773** and **1.627**. The free rule fits the supplied point labels more closely and reaches a lower TailRL objective, while the affine rule yields better held-out prediction and ridge accessibility. The identified intervention changes available head directions and the updates through which the encoder learns. Native and refitted outcomes describe their joint consequence.
+
+### Validation-selected decisions and the common final horizon
+
+Scalar MAE improves clean selected MAE over ordinary TailRL by **0.561 ± 0.131 years**, with all three paired signs favorable. Under SD-10, their selected difference, scalar MAE minus TailRL, is **−0.003 ± 0.051 years**, with individual values **+0.055, −0.036 and −0.029**. The selected noisy comparison thus has mixed signs and a small mean difference. At epoch 500 the archived native gap favors scalar MAE by **2.166 ± 0.515 years**, with all block signs favorable. Validation stopping and sustained useful learning supply different benefits to the fitted procedures.
+
+All 11 methods' archived native outcomes are retained below. Values are mean ± sample SD across three joint blocks; validation selects the checkpoint separately within each fit.
+
+| Method | Clean selected | SD-10 selected | Clean final | SD-10 final |
+|:--|--:|--:|--:|--:|
+| Categorical MSE | 5.879 ± 0.162 | 7.244 ± 0.271 | 6.077 ± 0.219 | 8.220 ± 0.104 |
+| Categorical TailRL | 5.961 ± 0.035 | 7.153 ± 0.052 | 6.245 ± 0.040 | 9.327 ± 0.492 |
+| Categorical CE | 6.781 ± 0.052 | 7.920 ± 0.216 | 7.928 ± 0.392 | 10.385 ± 0.660 |
+| Scalar MSE | 5.405 ± 0.040 | 7.005 ± 0.193 | 5.459 ± 0.049 | 7.134 ± 0.187 |
+| Scalar MAE | 5.400 ± 0.096 | 7.150 ± 0.053 | 5.381 ± 0.074 | 7.160 ± 0.115 |
+| Binomial CE (one score) | 5.358 ± 0.026 | 6.970 ± 0.018 | 5.387 ± 0.062 | 7.045 ± 0.057 |
+| Binomial TailRL (one score) | 5.375 ± 0.053 | 6.979 ± 0.051 | 5.418 ± 0.097 | 7.016 ± 0.069 |
+| CE: shared score + free residual | 6.051 ± 0.066 | 7.717 ± 0.046 | 7.112 ± 0.644 | 8.956 ± 0.247 |
+| CE: shared score + age-affine residual | 5.361 ± 0.010 | 7.054 ± 0.066 | 5.568 ± 0.203 | 7.111 ± 0.024 |
+| TailRL: shared score + free residual | 5.820 ± 0.124 | 7.602 ± 0.052 | 6.163 ± 0.058 | 9.215 ± 0.267 |
+| TailRL: shared score + age-affine residual | 5.411 ± 0.065 | 6.979 ± 0.094 | 5.465 ± 0.028 | 6.993 ± 0.071 |
+
+One-score binomial CE and TailRL give competitive selected and final predictors under both label regimes. Their noisy selected means, **6.970** and **6.979**, are below scalar MAE's **7.150** in this recipe. The broader supported principle is useful numerical sharing with an effective loss/update rule and readout. Scalar MAE is one successful implementation, with exact median/sign-weight properties, a directly measured clean representation effect, and a replicated useful training horizon.
+
+[All individual temporal statistics](evidence/scratch500-horizon/individual.tsv) · [Summaries](evidence/scratch500-horizon/summary.tsv) · [Paired block contrasts](evidence/scratch500-horizon/paired-individual.tsv) · [Paired summaries](evidence/scratch500-horizon/paired-summary.tsv) · [Native table verification](notes/long-native-table-validation.json) · [Independent long-horizon review](notes/final-long-horizon-review.txt)
