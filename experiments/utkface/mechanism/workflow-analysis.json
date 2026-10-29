@@ -1,0 +1,220 @@
+{
+  "schema": "utkface-mechanism-workflow-v1",
+  "artifact_root": "/home/zitongw2/.local/state/maxrl-statistics",
+  "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-workflow-analysis-20261029",
+  "max_gpus": 4,
+  "jobs_per_gpu": 8,
+  "poll_seconds": 5,
+  "idle_memory_mib": 100,
+  "idle_utilization": 5,
+  "dispatch_lock": "/tmp/utkface-extension-20261014/global-dispatch.lock",
+  "environment": {
+    "UV_PROJECT_ENVIRONMENT": "/home/zitongw2/maxrl-statistics/.venv",
+    "TMPDIR": "/tmp/utkface-lr-tmp",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "stages": [
+    {
+      "name": "imagenet_noise_g0",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-imagenet-20261029/g0",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g0",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g0/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g0/summary.tsv"
+      ]
+    },
+    {
+      "name": "imagenet_noise_g1",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-imagenet-20261029/g1",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g1",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g1/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g1/summary.tsv"
+      ]
+    },
+    {
+      "name": "imagenet_noise_g2",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-imagenet-20261029/g2",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g2",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g2/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g2/summary.tsv"
+      ]
+    },
+    {
+      "name": "imagenet_noise_g3",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-imagenet-20261029/g3",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g3",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g3/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029/g3/summary.tsv"
+      ]
+    },
+    {
+      "name": "initialization_noise_g0",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-initialization-20261029/g0",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g0",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g0/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g0/summary.tsv"
+      ]
+    },
+    {
+      "name": "initialization_noise_g1",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-initialization-20261029/g1",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g1",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g1/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g1/summary.tsv"
+      ]
+    },
+    {
+      "name": "initialization_noise_g2",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-initialization-20261029/g2",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g2",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g2/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g2/summary.tsv"
+      ]
+    },
+    {
+      "name": "initialization_noise_g3",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-initialization-20261029/g3",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g3",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g3/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029/g3/summary.tsv"
+      ]
+    },
+    {
+      "name": "imagenet_probe_report",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_probe_report",
+        "--probe-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-imagenet-20261029",
+        "--noise-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-imagenet-20261029",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/imagenet-probes"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/imagenet-probes/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/imagenet-probes/summary.tsv"
+      ]
+    },
+    {
+      "name": "initialization_probe_report",
+      "kind": "command",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_probe_report",
+        "--probe-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-initialization-20261029",
+        "--noise-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-initialization-20261029",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/initialization-probes"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/initialization-probes/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/initialization-probes/summary.tsv"
+      ]
+    }
+  ]
+}
