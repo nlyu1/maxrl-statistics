@@ -7,6 +7,7 @@ from src.config.base import BaseConfig
 from src.experiments.utkface.adaptation_config import AdaptationConfig
 
 MechanismLoss = Literal["mse", "mae", "ce", "tailrl_population"]
+BinomialMode = Literal["fixed", "free", "affine"]
 
 
 class MechanismVariant(StrEnum):
@@ -17,6 +18,10 @@ class MechanismVariant(StrEnum):
     SCALAR_MAE = "scalar_mae"
     BINOMIAL_TAILRL = "binomial_tailrl"
     BINOMIAL_CE = "binomial_ce"
+    BINOMIAL_TAILRL_FREE = "binomial_tailrl_free"
+    BINOMIAL_CE_FREE = "binomial_ce_free"
+    BINOMIAL_TAILRL_AFFINE = "binomial_tailrl_affine"
+    BINOMIAL_CE_AFFINE = "binomial_ce_affine"
     HEAD_TAILRL_BACKBONE_MSE = "head_tailrl_backbone_mse"
     HEAD_MSE_BACKBONE_TAILRL = "head_mse_backbone_tailrl"
 
@@ -29,8 +34,21 @@ OBJECTIVES: dict[MechanismVariant, tuple[MechanismLoss, MechanismLoss]] = {
     MechanismVariant.SCALAR_MAE: ("mae", "mae"),
     MechanismVariant.BINOMIAL_TAILRL: ("tailrl_population", "tailrl_population"),
     MechanismVariant.BINOMIAL_CE: ("ce", "ce"),
+    MechanismVariant.BINOMIAL_TAILRL_FREE: ("tailrl_population", "tailrl_population"),
+    MechanismVariant.BINOMIAL_CE_FREE: ("ce", "ce"),
+    MechanismVariant.BINOMIAL_TAILRL_AFFINE: ("tailrl_population", "tailrl_population"),
+    MechanismVariant.BINOMIAL_CE_AFFINE: ("ce", "ce"),
     MechanismVariant.HEAD_TAILRL_BACKBONE_MSE: ("tailrl_population", "mse"),
     MechanismVariant.HEAD_MSE_BACKBONE_TAILRL: ("mse", "tailrl_population"),
+}
+
+BINOMIAL_MODES: dict[MechanismVariant, BinomialMode] = {
+    MechanismVariant.BINOMIAL_TAILRL: "fixed",
+    MechanismVariant.BINOMIAL_CE: "fixed",
+    MechanismVariant.BINOMIAL_TAILRL_FREE: "free",
+    MechanismVariant.BINOMIAL_CE_FREE: "free",
+    MechanismVariant.BINOMIAL_TAILRL_AFFINE: "affine",
+    MechanismVariant.BINOMIAL_CE_AFFINE: "affine",
 }
 
 
@@ -48,10 +66,11 @@ class MechanismConfig(BaseConfig):
 
     @property
     def binomial(self) -> bool:
-        return self.variant in {
-            MechanismVariant.BINOMIAL_TAILRL,
-            MechanismVariant.BINOMIAL_CE,
-        }
+        return self.variant in BINOMIAL_MODES
+
+    @property
+    def binomial_mode(self) -> BinomialMode:
+        return BINOMIAL_MODES[self.variant]
 
     @property
     def head_method(self) -> MechanismLoss:

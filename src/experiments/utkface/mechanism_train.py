@@ -36,7 +36,11 @@ from src.experiments.utkface.adaptation_train import (
 from src.experiments.utkface.config import LossConfig
 from src.experiments.utkface.data import read_manifest, training_indices
 from src.experiments.utkface.losses import MAX_AGE, NUM_BINS, policy_loss, scalar_loss
-from src.experiments.utkface.mechanism_config import MechanismConfig, MechanismLoss
+from src.experiments.utkface.mechanism_config import (
+    BinomialMode,
+    MechanismConfig,
+    MechanismLoss,
+)
 from src.experiments.utkface.model import ScalarHead, build_model
 from src.experiments.utkface.noise import noisy_labels
 from src.experiments.utkface.run import write_json
@@ -50,8 +54,15 @@ MECHANISM_SOURCE_FILES = (
 
 
 class BinomialHead(ScalarHead):
-    def __init__(self, *, features: int) -> None:
+    def __init__(self, *, features: int, mode: BinomialMode) -> None:
         super().__init__(features=features)
+        if mode not in {"fixed", "free", "affine"}:
+            raise ValueError(f"Unsupported binomial residual mode: {mode}")
+        self.mode = mode
+        self.gate = 0.0 if mode == "fixed" else 1.0
+        self.residual = nn.Linear(features, NUM_BINS)
+        nn.init.zeros_(self.residual.weight)
+        nn.init.zeros_(self.residual.bias)
         bins = torch.arange(NUM_BINS, dtype=torch.float64)
         log_coefficients = (
             torch.lgamma(torch.tensor(float(NUM_BINS), dtype=torch.float64))
@@ -65,7 +76,14 @@ class BinomialHead(ScalarHead):
 
     def forward(self, features: Tensor) -> Tensor:
         scores = self.linear(features).float()
-        return self.log_coefficients + self.bins * scores
+        residual = self.residual(features).float()
+        with torch.autocast(device_type=features.device.type, enabled=False):
+            bins = self.bins.float()
+            if self.mode == "affine":
+                centered = bins - bins.mean()
+                slope = (residual @ centered) / centered.square().sum()
+                residual = residual.mean(-1, keepdim=True) + slope[:, None] * centered
+            return self.log_coefficients.float() + bins * scores + self.gate * residual
 
 
 class ResearchModel(nn.Module):
@@ -92,7 +110,7 @@ def build_research_model(*, config: MechanismConfig) -> ResearchModel:
         if config.scalar:
             fc = ScalarHead(features=features)
         elif config.binomial:
-            fc = BinomialHead(features=features)
+            fc = BinomialHead(features=features, mode=config.binomial_mode)
         else:
             fc = nn.Linear(features, NUM_BINS)
     return ResearchModel(encoder=encoder, fc=fc)
@@ -145,6 +163,23 @@ def provenance(
         ),
         "encoder_initial_sha256": model_sha256(state=model.encoder.state_dict()),
         "head_initial_sha256": model_sha256(state=model.fc.state_dict()),
+        **(
+            {"score_initial_sha256": model_sha256(state=model.fc.linear.state_dict())}
+            if config.scalar or config.binomial
+            else {}
+        ),
+        **(
+            {
+                "residual_initial_sha256": model_sha256(
+                    state=model.fc.residual.state_dict()
+                ),
+                "binomial_residual_mode": config.binomial_mode,
+                "binomial_residual_gate": model.fc.gate,
+                "binomial_branch_precision": "bf16_linear_then_float32_projection_and_sum",
+            }
+            if config.binomial
+            else {}
+        ),
         "model_seed": config.adaptation.run.seed,
         "head_seed": config.head_seed,
         "view_seed": config.adaptation.view_seed,
@@ -161,6 +196,8 @@ def provenance(
         "update_diagnostics": {
             "sample_every_steps": UPDATE_SAMPLE_EVERY,
             "sample_offset": 0,
+            "parameter_groups": ["backbone", "head"]
+            + (["fc.linear", "fc.residual"] if config.binomial else []),
             "rms": "actual_parameter_delta_including_weight_decay",
             "cosine": "actual_delta_versus_negative_clipped_gradient",
         },
@@ -327,6 +364,15 @@ def train_epoch(
 ) -> dict:
     model.train()
     groups = (tuple(model.encoder.parameters()), tuple(model.fc.parameters()))
+    component_names = ("fc.linear", "fc.residual") if config.binomial else ()
+    sample_groups = (
+        *groups,
+        *(
+            (tuple(model.fc.linear.parameters()), tuple(model.fc.residual.parameters()))
+            if config.binomial
+            else ()
+        ),
+    )
     head_config = loss_config(
         template=config.adaptation.run.loss, method=config.head_method
     )
@@ -337,7 +383,9 @@ def train_epoch(
     norm_totals = torch.zeros(2, device=device, dtype=torch.float64)
     norm_maxima = torch.zeros(2, device=device, dtype=torch.float64)
     clipped_steps = torch.zeros(2, device=device, dtype=torch.float64)
-    update_totals = torch.zeros((2, 3), device=device, dtype=torch.float64)
+    update_totals = torch.zeros(
+        (len(sample_groups), 3), device=device, dtype=torch.float64
+    )
     sampled_steps = []
     count = 0
     steps = 0
@@ -390,14 +438,14 @@ def train_epoch(
         before = (
             tuple(
                 tuple(parameter.detach().float().clone() for parameter in parameters)
-                for parameters in groups
+                for parameters in sample_groups
             )
             if sample
             else ()
         )
         optimizer.step()
         if sample:
-            for group_index, parameters in enumerate(groups):
+            for group_index, parameters in enumerate(sample_groups):
                 update_totals[group_index] += update_statistics(
                     parameters=parameters, before=before[group_index]
                 ).double()
@@ -430,6 +478,15 @@ def train_epoch(
             "raw_grad_norm_max": norms_max[index],
             "clipped_steps": int(clipped[index]),
             "clip_frequency": clipped[index] / steps,
+            "update_rms_mean": rms_sum / len(sampled_steps),
+            "update_negative_gradient_cosine_mean": (
+                cosine_sum / defined_count if defined_count else None
+            ),
+            "update_cosine_defined_samples": int(defined_count),
+        }
+    for index, name in enumerate(component_names, start=2):
+        rms_sum, cosine_sum, defined_count = updates[index]
+        diagnostics[name] = {
             "update_rms_mean": rms_sum / len(sampled_steps),
             "update_negative_gradient_cosine_mean": (
                 cosine_sum / defined_count if defined_count else None
@@ -793,27 +850,119 @@ def verify_binomial_identity() -> dict:
     with torch.device("cpu"), torch.random.fork_rng(devices=[]):
         torch.random.default_generator.manual_seed(1701)
         scalar = ScalarHead(features=7)
-        torch.random.default_generator.manual_seed(1701)
-        binomial = BinomialHead(features=7)
-        if model_sha256(state=scalar.state_dict()) != model_sha256(
-            state=binomial.state_dict()
-        ):
-            raise AssertionError("Scalar and binomial seeds produced different heads")
+        heads = {}
+        for mode in ("fixed", "free", "affine"):
+            torch.random.default_generator.manual_seed(1701)
+            heads[mode] = BinomialHead(features=7, mode=mode)
+        if len({model_sha256(state=head.state_dict()) for head in heads.values()}) != 1:
+            raise AssertionError("Binomial modes produced different initial states")
+        for head in heads.values():
+            if model_sha256(state=scalar.linear.state_dict()) != model_sha256(
+                state=head.linear.state_dict()
+            ):
+                raise AssertionError("Scalar and binomial score initialization differs")
         features = torch.randn(16, 7)
         scalar_predictions = scalar(features).flatten()
-        probabilities = binomial(features).softmax(-1)
+        binomial = heads["fixed"]
+        logits = binomial(features)
+        for head in heads.values():
+            torch.testing.assert_close(head(features), logits, rtol=0, atol=0)
+        native_logits = (
+            binomial.log_coefficients
+            + binomial.bins * binomial.linear(features).float()
+        )
+        torch.testing.assert_close(logits, native_logits, rtol=0, atol=0)
+        probabilities = logits.softmax(-1)
         mean = (probabilities * torch.arange(NUM_BINS)).sum(-1)
+        for head in heads.values():
+            candidate_mean = (head(features).softmax(-1) * head.bins).sum(-1)
+            torch.testing.assert_close(candidate_mean, mean, rtol=0, atol=0)
         torch.testing.assert_close(mean, scalar_predictions, rtol=2e-6, atol=2e-4)
         scalar_gradient = torch.autograd.grad(
             scalar_predictions.sum(), scalar.parameters()
         )
-        binomial_gradient = torch.autograd.grad(mean.sum(), binomial.parameters())
+        binomial_gradient = torch.autograd.grad(
+            mean.sum(), binomial.linear.parameters()
+        )
         for expected, actual in zip(scalar_gradient, binomial_gradient, strict=True):
             torch.testing.assert_close(actual, expected, rtol=3e-4, atol=3e-4)
+        targets = torch.tensor([0, 2, 17, 33, 49, 64, 88, MAX_AGE] * 2)
+        checks = {}
+        for method in ("ce", "tailrl_population"):
+            loss = LossConfig(
+                method=method,
+                kernel_scale_years=5,
+                num_rollouts=64,
+                survival_floor=0,
+                std_floor=1e-4,
+            )
+            gradients = {}
+            for mode, head in heads.items():
+                inputs = features.detach().clone().requires_grad_()
+                value = policy_loss(logits=head(inputs), targets=targets, config=loss)
+                gradients[mode] = torch.autograd.grad(
+                    value, (*head.parameters(), inputs)
+                )
+            inputs = features.detach().clone().requires_grad_()
+            native_logits = (
+                binomial.log_coefficients
+                + binomial.bins * binomial.linear(inputs).float()
+            )
+            native_value = policy_loss(
+                logits=native_logits, targets=targets, config=loss
+            )
+            native_gradients = torch.autograd.grad(
+                native_value, (*binomial.linear.parameters(), inputs)
+            )
+            for mode, values in gradients.items():
+                for actual, expected in zip(
+                    (*values[:2], values[-1]), native_gradients, strict=True
+                ):
+                    torch.testing.assert_close(actual, expected, rtol=1e-6, atol=1e-7)
+            if any(torch.count_nonzero(value) for value in gradients["fixed"][2:4]):
+                raise AssertionError(
+                    "Gate-zero residual gradients must be explicitly zero"
+                )
+            residual_difference = max(
+                (free - affine).abs().max().item()
+                for free, affine in zip(
+                    gradients["free"][2:4], gradients["affine"][2:4], strict=True
+                )
+            )
+            if residual_difference == 0:
+                raise AssertionError(
+                    "Free and affine residual gradients unexpectedly match"
+                )
+            checks[method] = {
+                "score_and_feature_gradients_match_native": True,
+                "residual_gradient_norms": {
+                    mode: sum(value.square().sum() for value in values[2:4])
+                    .sqrt()
+                    .item()
+                    for mode, values in gradients.items()
+                },
+                "free_affine_residual_gradient_max_difference": residual_difference,
+            }
+        affine = copy.deepcopy(heads["affine"])
+        with torch.no_grad():
+            affine.residual.weight.normal_(std=0.02)
+            affine.residual.bias.normal_(std=0.02)
+        residual = affine.residual(features)
+        centered = affine.bins - affine.bins.mean()
+        slope = residual @ centered / centered.square().sum()
+        expected_mean = MAX_AGE * (affine.linear(features).flatten() + slope).sigmoid()
+        affine_mean = (affine(features).softmax(-1) * affine.bins).sum(-1)
+        torch.testing.assert_close(affine_mean, expected_mean, rtol=2e-6, atol=2e-4)
         return {
             "mean_max_absolute_error": (mean - scalar_predictions).abs().max().item(),
-            "state_keys_identical": list(scalar.state_dict())
-            == list(binomial.state_dict()),
+            "binomial_states_identical": True,
+            "initial_outputs_and_means_identical": True,
+            "scalar_score_initialization_identical": True,
+            "gradient_checks": checks,
+            "nonzero_affine_residual_mean_max_error": (affine_mean - expected_mean)
+            .abs()
+            .max()
+            .item(),
         }
 
 

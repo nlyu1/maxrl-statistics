@@ -22,6 +22,10 @@ LABELS = {
     "binomial_tailrl": "Binomial TailRL (one score)",
     "head_tailrl_backbone_mse": "TailRL head / MSE backbone",
     "head_mse_backbone_tailrl": "MSE head / TailRL backbone",
+    "binomial_ce_free": "CE: shared score + free residual",
+    "binomial_ce_affine": "CE: shared score + age-affine residual",
+    "binomial_tailrl_free": "TailRL: shared score + free residual",
+    "binomial_tailrl_affine": "TailRL: shared score + age-affine residual",
 }
 COLORS = dict(
     zip(
@@ -36,6 +40,10 @@ COLORS = dict(
             "#009a85",
             "#e69f00",
             "#56b4e9",
+            "#d55e00",
+            "#cc79a7",
+            "#009e73",
+            "#882255",
         ),
         strict=True,
     )
@@ -56,8 +64,16 @@ GROUPS = {
     "score-controls": (
         "categorical_ce",
         "binomial_ce",
+        "binomial_ce_free",
+        "binomial_ce_affine",
+        "scalar_mse",
+        "scalar_mae",
+    ),
+    "tail-score-controls": (
         "categorical_tailrl",
         "binomial_tailrl",
+        "binomial_tailrl_free",
+        "binomial_tailrl_affine",
         "scalar_mse",
         "scalar_mae",
     ),
@@ -75,6 +91,12 @@ CONTRASTS = (
     ("binomial_tailrl", "categorical_tailrl"),
     ("scalar_mse", "categorical_mse"),
     ("scalar_mae", "scalar_mse"),
+    ("binomial_ce_free", "binomial_ce"),
+    ("binomial_tailrl_free", "binomial_tailrl"),
+    ("binomial_ce_free", "binomial_ce_affine"),
+    ("binomial_tailrl_free", "binomial_tailrl_affine"),
+    ("binomial_ce_affine", "binomial_ce"),
+    ("binomial_tailrl_affine", "binomial_tailrl"),
 )
 
 
@@ -268,8 +290,10 @@ def pairing_audit(*, runs: list[dict]) -> dict:
             "config_sha256": digest(config),
             "paired_config_sha256": digest(normalized),
             "source_sha256": digest(provenance.get("source_sha256", {})),
-            "head_family": "one_score"
-            if run["variant"].startswith(("scalar_", "binomial_"))
+            "head_family": "scalar"
+            if run["variant"].startswith("scalar_")
+            else "binomial"
+            if run["variant"].startswith("binomial_")
             else "categorical",
         })
         record.update({
@@ -281,6 +305,8 @@ def pairing_audit(*, runs: list[dict]) -> dict:
                 "clean_labels_sha256",
                 "encoder_initial_sha256",
                 "head_initial_sha256",
+                "score_initial_sha256",
+                "residual_initial_sha256",
                 "model_seed",
                 "head_seed",
                 "view_seed",
@@ -318,6 +344,8 @@ def pairing_audit(*, runs: list[dict]) -> dict:
                     "config_sha256",
                     "head_family",
                     "head_initial_sha256",
+                    "score_initial_sha256",
+                    "residual_initial_sha256",
                 }
             ]
             if group
@@ -333,7 +361,7 @@ def pairing_audit(*, runs: list[dict]) -> dict:
                 "passed": len({row[field] for row in group}) == 1
                 and all(row[field] is not None for row in group),
             })
-        for family in ("categorical", "one_score"):
+        for family in ("categorical", "scalar", "binomial"):
             heads = [
                 row["head_initial_sha256"]
                 for row in group
@@ -347,6 +375,20 @@ def pairing_audit(*, runs: list[dict]) -> dict:
                     "family": family,
                     "jobs": len(heads),
                     "passed": len(set(heads)) == 1 and heads[0] is not None,
+                })
+        for field, families in (
+            ("score_initial_sha256", {"scalar", "binomial"}),
+            ("residual_initial_sha256", {"binomial"}),
+        ):
+            values = [row[field] for row in group if row["head_family"] in families]
+            if values:
+                checks.append({
+                    "block": block,
+                    "noise_sd": noise,
+                    "field": field,
+                    "family": "+".join(sorted(families)),
+                    "jobs": len(values),
+                    "passed": len(set(values)) == 1 and values[0] is not None,
                 })
     if any(not check["passed"] for check in checks):
         raise ValueError(

@@ -33,6 +33,10 @@ HEAD_METHODS = {
     "scalar_mae": ("scalar", "mae"),
     "binomial_tailrl": ("categorical", "tailrl_population"),
     "binomial_ce": ("categorical", "ce"),
+    "binomial_ce_free": ("categorical", "ce"),
+    "binomial_ce_affine": ("categorical", "ce"),
+    "binomial_tailrl_free": ("categorical", "tailrl_population"),
+    "binomial_tailrl_affine": ("categorical", "tailrl_population"),
     "head_tailrl_backbone_mse": ("categorical", "tailrl_population"),
     "head_mse_backbone_tailrl": ("categorical", "mse"),
 }
@@ -151,6 +155,12 @@ def create(
                     "categorical_tailrl - head_tailrl_backbone_mse",
                 ],
                 "score_contrasts": [
+                    "binomial_ce_free - binomial_ce",
+                    "binomial_tailrl_free - binomial_tailrl",
+                    "binomial_ce_free - binomial_ce_affine",
+                    "binomial_tailrl_free - binomial_tailrl_affine",
+                    "binomial_ce_affine - binomial_ce",
+                    "binomial_tailrl_affine - binomial_tailrl",
                     "binomial_ce - categorical_ce",
                     "binomial_tailrl - categorical_tailrl",
                     "scalar_mse - categorical_mse",
@@ -163,9 +173,11 @@ def create(
                 "common_readout_requirement": "Probe matched final-epoch encoders with one refitted readout before assigning a representation mechanism.",
                 "candidate_predictions": {
                     "backbone_route": "Both within-head Tail-backbone minus MSE-backbone contrasts are positive, with common-readout support, if MSE feature learning explains the advantage.",
-                    "shared_score": "Binomial CE improves on free categorical CE, and/or binomial Tail improves on free Tail, if one-score structure supplies useful inductive bias.",
+                    "shared_score": "Free-residual CE and/or Tail has greater error than its identically initialized gated shared-score control if the score constraint supplies useful inductive bias.",
+                    "conditioning_control": "Compare a full residual against an age-affine residual: the latter adds a redundant location-update path while preserving the one-score prediction family.",
                     "scalar_loss": "Scalar MAE versus scalar MSE determines the additional effect of robust point-loss weighting inside the same score family.",
                 },
+                "late_learning": "For the scratch500 cohort, compare fixed-epoch validation and common-readout performance at 50 versus 500, with 100 and 200 locating the change; selected-checkpoint outcomes remain separate.",
                 "prespecified_direction_followup": {
                     "space": "Backbone pooled features h; q=gradient_h(mean), v=gradient_h(Tail), c=2(mean-y)/99^2",
                     "magnitude_direction_factorial": "Cross per-example magnitudes ||c*q|| and k*||v|| with directions sign(c)*q/||q|| and v/||v||, k chosen to match batch RMS, with Tail head gradients fixed.",
