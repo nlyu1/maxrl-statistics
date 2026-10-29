@@ -374,7 +374,7 @@ def evidence_index(*, index: list[dict], source: dict, notes: list[str]) -> str:
         "",
         "Original report bytes are retained. The dossier records completed artifacts; rendering is a separate step.",
         "",
-        "All JSON/TSV evidence and frozen Python source are copied. Only featured figures and their SVG/PDF companions are copied; other visualization paths and hashes remain in the manifest.",
+        "All JSON/TSV evidence, frozen Python source and committed workflow configurations are copied. Only featured figures and their SVG/PDF companions are copied; other visualization paths and hashes remain in the manifest.",
         "",
         "| Evidence | Retained fit coverage / probe sources | Frozen training or analysis commit |",
         "|---|---:|---|",
@@ -455,11 +455,16 @@ def frozen_code(*, repository: Path, commits: list[str], output: Path) -> list[d
                 "pyproject.toml",
                 "uv.lock",
                 "uv.toml",
+                "experiments/utkface/mechanism",
             ],
             text=True,
         ).splitlines()
         names = [
-            name for name in names if Path(name).suffix == ".py" or name in {"pyproject.toml", "uv.lock", "uv.toml"}
+            name
+            for name in names
+            if Path(name).suffix == ".py"
+            or name in {"pyproject.toml", "uv.lock", "uv.toml"}
+            or (name.startswith("experiments/utkface/mechanism/") and Path(name).suffix == ".json")
         ]
         require(condition=bool(names), path=repository, expectation=f"available frozen Python source at {commit}")
         content = subprocess.check_output([
