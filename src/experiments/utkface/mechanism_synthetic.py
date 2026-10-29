@@ -10,7 +10,9 @@ from pathlib import Path
 import numpy as np
 import scipy
 import torch
+from scipy.linalg import qr
 from scipy.optimize import minimize
+from scipy.sparse.linalg import LinearOperator, cg
 from scipy.special import expit
 from threadpoolctl import threadpool_limits
 
@@ -27,10 +29,9 @@ COEFFICIENTS = (
     - torch.lgamma(AGES + 1) - torch.lgamma(NUM_BINS - AGES)
 )
 CENTERED = AGES - AGES.mean()
-PROJECTION = (
-    torch.eye(NUM_BINS, dtype=torch.float64) - 1 / NUM_BINS
-    - torch.outer(CENTERED, CENTERED) / CENTERED.square().sum()
-)
+with threadpool_limits(limits=1):
+    BASIS = torch.from_numpy(qr(np.column_stack((np.ones(NUM_BINS), CENTERED.numpy())),
+                               mode="full")[0][:, 2:].copy())
 
 
 def payload_hash(*, value: object) -> str:
@@ -70,7 +71,7 @@ def model_logits(*, design: torch.Tensor, parameters: torch.Tensor, tied: bool) 
     width = design.shape[1]
     logits = COEFFICIENTS + (design @ parameters[:width])[:, None] * AGES
     if not tied:
-        residual = PROJECTION @ parameters[width:].reshape(NUM_BINS, width)
+        residual = BASIS @ parameters[width:].reshape(NUM_BINS - 2, width)
         logits = logits + design @ residual.T
     return logits
 
@@ -79,7 +80,7 @@ def fit_model(*, design: np.ndarray, targets: np.ndarray, tied: bool,
               penalty: float, score_ridge: float, max_iterations: int) -> tuple[np.ndarray, dict]:
     x, y = torch.from_numpy(design), torch.from_numpy(targets).long()
     width = design.shape[1]
-    raw_count = width if tied else (NUM_BINS + 1) * width
+    raw_count = width if tied else (NUM_BINS - 1) * width
 
     def objective(values: np.ndarray) -> tuple[float, np.ndarray]:
         parameters = torch.tensor(values, dtype=torch.float64, requires_grad=True)
@@ -87,8 +88,7 @@ def fit_model(*, design: np.ndarray, targets: np.ndarray, tied: bool,
         value = -log_probs[torch.arange(len(y)), y].mean()
         value = value + 0.5 * score_ridge * parameters[:width].square().sum()
         if not tied:
-            residual = PROJECTION @ parameters[width:].reshape(NUM_BINS, width)
-            value = value + 0.5 * penalty * residual.square().sum()
+            value = value + 0.5 * penalty * parameters[width:].square().sum()
         gradient = torch.autograd.grad(value, parameters)[0]
         return float(value.detach()), gradient.detach().numpy()
 
@@ -96,18 +96,81 @@ def fit_model(*, design: np.ndarray, targets: np.ndarray, tied: bool,
     result = minimize(objective, np.zeros(raw_count), method="L-BFGS-B", jac=True,
                       options={"maxiter": max_iterations, "maxfun": 4 * max_iterations,
                                "gtol": 1e-8, "ftol": 1e-12, "maxls": 40, "maxcor": 20})
-    value, gradient = objective(result.x)
-    if not np.isfinite(result.x).all() or not np.isfinite(gradient).all():
+    theta = result.x.copy()
+    initial_value, initial_gradient = objective(theta)
+    ridge = torch.full((raw_count,), penalty, dtype=torch.float64)
+    ridge[:width] = score_ridge
+    polishing_steps = hvp_evaluations = backtracks = 0
+    cg_statuses = []
+    termination = "step_limit"
+    for _ in range(12):
+        value, gradient = objective(theta)
+        if float(np.abs(gradient).max()) <= 1e-8:
+            termination = "gradient_tolerance"
+            break
+        with torch.inference_mode():
+            p = log_policy(logits=model_logits(design=x, parameters=torch.from_numpy(theta), tied=tied)).exp()
+            variance = ((p @ AGES.square()) - (p @ AGES).square()).clamp_min(0)
+            diagonal = x.square().T @ variance / len(x) + score_ridge
+            if not tied:
+                variance_basis = ((p @ BASIS.square()) - (p @ BASIS).square()).clamp_min(0)
+                diagonal = torch.cat((diagonal, (variance_basis.T @ x.square() / len(x) + penalty).flatten()))
+
+        def product(vector: np.ndarray) -> np.ndarray:
+            nonlocal hvp_evaluations
+            hvp_evaluations += 1
+            direction = torch.from_numpy(vector)
+            logits_direction = (x @ direction[:width])[:, None] * AGES
+            if not tied:
+                logits_direction += x @ (BASIS @ direction[width:].reshape(NUM_BINS - 2, width)).T
+            weighted = p * (logits_direction - (p * logits_direction).sum(-1, keepdim=True)) / len(x)
+            answer = x.T @ (weighted @ AGES)
+            if not tied:
+                answer = torch.cat((answer, (BASIS.T @ (weighted.T @ x)).flatten()))
+            return (answer + ridge * direction).numpy()
+
+        operator = LinearOperator((raw_count, raw_count), matvec=product, dtype=np.float64)
+        preconditioner = LinearOperator(operator.shape, matvec=lambda v: v / diagonal.numpy(), dtype=np.float64)
+        direction, status = cg(operator, -gradient, M=preconditioner, rtol=1e-10, atol=1e-14, maxiter=400)
+        cg_statuses.append(int(status))
+        slope = float(gradient @ direction)
+        if not np.isfinite(direction).all() or slope >= 0:
+            termination = "non_descent_newton_direction"
+            break
+        step, accepted = 1.0, False
+        rounding = 32 * np.finfo(np.float64).eps * max(1.0, abs(value))
+        for _ in range(30):
+            candidate_value, _ = objective(theta + step * direction)
+            if candidate_value <= value + 1e-4 * step * slope + rounding:
+                theta += step * direction
+                accepted = True
+                polishing_steps += 1
+                break
+            step *= 0.5
+            backtracks += 1
+        if not accepted:
+            termination = "line_search_limit"
+            break
+    value, gradient = objective(theta)
+    if not np.isfinite(theta).all() or not np.isfinite(gradient).all():
         raise RuntimeError(f"Nonfinite convex fit: {result.message}")
     norm = float(np.abs(gradient).max())
     projected = np.zeros((NUM_BINS, width)) if tied else (
-        PROJECTION.numpy() @ result.x[width:].reshape(NUM_BINS, width)
+        BASIS.numpy() @ theta[width:].reshape(NUM_BINS - 2, width)
     )
-    return result.x, {
+    return theta, {
         "scipy_success": bool(result.success), "scipy_status": int(result.status),
         "scipy_message": str(result.message), "iterations": int(result.nit),
         "function_evaluations": int(result.nfev), "objective": value,
         "gradient_infinity_norm": norm, "gradient_tolerance_met": bool(norm <= 1e-8),
+        "lbfgs_gradient_infinity_norm": float(np.abs(initial_gradient).max()),
+        "polishing_steps": polishing_steps, "polishing_hvp_evaluations": hvp_evaluations,
+        "polishing_backtracks": backtracks, "polishing_cg_max_abs_status": max((abs(status) for status in cg_statuses), default=0),
+        "polishing_cg_nonconverged": sum(status != 0 for status in cg_statuses),
+        "polishing_termination": "gradient_tolerance" if norm <= 1e-8 else termination,
+        "strong_convexity_lower_bound": score_ridge if tied else min(score_ridge, penalty),
+        "objective_gap_upper_bound": float(gradient @ gradient) / (2 * (score_ridge if tied else min(score_ridge, penalty))),
+        "polishing_objective_change": value - initial_value,
         "wall_seconds": time.monotonic() - started, "raw_parameters": raw_count,
         "effective_parameters": width if tied else (NUM_BINS - 1) * width,
         "residual_constant_component_max": float(np.abs(projected.mean(0)).max()),
@@ -168,13 +231,16 @@ def run_study(*, args: argparse.Namespace) -> None:
               "training_sizes": [128] if args.smoke else [128, 512, 2048],
               "validation_size": 256 if args.smoke else 2048,
               "oracle_test_size": 1000 if args.smoke else 20000,
+              "oracle_split": 2 if args.smoke else 3,
               "residual_penalties": [0.1] if args.smoke else [0.001, 0.1, 10.0],
               "score_ridge": args.score_ridge, "max_iterations": args.max_iterations,
               "laws": list(LAWS), "true_score": "0.7*X0+0.4*X1-0.3*X2",
               "selection": "Minimum observed-label validation MSE; ties favor fewer effective parameters.",
               "penalty": "Mean categorical CE + score_ridge*||beta||^2/2 + residual_penalty*||projected_R||^2/2; includes intercepts.",
               "initialization": "All score and raw residual parameters are zero for every fit.",
-              "parameterization": "Residual logits are linear in [1,X], orthogonal to constant and age vectors. The full class contains the tied class. Raw residual coordinates retain 2*(d+1) redundant null directions; zero initialization and projected gradients keep those directions inactive.",
+              "parameterization": "Residual logits use an orthonormal 98-dimensional complement to constant and age vectors, with no redundant coordinates. This preserves the former projected-100-row function class and residual L2 penalty. The full class contains the tied class.",
+              "polishing": "Up to 12 preconditioned Newton-CG steps, 400 CG iterations per step, Armijo backtracking with a float64 rounding allowance. Exact GLM Hessian-vector products; objective gap <= ||gradient||^2/(2*minimum ridge).",
+              "residual_basis_sha256": array_hash(values=BASIS.numpy()),
               "pairing": "Inputs are shared across laws, penalties and nested sample sizes within each independent seed block. Label RNG streams differ across laws. Oracle inputs are shared across all fits within a seed.",
               "metric_scope": "Oracle mean MSE is excess observed-label squared risk. Oracle mean MAE measures error to the conditional mean; it is not excess observed-label absolute risk.",
               "scope": "Designed conditional label laws with the same mean and different shape/noise; this is not a new image experiment."}
@@ -238,7 +304,7 @@ def run_study(*, args: argparse.Namespace) -> None:
     write_json(path=args.output_dir / "report.json", payload=report)
     selected_ids = {row["selected_fit"] for row in freeze["selections"]}
     for seed in config["seeds"]:
-        test_x, test_mean = design_rows(count=config["oracle_test_size"], seed=seed, split=2)
+        test_x, test_mean = design_rows(count=config["oracle_test_size"], seed=seed, split=config["oracle_split"])
         report["oracle_test_data"].append({"seed": seed,
             "x_sha256": array_hash(values=test_x), "mean_sha256": array_hash(values=test_mean)})
         for row in (row for row in report["fits"] if row["seed"] == seed):
