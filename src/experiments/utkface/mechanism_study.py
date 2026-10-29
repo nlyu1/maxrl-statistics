@@ -15,15 +15,16 @@ from src.experiments.utkface.adaptation_dispatch import (
     sanitized_environment,
 )
 from src.experiments.utkface.config import NoiseConfig, canonical_config
-from src.experiments.utkface.mechanism_config import MechanismConfig, MechanismVariant
+from src.experiments.utkface.mechanism_config import (
+    BLOCKS,
+    SYMMETRIC_SWAP_BASE_SEED,
+    SYMMETRIC_SWAP_PAIR_COUNT,
+    MechanismConfig,
+    MechanismVariant,
+)
 from src.experiments.utkface.run import write_json
 from src.experiments.utkface.scheduler import gpu_inventory, gpu_is_free
 
-BLOCKS = (
-    {"model": 731, "head": 1731, "order": 2731, "view": 3731, "noise": 4731},
-    {"model": 947, "head": 1947, "order": 2947, "view": 3947, "noise": 4947},
-    {"model": 1163, "head": 2163, "order": 3163, "view": 4163, "noise": 5163},
-)
 VARIANTS = tuple(variant.value for variant in MechanismVariant)
 HEAD_METHODS = {
     "categorical_mse": ("categorical", "mse"),
@@ -38,6 +39,7 @@ HEAD_METHODS = {
     "binomial_tailrl_free": ("categorical", "tailrl_population"),
     "binomial_tailrl_affine": ("categorical", "tailrl_population"),
     "categorical_ce_binomial_init_fp32": ("categorical", "ce"),
+    "categorical_ce_symmetric_swap_init_fp32": ("categorical", "ce"),
     "categorical_tailrl_binomial_init_fp32": ("categorical", "tailrl_population"),
     "categorical_ce_random_fp32": ("categorical", "ce"),
     "categorical_tailrl_random_fp32": ("categorical", "tailrl_population"),
@@ -153,6 +155,25 @@ def create(
             ).strip(),
             "blocks": BLOCKS,
             "jobs": jobs,
+            **(
+                {
+                    "age_assignment_control": {
+                        "variant": "categorical_ce_symmetric_swap_init_fp32",
+                        "primary_noise_sd": 0,
+                        "secondary_noise_sd": 10,
+                        "primary_contrast": "categorical_ce_binomial_init_fp32 - categorical_ce_symmetric_swap_init_fp32",
+                        "random_reference": "categorical_ce_random_fp32",
+                        "mapping_seed": f"{SYMMETRIC_SWAP_BASE_SEED} + head_seed",
+                        "swapped_pair_count": SYMMETRIC_SWAP_PAIR_COUNT,
+                        "mapping_scope": "One independently seeded map per block, shared by clean and SD10; full map saved in run provenance before evaluation or training",
+                        "preserved": "Actual-age log binomial coefficients, probability multiset, entropy, head norms/rank, full ordinary-head capacity, FP32 computation",
+                        "intervention": "Nonmonotone numerical score assignment; actual target labels and mean-age readout remain ages 0..99",
+                        "interpretation": "A contrast can identify a contribution of coherent numerical assignment beyond preserved properties; target-dependent gradient magnitudes, clipping exposure and initial age probabilities may change. Folded age information remains, and a three-block near tie is not evidence of equivalence.",
+                    }
+                }
+                if "categorical_ce_symmetric_swap_init_fp32" in variants
+                else {}
+            ),
             "primary": {
                 "selection": f"Minimum clean validation mean MAE over epochs 0..{epochs}",
                 "endpoint": "Clean test mean MAE at that selected checkpoint",

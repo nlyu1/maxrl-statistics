@@ -32,6 +32,7 @@ LABELS = {
     "categorical_tailrl_random_fp32": "TailRL: ordinary head, random start (FP32)",
     "binomial_ce_free_fp32": "CE: score + free residual (FP32)",
     "binomial_tailrl_free_fp32": "TailRL: score + free residual (FP32)",
+    "categorical_ce_symmetric_swap_init_fp32": "CE: ordinary head, symmetric-swap start (FP32)",
 }
 COLORS = dict(
     zip(
@@ -56,6 +57,7 @@ COLORS = dict(
             "#117733",
             "#ddcc77",
             "#aa4499",
+            "#661100",
         ),
         strict=True,
     )
@@ -97,6 +99,7 @@ GROUPS = {
     ),
     "initialization-controls-ce": (
         "categorical_ce_binomial_init_fp32",
+        "categorical_ce_symmetric_swap_init_fp32",
         "categorical_ce_random_fp32",
         "binomial_ce_free_fp32",
     ),
@@ -123,6 +126,8 @@ CONTRASTS = (
     ("categorical_tailrl_binomial_init_fp32", "categorical_tailrl_random_fp32"),
     ("categorical_ce_binomial_init_fp32", "binomial_ce_free_fp32"),
     ("categorical_tailrl_binomial_init_fp32", "binomial_tailrl_free_fp32"),
+    ("categorical_ce_binomial_init_fp32", "categorical_ce_symmetric_swap_init_fp32"),
+    ("categorical_ce_symmetric_swap_init_fp32", "categorical_ce_random_fp32"),
 )
 
 
@@ -318,6 +323,8 @@ def pairing_audit(*, runs: list[dict]) -> dict:
             "source_sha256": digest(provenance.get("source_sha256", {})),
             "head_family": "scalar"
             if run["variant"].startswith("scalar_")
+            else "categorical_symmetric_swap_init"
+            if run["variant"] == "categorical_ce_symmetric_swap_init_fp32"
             else "categorical_binomial_init"
             if "_binomial_init_" in run["variant"]
             else "binomial"
@@ -392,6 +399,7 @@ def pairing_audit(*, runs: list[dict]) -> dict:
         for family in (
             "categorical",
             "categorical_binomial_init",
+            "categorical_symmetric_swap_init",
             "scalar",
             "binomial",
         ):
@@ -412,7 +420,12 @@ def pairing_audit(*, runs: list[dict]) -> dict:
         for field, families in (
             (
                 "score_initial_sha256",
-                {"scalar", "binomial", "categorical_binomial_init"},
+                {
+                    "scalar",
+                    "binomial",
+                    "categorical_binomial_init",
+                    "categorical_symmetric_swap_init",
+                },
             ),
             ("residual_initial_sha256", {"binomial"}),
         ):

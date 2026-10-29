@@ -199,9 +199,11 @@ def load_probes(*, root: Path) -> tuple[dict, list[dict], dict]:
         "cohort_valid": cohort_valid,
         "missing_cohort_cells": [{"block": b, "noise_sd": n, "variant": v} for b, n, v in sorted(missing_cells)],
         "missing_shards": [
-            str(root / f"g{i}" / "report.json") for i in range(4) if not (root / f"g{i}" / "report.json").is_file()
+            str(root / f"g{i}" / "report.json")
+            for i in range(min(4, len(variants)))
+            if not (root / f"g{i}" / "report.json").is_file()
         ],
-        "unexpected_shards": [str(p) for p in paths if p.parent.name not in {f"g{i}" for i in range(4)}],
+        "unexpected_shards": [str(p) for p in paths if p.parent.name not in {f"g{i}" for i in range(min(4, len(variants)))}],
         "input_reports": [{"path": str(p), "sha256": file_sha256(path=p)} for p in paths],
     }
     return plan, runs, coverage

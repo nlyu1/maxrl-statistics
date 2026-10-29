@@ -38,6 +38,9 @@ from src.experiments.utkface.config import LossConfig
 from src.experiments.utkface.data import read_manifest, training_indices
 from src.experiments.utkface.losses import MAX_AGE, NUM_BINS, policy_loss, scalar_loss
 from src.experiments.utkface.mechanism_config import (
+    BLOCKS,
+    SYMMETRIC_SWAP_BASE_SEED,
+    SYMMETRIC_SWAP_PAIR_COUNT,
     BinomialMode,
     HeadPrecision,
     MechanismConfig,
@@ -111,6 +114,49 @@ def fused_binomial_head(*, head: BinomialHead) -> nn.Linear:
     return fused
 
 
+def symmetric_swap_mapping(*, head_seed: int) -> Tensor:
+    generator = torch.Generator(device="cpu").manual_seed(
+        SYMMETRIC_SWAP_BASE_SEED + head_seed
+    )
+    mapping = torch.arange(NUM_BINS, device="cpu")
+    lower = torch.randperm(NUM_BINS // 2, generator=generator, device="cpu")[
+        :SYMMETRIC_SWAP_PAIR_COUNT
+    ]
+    upper = MAX_AGE - lower
+    mapping[lower] = upper
+    mapping[upper] = lower
+    return mapping
+
+
+def initialize_symmetric_swap(*, head: nn.Linear, head_seed: int) -> None:
+    mapping = symmetric_swap_mapping(head_seed=head_seed)
+    with torch.no_grad():
+        head.weight.copy_(head.weight[mapping])
+        head.bias.copy_(head.bias[mapping])
+
+
+def symmetric_swap_provenance(*, head_seed: int) -> dict:
+    mapping = symmetric_swap_mapping(head_seed=head_seed)
+    ages = torch.arange(NUM_BINS, device="cpu", dtype=torch.float64)
+    centered = ages - ages.mean()
+    code = mapping.double() - ages.mean()
+    jumps = mapping.diff().abs()
+    values = mapping.tolist()
+    return {
+        "seed": SYMMETRIC_SWAP_BASE_SEED + head_seed,
+        "base_seed": SYMMETRIC_SWAP_BASE_SEED,
+        "swapped_pair_count": SYMMETRIC_SWAP_PAIR_COUNT,
+        "mapping": values,
+        "mapping_sha256": json_sha256(values),
+        "algorithm": "CPU randperm(50)[:25]; swap each selected {age, 99-age} pair",
+        "age_code_pearson_correlation": (
+            centered @ code / centered.square().sum()
+        ).item(),
+        "adjacent_code_jump_mean": jumps.double().mean().item(),
+        "adjacent_code_jump_max": jumps.max().item(),
+    }
+
+
 class ResearchModel(nn.Module):
     def __init__(
         self, *, encoder: nn.Module, fc: nn.Module, head_precision: HeadPrecision
@@ -145,6 +191,8 @@ def build_research_model(*, config: MechanismConfig) -> ResearchModel:
             fc = BinomialHead(features=features, mode=config.binomial_mode)
         elif config.categorical_binomial_init:
             fc = fused_binomial_head(head=BinomialHead(features=features, mode="free"))
+            if config.categorical_symmetric_swap_init:
+                initialize_symmetric_swap(head=fc, head_seed=config.head_seed)
         else:
             fc = nn.Linear(features, NUM_BINS)
     return ResearchModel(encoder=encoder, fc=fc, head_precision=config.head_precision)
@@ -192,6 +240,10 @@ def provenance(
             scalar = ScalarHead(features=model.fc.in_features)
             fused_source["score_initial_sha256"] = model_sha256(
                 state=scalar.linear.state_dict()
+            )
+        if config.categorical_symmetric_swap_init:
+            fused_source["symmetric_age_assignment"] = symmetric_swap_provenance(
+                head_seed=config.head_seed
             )
     source = {
         "mechanism_config": config.model_dump(mode="json"),
@@ -1158,6 +1210,201 @@ def verify_fp32_controls() -> dict:
         }
 
 
+def verify_symmetric_swap_initialization() -> dict:
+    tolerances = {
+        "logits_and_ce": {"rtol": 3e-6, "atol": 3e-5},
+        "probabilities": {"rtol": 3e-5, "atol": 3e-6},
+        "entropy_and_norms": {"rtol": 3e-6, "atol": 3e-5},
+        "gradients": {"rtol": 3e-4, "atol": 3e-5},
+    }
+    checks = []
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(1704)
+        inputs = torch.randn(NUM_BINS, 512).bfloat16().float()
+        targets = torch.arange(NUM_BINS)
+        for seeds in BLOCKS:
+            head_seed = seeds["head"]
+            torch.random.default_generator.manual_seed(head_seed)
+            score = BinomialHead(features=inputs.shape[1], mode="free")
+            ordered = fused_binomial_head(head=score)
+            swapped = copy.deepcopy(ordered)
+            rng_state = torch.get_rng_state().clone()
+            mapping = symmetric_swap_mapping(head_seed=head_seed)
+            initialize_symmetric_swap(head=swapped, head_seed=head_seed)
+            assignment = symmetric_swap_provenance(head_seed=head_seed)
+            torch.testing.assert_close(torch.get_rng_state(), rng_state, rtol=0, atol=0)
+            torch.testing.assert_close(mapping.sort().values, targets, rtol=0, atol=0)
+            torch.testing.assert_close(mapping[mapping], targets, rtol=0, atol=0)
+            torch.testing.assert_close(
+                (mapping - MAX_AGE / 2).abs(),
+                (targets - MAX_AGE / 2).abs(),
+                rtol=0,
+                atol=0,
+            )
+            if (
+                (mapping[: NUM_BINS // 2] != targets[: NUM_BINS // 2]).sum().item()
+                != SYMMETRIC_SWAP_PAIR_COUNT
+                or not (mapping.diff() > 0).any()
+                or not (mapping.diff() < 0).any()
+            ):
+                raise AssertionError(
+                    "Expected 25 swapped symmetric pairs and nonmonotone codes"
+                )
+            torch.testing.assert_close(
+                score.log_coefficients[mapping], score.log_coefficients, rtol=0, atol=0
+            )
+            torch.testing.assert_close(
+                swapped.weight, ordered.weight[mapping], rtol=0, atol=0
+            )
+            torch.testing.assert_close(
+                swapped.bias, ordered.bias[mapping], rtol=0, atol=0
+            )
+            random = nn.Linear(inputs.shape[1], NUM_BINS)
+            counts = {
+                name: sum(parameter.numel() for parameter in head.parameters())
+                for name, head in (
+                    ("ordered", ordered),
+                    ("swapped", swapped),
+                    ("random", random),
+                )
+            }
+            if (
+                len(set(counts.values())) != 1
+                or counts["swapped"] != NUM_BINS * (inputs.shape[1] + 1)
+                or type(swapped) is not nn.Linear
+                or tuple(swapped.state_dict()) != ("weight", "bias")
+                or tuple(swapped.buffers())
+            ):
+                raise AssertionError(
+                    "Symmetric swap must retain the full ordinary linear head"
+                )
+            ranks = {
+                name: torch.linalg.matrix_rank(head.weight.detach()).item()
+                for name, head in (("ordered", ordered), ("swapped", swapped))
+            }
+            if ranks["ordered"] != 1 or ranks["swapped"] != 1:
+                raise AssertionError(
+                    "Initial ordered and swapped head weights must have rank one"
+                )
+            ordered_model = ResearchModel(
+                encoder=nn.Identity(), fc=ordered, head_precision="fp32"
+            )
+            swapped_model = ResearchModel(
+                encoder=nn.Identity(), fc=swapped, head_precision="fp32"
+            )
+            ordered_inputs = inputs.detach().clone().requires_grad_()
+            swapped_inputs = inputs.detach().clone().requires_grad_()
+            with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                ordered_logits = ordered_model(ordered_inputs)
+                swapped_logits = swapped_model(swapped_inputs)
+            if (
+                ordered_logits.dtype != torch.float32
+                or swapped_logits.dtype != torch.float32
+            ):
+                raise AssertionError(
+                    "Symmetric-swap heads must compute FP32 logits under bf16 autocast"
+                )
+            ordered_log_probs = ordered_logits.log_softmax(-1)
+            swapped_log_probs = swapped_logits.log_softmax(-1)
+            ordered_probs = ordered_log_probs.exp()
+            swapped_probs = swapped_log_probs.exp()
+            ordered_ce = F.cross_entropy(
+                ordered_logits, mapping[targets], reduction="none"
+            )
+            swapped_ce = F.cross_entropy(swapped_logits, targets, reduction="none")
+            ordered_gradients = torch.autograd.grad(
+                ordered_ce.sum(), (ordered_inputs, ordered.weight, ordered.bias)
+            )
+            swapped_gradients = torch.autograd.grad(
+                swapped_ce.sum(), (swapped_inputs, swapped.weight, swapped.bias)
+            )
+            analytic_feature_gradient = (
+                MAX_AGE * score.linear(inputs).flatten().sigmoid() - mapping[targets]
+            )[:, None] * score.linear.weight
+            comparisons = (
+                ("logits", swapped_logits, ordered_logits[:, mapping], "logits_and_ce"),
+                (
+                    "probability_assignment",
+                    swapped_probs,
+                    ordered_probs[:, mapping],
+                    "probabilities",
+                ),
+                (
+                    "sorted_probabilities",
+                    swapped_probs.sort(-1).values,
+                    ordered_probs.sort(-1).values,
+                    "probabilities",
+                ),
+                (
+                    "entropy",
+                    -(swapped_probs * swapped_log_probs).sum(-1),
+                    -(ordered_probs * ordered_log_probs).sum(-1),
+                    "entropy_and_norms",
+                ),
+                (
+                    "weight_norm",
+                    swapped.weight.norm(),
+                    ordered.weight.norm(),
+                    "entropy_and_norms",
+                ),
+                (
+                    "bias_norm",
+                    swapped.bias.norm(),
+                    ordered.bias.norm(),
+                    "entropy_and_norms",
+                ),
+                ("mapped_target_ce", swapped_ce, ordered_ce, "logits_and_ce"),
+                (
+                    "mapped_target_feature_gradient",
+                    swapped_gradients[0],
+                    ordered_gradients[0],
+                    "gradients",
+                ),
+                (
+                    "mapped_target_weight_gradient",
+                    swapped_gradients[1],
+                    ordered_gradients[1][mapping],
+                    "gradients",
+                ),
+                (
+                    "mapped_target_bias_gradient",
+                    swapped_gradients[2],
+                    ordered_gradients[2][mapping],
+                    "gradients",
+                ),
+                (
+                    "analytic_feature_gradient",
+                    swapped_gradients[0],
+                    analytic_feature_gradient,
+                    "gradients",
+                ),
+            )
+            errors = {}
+            for name, actual, expected, tolerance in comparisons:
+                torch.testing.assert_close(actual, expected, **tolerances[tolerance])
+                errors[name] = (actual - expected).abs().max().item()
+            checks.append({
+                "head_seed": head_seed,
+                "symmetric_age_assignment": assignment,
+                "score_initial_sha256": model_sha256(state=score.linear.state_dict()),
+                "ordered_head_initial_sha256": model_sha256(state=ordered.state_dict()),
+                "swapped_head_initial_sha256": model_sha256(state=swapped.state_dict()),
+                "mapping_is_nontrivial_balanced_symmetric_involution": True,
+                "global_rng_unchanged_by_mapping": True,
+                "actual_age_log_coefficients_identical": True,
+                "ordinary_head_parameter_counts": counts,
+                "initial_weight_ranks": ranks,
+                "head_dtype": str(swapped_logits.dtype),
+                "max_absolute_errors": errors,
+            })
+    return {
+        "blocks": checks,
+        "fp32_tolerances": tolerances,
+        "gradient_scope": "CE(swapped, y) equals CE(ordered, mapping[y]); feature gradients match and ordinary-head gradients match after the corresponding row permutation. The analytic per-example feature gradient is (99*sigmoid(score)-mapping[y])*score_weight, using summed CE. Equality is not asserted against ordered CE at the same actual target y.",
+        "readout_scope": "Training targets and the mean-age readout retain actual ages 0..99; only the initial ordinary-head rows are swapped.",
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -1171,6 +1418,7 @@ def main() -> None:
                     "binomial_identity": verify_binomial_identity(),
                     "routed_gradient_max_absolute_error": verify_routed_gradients(),
                     "fp32_initialization_controls": verify_fp32_controls(),
+                    "symmetric_swap_initialization": verify_symmetric_swap_initialization(),
                 },
                 indent=2,
             )
