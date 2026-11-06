@@ -231,6 +231,8 @@ def comparison_plots(*, root: Path, destination: Path, results: list[dict]) -> N
 
 
 def visualizations(*, root: Path, seed: int) -> None:
+    if (root / "SUPERSEDED.md").exists():
+        raise ValueError(f"Refusing to visualize a superseded cohort: {root}")
     train_size = json.loads((root / "completion.json").read_text())["train_size"]
     results = [
         json.loads(path.read_text())

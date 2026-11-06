@@ -32,6 +32,8 @@ def representative(*, result: dict, protocol: str, rollouts: int) -> bool:
 
 
 def report(*, root: Path) -> None:
+    if (root / "SUPERSEDED.md").exists():
+        raise ValueError(f"Refusing to report a superseded cohort: {root}")
     completion = json.loads((root / "completion.json").read_text())
     train_size = completion["train_size"]
     selection = json.loads((root / f"selection-train{train_size}.json").read_text())

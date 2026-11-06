@@ -19,6 +19,8 @@ class Dataset:
 
 
 def prepare_dataset(*, root: Path, config: DatasetConfig) -> Path:
+    if (root / "SUPERSEDED.md").exists():
+        raise ValueError(f"Artifact cohort is superseded; choose a fresh root: {root}")
     destination = root / "dataset.pt"
     metadata = root / "dataset.json"
     if destination.exists():
