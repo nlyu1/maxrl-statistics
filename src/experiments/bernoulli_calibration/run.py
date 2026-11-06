@@ -27,6 +27,11 @@ from src.experiments.utils import set_seeds
 from src.experiments.utkface.run import write_json
 
 
+def model_logits(*, model: BagProbabilityModel, tokens: Tensor) -> Tensor:
+    with torch.autocast(device_type=tokens.device.type, dtype=torch.bfloat16):
+        return model(tokens=tokens).float()
+
+
 @torch.no_grad()
 def evaluate(
     *, model: BagProbabilityModel, dataset: Dataset, split: str, config: RunConfig
@@ -34,7 +39,7 @@ def evaluate(
     model.eval()
     tokens, targets = dataset.tokens[split], dataset.probabilities[split]
     logits = torch.cat([
-        model(tokens=tokens[start : start + config.eval_batch_size]).float()
+        model_logits(model=model, tokens=tokens[start : start + config.eval_batch_size])
         for start in range(0, len(tokens), config.eval_batch_size)
     ])
     probability = logits.sigmoid()
@@ -117,7 +122,6 @@ def train(*, config: RunConfig, record_validation: bool) -> dict:
     with (
         torch.cuda.device(device),
         torch.device(device),
-        torch.autocast(device_type="cuda", dtype=torch.bfloat16),
     ):
         torch.cuda.reset_peak_memory_stats(device)
         set_seeds(config.seed)
@@ -202,7 +206,7 @@ def train(*, config: RunConfig, record_validation: bool) -> dict:
             index = permutation[cursor : cursor + config.batch_size]
             cursor += config.batch_size
             model.train()
-            logits = model(tokens=dataset.tokens["train"][index])
+            logits = model_logits(model=model, tokens=dataset.tokens["train"][index])
             loss, diagnostics = training_loss(
                 logits=logits,
                 probabilities=dataset.probabilities["train"][index],

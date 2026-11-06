@@ -1,8 +1,5 @@
 import argparse
-import fcntl
 import json
-import multiprocessing
-from concurrent.futures import ProcessPoolExecutor
 from functools import cache
 from pathlib import Path
 
@@ -23,12 +20,9 @@ from src.experiments.bernoulli_calibration.config import (
     ROLLOUTS,
     SEEDS,
     SUPERVISED,
-    RunConfig,
 )
 from src.experiments.bernoulli_calibration.report import COLORS, representative
-from src.experiments.bernoulli_calibration.study import execute
 from src.experiments.utkface.run import write_json
-from src.experiments.utkface.scheduler import gpu_inventory, gpu_is_free
 
 
 @dataclass(kw_only=True, config=ConfigDict(arbitrary_types_allowed=True))
@@ -236,64 +230,7 @@ def comparison_plots(*, root: Path, destination: Path, results: list[dict]) -> N
         plt.close(figure)
 
 
-def replay_configurations(
-    *, results: list[dict], root: Path, gpu: int, seed: int
-) -> list[RunConfig]:
-    selected = [
-        result
-        for result in results
-        if result["config"]["seed"] == seed
-        and (
-            result["config"]["method"] == "maxrl"
-            or representative(
-                result=result, protocol=result["config"]["protocol"], rollouts=64
-            )
-        )
-    ]
-    return [
-        RunConfig.model_validate(result["config"]).model_copy(
-            update={
-                "root": root,
-                "device": f"cuda:{gpu}",
-                "identifier": f"trajectory-{result['config']['identifier']}",
-            }
-        )
-        for result in selected
-    ]
-
-
-def capture_trajectories(
-    *, root: Path, jobs: list[RunConfig], gpu: int, jobs_per_gpu: int
-) -> None:
-    pending = [
-        job
-        for job in jobs
-        if not (job.output_dir / "validation-trajectory.pt").exists()
-    ]
-    if not pending:
-        return
-    target = next(row for row in gpu_inventory() if row["index"] == gpu)
-    if not gpu_is_free(gpu=target):
-        raise RuntimeError(f"Requested GPU is occupied: {target}")
-    claim_dir = root.parent / "gpu-claims"
-    claim_dir.mkdir(exist_ok=True)
-    progress = root / "visualization-replays"
-    progress.mkdir(exist_ok=True)
-    with (claim_dir / f"{target['uuid']}.lock").open("a") as claim:
-        fcntl.flock(claim, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with ProcessPoolExecutor(
-            max_workers=jobs_per_gpu, mp_context=multiprocessing.get_context("spawn")
-        ) as executor:
-            execute(
-                jobs=pending,
-                executor=executor,
-                slots=jobs_per_gpu,
-                root=progress,
-                record_validation=True,
-            )
-
-
-def visualizations(*, root: Path, gpu: int, jobs_per_gpu: int, seed: int) -> None:
+def visualizations(*, root: Path, seed: int) -> None:
     train_size = json.loads((root / "completion.json").read_text())["train_size"]
     results = [
         json.loads(path.read_text())
@@ -362,46 +299,48 @@ def visualizations(*, root: Path, gpu: int, jobs_per_gpu: int, seed: int) -> Non
             footer="Three original seeds pooled; fixed sampled points and full-data conditional means.\nStatistics use all test predictions. Dashed diagonal: perfect probability matching.",
         )
 
-    jobs = replay_configurations(results=results, root=root, gpu=gpu, seed=seed)
-    capture_trajectories(root=root, jobs=jobs, gpu=gpu, jobs_per_gpu=jobs_per_gpu)
-    replay_audit = []
-    trajectories = {}
-    for job in jobs:
-        original_id = job.identifier.removeprefix("trajectory-")
-        original = next(
-            row for row in results if row["config"]["identifier"] == original_id
-        )
-        replay = json.loads((job.output_dir / "result.json").read_text())
-        if (
-            original["initial_model_fingerprint"] != replay["initial_model_fingerprint"]
-            or original["dataset_fingerprint"] != replay["dataset_fingerprint"]
-        ):
-            raise ValueError(
-                f"Replay initialization or dataset mismatch: {original_id}"
+    selected = [
+        result
+        for result in results
+        if result["config"]["seed"] == seed
+        and (
+            result["config"]["method"] == "maxrl"
+            or representative(
+                result=result, protocol=result["config"]["protocol"], rollouts=64
             )
-        previous = pl.read_parquet(
-            root / "runs" / original_id / "test-predictions.parquet"
-        )["q_final"].to_numpy()
-        current = pl.read_parquet(job.output_dir / "test-predictions.parquet")[
-            "q_final"
-        ].to_numpy()
-        delta = current - previous
-        replay_audit.append({
-            "original": original_id,
-            "replay": job.identifier,
-            "test_prediction_difference_rmse": float(np.sqrt(np.mean(delta**2))),
-            "test_prediction_difference_max": float(np.max(np.abs(delta))),
-            "validation_rmse_difference": abs(
-                replay["final"]["validation"]["rmse"]
-                - original["final"]["validation"]["rmse"]
-            ),
-        })
-        trajectories[(job.protocol, job.method, job.num_rollouts)] = torch.load(
-            job.output_dir / "validation-trajectory.pt",
+        )
+    ]
+    trajectory_audit = []
+    trajectories = {}
+    for result in selected:
+        config = result["config"]
+        trajectory = torch.load(
+            root / "runs" / config["identifier"] / "validation-trajectory.pt",
             map_location="cpu",
             weights_only=True,
         )
-    write_json(path=destination / "replay-audit.json", payload=replay_audit)
+        if (
+            result["initial_model_fingerprint"]
+            != trajectory["initial_model_fingerprint"]
+            or result["dataset_fingerprint"] != trajectory["dataset_fingerprint"]
+        ):
+            raise ValueError(
+                f"Trajectory initialization or dataset mismatch: {config['identifier']}"
+            )
+        rmse = (trajectory["q"][-1] - trajectory["f"]).square().mean().sqrt().item()
+        difference = abs(rmse - result["final"]["validation"]["rmse"])
+        if difference > 1e-6:
+            raise ValueError(
+                f"Trajectory endpoint does not match metrics: {config['identifier']}"
+            )
+        trajectory_audit.append({
+            "run": config["identifier"],
+            "endpoint_rmse_difference": difference,
+        })
+        trajectories[(config["protocol"], config["method"], config["num_rollouts"])] = (
+            trajectory
+        )
+    write_json(path=destination / "trajectory-audit.json", payload=trajectory_audit)
     for protocol in ("shared", "split"):
         reference = trajectories[(protocol, "maxrl", 64)]
         steps = reference["step"].numpy()
@@ -457,14 +396,14 @@ def visualizations(*, root: Path, gpu: int, jobs_per_gpu: int, seed: int) -> Non
                 ],
                 durations=durations,
                 destination=destination / f"scatter-training-{protocol}-{kind}",
-                footer="Recorded matching-seed training replay; original loss-selected learning rates.\nFixed validation points; full-data conditional means and statistics; no interpolation.",
+                footer="Predictions recorded during the original training run; loss-selected learning rates.\nFixed validation points; full-data conditional means and statistics; no interpolation.",
             )
     manifest = {
         "seed": seed,
-        "replay_runs": len(jobs),
+        "recorded_runs": len(selected),
         "training_gif_steps": animation_steps.tolist(),
-        "maximum_replay_prediction_rmse": max(
-            row["test_prediction_difference_rmse"] for row in replay_audit
+        "maximum_endpoint_rmse_difference": max(
+            row["endpoint_rmse_difference"] for row in trajectory_audit
         ),
         "original_seed_count": len({row["config"]["seed"] for row in results}),
         "rollouts": list(ROLLOUTS),
@@ -475,9 +414,11 @@ def visualizations(*, root: Path, gpu: int, jobs_per_gpu: int, seed: int) -> Non
         "",
         "Static metric and learning-curve comparisons use all three original seeds. Each configuration retains its original loss-selected learning rate.",
         "",
-        "Rollout GIFs show final test predictions as N changes. Training GIFs show recorded validation predictions from matched seed-42 replays. Frames use actual model outputs, including early updates, without interpolation. Each scatter uses fixed sampled points; conditional means and statistics use the full split.",
+        "Shared-label supervised baselines use one observed label per context and are reused across N. Split-label methods all receive N independent labels per context; increasing N changes both the label budget and the rollout budget.",
         "",
-        f"Replayed {len(jobs)} selected runs. Maximum final test probability difference RMSE versus the original run: {manifest['maximum_replay_prediction_rmse']:.8g}. See replay-audit.json for every endpoint comparison.",
+        f"Rollout GIFs show final test predictions as N changes. Training GIFs use validation predictions recorded during the original seed-{seed} runs. Frames use actual model outputs, including early updates, without interpolation. Each scatter uses fixed sampled points; conditional means and statistics use the full split.",
+        "",
+        f"Verified {len(selected)} recorded trajectories against run metrics. Maximum endpoint RMSE discrepancy: {manifest['maximum_endpoint_rmse_difference']:.8g}. See trajectory-audit.json for every endpoint check.",
         "",
     ]
     for protocol in ("shared", "split"):
@@ -501,14 +442,10 @@ def visualizations(*, root: Path, gpu: int, jobs_per_gpu: int, seed: int) -> Non
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--gpu", type=int, required=True)
-    parser.add_argument("--jobs-per-gpu", type=int, required=True)
     parser.add_argument("--seed", type=int, default=SEEDS[0])
     arguments = parser.parse_args()
     visualizations(
         root=arguments.root,
-        gpu=arguments.gpu,
-        jobs_per_gpu=arguments.jobs_per_gpu,
         seed=arguments.seed,
     )
 

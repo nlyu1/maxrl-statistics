@@ -12,6 +12,9 @@ same per-seed initialization, minibatch order, and separate label/action random
 generators. CUDA execution uses device contexts and bfloat16 autocast; loss
 arithmetic and model probabilities use float32. AdamW has zero weight decay;
 there is no entropy bonus, KL penalty, dropout, gradient clipping or LR schedule.
+Autocast is scoped to each forward pass, so its weight cache cannot survive an
+optimizer update. A GPU regression check reloads saved weights and verifies
+that their predictions reproduce the recorded endpoint.
 
 ## Methods and grouping
 
@@ -55,6 +58,8 @@ sets every 32 updates, including step zero. Retain final and best-native-loss
 checkpoints, and evaluate both on test only after training. Save native loss,
 probability MAE/RMSE, Pearson with a defined flag, label NLL, excess NLL, entropy,
 true entropy, expected reward, and sampled subgroup/update diagnostics.
+All main runs also retain full validation probability snapshots at evaluation
+points and updates 1,2,4,8,16 for training animations.
 
 The automatic training-size check uses shared-label CE/MSE only. Increase to
 the next prefix if at least two seeds have validation RMSE more than 0.02 above
@@ -70,10 +75,10 @@ scatters and rollout comparisons. Jobs per GPU are explicitly configurable.
 
 ```bash
 uv run python -m src.experiments.bernoulli_calibration.study \
-  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107 \
+  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107-v2 \
   --gpu 1 --jobs-per-gpu 4
 uv run python -m src.experiments.bernoulli_calibration.report \
-  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107
+  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107-v2
 ```
 
 Run Python, tests and experiments on the server as specified in `server.md`.
@@ -82,16 +87,19 @@ Run Python, tests and experiments on the server as specified in `server.md`.
 
 ```bash
 uv run python -m src.experiments.bernoulli_calibration.visualizations \
-  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107 \
-  --gpu 1 --jobs-per-gpu 4 --seed 42
+  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107-v2 \
+  --seed 42
 ```
 
 The comparisons gallery includes final MAE/RMSE/Pearson/entropy versus N,
 learning curves comparing all rollout counts, and GIFs of correlation scatters.
 Rollout GIFs use final test predictions from all three original seeds. Training
-GIFs replay the chosen seed at the original loss-selected rates and record
-validation predictions, including updates 1,2,4,8,16 and the regular evaluation
-points. They show actual snapshots without interpolating predictions. Replays
-use distinct run directories, preserve the original results, and retain an
-endpoint comparison audit. Animation statistics and conditional means use the
-full split; points use a fixed subset for readability.
+GIFs use predictions recorded directly during the chosen seed's training run,
+including updates 1,2,4,8,16 and the regular evaluation points. They show actual
+snapshots without interpolating predictions. An endpoint audit checks the
+trajectories against saved metrics. Animation statistics and conditional means
+use the full split; points use a fixed subset for readability.
+
+The original `bernoulli-calibration-20261107` cohort is superseded: its autocast
+context spanned optimizer updates and could reuse stale linear weights. The
+`-v2` cohort reruns both LR selection and main training with corrected scopes.

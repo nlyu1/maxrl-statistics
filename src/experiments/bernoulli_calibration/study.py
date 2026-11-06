@@ -289,7 +289,7 @@ def run_study(
                     executor=executor,
                     slots=jobs_per_gpu,
                     root=root,
-                    record_validation=False,
+                    record_validation=True,
                 )
                 diagnostic = resizing_diagnostic(results=main_results)
                 write_json(

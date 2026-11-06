@@ -14,7 +14,7 @@ from src.experiments.bernoulli_calibration.objectives import (
     grouped_advantages,
     native_losses,
 )
-from src.experiments.bernoulli_calibration.run import train
+from src.experiments.bernoulli_calibration.run import evaluate, train
 from src.experiments.bernoulli_calibration.study import families, select_rates
 from src.experiments.utils import set_seeds
 
@@ -201,3 +201,16 @@ def test_gpu_validation_snapshots_and_head_updates(tmp_path: Path) -> None:
         config.output_dir / "final.pt", map_location="cpu", weights_only=True
     )
     assert all((final[name] - initial[name]).abs().max().item() > 0 for name in initial)
+    with torch.cuda.device(0), torch.device("cuda:0"):
+        restored = BagProbabilityModel(data=canonical_dataset(), config=config)
+        restored.load_state_dict(final)
+        dataset = load_dataset(
+            path=tmp_path / "dataset.pt", device=torch.device("cuda:0"), train_size=32
+        )
+        metrics, predictions = evaluate(
+            model=restored, dataset=dataset, split="validation", config=config
+        )
+    torch.testing.assert_close(predictions, trajectory["q"][-1], rtol=0, atol=1e-7)
+    assert metrics["rmse"] == pytest.approx(
+        result["final"]["validation"]["rmse"], abs=1e-7
+    )

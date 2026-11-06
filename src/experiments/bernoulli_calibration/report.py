@@ -433,6 +433,11 @@ def report(*, root: Path) -> None:
         "scatter-split",
     ):
         lines.extend(("", f"![{name}]({name}.png)"))
+    if (destination / "comparisons" / "GALLERY.md").exists():
+        lines.extend((
+            "",
+            "[Rollout comparisons and correlation animations](comparisons/GALLERY.md)",
+        ))
     (destination / "REPORT.md").write_text("\n".join(lines) + "\n")
     print(destination)
 
