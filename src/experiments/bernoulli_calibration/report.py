@@ -34,6 +34,8 @@ def representative(*, result: dict, protocol: str, rollouts: int) -> bool:
 def report(*, root: Path) -> None:
     completion = json.loads((root / "completion.json").read_text())
     train_size = completion["train_size"]
+    selection = json.loads((root / f"selection-train{train_size}.json").read_text())
+    boundary_winners = sum(row["grid_boundary"] for row in selection.values())
     paths = sorted((root / "runs").glob(f"main-t{train_size}-*/result.json"))
     results = [json.loads(path.read_text()) for path in paths]
     if not results:
@@ -63,6 +65,12 @@ def report(*, root: Path) -> None:
         }
         rows.append({
             **identifiers,
+            "labels_per_context": 1
+            if config["protocol"] == "shared"
+            else config["num_rollouts"],
+            "policy_rollouts_per_context": 0
+            if config["method"] in SUPERVISED
+            else config["num_rollouts"],
             "best_native_step": result["best_native_step"],
             "seconds": result["seconds"],
             **{f"final_{key}": value for key, value in result["test_final"].items()},
@@ -93,6 +101,7 @@ def report(*, root: Path) -> None:
         .group_by("method", "protocol", "num_rollouts")
         .agg(
             pl.len().alias("seeds"),
+            pl.col("learning_rate").first(),
             *[
                 expression
                 for metric in (
@@ -112,6 +121,19 @@ def report(*, root: Path) -> None:
         .sort("protocol", "method", "num_rollouts")
     )
     summary.write_csv(destination / "summary.csv")
+    pilot_rows = []
+    for path in sorted((root / "runs").glob(f"pilot-t{train_size}-*/result.json")):
+        candidate = json.loads(path.read_text())
+        pilot_rows.append({
+            **{
+                key: candidate["config"][key]
+                for key in ("method", "protocol", "num_rollouts", "learning_rate")
+            },
+            "validation_native_loss": candidate["final"]["validation"]["native_loss"],
+            "validation_rmse": candidate["final"]["validation"]["rmse"],
+            "seconds": candidate["seconds"],
+        })
+    pl.DataFrame(pilot_rows).write_csv(destination / "pilot-losses.csv")
     plt.rcParams.update({
         "font.size": 10,
         "axes.spines.top": False,
@@ -175,6 +197,21 @@ def report(*, root: Path) -> None:
                 axis.axhline(
                     truth, color="#777777", linestyle="--", label="true entropy"
                 )
+                axis.annotate(
+                    "true entropy",
+                    (steps[0], truth),
+                    xytext=(5, 5),
+                    textcoords="offset points",
+                    color="#666666",
+                )
+                interactive.add_hline(
+                    y=truth,
+                    line_dash="dash",
+                    line_color="#777777",
+                    row=2,
+                    col=2,
+                    annotation_text="True entropy",
+                )
             axis.set(xlabel="Optimizer update", ylabel=metric)
             axis.grid(alpha=0.2)
         axes[0, 0].legend()
@@ -184,12 +221,94 @@ def report(*, root: Path) -> None:
         figure.savefig(destination / f"curves-{protocol}.png", dpi=160)
         figure.savefig(destination / f"curves-{protocol}.svg")
         plt.close(figure)
+        trace_groups = {64: list(range(len(interactive.data)))}
+        for count in ROLLOUTS:
+            if count == 64:
+                continue
+            start = len(interactive.data)
+            candidates = [
+                row
+                for row in results
+                if representative(result=row, protocol=protocol, rollouts=count)
+            ]
+            for panel, metric in enumerate(("mae", "rmse", "pearson", "entropy")):
+                for method in METHODS:
+                    entries = [
+                        histories[row["config"]["identifier"]]
+                        for row in candidates
+                        if row["config"]["method"] == method
+                    ]
+                    steps = [entry["step"] for entry in entries[0]]
+                    values = np.array([
+                        [entry["validation"][metric] for entry in history]
+                        for history in entries
+                    ])
+                    interactive.add_trace(
+                        go.Scatter(
+                            x=steps,
+                            y=values.mean(0),
+                            name=method,
+                            legendgroup=method,
+                            showlegend=panel == 0,
+                            line={"color": COLORS[method]},
+                            visible=False,
+                        ),
+                        row=panel // 2 + 1,
+                        col=panel % 2 + 1,
+                    )
+            trace_groups[count] = list(range(start, len(interactive.data)))
         interactive.update_layout(
-            title=f"{protocol} labels, N=64; validation seed means", height=750
+            title=f"{protocol} labels, N=64; validation seed means",
+            height=750,
+            updatemenus=[
+                {
+                    "buttons": [
+                        {
+                            "label": f"N={count}",
+                            "method": "update",
+                            "args": [
+                                {
+                                    "visible": [
+                                        index in trace_groups[count]
+                                        for index in range(len(interactive.data))
+                                    ]
+                                },
+                                {
+                                    "title": f"{protocol} labels, N={count}; validation seed means"
+                                },
+                            ],
+                        }
+                        for count in (64, 2, 4, 8, 16, 256)
+                    ],
+                    "x": 1.0,
+                    "y": 1.15,
+                }
+            ],
         )
         interactive.write_html(
             destination / f"curves-{protocol}.html", include_plotlyjs=True
         )
+        figure, axes = plt.subplots(2, 3, figsize=(12, 8), constrained_layout=True)
+        for axis, method in zip(axes.flat, METHODS, strict=True):
+            candidates = [row for row in selected if row["config"]["method"] == method]
+            for split, style in (("train", "--"), ("validation", "-")):
+                entries = [histories[row["config"]["identifier"]] for row in candidates]
+                steps = [entry["step"] for entry in entries[0]]
+                values = np.array([
+                    [entry[split]["native_loss"] for entry in history]
+                    for history in entries
+                ])
+                mean, sd = values.mean(0), values.std(0, ddof=1)
+                axis.plot(steps, mean, style, color=COLORS[method], label=split)
+                axis.fill_between(
+                    steps, mean - sd, mean + sd, color=COLORS[method], alpha=0.1
+                )
+            axis.set(title=method, xlabel="Optimizer update", ylabel="Native loss")
+            axis.legend()
+            axis.grid(alpha=0.2)
+        figure.suptitle(f"Method losses: {protocol} labels, N=64; mean +/- seed SD")
+        figure.savefig(destination / f"native-loss-{protocol}.png", dpi=160)
+        plt.close(figure)
         figure, axes = plt.subplots(2, 3, figsize=(12, 8), constrained_layout=True)
         for axis, method in zip(axes.flat, METHODS, strict=True):
             candidates = [row for row in selected if row["config"]["method"] == method]
@@ -275,12 +394,20 @@ def report(*, root: Path) -> None:
         "",
         f"Training bags: {train_size}; validation: 8192; test: 8192. Three matched seeds.",
         "",
+        "The 32-word teacher is f(x)=sigmoid(sum(word_values)/4) for length-16 contexts. The model is trained from scratch with 128-dimensional embeddings, normalized sum pooling, a 32-unit GELU hidden layer, and one output logit (8257 parameters). Labels are resampled on every visit. Seeds vary optimization and observations on one fixed dataset split.",
+        "",
         "Learning rates use final pilot validation native loss. GRPO/RLOO use expected mismatch; MaxRL uses its finite-compute objective. Calibration metrics never select rates or checkpoints.",
         "",
         "Curves include step zero. Shading is seed standard deviation. Scatters show raw predictions with within-probability means separately per seed. Raw predictions are retained for every main run.",
         "",
-        "| Protocol | Method | N | Final test RMSE | Best native checkpoint RMSE | Final test Pearson |",
-        "|---|---|---:|---:|---:|---:|",
+        f"Completed {len(pilot_rows)} pilot trials and {len(results)} main runs. Each main run uses 2048 optimizer updates. See pilot-losses.csv for native-loss LR comparisons and curves.parquet for every method/protocol/rollout/seed trajectory.",
+        "",
+        f"The bounded pilot search leaves {boundary_winners}/{len(selection)} learning-rate winners at a searched boundary after up to two extensions. These preliminary sweeps do not establish globally optimal learning rates.",
+        "",
+        f"Training-size diagnostic: {json.dumps(completion['resizing_diagnostic'], sort_keys=True)}",
+        "",
+        "| Protocol | Method | N | Learning rate | Final test RMSE | Best native checkpoint RMSE | Final test Pearson |",
+        "|---|---|---:|---:|---:|---:|---:|",
     ]
     for row in summary.iter_rows(named=True):
         if (
@@ -288,13 +415,20 @@ def report(*, root: Path) -> None:
             or row["protocol"] == "shared"
             and row["method"] in SUPERVISED
         ):
+            count = (
+                "all"
+                if row["protocol"] == "shared" and row["method"] in SUPERVISED
+                else str(row["num_rollouts"])
+            )
             lines.append(
-                f"| {row['protocol']} | {row['method']} | {row['num_rollouts']} | {row['final_rmse_mean']:.4f} +/- {row['final_rmse_sd']:.4f} | {row['best_native_rmse_mean']:.4f} | {row['final_pearson_mean']:.4f} |"
+                f"| {row['protocol']} | {row['method']} | {count} | {row['learning_rate']:g} | {row['final_rmse_mean']:.4f} +/- {row['final_rmse_sd']:.4f} | {row['best_native_rmse_mean']:.4f} | {row['final_pearson_mean']:.4f} |"
             )
     for name in (
         "curves-shared",
         "curves-split",
         "rollout-comparison",
+        "native-loss-shared",
+        "native-loss-split",
         "scatter-shared",
         "scatter-split",
     ):
