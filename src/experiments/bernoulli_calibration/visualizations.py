@@ -160,10 +160,18 @@ def comparison_plots(*, root: Path, destination: Path, results: list[dict]) -> N
                     color=COLORS[method],
                 )
             if metric == "entropy":
+                true_entropy = results[0]["test_final"]["true_entropy"]
                 axis.axhline(
-                    results[0]["test_final"]["true_entropy"],
+                    true_entropy,
                     linestyle="--",
                     color="#888888",
+                )
+                axis.annotate(
+                    "true entropy",
+                    (ROLLOUTS[0], true_entropy),
+                    xytext=(3, 4),
+                    textcoords="offset points",
+                    color="#666666",
                 )
             axis.set(
                 xscale="log",
@@ -437,6 +445,13 @@ def visualizations(*, root: Path, seed: int) -> None:
         ):
             lines.extend((f"![{name}]({name}.gif)", ""))
     (destination / "GALLERY.md").write_text("\n".join(lines))
+    report_path = destination.parent / "REPORT.md"
+    report_text = report_path.read_text()
+    if "comparisons/GALLERY.md" not in report_text:
+        report_path.write_text(
+            report_text
+            + "\n[Rollout comparisons and correlation animations](comparisons/GALLERY.md)\n"
+        )
     print(json.dumps(manifest), flush=True)
     print(destination, flush=True)
 
