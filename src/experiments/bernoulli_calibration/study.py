@@ -54,14 +54,21 @@ def families(*, root: Path, train_size: int, device: str) -> list[RunConfig]:
 
 
 def execute(
-    *, jobs: list[RunConfig], executor: ProcessPoolExecutor, slots: int, root: Path
+    *,
+    jobs: list[RunConfig],
+    executor: ProcessPoolExecutor,
+    slots: int,
+    root: Path,
+    record_validation: bool,
 ) -> list[dict]:
     remaining = deque(jobs)
     active = {}
     results = []
     for _ in range(min(slots, len(jobs))):
         config = remaining.popleft()
-        active[executor.submit(train, config=config)] = config.identifier
+        active[
+            executor.submit(train, config=config, record_validation=record_validation)
+        ] = config.identifier
     while active:
         completed, _ = wait(active, return_when=FIRST_COMPLETED)
         for future in completed:
@@ -92,7 +99,11 @@ def execute(
             )
             if remaining:
                 config = remaining.popleft()
-                active[executor.submit(train, config=config)] = config.identifier
+                active[
+                    executor.submit(
+                        train, config=config, record_validation=record_validation
+                    )
+                ] = config.identifier
     return results
 
 
@@ -211,7 +222,11 @@ def run_study(
                             )
                         )
                 pilot_results = execute(
-                    jobs=pilot, executor=executor, slots=jobs_per_gpu, root=root
+                    jobs=pilot,
+                    executor=executor,
+                    slots=jobs_per_gpu,
+                    root=root,
+                    record_validation=False,
                 )
                 selected = select_rates(
                     results=pilot_results, root=root, train_size=train_size
@@ -250,6 +265,7 @@ def run_study(
                             executor=executor,
                             slots=jobs_per_gpu,
                             root=root,
+                            record_validation=False,
                         )
                     )
                     selected = select_rates(
@@ -269,7 +285,11 @@ def run_study(
                     for seed in SEEDS
                 ]
                 main_results = execute(
-                    jobs=main_jobs, executor=executor, slots=jobs_per_gpu, root=root
+                    jobs=main_jobs,
+                    executor=executor,
+                    slots=jobs_per_gpu,
+                    root=root,
+                    record_validation=False,
                 )
                 diagnostic = resizing_diagnostic(results=main_results)
                 write_json(

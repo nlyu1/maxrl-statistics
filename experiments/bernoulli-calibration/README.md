@@ -77,3 +77,21 @@ uv run python -m src.experiments.bernoulli_calibration.report \
 ```
 
 Run Python, tests and experiments on the server as specified in `server.md`.
+
+## Rollout comparisons and scatter animations
+
+```bash
+uv run python -m src.experiments.bernoulli_calibration.visualizations \
+  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107 \
+  --gpu 1 --jobs-per-gpu 4 --seed 42
+```
+
+The comparisons gallery includes final MAE/RMSE/Pearson/entropy versus N,
+learning curves comparing all rollout counts, and GIFs of correlation scatters.
+Rollout GIFs use final test predictions from all three original seeds. Training
+GIFs replay the chosen seed at the original loss-selected rates and record
+validation predictions, including updates 1,2,4,8,16 and the regular evaluation
+points. They show actual snapshots without interpolating predictions. Replays
+use distinct run directories, preserve the original results, and retain an
+endpoint comparison audit. Animation statistics and conditional means use the
+full split; points use a fixed subset for readability.

@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from src.experiments.bernoulli_calibration.config import (
+    EARLY_SNAPSHOT_STEPS,
     RunConfig,
     canonical_dataset,
 )
@@ -93,13 +94,15 @@ def save_curves(*, output: Path, history: list[dict]) -> None:
     )
 
 
-def train(*, config: RunConfig) -> dict:
+def train(*, config: RunConfig, record_validation: bool) -> dict:
     output = config.output_dir
     result_path = output / "result.json"
     if result_path.exists():
         result = json.loads(result_path.read_text())
         if result["config"] != config.model_dump(mode="json"):
             raise ValueError(f"Completed run configuration mismatch: {output}")
+        if record_validation and not (output / "validation-trajectory.pt").exists():
+            raise ValueError(f"Completed run has no validation trajectory: {output}")
         return result
     if not config.device.startswith("cuda:") or not torch.cuda.is_available():
         raise RuntimeError("Training requires an explicit CUDA device")
@@ -109,6 +112,8 @@ def train(*, config: RunConfig) -> dict:
     (output / "config.json").write_text(config.model_dump_json(indent=2) + "\n")
     started = time.monotonic()
     history = []
+    snapshot_steps: list[int] = []
+    snapshots: list[Tensor] = []
     with (
         torch.cuda.device(device),
         torch.device(device),
@@ -149,9 +154,12 @@ def train(*, config: RunConfig) -> dict:
                 train_metrics, _ = evaluate(
                     model=model, dataset=dataset, split="train", config=config
                 )
-                validation, _ = evaluate(
+                validation, validation_predictions = evaluate(
                     model=model, dataset=dataset, split="validation", config=config
                 )
+                if record_validation:
+                    snapshot_steps.append(step)
+                    snapshots.append(validation_predictions)
                 diagnostics = {
                     name: (value / batches_since_evaluation).item()
                     for name, value in diagnostic_totals.items()
@@ -178,6 +186,12 @@ def train(*, config: RunConfig) -> dict:
                 save_curves(output=output, history=history)
                 diagnostic_totals = {}
                 batches_since_evaluation = 0
+            elif record_validation and step in EARLY_SNAPSHOT_STEPS:
+                _, validation_predictions = evaluate(
+                    model=model, dataset=dataset, split="validation", config=config
+                )
+                snapshot_steps.append(step)
+                snapshots.append(validation_predictions)
             if step == config.steps:
                 break
             if cursor + config.batch_size > len(permutation):
@@ -220,6 +234,19 @@ def train(*, config: RunConfig) -> dict:
                 ["git", "rev-parse", "HEAD"], text=True
             ).strip(),
         }
+        if record_validation:
+            torch.save(
+                {
+                    "step": torch.tensor(
+                        snapshot_steps, dtype=torch.long, device="cpu"
+                    ),
+                    "q": torch.stack(snapshots),
+                    "f": dataset.probabilities["validation"].cpu(),
+                    "dataset_fingerprint": dataset.fingerprint,
+                    "initial_model_fingerprint": initial_fingerprint,
+                },
+                output / "validation-trajectory.pt",
+            )
         if config.stage == "main":
             result["test_final"], final_predictions = evaluate(
                 model=model, dataset=dataset, split="test", config=config
@@ -247,8 +274,12 @@ def train(*, config: RunConfig) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--record-validation", action="store_true")
     arguments = parser.parse_args()
-    result = train(config=RunConfig.model_validate_json(arguments.config.read_text()))
+    result = train(
+        config=RunConfig.model_validate_json(arguments.config.read_text()),
+        record_validation=arguments.record_validation,
+    )
     print(
         json.dumps({
             "family": result["family"],

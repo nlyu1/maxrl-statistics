@@ -14,7 +14,9 @@ from src.experiments.bernoulli_calibration.objectives import (
     grouped_advantages,
     native_losses,
 )
+from src.experiments.bernoulli_calibration.run import train
 from src.experiments.bernoulli_calibration.study import families, select_rates
+from src.experiments.utils import set_seeds
 
 
 @pytest.mark.parametrize("count", [2, 3, 4])
@@ -151,3 +153,51 @@ def test_rate_selection_uses_native_loss(tmp_path: Path) -> None:
     assert select_rates(results=candidates, root=tmp_path, train_size=8192) == {
         "rloo-shared-n16": 1e-3
     }
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA trajectory check")
+def test_gpu_validation_snapshots_and_head_updates(tmp_path: Path) -> None:
+    prepare_dataset(
+        root=tmp_path,
+        config=canonical_dataset().model_copy(
+            update={
+                "train_capacity": 64,
+                "validation_size": 16,
+                "test_size": 16,
+            }
+        ),
+    )
+    config = canonical_run(root=tmp_path).model_copy(
+        update={
+            "identifier": "capture-check",
+            "stage": "main",
+            "steps": 4,
+            "train_size": 32,
+            "batch_size": 16,
+            "eval_interval": 4,
+        }
+    )
+    with torch.cuda.device(0), torch.device("cuda:0"):
+        set_seeds(config.seed)
+        model = BagProbabilityModel(data=canonical_dataset(), config=config)
+        initial = {
+            name: value.detach().cpu().clone()
+            for name, value in model.state_dict().items()
+        }
+    result = train(config=config, record_validation=True)
+    trajectory = torch.load(
+        config.output_dir / "validation-trajectory.pt",
+        map_location="cpu",
+        weights_only=True,
+    )
+    assert trajectory["step"].tolist() == [0, 1, 2, 4]
+    assert trajectory["q"].shape == (4, 16)
+    assert (
+        trajectory["initial_model_fingerprint"] == result["initial_model_fingerprint"]
+    )
+    rmse = (trajectory["q"][-1] - trajectory["f"]).square().mean().sqrt().item()
+    assert rmse == pytest.approx(result["final"]["validation"]["rmse"], abs=1e-6)
+    final = torch.load(
+        config.output_dir / "final.pt", map_location="cpu", weights_only=True
+    )
+    assert all((final[name] - initial[name]).abs().max().item() > 0 for name in initial)
