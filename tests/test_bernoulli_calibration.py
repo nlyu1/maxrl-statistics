@@ -14,12 +14,16 @@ from src.experiments.bernoulli_calibration.objectives import (
     grouped_advantages,
     native_losses,
 )
+from src.experiments.bernoulli_calibration.study import families, select_rates
 
 
 @pytest.mark.parametrize("count", [2, 3, 4])
 @pytest.mark.parametrize("method", ["rloo", "maxrl"])
 @pytest.mark.parametrize("protocol", ["shared", "split"])
-def test_exact_expected_gradients(count: int, method: str, protocol: str) -> None:
+@pytest.mark.parametrize("probability,target", [(0.2, 0.3), (0.8, 0.65), (0.5, 0.5)])
+def test_exact_expected_gradients(
+    count: int, method: str, protocol: str, probability: float, target: float
+) -> None:
     config = canonical_run(root=Path("unused")).model_copy(
         update={
             "method": method,
@@ -27,7 +31,6 @@ def test_exact_expected_gradients(count: int, method: str, protocol: str) -> Non
             "num_rollouts": count,
         }
     )
-    probability, target = 0.2, 0.3
     actions = torch.tensor(list(product((0.0, 1.0), repeat=count)), dtype=torch.float64)
     label_rows = torch.tensor(
         list(product((0.0, 1.0), repeat=count if protocol == "split" else 1)),
@@ -121,3 +124,30 @@ def test_architecture_and_permutation_invariance() -> None:
     tokens = torch.randint(32, (3, 16))
     assert sum(parameter.numel() for parameter in model.parameters()) == 8257
     torch.testing.assert_close(model(tokens=tokens), model(tokens=tokens.flip(-1)))
+
+
+def test_supervised_shared_baselines_are_reused() -> None:
+    configurations = families(root=Path("unused"), train_size=8192, device="cuda:0")
+    assert (
+        len(configurations) == len({config.family for config in configurations}) == 57
+    )
+    shared_ce = [
+        config
+        for config in configurations
+        if config.method == "ce" and config.protocol == "shared"
+    ]
+    assert len(shared_ce) == 1
+
+
+def test_rate_selection_uses_native_loss(tmp_path: Path) -> None:
+    candidates = [
+        {
+            "family": "rloo-shared-n16",
+            "config": {"learning_rate": rate, "identifier": str(rate)},
+            "final": {"validation": {"native_loss": loss, "rmse": rmse}},
+        }
+        for rate, loss, rmse in ((1e-3, 0.2, 0.9), (1e-2, 0.4, 0.1))
+    ]
+    assert select_rates(results=candidates, root=tmp_path, train_size=8192) == {
+        "rloo-shared-n16": 1e-3
+    }

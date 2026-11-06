@@ -11,6 +11,8 @@ SUPERVISED = ("ce", "mse", "mae")
 METHODS = (*SUPERVISED, "rloo", "grpo", "maxrl")
 ROLLOUTS = (2, 4, 8, 16, 64, 256)
 LEARNING_RATES = (1e-4, 3e-4, 1e-3, 3e-3, 1e-2)
+LR_EXTENSION_FACTOR = 3.0
+LR_EXTENSION_ROUNDS = 2
 SEEDS = (42, 43, 44)
 TRAIN_SIZES = (8192, 16384, 32768)
 

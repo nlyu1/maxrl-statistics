@@ -38,6 +38,9 @@ native to each method: Bernoulli NLL for CE, expected binary-label MSE/MAE for
 scalar regression, expected mismatch for RLOO/GRPO, and negative finite-compute
 log success for MaxRL. GRPO is ranked by its underlying reward, not its detached
 normalized policy-gradient surrogate. Calibration RMSE never selects rates.
+If the winning rate is at a searched boundary, extend that boundary by a factor
+of three, for at most two additional pilot rounds. Persistent boundary winners
+are flagged in the selection record.
 
 For the centered, zero-success-skipping MaxRL estimator, define
 `J_D(s) = -sum((1-s)**k / k, k=1..D)` with `D=N-1`. Shared validation loss is

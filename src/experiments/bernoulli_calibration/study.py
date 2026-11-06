@@ -13,6 +13,8 @@ import numpy as np
 
 from src.experiments.bernoulli_calibration.config import (
     LEARNING_RATES,
+    LR_EXTENSION_FACTOR,
+    LR_EXTENSION_ROUNDS,
     METHODS,
     ROLLOUTS,
     SEEDS,
@@ -115,7 +117,10 @@ def select_rates(
             "native_loss": winner["final"]["validation"]["native_loss"],
             "identifier": winner["config"]["identifier"],
             "grid_boundary": winner["config"]["learning_rate"]
-            in (LEARNING_RATES[0], LEARNING_RATES[-1]),
+            in (
+                min(item["config"]["learning_rate"] for item in candidates),
+                max(item["config"]["learning_rate"] for item in candidates),
+            ),
             "candidates": [
                 {
                     "learning_rate": item["config"]["learning_rate"],
@@ -211,6 +216,45 @@ def run_study(
                 selected = select_rates(
                     results=pilot_results, root=root, train_size=train_size
                 )
+                for _ in range(LR_EXTENSION_ROUNDS):
+                    extension_jobs = []
+                    for base in configurations:
+                        rates = sorted(
+                            result["config"]["learning_rate"]
+                            for result in pilot_results
+                            if result["family"] == base.family
+                        )
+                        winner = selected[base.family]
+                        if winner not in (rates[0], rates[-1]):
+                            continue
+                        rate = (
+                            winner / LR_EXTENSION_FACTOR
+                            if winner == rates[0]
+                            else winner * LR_EXTENSION_FACTOR
+                        )
+                        extension_jobs.append(
+                            base.model_copy(
+                                update={
+                                    "stage": "pilot",
+                                    "learning_rate": rate,
+                                    "steps": pilot_steps,
+                                    "identifier": f"pilot-t{train_size}-{base.family}-lr{rate:g}",
+                                }
+                            )
+                        )
+                    if not extension_jobs:
+                        break
+                    pilot_results.extend(
+                        execute(
+                            jobs=extension_jobs,
+                            executor=executor,
+                            slots=jobs_per_gpu,
+                            root=root,
+                        )
+                    )
+                    selected = select_rates(
+                        results=pilot_results, root=root, train_size=train_size
+                    )
                 main_jobs = [
                     base.model_copy(
                         update={

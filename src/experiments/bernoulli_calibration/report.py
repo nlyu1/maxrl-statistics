@@ -200,6 +200,14 @@ def report(*, root: Path) -> None:
                     / result["config"]["identifier"]
                     / "test-predictions.parquet"
                 )
+                axis.scatter(
+                    predictions["f"],
+                    predictions["q_final"],
+                    s=2,
+                    alpha=0.025,
+                    color=COLORS[method],
+                    rasterized=True,
+                )
                 grouped = (
                     predictions.group_by("f").agg(pl.col("q_final").mean()).sort("f")
                 )
@@ -215,7 +223,7 @@ def report(*, root: Path) -> None:
             axis.set(
                 title=method,
                 xlabel="Ground truth f(x)",
-                ylabel="Mean model probability",
+                ylabel="Model probability",
                 xlim=(0, 1),
                 ylim=(0, 1),
             )
@@ -269,7 +277,7 @@ def report(*, root: Path) -> None:
         "",
         "Learning rates use final pilot validation native loss. GRPO/RLOO use expected mismatch; MaxRL uses its finite-compute objective. Calibration metrics never select rates or checkpoints.",
         "",
-        "Curves include step zero. Shading is seed standard deviation. Scatters average predictions within each true-probability value, separately per seed. Raw predictions are retained for every main run.",
+        "Curves include step zero. Shading is seed standard deviation. Scatters show raw predictions with within-probability means separately per seed. Raw predictions are retained for every main run.",
         "",
         "| Protocol | Method | N | Final test RMSE | Best native checkpoint RMSE | Final test Pearson |",
         "|---|---|---:|---:|---:|---:|",
