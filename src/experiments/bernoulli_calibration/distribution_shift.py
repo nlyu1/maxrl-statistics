@@ -11,7 +11,12 @@ import polars as pl
 import torch
 from matplotlib.ticker import ScalarFormatter
 
-from src.experiments.bernoulli_calibration.config import ROLLOUTS, SEEDS, SUPERVISED
+from src.experiments.bernoulli_calibration.config import (
+    METHODS,
+    ROLLOUTS,
+    SEEDS,
+    SUPERVISED,
+)
 from src.experiments.bernoulli_calibration.report import COLORS
 from src.experiments.bernoulli_calibration.visualizations import (
     ScatterTrajectory,
@@ -309,6 +314,40 @@ def compare_distributions(
         lines.append(
             f"| {cohort} | {row['training_bags']} | {row['test_mean']:.4f} | {row['test_median']:.4f} | {row['test_std']:.4f} | {row['test_majority_positive_fraction']:.4f} |"
         )
+    lines.extend((
+        "",
+        "## Final test results at N=256",
+        "",
+        "RMSE entries show the mean +/- sample standard deviation across three seeds. Shared-label supervised baselines use one label per context and are reused across rollout counts.",
+        "",
+        "| Labels | Method | Reference RMSE | Shifted RMSE | Shifted MSE skill |",
+        "|---|---|---:|---:|---:|",
+    ))
+    for protocol in ("shared", "split"):
+        for method in METHODS:
+            rows = summary.filter(
+                (pl.col("protocol") == protocol)
+                & (pl.col("method") == method)
+                & (
+                    (pl.col("num_rollouts") == 256)
+                    | pl.lit(protocol == "shared" and method in SUPERVISED)
+                )
+            )
+            values = {
+                cohort: rows.filter(pl.col("cohort") == cohort).row(0, named=True)
+                for cohort in roots
+            }
+            errors = [
+                f"{values[cohort]['final_rmse_mean']:.5f} +/- {values[cohort]['final_rmse_sd']:.5f}"
+                for cohort in roots
+            ]
+            lines.append(
+                f"| {protocol} | {method.upper()} | {errors[0]} | {errors[1]} | {values['shifted']['mse_skill_mean']:.4f} |"
+            )
+    lines.extend((
+        "",
+        "[All rollout counts and metrics](paired-summary.csv) | [Individual seeds](paired-results.csv) | [Constant and oracle references](constant-and-oracle-references.csv)",
+    ))
     for name, suffix in (
         ("teacher-distribution", "png"),
         ("rmse-and-skill", "png"),
