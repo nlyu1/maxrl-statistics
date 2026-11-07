@@ -80,7 +80,7 @@ scatters and rollout comparisons. Jobs per GPU are explicitly configurable.
 ```bash
 uv run python -m src.experiments.bernoulli_calibration.study \
   --root ~/.local/state/maxrl-statistics/bernoulli-calibration-mean020-20261107 \
-  --gpu 3 --jobs-per-gpu 4 --target-mean 0.2
+  --gpu 1 --jobs-per-gpu 4 --target-mean 0.2
 uv run python -m src.experiments.bernoulli_calibration.report \
   --root ~/.local/state/maxrl-statistics/bernoulli-calibration-mean020-20261107
 ```
@@ -127,3 +127,7 @@ probability distributions and all rollout counts, records constant-prior and
 oracle references, and renders matched training scatter GIFs. MSE skill adjusts
 for changes in the variance of f. The comparison reads archived reference
 artifacts directly; the reference cohort is not retrained.
+It also computes pointwise optima of the exact finite-N MaxRL objectives to
+separate objective bias from estimation and optimization effects. Their
+probability RMSE is not a lower bound on calibration error. Native-objective
+gradient and boundary conditions are checked independently with autograd.
