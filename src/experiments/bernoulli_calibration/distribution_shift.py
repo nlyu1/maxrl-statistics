@@ -23,6 +23,7 @@ from src.experiments.utkface.run import write_json
 def compare_distributions(
     *, reference_root: Path, shifted_root: Path, seed: int
 ) -> None:
+    shifted_config = json.loads((shifted_root / "dataset.json").read_text())
     roots = {"reference": reference_root, "shifted": shifted_root}
     datasets = {
         name: torch.load(root / "dataset.pt", map_location="cpu", weights_only=True)
@@ -89,6 +90,10 @@ def compare_distributions(
         )
         for name, prediction in (
             ("constant zero", np.zeros_like(probability)),
+            (
+                f"constant {shifted_config['target_mean']:g}",
+                np.full_like(probability, shifted_config["target_mean"]),
+            ),
             ("constant empirical prior", np.full_like(probability, probability.mean())),
             ("oracle probabilities", probability),
             ("oracle majority decision", (probability > 0.5).astype(float)),
@@ -276,7 +281,7 @@ def compare_distributions(
         destination=destination / "maxrl-training-distribution-shift",
         footer="Top: balanced reference. Bottom: shifted teacher. Same word bags and model initialization.\nActual recorded validation predictions; each cohort uses native-loss-selected learning rates.",
     )
-    config = json.loads((shifted_root / "dataset.json").read_text())
+    config = shifted_config
     write_json(
         path=destination / "manifest.json",
         payload={
