@@ -88,6 +88,7 @@ def compare_distributions(
                 "final_mae",
                 "final_rmse",
                 "final_pearson",
+                "final_pearson_defined",
                 "final_entropy",
                 "final_expected_reward",
                 "mse_skill",
@@ -123,6 +124,7 @@ def compare_distributions(
         .group_by("cohort", "method", "protocol", "num_rollouts")
         .agg(
             pl.len().alias("seeds"),
+            pl.col("final_pearson_defined").sum().alias("pearson_defined_seeds"),
             pl.col("learning_rate").first(),
             pl.col("train_size").first(),
             *[

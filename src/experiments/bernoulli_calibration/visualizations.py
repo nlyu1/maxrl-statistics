@@ -107,7 +107,7 @@ def scatter_animation(
             denominator = np.linalg.norm(centered_p) * np.linalg.norm(centered_q)
             pearson = (
                 f"{np.dot(centered_p, centered_q) / denominator:.3f}"
-                if denominator
+                if denominator > 1e-12
                 else "undefined"
             )
             rmse = np.sqrt(np.mean(np.square(predictions - panel.truth)))
