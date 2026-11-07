@@ -16,6 +16,7 @@ from src.experiments.bernoulli_calibration.config import (
     ROLLOUTS,
     SEEDS,
     SUPERVISED,
+    Protocol,
 )
 from src.experiments.bernoulli_calibration.report import COLORS
 from src.experiments.bernoulli_calibration.visualizations import (
@@ -23,6 +24,35 @@ from src.experiments.bernoulli_calibration.visualizations import (
     scatter_animation,
 )
 from src.experiments.utkface.run import write_json
+
+
+def pointwise_maxrl_probability(
+    *, truth: np.ndarray, protocol: Protocol, num_rollouts: int
+) -> np.ndarray:
+    if num_rollouts < 2:
+        raise ValueError("Centered MaxRL requires at least two rollouts")
+    probability = truth.astype(np.float64)
+    one = probability if protocol == "split" else np.ones_like(probability)
+    zero = 1 - probability if protocol == "split" else np.ones_like(probability)
+    powers = np.arange(num_rollouts - 1)
+
+    def derivative(prediction: np.ndarray) -> np.ndarray:
+        positive = ((1 - one * prediction)[:, None] ** powers).sum(-1)
+        negative = ((1 - zero * (1 - prediction))[:, None] ** powers).sum(-1)
+        return -probability * one * positive + (1 - probability) * zero * negative
+
+    low, high = np.zeros_like(probability), np.ones_like(probability)
+    for _ in range(80):
+        middle = (low + high) / 2
+        decrease = derivative(middle) < 0
+        low = np.where(decrease, middle, low)
+        high = np.where(decrease, high, middle)
+    result = (low + high) / 2
+    at_zero = derivative(np.zeros_like(result))
+    at_one = derivative(np.ones_like(result))
+    result = np.where(at_zero >= 0, 0, result)
+    result = np.where(at_one <= 0, 1, result)
+    return np.where((at_zero == 0) & (at_one == 0), probability, result)
 
 
 def compare_distributions(
@@ -51,6 +81,7 @@ def compare_distributions(
     statistics = {}
     tables = []
     references = []
+    finite_rows = []
     for cohort, root in roots.items():
         probability = (
             datasets[cohort]["probabilities"]["test"].numpy().astype(np.float64)
@@ -67,6 +98,23 @@ def compare_distributions(
             "test_quantile90": float(np.quantile(probability, 0.9)),
             "test_majority_positive_fraction": float((probability > 0.5).mean()),
         }
+        unique, counts = np.unique(probability, return_counts=True)
+        for protocol in ("shared", "split"):
+            for count in ROLLOUTS:
+                optimum = pointwise_maxrl_probability(
+                    truth=unique, protocol=protocol, num_rollouts=count
+                )
+                finite_rows.append({
+                    "cohort": cohort,
+                    "protocol": protocol,
+                    "num_rollouts": count,
+                    "pointwise_native_optimum_rmse": float(
+                        np.sqrt(np.average((optimum - unique) ** 2, weights=counts))
+                    ),
+                    "optimum_zero_context_fraction": float(
+                        counts[optimum == 0].sum() / counts.sum()
+                    ),
+                })
         table = pl.read_csv(root / "report" / "results.csv").with_columns(
             pl.lit(cohort).alias("cohort"),
             (1 - pl.col("final_rmse").pow(2) / variance).alias("mse_skill"),
@@ -149,6 +197,8 @@ def compare_distributions(
     pl.DataFrame(references).write_csv(
         destination / "constant-and-oracle-references.csv"
     )
+    finite_table = pl.DataFrame(finite_rows)
+    finite_table.write_csv(destination / "finite-budget-pointwise-optima.csv")
     figure, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
     for cohort, color in (("reference", "#777777"), ("shifted", "#347fb8")):
         probability = datasets[cohort]["probabilities"]["validation"].numpy()
@@ -349,6 +399,33 @@ def compare_distributions(
     lines.extend((
         "",
         "[All rollout counts and metrics](paired-summary.csv) | [Individual seeds](paired-results.csv) | [Constant and oracle references](constant-and-oracle-references.csv)",
+        "",
+        "## Finite-rollout objective bias",
+        "",
+        "The exact centered MaxRL objective has degree N-1. Its pointwise optimum is computed separately for each true probability, including exact boundary checks, with no model or sampling error. These are calibration errors at the native-objective optimum, not lower bounds on achievable calibration error. Comparing them with trained runs helps distinguish objective bias from optimization and estimation effects.",
+        "",
+        "| N | Shifted shared: trained RMSE | Shared: pointwise native optimum RMSE | Shifted split: trained RMSE | Split: pointwise native optimum RMSE |",
+        "|---:|---:|---:|---:|---:|",
+    ))
+    for count in ROLLOUTS:
+        values = []
+        for protocol in ("shared", "split"):
+            trained = summary.filter(
+                (pl.col("cohort") == "shifted")
+                & (pl.col("method") == "maxrl")
+                & (pl.col("protocol") == protocol)
+                & (pl.col("num_rollouts") == count)
+            )["final_rmse_mean"].item()
+            optimum = finite_table.filter(
+                (pl.col("cohort") == "shifted")
+                & (pl.col("protocol") == protocol)
+                & (pl.col("num_rollouts") == count)
+            )["pointwise_native_optimum_rmse"].item()
+            values.extend((f"{trained:.5f}", f"{optimum:.5f}"))
+        lines.append(f"| {count} | " + " | ".join(values) + " |")
+    lines.extend((
+        "",
+        "[Pointwise native optima for both teacher distributions](finite-budget-pointwise-optima.csv)",
     ))
     for name, suffix in (
         ("teacher-distribution", "png"),

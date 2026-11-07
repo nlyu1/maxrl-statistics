@@ -1,6 +1,7 @@
 from itertools import product
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
 
@@ -10,6 +11,9 @@ from src.experiments.bernoulli_calibration.config import (
     population_mean,
 )
 from src.experiments.bernoulli_calibration.data import load_dataset, prepare_dataset
+from src.experiments.bernoulli_calibration.distribution_shift import (
+    pointwise_maxrl_probability,
+)
 from src.experiments.bernoulli_calibration.model import BagProbabilityModel
 from src.experiments.bernoulli_calibration.objectives import (
     grouped_advantages,
@@ -265,3 +269,30 @@ def test_teacher_shift_preserves_contexts(tmp_path: Path) -> None:
         torch.testing.assert_close(
             initializations[0][name], initializations[1][name], rtol=0, atol=0
         )
+
+
+@pytest.mark.parametrize("protocol", ["shared", "split"])
+@pytest.mark.parametrize("count", [2, 4, 16, 256])
+def test_pointwise_maxrl_optima_satisfy_native_gradient_conditions(
+    protocol: str, count: int
+) -> None:
+    truth = np.array([0.02, 0.15, 0.2, 0.5, 0.8, 0.85, 0.98])
+    optimum = pointwise_maxrl_probability(
+        truth=truth, protocol=protocol, num_rollouts=count
+    )
+    np.testing.assert_allclose(optimum + optimum[::-1], 1, atol=1e-12)
+    assert optimum[3] == pytest.approx(0.5, abs=1e-12)
+    prediction = torch.tensor(
+        optimum.clip(1e-10, 1 - 1e-10), dtype=torch.float64, requires_grad=True
+    )
+    config = canonical_run(root=Path("unused")).model_copy(
+        update={"method": "maxrl", "protocol": protocol, "num_rollouts": count}
+    )
+    loss = native_losses(
+        logits=prediction.logit(), targets=torch.tensor(truth), config=config
+    ).sum()
+    gradient = torch.autograd.grad(loss, prediction)[0].numpy()
+    interior = (optimum > 0) & (optimum < 1)
+    np.testing.assert_allclose(gradient[interior], 0, atol=1e-8)
+    assert np.all(gradient[optimum == 0] >= -1e-8)
+    assert np.all(gradient[optimum == 1] <= 1e-8)
