@@ -112,3 +112,18 @@ Use fresh artifact roots for new teacher configurations. MSE skill relative to
 the constant empirical prior is recorded as a diagnostic; it never selects
 learning rates or checkpoints. Undefined Pearson correlations are marked rather
 than treated as zero correlations in reports.
+
+## Matched teacher-distribution comparison
+
+```bash
+uv run python -m src.experiments.bernoulli_calibration.distribution_shift \
+  --reference-root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107-v2 \
+  --shifted-root ~/.local/state/maxrl-statistics/bernoulli-calibration-mean020-20261107 \
+  --seed 42
+```
+
+This verifies identical stored bags and model initializations, compares teacher
+probability distributions and all rollout counts, records constant-prior and
+oracle references, and renders matched training scatter GIFs. MSE skill adjusts
+for changes in the variance of f. The comparison reads archived reference
+artifacts directly; the reference cohort is not retrained.

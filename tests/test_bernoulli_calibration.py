@@ -251,3 +251,17 @@ def test_teacher_shift_preserves_contexts(tmp_path: Path) -> None:
         assert torch.all(
             datasets[1].probabilities[split] < datasets[0].probabilities[split]
         )
+    initializations = []
+    for target_mean in (0.5, 0.2):
+        torch.manual_seed(42)
+        model = BagProbabilityModel(
+            data=canonical_dataset(target_mean=target_mean),
+            config=canonical_run(root=tmp_path),
+        )
+        initializations.append({
+            name: value.clone() for name, value in model.state_dict().items()
+        })
+    for name in initializations[0]:
+        torch.testing.assert_close(
+            initializations[0][name], initializations[1][name], rtol=0, atol=0
+        )
