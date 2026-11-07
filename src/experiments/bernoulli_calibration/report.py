@@ -11,7 +11,12 @@ import plotly.graph_objects as go
 import polars as pl
 from plotly.subplots import make_subplots
 
-from src.experiments.bernoulli_calibration.config import METHODS, ROLLOUTS, SUPERVISED
+from src.experiments.bernoulli_calibration.config import (
+    METHODS,
+    ROLLOUTS,
+    SUPERVISED,
+    DatasetConfig,
+)
 
 COLORS = dict(
     zip(
@@ -31,11 +36,28 @@ def representative(*, result: dict, protocol: str, rollouts: int) -> bool:
     )
 
 
+def curve_statistics(
+    *, histories: list[list[dict]], split: str, metric: str
+) -> tuple[np.ndarray, np.ndarray]:
+    values = np.array([
+        [
+            np.nan
+            if metric == "pearson" and not entry[split]["pearson_defined"]
+            else entry[split][metric]
+            for entry in history
+        ]
+        for history in histories
+    ])
+    masked = np.ma.masked_invalid(values)
+    return masked.mean(0).filled(np.nan), masked.std(0, ddof=1).filled(np.nan)
+
+
 def report(*, root: Path) -> None:
     if (root / "SUPERSEDED.md").exists():
         raise ValueError(f"Refusing to report a superseded cohort: {root}")
     completion = json.loads((root / "completion.json").read_text())
     train_size = completion["train_size"]
+    data_config = DatasetConfig.model_validate_json((root / "dataset.json").read_text())
     selection = json.loads((root / f"selection-train{train_size}.json").read_text())
     boundary_winners = sum(row["grid_boundary"] for row in selection.values())
     paths = sorted((root / "runs").glob(f"main-t{train_size}-*/result.json"))
@@ -92,7 +114,18 @@ def report(*, root: Path) -> None:
                     for key, value in row[split].items()
                 },
             })
-    table = pl.DataFrame(rows)
+    table = pl.DataFrame(rows).with_columns(
+        pl
+        .when(pl.col("final_pearson_defined"))
+        .then(pl.col("final_pearson"))
+        .otherwise(None)
+        .alias("final_pearson"),
+        pl
+        .when(pl.col("best_native_pearson_defined"))
+        .then(pl.col("best_native_pearson"))
+        .otherwise(None)
+        .alias("best_native_pearson"),
+    )
     table.write_csv(destination / "results.csv")
     table.write_parquet(destination / "results.parquet")
     pl.DataFrame(curve_rows, infer_schema_length=None).write_parquet(
@@ -104,6 +137,7 @@ def report(*, root: Path) -> None:
         .agg(
             pl.len().alias("seeds"),
             pl.col("learning_rate").first(),
+            pl.col("final_pearson_defined").sum().alias("pearson_defined_seeds"),
             *[
                 expression
                 for metric in (
@@ -111,6 +145,7 @@ def report(*, root: Path) -> None:
                     "final_rmse",
                     "final_pearson",
                     "final_entropy",
+                    "final_mse_skill",
                     "best_native_rmse",
                     "final_expected_reward",
                 )
@@ -169,11 +204,9 @@ def report(*, root: Path) -> None:
                     histories[row["config"]["identifier"]] for row in candidates
                 ]
                 steps = [entry["step"] for entry in histories_for_method[0]]
-                values = np.array([
-                    [entry["validation"][metric] for entry in history]
-                    for history in histories_for_method
-                ])
-                average, deviation = values.mean(0), values.std(0, ddof=1)
+                average, deviation = curve_statistics(
+                    histories=histories_for_method, split="validation", metric=metric
+                )
                 axis.plot(steps, average, label=method, color=COLORS[method])
                 axis.fill_between(
                     steps,
@@ -241,14 +274,13 @@ def report(*, root: Path) -> None:
                         if row["config"]["method"] == method
                     ]
                     steps = [entry["step"] for entry in entries[0]]
-                    values = np.array([
-                        [entry["validation"][metric] for entry in history]
-                        for history in entries
-                    ])
+                    average, _ = curve_statistics(
+                        histories=entries, split="validation", metric=metric
+                    )
                     interactive.add_trace(
                         go.Scatter(
                             x=steps,
-                            y=values.mean(0),
+                            y=average,
                             name=method,
                             legendgroup=method,
                             showlegend=panel == 0,
@@ -296,11 +328,9 @@ def report(*, root: Path) -> None:
             for split, style in (("train", "--"), ("validation", "-")):
                 entries = [histories[row["config"]["identifier"]] for row in candidates]
                 steps = [entry["step"] for entry in entries[0]]
-                values = np.array([
-                    [entry[split]["native_loss"] for entry in history]
-                    for history in entries
-                ])
-                mean, sd = values.mean(0), values.std(0, ddof=1)
+                mean, sd = curve_statistics(
+                    histories=entries, split=split, metric="native_loss"
+                )
                 axis.plot(steps, mean, style, color=COLORS[method], label=split)
                 axis.fill_between(
                     steps, mean - sd, mean + sd, color=COLORS[method], alpha=0.1
@@ -396,11 +426,13 @@ def report(*, root: Path) -> None:
         "",
         f"Training bags: {train_size}; validation: 8192; test: 8192. Three matched seeds.",
         "",
-        "The 32-word teacher is f(x)=sigmoid(sum(word_values)/4) for length-16 contexts. The model is trained from scratch with 128-dimensional embeddings, normalized sum pooling, a 32-unit GELU hidden layer, and one output logit (8257 parameters). Labels are resampled on every visit. Seeds vary optimization and observations on one fixed dataset split.",
+        f"The teacher is f(x)=sigmoid(sum(word_values)/4 + {data_config.logit_bias:.8f}) for length-16 contexts. Its population mean is {data_config.target_mean:g}; the offset is solved from the exact word-sampling distribution. The model is trained from scratch with 128-dimensional embeddings, normalized sum pooling, a 32-unit GELU hidden layer, and one output logit (8257 parameters). Labels are resampled on every visit. Seeds vary optimization and observations on one fixed dataset split.",
         "",
         "Learning rates use final pilot validation native loss. GRPO/RLOO use expected mismatch; MaxRL uses its finite-compute objective. Calibration metrics never select rates or checkpoints.",
         "",
         "Curves include step zero. Shading is seed standard deviation. Scatters show raw predictions with within-probability means separately per seed. Raw predictions are retained for every main run.",
+        "",
+        "MSE skill is 1 - MSE(q,f)/Var(f), using the constant empirical prior as its zero-skill reference. It is a diagnostic, not a selection criterion. Undefined Pearson values are null in the tables.",
         "",
         f"Completed {len(pilot_rows)} pilot trials and {len(results)} main runs. Each main run uses 2048 optimizer updates. See pilot-losses.csv for native-loss LR comparisons and curves.parquet for every method/protocol/rollout/seed trajectory.",
         "",
@@ -422,8 +454,13 @@ def report(*, root: Path) -> None:
                 if row["protocol"] == "shared" and row["method"] in SUPERVISED
                 else str(row["num_rollouts"])
             )
+            pearson = (
+                "undefined"
+                if row["final_pearson_mean"] is None
+                else f"{row['final_pearson_mean']:.4f}"
+            )
             lines.append(
-                f"| {row['protocol']} | {row['method']} | {count} | {row['learning_rate']:g} | {row['final_rmse_mean']:.4f} +/- {row['final_rmse_sd']:.4f} | {row['best_native_rmse_mean']:.4f} | {row['final_pearson_mean']:.4f} |"
+                f"| {row['protocol']} | {row['method']} | {count} | {row['learning_rate']:g} | {row['final_rmse_mean']:.4f} +/- {row['final_rmse_sd']:.4f} | {row['best_native_rmse_mean']:.4f} | {pearson} |"
             )
     for name in (
         "curves-shared",

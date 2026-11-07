@@ -49,7 +49,7 @@ def prepare_dataset(*, root: Path, config: DatasetConfig) -> Path:
                     seen.add(key)
                     rows.append(row)
         array = np.stack(rows)
-        score = values[array].sum(axis=-1) / np.sqrt(config.length)
+        score = values[array].sum(axis=-1) / np.sqrt(config.length) + config.logit_bias
         tokens[split] = torch.from_numpy(array)
         probabilities[split] = torch.from_numpy(1 / (1 + np.exp(-score))).float()
     digest = hashlib.sha256(config.model_dump_json().encode())
@@ -72,6 +72,8 @@ def prepare_dataset(*, root: Path, config: DatasetConfig) -> Path:
             "minimum": probability.min().item(),
             "maximum": probability.max().item(),
             "half_fraction": (probability == 0.5).float().mean().item(),
+            "median": probability.median().item(),
+            "below_half_fraction": (probability < 0.5).float().mean().item(),
         }
         for split, probability in probabilities.items()
     }

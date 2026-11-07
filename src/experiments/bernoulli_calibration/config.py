@@ -1,3 +1,6 @@
+from collections import Counter, defaultdict
+from functools import cache
+from math import exp, log, log1p, sqrt
 from pathlib import Path
 from typing import Literal
 
@@ -18,6 +21,64 @@ TRAIN_SIZES = (8192, 16384, 32768)
 EARLY_SNAPSHOT_STEPS = (1, 2, 4, 8, 16)
 
 
+@cache
+def population_scores(
+    *, word_values: tuple[float, ...], length: int
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    weights = {
+        value: count / len(word_values) for value, count in Counter(word_values).items()
+    }
+    distribution = {0.0: 1.0}
+    for _ in range(length):
+        following: dict[float, float] = defaultdict(float)
+        for total, mass in distribution.items():
+            for value, probability in weights.items():
+                following[total + value] += mass * probability
+        distribution = dict(following)
+    ordered = sorted(distribution.items())
+    return tuple(value / sqrt(length) for value, _ in ordered), tuple(
+        mass for _, mass in ordered
+    )
+
+
+def population_mean(
+    *, word_values: tuple[float, ...], length: int, logit_bias: float
+) -> float:
+    scores, masses = population_scores(word_values=word_values, length=length)
+    total = 0.0
+    for score, mass in zip(scores, masses, strict=True):
+        value = score + logit_bias
+        probability = (
+            1 / (1 + exp(-value)) if value >= 0 else exp(value) / (1 + exp(value))
+        )
+        total += mass * probability
+    return total
+
+
+def teacher_bias(
+    *, word_values: tuple[float, ...], length: int, target_mean: float
+) -> float:
+    if not 0 < target_mean < 1:
+        raise ValueError(
+            "Target probability mean must be strictly between zero and one"
+        )
+    scores, _ = population_scores(word_values=word_values, length=length)
+    target_logit = log(target_mean) - log1p(-target_mean)
+    low, high = target_logit - max(scores), target_logit - min(scores)
+    for _ in range(80):
+        middle = (low + high) / 2
+        mean = population_mean(
+            word_values=word_values, length=length, logit_bias=middle
+        )
+        if mean == target_mean:
+            return middle
+        if mean < target_mean:
+            low = middle
+        else:
+            high = middle
+    return (low + high) / 2
+
+
 class DatasetConfig(BaseConfig):
     seed: int
     vocabulary: tuple[str, ...]
@@ -26,6 +87,8 @@ class DatasetConfig(BaseConfig):
     train_capacity: int = Field(ge=1)
     validation_size: int = Field(ge=2)
     test_size: int = Field(ge=2)
+    target_mean: float = Field(gt=0, lt=1)
+    logit_bias: float = Field(allow_inf_nan=False)
 
     @model_validator(mode="after")
     def validate_vocabulary(self) -> "DatasetConfig":
@@ -33,6 +96,11 @@ class DatasetConfig(BaseConfig):
             raise ValueError("Each vocabulary item requires a teacher value")
         if len(set(self.vocabulary)) != len(self.vocabulary):
             raise ValueError("Vocabulary words must be unique")
+        mean = population_mean(
+            word_values=self.word_values, length=self.length, logit_bias=self.logit_bias
+        )
+        if abs(mean - self.target_mean) > 1e-10:
+            raise ValueError("Teacher bias does not match the declared population mean")
         return self
 
 
@@ -70,7 +138,7 @@ class RunConfig(BaseConfig):
         return f"{self.method}-{self.protocol}-{count}"
 
 
-def canonical_dataset() -> DatasetConfig:
+def canonical_dataset(*, target_mean: float) -> DatasetConfig:
     scored = (
         "awful",
         "grim",
@@ -107,14 +175,17 @@ def canonical_dataset() -> DatasetConfig:
         "this",
         "that",
     )
+    values = (-2.0,) * 4 + (-1.0,) * 4 + (1.0,) * 4 + (2.0,) * 4 + (0.0,) * 16
     return DatasetConfig(
         seed=20261107,
         vocabulary=scored + fillers,
-        word_values=(-2.0,) * 4 + (-1.0,) * 4 + (1.0,) * 4 + (2.0,) * 4 + (0.0,) * 16,
+        word_values=values,
         length=16,
         train_capacity=32768,
         validation_size=8192,
         test_size=8192,
+        target_mean=target_mean,
+        logit_bias=teacher_bias(word_values=values, length=16, target_mean=target_mean),
     )
 
 

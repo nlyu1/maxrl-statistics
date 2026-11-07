@@ -3,6 +3,10 @@
 Each length-16 context samples uniformly from 32 words. Four words each have
 teacher values -2, -1, +1, +2; sixteen fillers have value zero. The latent
 probability is `sigmoid(sum(word_values) / 4)`. Labels are fresh Bernoulli draws.
+The teacher now supports a fixed logit offset. Specify `--target-mean` explicitly;
+its offset is solved from the exact finite word-score distribution so that the
+population mean of f equals the requested value. The offset is not supplied to
+the model. Context sampling stays unchanged across means, allowing matched bags.
 Training, validation and test word-count vectors are disjoint. Training prefixes
 of 8192, 16384 and 32768 bags share fixed 8192-bag validation and test sets.
 
@@ -75,10 +79,10 @@ scatters and rollout comparisons. Jobs per GPU are explicitly configurable.
 
 ```bash
 uv run python -m src.experiments.bernoulli_calibration.study \
-  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107-v2 \
-  --gpu 1 --jobs-per-gpu 4
+  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-mean020-20261107 \
+  --gpu 3 --jobs-per-gpu 4 --target-mean 0.2
 uv run python -m src.experiments.bernoulli_calibration.report \
-  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107-v2
+  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-mean020-20261107
 ```
 
 Run Python, tests and experiments on the server as specified in `server.md`.
@@ -87,7 +91,7 @@ Run Python, tests and experiments on the server as specified in `server.md`.
 
 ```bash
 uv run python -m src.experiments.bernoulli_calibration.visualizations \
-  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-20261107-v2 \
+  --root ~/.local/state/maxrl-statistics/bernoulli-calibration-mean020-20261107 \
   --seed 42
 ```
 
@@ -103,3 +107,8 @@ use the full split; points use a fixed subset for readability.
 The original `bernoulli-calibration-20261107` cohort is superseded: its autocast
 context spanned optimizer updates and could reuse stale linear weights. The
 `-v2` cohort reruns both LR selection and main training with corrected scopes.
+The corrected `-v2` results are the balanced reference for the mean-0.2 study.
+Use fresh artifact roots for new teacher configurations. MSE skill relative to
+the constant empirical prior is recorded as a diagnostic; it never selects
+learning rates or checkpoints. Undefined Pearson correlations are marked rather
+than treated as zero correlations in reports.

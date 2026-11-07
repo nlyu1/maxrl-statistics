@@ -14,8 +14,8 @@ from torch import Tensor
 
 from src.experiments.bernoulli_calibration.config import (
     EARLY_SNAPSHOT_STEPS,
+    DatasetConfig,
     RunConfig,
-    canonical_dataset,
 )
 from src.experiments.bernoulli_calibration.data import Dataset, load_dataset
 from src.experiments.bernoulli_calibration.model import BagProbabilityModel
@@ -44,6 +44,7 @@ def evaluate(
     ])
     probability = logits.sigmoid()
     difference = probability - targets
+    target_variance = (targets - targets.mean()).square().mean()
     centered_q = probability - probability.mean()
     centered_p = targets - targets.mean()
     denominator = centered_q.square().sum().sqrt() * centered_p.square().sum().sqrt()
@@ -62,6 +63,7 @@ def evaluate(
         ).mean(),
         "mae": difference.abs().mean(),
         "rmse": difference.square().mean().sqrt(),
+        "mse_skill": 1 - difference.square().mean() / target_variance.clamp_min(1e-12),
         "pearson": pearson,
         "label_nll": nll,
         "excess_nll": nll - true_entropy,
@@ -79,6 +81,7 @@ def evaluate(
         )
     result = dict(zip(names, numbers, strict=True))
     result["pearson_defined"] = bool(defined.item())
+    result["mse_skill_defined"] = bool((target_variance > 1e-12).item())
     return result, probability.cpu()
 
 
@@ -128,7 +131,10 @@ def train(*, config: RunConfig, record_validation: bool) -> dict:
         dataset = load_dataset(
             path=config.root / "dataset.pt", device=device, train_size=config.train_size
         )
-        model = BagProbabilityModel(data=canonical_dataset(), config=config)
+        data_config = DatasetConfig.model_validate_json(
+            (config.root / "dataset.json").read_text()
+        )
+        model = BagProbabilityModel(data=data_config, config=config)
         digest = hashlib.sha256()
         for tensor in model.state_dict().values():
             digest.update(tensor.detach().cpu().numpy().tobytes())

@@ -67,7 +67,7 @@ def training_loss(
         else:
             error = values.sigmoid()[:, None] - labels
             loss = (error.square() if config.method == "mse" else error.abs()).mean()
-        return loss, {}
+        return loss, {"sampled_label_one_fraction": labels.mean()}
     with torch.no_grad():
         actions = (
             torch.rand(
@@ -92,6 +92,7 @@ def training_loss(
             )
         active = counts > 0
         diagnostic = {
+            "sampled_label_one_fraction": labels.mean(),
             "sampled_reward": rewards.mean(),
             "nonzero_advantage_fraction": (advantages != 0).float().mean(),
             "empty_group_fraction": (counts == 0).float().mean(),

@@ -21,7 +21,11 @@ from src.experiments.bernoulli_calibration.config import (
     SEEDS,
     SUPERVISED,
 )
-from src.experiments.bernoulli_calibration.report import COLORS, representative
+from src.experiments.bernoulli_calibration.report import (
+    COLORS,
+    curve_statistics,
+    representative,
+)
 from src.experiments.utkface.run import write_json
 
 
@@ -212,11 +216,9 @@ def comparison_plots(*, root: Path, destination: Path, results: list[dict]) -> N
                 ]
                 steps = [entry["step"] for entry in histories[0]]
                 for column, metric in enumerate(("rmse", "pearson", "entropy")):
-                    values = np.array([
-                        [entry["validation"][metric] for entry in history]
-                        for history in histories
-                    ])
-                    mean, sd = values.mean(0), values.std(0, ddof=1)
+                    mean, sd = curve_statistics(
+                        histories=histories, split="validation", metric=metric
+                    )
                     axis = axes[row, column]
                     axis.plot(steps, mean, color=color, label=f"N={count}")
                     axis.fill_between(

@@ -174,7 +174,13 @@ def resizing_diagnostic(*, results: list[dict]) -> dict:
 
 
 def run_study(
-    *, root: Path, gpu: int, jobs_per_gpu: int, pilot_steps: int, main_steps: int
+    *,
+    root: Path,
+    gpu: int,
+    jobs_per_gpu: int,
+    pilot_steps: int,
+    main_steps: int,
+    target_mean: float,
 ) -> None:
     root.mkdir(parents=True, exist_ok=True)
     inventory = gpu_inventory()
@@ -185,7 +191,8 @@ def run_study(
     claim_dir.mkdir(exist_ok=True)
     with (claim_dir / f"{target['uuid']}.lock").open("a") as claim:
         fcntl.flock(claim, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        prepare_dataset(root=root, config=canonical_dataset())
+        data_config = canonical_dataset(target_mean=target_mean)
+        prepare_dataset(root=root, config=data_config)
         provenance = {
             "source_revision": subprocess.check_output(
                 ["git", "rev-parse", "HEAD"], text=True
@@ -199,6 +206,8 @@ def run_study(
             "seeds": SEEDS,
             "started_at": time.time(),
             "pid": os.getpid(),
+            "target_mean": data_config.target_mean,
+            "teacher_logit_bias": data_config.logit_bias,
         }
         write_json(path=root / "study.json", payload=provenance)
         with ProcessPoolExecutor(
@@ -312,6 +321,7 @@ def main() -> None:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--gpu", type=int, required=True)
     parser.add_argument("--jobs-per-gpu", type=int, required=True)
+    parser.add_argument("--target-mean", type=float, required=True)
     parser.add_argument("--pilot-steps", type=int, default=256)
     parser.add_argument("--main-steps", type=int, default=2048)
     arguments = parser.parse_args()
@@ -321,6 +331,7 @@ def main() -> None:
         jobs_per_gpu=arguments.jobs_per_gpu,
         pilot_steps=arguments.pilot_steps,
         main_steps=arguments.main_steps,
+        target_mean=arguments.target_mean,
     )
 
 

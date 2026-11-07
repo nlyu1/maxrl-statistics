@@ -7,6 +7,7 @@ import torch
 from src.experiments.bernoulli_calibration.config import (
     canonical_dataset,
     canonical_run,
+    population_mean,
 )
 from src.experiments.bernoulli_calibration.data import load_dataset, prepare_dataset
 from src.experiments.bernoulli_calibration.model import BagProbabilityModel
@@ -96,7 +97,7 @@ def test_scalar_probability_targets(method: str) -> None:
 
 
 def test_dataset_splits_and_training_prefix(tmp_path: Path) -> None:
-    config = canonical_dataset().model_copy(
+    config = canonical_dataset(target_mean=0.5).model_copy(
         update={
             "train_capacity": 64,
             "validation_size": 16,
@@ -121,7 +122,8 @@ def test_dataset_splits_and_training_prefix(tmp_path: Path) -> None:
 def test_architecture_and_permutation_invariance() -> None:
     torch.manual_seed(42)
     model = BagProbabilityModel(
-        data=canonical_dataset(), config=canonical_run(root=Path("unused"))
+        data=canonical_dataset(target_mean=0.5),
+        config=canonical_run(root=Path("unused")),
     )
     tokens = torch.randint(32, (3, 16))
     assert sum(parameter.numel() for parameter in model.parameters()) == 8257
@@ -159,7 +161,7 @@ def test_rate_selection_uses_native_loss(tmp_path: Path) -> None:
 def test_gpu_validation_snapshots_and_head_updates(tmp_path: Path) -> None:
     prepare_dataset(
         root=tmp_path,
-        config=canonical_dataset().model_copy(
+        config=canonical_dataset(target_mean=0.5).model_copy(
             update={
                 "train_capacity": 64,
                 "validation_size": 16,
@@ -179,7 +181,9 @@ def test_gpu_validation_snapshots_and_head_updates(tmp_path: Path) -> None:
     )
     with torch.cuda.device(0), torch.device("cuda:0"):
         set_seeds(config.seed)
-        model = BagProbabilityModel(data=canonical_dataset(), config=config)
+        model = BagProbabilityModel(
+            data=canonical_dataset(target_mean=0.5), config=config
+        )
         initial = {
             name: value.detach().cpu().clone()
             for name, value in model.state_dict().items()
@@ -202,7 +206,9 @@ def test_gpu_validation_snapshots_and_head_updates(tmp_path: Path) -> None:
     )
     assert all((final[name] - initial[name]).abs().max().item() > 0 for name in initial)
     with torch.cuda.device(0), torch.device("cuda:0"):
-        restored = BagProbabilityModel(data=canonical_dataset(), config=config)
+        restored = BagProbabilityModel(
+            data=canonical_dataset(target_mean=0.5), config=config
+        )
         restored.load_state_dict(final)
         dataset = load_dataset(
             path=tmp_path / "dataset.pt", device=torch.device("cuda:0"), train_size=32
@@ -214,3 +220,34 @@ def test_gpu_validation_snapshots_and_head_updates(tmp_path: Path) -> None:
     assert metrics["rmse"] == pytest.approx(
         result["final"]["validation"]["rmse"], abs=1e-7
     )
+
+
+@pytest.mark.parametrize("target_mean", [0.05, 0.2, 0.5, 0.8, 0.95])
+def test_population_teacher_mean(target_mean: float) -> None:
+    config = canonical_dataset(target_mean=target_mean)
+    assert population_mean(
+        word_values=config.word_values,
+        length=config.length,
+        logit_bias=config.logit_bias,
+    ) == pytest.approx(target_mean, abs=1e-12)
+
+
+def test_teacher_shift_preserves_contexts(tmp_path: Path) -> None:
+    datasets = []
+    for target_mean in (0.5, 0.2):
+        config = canonical_dataset(target_mean=target_mean).model_copy(
+            update={"train_capacity": 64, "validation_size": 16, "test_size": 16}
+        )
+        path = prepare_dataset(root=tmp_path / str(target_mean), config=config)
+        dataset = load_dataset(path=path, device=torch.device("cpu"), train_size=64)
+        datasets.append(dataset)
+        for split, tokens in dataset.tokens.items():
+            score = (
+                torch.tensor(config.word_values)[tokens].sum(-1) / 4 + config.logit_bias
+            )
+            torch.testing.assert_close(dataset.probabilities[split], score.sigmoid())
+    for split in datasets[0].tokens:
+        torch.testing.assert_close(datasets[0].tokens[split], datasets[1].tokens[split])
+        assert torch.all(
+            datasets[1].probabilities[split] < datasets[0].probabilities[split]
+        )
