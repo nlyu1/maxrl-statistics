@@ -5,6 +5,7 @@ import json
 import math
 import os
 import runpy
+import signal
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
@@ -17,10 +18,14 @@ import pytest
 from src.experiments.utkface.scheduler import gpu_is_free
 from src.experiments.utkface.vlm_eval import (
     GPUProcessException,
+    SharedGPURuntime,
+    SharedServingPolicy,
     evaluate_images,
+    load_shared_policy,
     parse_age,
     prediction_metrics,
     query_image,
+    shared_runtime,
     summarize_records,
     tune,
     wait_for_server,
@@ -31,6 +36,10 @@ from src.experiments.utkface.vlm_queue import (
     gpu_inventory_for_plan,
     owned_worker,
     process_matches_exception,
+    request_worker_stop,
+    shared_gpu_is_ready,
+    shared_stop_reason,
+    terminate_worker,
 )
 
 
@@ -111,7 +120,133 @@ def test_missing_completion_is_an_error():
         summarize_records(records=[record(index=0, target=30, values=[30])], samples=2)
 
 
-def test_request_sends_pixels_without_age_filename_or_label(tmp_path, monkeypatch):
+@pytest.fixture
+def shared_grant():
+    return SharedGPURuntime(
+        model_identifier="0p8b_posttrained",
+        gpu_uuid="approved-gpu",
+        resident_processes=(),
+        baseline_memory_mib=20000,
+        total_memory_mib=46068,
+        gpu_memory_utilization=0.35,
+        max_num_seqs=64,
+        client_concurrencies=(8, 16),
+    )
+
+
+@pytest.mark.parametrize(
+    "elapsed,accepted,valid",
+    [(599, True, False), (600, False, False), (600, True, True)],
+)
+def test_shared_policy_requires_completed_observation(
+    tmp_path, shared_grant, elapsed, accepted, valid
+):
+    observed = tmp_path / "observation.json"
+    observed.write_text(
+        json.dumps({
+            "accepted": accepted,
+            "elapsed_seconds": elapsed,
+        "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+            "gpus": [
+                {
+                    "index": i,
+                    "uuid": "approved-gpu" if i == 1 else str(i),
+                    "max_utilization": 0,
+                }
+                for i in (1, 2, 3, 5, 9)
+            ],
+        })
+    )
+    policy = SharedServingPolicy(
+        observation=observed,
+        observation_sha256=hashlib.sha256(observed.read_bytes()).hexdigest(),
+        minimum_headroom_mib=6144,
+        maximum_resident_cpu_fraction=0.25,
+        grants=(shared_grant,),
+    )
+    (tmp_path / "shared-serving.json").write_text(policy.model_dump_json())
+    if not valid:
+        with pytest.raises(ValueError, match="ten-minute"):
+            load_shared_policy(root=tmp_path)
+        return
+    loaded = load_shared_policy(root=tmp_path)
+    assert loaded == policy
+    assert shared_runtime(policy=loaded, identifier="4b_posttrained") is None
+    another_boot = json.loads(observed.read_text())
+    another_boot["boot_id"] = "different-boot"
+    observed.write_text(json.dumps(another_boot))
+    wrong_boot = policy.model_copy(update={
+        "observation_sha256": hashlib.sha256(observed.read_bytes()).hexdigest()
+    })
+    (tmp_path / "shared-serving.json").write_text(wrong_boot.model_dump_json())
+    with pytest.raises(ValueError, match="another server boot"):
+        load_shared_policy(root=tmp_path)
+    (tmp_path / "shared-serving.json").write_text(policy.model_dump_json())
+    observed.write_text("changed")
+    with pytest.raises(ValueError, match="observation changed"):
+        load_shared_policy(root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "uuid,pids,memory,utilization,expected",
+    [
+        ("approved-gpu", [], 20000, 0, True),
+        ("approved-gpu", [123], 20000, 0, False),
+        ("approved-gpu", [], 20257, 0, False),
+        ("approved-gpu", [], 20000, 6, False),
+        ("different-gpu", [], 20000, 0, False),
+    ],
+)
+def test_shared_dispatch_checks_residents_activity_and_memory(
+    shared_grant, uuid, pids, memory, utilization, expected
+):
+    gpu = {"uuid": uuid, "pids": pids, "memory_mib": memory, "utilization": utilization}
+    assert (
+        shared_gpu_is_ready(
+            gpu=gpu,
+            grant=shared_grant,
+            policy=SimpleNamespace(minimum_headroom_mib=6144),
+        )
+        is expected
+    )
+
+
+@pytest.mark.parametrize(
+    "memory,cpu_seconds,expected",
+    [
+        (40000, 11, "shared_gpu_memory_headroom"),
+        (35000, 16, "resident_simulation_cpu_activity"),
+        (35000, 11, ""),
+    ],
+)
+def test_shared_worker_yields_to_memory_or_resident_activity(
+    monkeypatch, shared_grant, memory, cpu_seconds, expected
+):
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.resident_cpu_seconds",
+        lambda **kw: {"1": cpu_seconds},
+    )
+    attempt = {"resident_cpu_seconds": {"1": 10}, "resident_cpu_sampled_at": 100}
+    assert (
+        shared_stop_reason(
+            gpu={"memory_mib": memory},
+            grant=shared_grant,
+            policy=SimpleNamespace(
+                minimum_headroom_mib=6144, maximum_resident_cpu_fraction=0.25
+            ),
+            attempt=attempt,
+            now=110,
+        )
+        == expected
+    )
+
+
+@pytest.mark.parametrize(
+    "temperature,top_p,presence_penalty", [(0.7, 0.8, 0.0), (1.0, 0.95, 1.5)]
+)
+def test_request_sends_pixels_without_age_filename_or_label(
+    tmp_path, monkeypatch, temperature, top_p, presence_penalty
+):
     source = tmp_path / "37_0_0_123.jpg"
     source.write_bytes(b"image-pixels")
     captured = []
@@ -124,10 +259,10 @@ def test_request_sends_pixels_without_age_filename_or_label(tmp_path, monkeypatc
     plan = SimpleNamespace(
         manifest=tmp_path / "manifest.json",
         prompt="Estimate age in years.",
-        temperature=0.7,
-        top_p=0.8,
+        temperature=temperature,
+        top_p=top_p,
         top_k=20,
-        presence_penalty=0.0,
+        presence_penalty=presence_penalty,
         sampling_seed=20261020,
     )
     spec = SimpleNamespace(model_identifier="model", mode="thinking_on")
@@ -142,6 +277,13 @@ def test_request_sends_pixels_without_age_filename_or_label(tmp_path, monkeypatc
     )
     request = captured[0]
     assert request["n"] == 8
+    assert request["temperature"] == temperature
+    assert request["top_p"] == top_p
+    assert request["top_k"] == 20
+    assert request["min_p"] == 0.0
+    assert request["presence_penalty"] == presence_penalty
+    assert request["repetition_penalty"] == 1.0
+    assert result["sampling"]["presence_penalty"] == presence_penalty
     assert request["chat_template_kwargs"] == {"enable_thinking": True}
     assert request["messages"][0]["content"][0]["image_url"]["url"].startswith(
         "data:image/jpeg;base64,"
@@ -178,6 +320,64 @@ def test_download_helper_is_valid_python_and_handles_json(tmp_path, monkeypatch)
 
 def test_process_ownership_rejects_unrelated_pid(tmp_path):
     assert not owned_worker(pid=os.getpid(), root=tmp_path)
+
+
+@pytest.mark.parametrize("force, expected", [(False, signal.SIGTERM), (True, signal.SIGKILL)])
+def test_worker_termination_signals_only_owned_process_group(
+    tmp_path, monkeypatch, force, expected
+):
+    calls = []
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.owned_worker", lambda **kwargs: True
+    )
+    monkeypatch.setattr("os.getpgid", lambda pid: pid)
+    monkeypatch.setattr("os.killpg", lambda pid, sig: calls.append((pid, sig)))
+    terminate_worker(pid=1234, root=tmp_path, force=force)
+    assert calls == [(1234, expected)]
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_worker_termination_rejects_unrelated_process(tmp_path, monkeypatch, force):
+    calls = []
+    monkeypatch.setattr("os.killpg", lambda *args: calls.append(args))
+    terminate_worker(pid=os.getpid(), root=tmp_path, force=force)
+    assert not calls
+
+
+def test_forced_worker_termination_rejects_shared_process_group(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.owned_worker", lambda **kwargs: True
+    )
+    monkeypatch.setattr("os.getpgid", lambda pid: pid + 1)
+    monkeypatch.setattr("os.killpg", lambda *args: calls.append(args))
+    with pytest.raises(RuntimeError, match="dedicated process group"):
+        terminate_worker(pid=1234, root=tmp_path, force=True)
+    assert not calls
+
+
+def test_stalled_worker_shutdown_escalates_once_after_grace(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.terminate_worker",
+        lambda **kwargs: calls.append(("signal", kwargs)),
+    )
+    monkeypatch.setattr(
+        "src.experiments.utkface.vlm_queue.stop_container",
+        lambda **kwargs: calls.append(("container", kwargs)),
+    )
+    attempt = {"pid": 1234, "container": "owned", "preempted": True}
+    for now in (100, 110, 129):
+        request_worker_stop(attempt=attempt, root=tmp_path, now=now)
+    assert calls == [("signal", {"pid": 1234, "root": tmp_path, "force": False})]
+    for now in (130, 140):
+        request_worker_stop(attempt=attempt, root=tmp_path, now=now)
+    assert calls[1:] == [
+        ("container", {"root": tmp_path, "container": "owned"}),
+        ("signal", {"pid": 1234, "root": tmp_path, "force": True}),
+    ]
+    assert attempt["termination_requested_at"] == 100
+    assert attempt["forced_termination_at"] == 130
 
 
 @pytest.mark.parametrize(
@@ -297,6 +497,11 @@ def test_worker_releases_container_when_log_storage_is_full(tmp_path, monkeypatc
         evaluations=(),
         manifest=tmp_path / "manifest.json",
         fingerprint="frozen",
+        gpu_memory_utilization=0.8,
+        max_num_seqs=256,
+        client_concurrencies=(32, 64),
+        max_model_len=12288,
+        max_num_batched_tokens=8192,
     )
     stopped = []
     original_write_text = Path.write_text
@@ -384,15 +589,15 @@ def test_tuning_reports_exhausted_caps_and_fills_http_limits(
     assert result["cap_criterion_met"] is cap_passes
     assert result["token_budget_limited"] is not cap_passes
     assert result["concurrency"] == 64
-    throughput_calls = [
-        call for call in calls if "concurrency_" in call["output"].name
-    ]
+    throughput_calls = [call for call in calls if "concurrency_" in call["output"].name]
     assert [call["concurrency"] for call in throughput_calls] == [32, 64, 64, 32]
     assert all(len(call["indices"]) >= call["concurrency"] for call in throughput_calls)
     assert all(call["max_tokens"] == expected_cap for call in throughput_calls)
 
 
-def test_evaluation_error_does_not_wait_for_blocked_http_requests(tmp_path, monkeypatch):
+def test_evaluation_error_does_not_wait_for_blocked_http_requests(
+    tmp_path, monkeypatch
+):
     release = Event()
     blocked = Event()
 

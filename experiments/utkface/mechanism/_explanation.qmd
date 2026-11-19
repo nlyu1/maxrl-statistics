@@ -1,0 +1,133 @@
+## The supported explanation
+
+The completed ImageNet controls identify coherent numerical age assignment and head–encoder coadaptation as useful parts of the learning rule. The 500-epoch scratch cohort extends the evidence to sustained numerical learning and matched head constraints. Scalar point learning supplies a persistent numerical task: it predicts one age statistic through a shared score and corrects errors in that statistic. A structured categorical starting function can supply useful numerical organization while retaining a full classifier. The readout, loss weights, available flexibility and useful training horizon determine the resulting held-out point prediction. These controls establish numerical-structure and update effects; MAE's removal of residual-magnitude weighting supplies a further property motivating its use for a point decision.
+
+This hypothesis has a concrete intervention behind it. We changed the numerical age assignment of a full categorical head while preserving its base binomial coefficients, initial probability multiset, entropy, head norm, rank and attainable family. The coherent assignment improved selected test MAE by **0.733 years clean** and **1.183 years under SD-10**, with every paired block agreeing. The gain also survived fitting a common readout to the resulting encoders. Numerical assignment therefore contributes beyond the preserved properties in this training regime.
+
+These are three paired joint blocks on one reused split. The conclusion concerns the registered training and readout procedures; individual block results accompany every main comparison.
+
+The objectives supply numerical structure in different ways. Point losses directly organize fitting around an age mean or median. TailRL uses overlapping numerical age-radius windows and fits their probabilities. Categorical CE fits label probabilities; ordered binomial initialization gives its initial encoder correction an age-mean residual. Both the loss definition and the starting function can therefore supply a numerical task for feature learning.
+
+### What numerical sharing gives the encoder
+
+Let $h$ be the pooled image representation and $s=w^\top h+b$ a shared score. A binomial starting function has
+
+$$
+z_a=\log {99\choose a}+as,\qquad \mu_F=99\operatorname{sigmoid}(s).
+$$
+
+Its per-example CE correction to the image features is exactly
+
+$$
+\nabla_h L_F=w(\mu_F-y).
+$$
+
+The encoder receives a numerical age residual along one learned feature direction. Conditional expectation gives $w[\mu_F-\mathbb E(Y\mid h)]$. A scalar mean head maintains this kind of numerical correction throughout learning, with its loss supplying the residual weight. Scalar MAE instead supplies a median-directed sign correction.
+
+In the symmetric-swap control, an involution $\pi$ exchanges 25 of the 50 age pairs $\{a,99-a\}$. Binomial symmetry preserves each age's base coefficient, but the initial correction becomes
+
+$$
+\nabla_h L_P=w[\mu_F-\pi(y)],
+\qquad
+\mathbb E[\nabla_h L_P\mid h]
+=w\{\mu_F-\mathbb E[\pi(Y)\mid h]\}.
+$$
+
+The shared direction now receives the numerical residual of the altered age code. Both fields are one dimensional. Their distinction is the meaning assigned to the target in that field.
+
+At a pointwise CE optimum in a fixed one-score family, including endpoint limits, the model matches the data's mean age code. That one coded mean determines the physical-age mean for every label distribution on the age grid exactly when the code is a nonconstant affine function of age. A global reversal remains coherent after reversing the score convention. The saved partial swaps allow two constructed label laws to have the same coded mean and different physical-age means. At the centered score, their expected swapped feature correction vanishes while the ordered correction retains an age-mean residual. For these constructed laws, the ordinary full head also retains an output-bias gradient through which a sufficiently small Euclidean step moves the physical mean toward its target. The calculation therefore locates a difference in the starting encoder signal within the complete training intervention.
+
+At the centered score $s=0$, the two heads give identical probabilities, target CE and individual feature-gradient magnitudes. The selected symmetric pairs reverse correction sign. This gives a precise local illustration of how numerical assignment organizes the encoder's learning signal. The actual image experiment evaluates the full assignment change at varying scores, with shared minibatches, encoder Jacobians, clipping and Adam.
+
+![The centered initial CE score corrections for the three frozen assignment maps. Ordered assignment links correction sign to physical age; each swapped symmetric pair reverses it while preserving the individual magnitude at this anchor. The plots enumerate possible target ages.](evidence/age-assignment/centered-age-corrections.png){#fig-centered-assignment width=100%}
+
+### The gain transfers to a full categorical learner
+
+An ordinary float32 categorical CE head with ordered binomial initialization reaches clean selected MAE **5.398**, compared with **6.050** for the same architecture under ordinary random initialization. The three paired gains are **0.755, 0.704 and 0.499 years**. Every categorical output remains available during training.
+
+Keeping an additional scalar-score path produces clean selected MAE **5.448**. Its endpoint difference from the ordinary ordered head varies in sign, while its early trajectory changes substantially. Parameter coordinates affect the path even when the starting policies coincide. The ordinary ordered head already obtains the large clean initialization benefit.
+
+For the common-readout comparison, we freeze each encoder at a fixed epoch and fit ridge regression to standardized features, selecting its regularization by clean-validation MSE. The primary readout uses the supplied training labels; the oracle-clean diagnostic uses additional reference training labels. At epoch 50, the same supplied-label ridge procedure gives ordered-minus-random CE differences **−1.668, −1.688 and −1.697 years**. Under SD-10, the average gains are **0.747 years** with supplied-label ridge and **1.128 years** with the clean-label diagnostic. These are changes in age accessibility under a specified readout procedure.
+
+The stronger assignment control preserves the base shape and low-rank structure of the ordered starting function. Ordered-minus-swapped differences are:
+
+| Outcome | Clean labels | Fixed SD-10 |
+|:--|--:|--:|
+| Validation-selected native test MAE | −0.733 | −1.183 |
+| Epoch-50 native test MAE | −0.881 | −1.102 |
+| Epoch-50 supplied-label ridge test MAE | −1.098 | −0.849 |
+| Epoch-50 oracle-clean ridge test MAE | −1.098 | −0.788 |
+
+All paired block comparisons for the trained-model outcomes above favor the ordered assignment, as do the epoch-25 common probes. The swapped start has better aggregate initial validation MAE and NLL than the ordered start, so the ordered advantage develops during learning. Relative to ordinary random initialization, the swapped start improves clean final native MAE (**6.469 versus 6.785**), while random initialization has lower validation-selected MAE under both clean labels (**6.050 versus 6.131**) and SD-10 corruption (**7.345 versus 8.330**). This endpoint-dependent pattern remains consistent with useful structure in the symmetric base prior and folded age information retained by the swapped package.
+
+The identified intervention is numerical assignment under the declared update rule. Its consequences include target-dependent correction signs, relative weights, probabilities and clipping. The centered identity explains an available local mechanism; the training comparison measures the complete intervention.
+
+![Native CE prediction under matched float32 head arithmetic. F is the ordered ordinary head, R the random ordinary head, U the scalar-plus-free-residual head and P the symmetric-swap ordinary head. Validation selects the blue checkpoint; red gives the common final epoch. Small dots are the three joint blocks and bars show mean ± sample standard deviation.](evidence/initialization-combined/native-ce.png){#fig-initialization-native width=100%}
+
+![Age prediction from the same standardized ridge procedure applied to the trained encoders, frozen at epochs 25 and 50. Supplied-label ridge is the primary probe; oracle-clean ridge uses additional reference training labels as a diagnostic. The two coincide under clean training labels. Individual blocks and mean ± sample standard deviation are shown.](evidence/initialization-combined/common-ridge.png){#fig-initialization-ridge width=100%}
+
+### Scalar sharing and flexible point prediction have a tradeoff
+
+A shared age score supplies a strong organization for feature learning. A categorical mean can also provide a useful nonlinear readout of the same features. In the first 50-epoch cohort, categorical mean-MSE has lower selected MAE than scalar MSE in all three clean and all three noisy blocks, averaging advantages of **0.203** and **0.149 years**. Conversely, the epoch-50 clean scalar-MSE features give better common-ridge prediction by **0.209 years** on average. The stored readout and linear feature accessibility measure different properties.
+
+Frozen ImageNet features give a useful boundary for the fitted readout recipes: the retained scalar-MAE head has MAE **9.086**, while TailRL reaches **7.871**. The richer categorical mapping, objective and finite optimization all form this comparison. End-to-end adaptation gives the encoder an additional way to organize its features around a numerical age score.
+
+The within-score loss comparison further identifies the role of weights. Scalar MSE and binomial CE use the same sigmoid mean family and score initialization. Clean binomial CE improves selected MAE by **0.338 years** and final common-ridge MAE by **0.506 years**. Their scalar derivatives are
+
+$$
+\partial_s L_{\mathrm{BinCE}}=\mu-y,\qquad
+\partial_s L_{\mathrm{MSE}}=\frac{2(\mu-y)q(1-q)}{99},\qquad
+\partial_s L_{\mathrm{MAE}}=\operatorname{sign}(\mu-y)q(1-q).
+$$
+
+These weights change the minibatch correction and the optimizer's response. The quasi-score derivation gives a precise variance-dependent comparison in a correctly specified fixed-dimensional mean model: CE weighting is asymptotically optimal within the regular mean estimating equations for the two designed binomial/endpoint laws. Squared-error weighting attains that bound under constant conditional variance. The image results measure the complete learned-representation training rule.
+
+### Regularization controls the cost of additional categorical fitting
+
+The free-versus-affine residual intervention starts from the same function with matched registered parameters. The affine projection retains the shared-score mean class and a redundant location-update path. The free residual adds non-affine categorical directions, changing both mean flexibility and distributional flexibility.
+
+The comparison changes the available directions and the gradients presented to Adam. It identifies that constraint/update intervention under the declared training procedure.
+
+For CE, the free residual has higher selected error than the affine control in every block under both label regimes. At epoch 50, the corresponding common-ridge costs average **0.561 years clean**, **0.312 years with noisy supplied-label ridge** and **0.443 years with the noisy oracle diagnostic**. For TailRL under SD-10, the final common-readout costs are **0.302** and **0.466 years**, again with all block signs agreeing. The clean TailRL comparisons have a different ordering: the benefit of retaining the affine structure depends on the objective and label regime.
+
+The certified synthetic experiment isolates an estimation component with fixed features and a known realizable mean. Under binomial labels, weak residual regularization adds mean-MSE costs of **13.334, 3.065 and 0.521 years²** at training sizes **128, 512 and 2,048**. Strong residual shrinkage approaches the shared-score result. All fitted problems satisfy explicit convex convergence certificates, and a separate NumPy/SciPy implementation reproduces all 180 retained fits' objectives, gradients, predictions and validation choices.
+
+An independent challenger then gives the scalar score its own three-candidate regularization search. Under the high-variance endpoint law at $n=128$, conditional-mean MSE is **212.15** for the original fixed scalar ridge, **206.45** for the selected full estimator and **136.08** for the selected scalar ridge. The latter improves excess mean risk by **34.08%** relative to the selected full procedure, or total observed-label squared risk by **3.04%** after including irreducible noise. This is a useful scalar regularization competitor within the declared candidate sets. Full models can also approach scalar solutions under suitable regularization.
+
+![Certified fixed-feature estimation under the two designed label laws. The residual penalty varies categorical flexibility while the score penalty remains fixed. The oracle evaluates the known conditional mean on fresh inputs after validation selection.](evidence/synthetic-figures/residual-regularization.png){#fig-residual-regularization width=100%}
+
+![The challenger-designed scalar regularization search. Each family has three declared validation candidates; the candidate sets control different penalties. Fresh oracle inputs evaluate the frozen choices.](evidence/synthetic-figures/scalar-regularization.png){#fig-scalar-regularization width=100%}
+
+### The fitted readout and encoder coadapt
+
+The head objective changes the gradient field through which the encoder learns, and the encoder changes the features on which the head fits. The routing factorial measures this joint process. Its interactions persist after replacing the final head with a common ridge procedure.
+
+For example, under clean labels at epoch 50, changing the source encoder route from MSE to TailRL improves common-ridge MAE by **0.184 years** when the source head uses MSE, and raises error by **0.358 years** when the source head uses TailRL. Both simple-effect signs repeat across all three blocks. The useful supervision rule depends on its coadapted head.
+
+The late noisy free-Tail case separates native-readout deterioration from continued accessible learning:
+
+| Method and readout | Epoch 25 MAE | Epoch 50 MAE |
+|:--|--:|--:|
+| Free TailRL, native | 7.411 | 7.967 |
+| Free TailRL, supplied-label ridge | 7.452 | 7.389 |
+| Free TailRL, oracle-clean ridge | 6.815 | 6.851 |
+| Affine TailRL, supplied-label ridge | 7.377 | 7.087 |
+| Affine TailRL, oracle-clean ridge | 6.651 | 6.385 |
+
+The free head's native prediction worsens in every block while its common-readout changes are small and mixed. The affine model continues improving under both probes. Thus the observed late gap combines an unfavorable native readout with a relative difference in continued accessible learning. Head replacement changes the fitted procedure, so these observations describe interventions rather than an additive percentage decomposition.
+
+The own-field audit supplies a further distinction. Final within-age corruption-following slopes average **0.939 for free TailRL** and **0.949 for affine TailRL**, while supplied training MAEs are **3.298** and **3.278**. Field following and held-out point accuracy have different orderings here. Free TailRL's decreasing policy variance and entropy identify a distribution-shape trajectory accompanying its native deterioration. A concentration-specific causal claim would require its own intervention.
+
+### Why the scalar-MAE advantage is concentrated in particular regimes
+
+Scalar MAE combines a shared numerical score with a sign-weighted point objective that elicits a conditional median of the supplied-label law. Its residual coefficient is independent of error magnitude. These are exact properties of the recipe. The completed controls establish related numerical-structure and update effects, and the repeated 500-epoch cohort corroborates the useful-horizon prediction motivated by the historical scalar-MAE results.
+
+The matched scalar-MAE versus scalar-MSE control supplies a direct loss intervention. The two methods share the sigmoid mean family, initial head and encoder, training indices, labels and image views. A diagnostic audit of their retained common readouts finds clean MAE improvements of **0.299 years at epoch 25** and **0.285 years at epoch 50**, with all three paired blocks favorable at both epochs. Epoch-50 differences are **−0.318, −0.263 and −0.274 years**. Common-ridge test MSE also improves in every block, averaging **2.797 years²** at epoch 25 and **4.125 years²** at epoch 50. The readout is fitted and selected using squared error, so this feature-accessibility effect appears under both point metrics.
+
+Under fixed SD-10, the oracle-clean ridge MAE favors MAE-trained features in every block at both epochs, averaging **0.306** and **0.157 years** of improvement. Supplied-label ridge MAE differences have mixed signs. At epoch 50, supplied-label ridge test MSE is higher for MAE-trained features in all blocks, averaging **2.488 years²**. The chosen loss therefore changes accessible age prediction in a way that depends on training labels, readout and error criterion. The native head has its own trajectory: clean validation-selected MAE favors scalar MAE in all three blocks, while its final native comparison has mixed signs. [The complete scalar-loss audit](notes/mae-loss-comparison.json) retains all 72 paired readout/metric rows, and [the independent review](notes/mae-mechanism-scope.txt) verifies the matched starts, data and readout selection.
+
+The theoretical targets also clarify the comparison. Scalar MSE, categorical CE and the exact unrestricted equal-radius population TailRL objective all recover the conditional mean under their respective realizability conditions. For fresh symmetric noise around a deterministic integer reference age, rounding and clipping retain that age as a supplied-label median, while moving the corrupted-label mean inward near the boundaries. A single fixed noisy label can still be fitted. This target property motivates MAE for the stated label law; the image interventions directly establish the contributions of numerical assignment and the implemented learning rule.
+
+The long-run experiment supplies direct temporal evidence. Scalar MAE improves clean common-ridge MAE by **0.740 years** from epoch 50 to 500; under SD-10 the improvements are **0.538 years with supplied labels** and **0.661 with the clean-label diagnostic**, with every block favorable. Ordinary TailRL's corresponding errors increase. The one-score binomial heads also retain useful performance, and the free-versus-affine comparison shows a repeated later cost of the free rule. These results connect numerical structure to what additional encoder learning makes accessible and how the fitted head uses it. Under SD-10, scalar MAE and ordinary TailRL have similar average validation-selected errors with mixed paired signs, while the final horizon strongly favors scalar MAE. [The full temporal comparison](#sec-long) separates those decisions.
+
+The supported explanation is conditional and constructive: numerical sharing helps the encoder learn an age representation supporting the chosen point statistic; sufficient readout flexibility helps when that mapping is harder; suitable weighting, regularization and training time keep the learned structure useful. The controlled assignment, constraint, routing, scalar-loss and synthetic interventions identify these contributions. MAE provides one effective numerical learning rule whose exact loss properties and measured representation/temporal outcomes are now supported together.

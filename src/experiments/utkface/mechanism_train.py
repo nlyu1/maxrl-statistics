@@ -1,0 +1,1432 @@
+import argparse
+import copy
+import json
+import os
+import platform
+import time
+from contextlib import AbstractContextManager, nullcontext
+from pathlib import Path
+
+import torch
+import torch.nn.functional as F
+import torchvision
+from torch import Tensor, nn
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
+
+from src.experiments.utils import cleanup_cuda, set_seeds
+from src.experiments.utkface.adaptation_data import build_image_loader, epoch_order
+from src.experiments.utkface.adaptation_train import (
+    SOURCE_FILES,
+    build_optimizer,
+    build_scheduler,
+    collection_device,
+    context,
+    evaluate_loader,
+    file_sha256,
+    git_head,
+    json_sha256,
+    model_sha256,
+    model_state_cpu,
+    restore_rng_state,
+    serialized_rng_state,
+    source_root,
+    write_prediction_artifact,
+)
+from src.experiments.utkface.config import LossConfig
+from src.experiments.utkface.data import read_manifest, training_indices
+from src.experiments.utkface.losses import MAX_AGE, NUM_BINS, policy_loss, scalar_loss
+from src.experiments.utkface.mechanism_config import (
+    BLOCKS,
+    SYMMETRIC_SWAP_BASE_SEED,
+    SYMMETRIC_SWAP_PAIR_COUNT,
+    BinomialMode,
+    HeadPrecision,
+    MechanismConfig,
+    MechanismLoss,
+)
+from src.experiments.utkface.model import ScalarHead, build_model
+from src.experiments.utkface.noise import noisy_labels
+from src.experiments.utkface.run import write_json
+
+UPDATE_SAMPLE_EVERY = 5
+MECHANISM_SOURCE_FILES = (
+    *SOURCE_FILES,
+    "src/experiments/utkface/mechanism_config.py",
+    "src/experiments/utkface/mechanism_train.py",
+)
+
+
+class BinomialHead(ScalarHead):
+    def __init__(self, *, features: int, mode: BinomialMode) -> None:
+        super().__init__(features=features)
+        if mode not in {"fixed", "free", "affine"}:
+            raise ValueError(f"Unsupported binomial residual mode: {mode}")
+        self.mode = mode
+        self.gate = 0.0 if mode == "fixed" else 1.0
+        self.residual = nn.Linear(features, NUM_BINS)
+        nn.init.zeros_(self.residual.weight)
+        nn.init.zeros_(self.residual.bias)
+        bins = torch.arange(NUM_BINS, dtype=torch.float64)
+        log_coefficients = (
+            torch.lgamma(torch.tensor(float(NUM_BINS), dtype=torch.float64))
+            - torch.lgamma(bins + 1)
+            - torch.lgamma(NUM_BINS - bins)
+        )
+        self.register_buffer("bins", bins.float(), persistent=False)
+        self.register_buffer(
+            "log_coefficients", log_coefficients.float(), persistent=False
+        )
+
+    def forward(self, features: Tensor) -> Tensor:
+        scores = self.linear(features).float()
+        residual = self.residual(features).float()
+        with torch.autocast(device_type=features.device.type, enabled=False):
+            bins = self.bins.float()
+            if self.mode == "affine":
+                centered = bins - bins.mean()
+                slope = (residual @ centered) / centered.square().sum()
+                residual = residual.mean(-1, keepdim=True) + slope[:, None] * centered
+            return self.log_coefficients.float() + bins * scores + self.gate * residual
+
+
+def head_context(
+    *, features: Tensor, precision: HeadPrecision
+) -> AbstractContextManager:
+    return (
+        torch.autocast(device_type=features.device.type, enabled=False)
+        if precision == "fp32"
+        else nullcontext()
+    )
+
+
+def fused_binomial_head(*, head: BinomialHead) -> nn.Linear:
+    fused = nn.Linear(
+        head.linear.in_features,
+        NUM_BINS,
+        device=head.linear.weight.device,
+        dtype=head.linear.weight.dtype,
+    )
+    with torch.no_grad():
+        fused.weight.copy_(head.bins[:, None] * head.linear.weight)
+        fused.bias.copy_(head.log_coefficients + head.bins * head.linear.bias[0])
+    return fused
+
+
+def symmetric_swap_mapping(*, head_seed: int) -> Tensor:
+    generator = torch.Generator(device="cpu").manual_seed(
+        SYMMETRIC_SWAP_BASE_SEED + head_seed
+    )
+    mapping = torch.arange(NUM_BINS, device="cpu")
+    lower = torch.randperm(NUM_BINS // 2, generator=generator, device="cpu")[
+        :SYMMETRIC_SWAP_PAIR_COUNT
+    ]
+    upper = MAX_AGE - lower
+    mapping[lower] = upper
+    mapping[upper] = lower
+    return mapping
+
+
+def initialize_symmetric_swap(*, head: nn.Linear, head_seed: int) -> None:
+    mapping = symmetric_swap_mapping(head_seed=head_seed)
+    with torch.no_grad():
+        head.weight.copy_(head.weight[mapping])
+        head.bias.copy_(head.bias[mapping])
+
+
+def symmetric_swap_provenance(*, head_seed: int) -> dict:
+    mapping = symmetric_swap_mapping(head_seed=head_seed)
+    ages = torch.arange(NUM_BINS, device="cpu", dtype=torch.float64)
+    centered = ages - ages.mean()
+    code = mapping.double() - ages.mean()
+    jumps = mapping.diff().abs()
+    values = mapping.tolist()
+    return {
+        "seed": SYMMETRIC_SWAP_BASE_SEED + head_seed,
+        "base_seed": SYMMETRIC_SWAP_BASE_SEED,
+        "swapped_pair_count": SYMMETRIC_SWAP_PAIR_COUNT,
+        "mapping": values,
+        "mapping_sha256": json_sha256(values),
+        "algorithm": "CPU randperm(50)[:25]; swap each selected {age, 99-age} pair",
+        "age_code_pearson_correlation": (
+            centered @ code / centered.square().sum()
+        ).item(),
+        "adjacent_code_jump_mean": jumps.double().mean().item(),
+        "adjacent_code_jump_max": jumps.max().item(),
+    }
+
+
+class ResearchModel(nn.Module):
+    def __init__(
+        self, *, encoder: nn.Module, fc: nn.Module, head_precision: HeadPrecision
+    ) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.fc = fc
+        self.head_precision = head_precision
+
+    def forward(self, images: Tensor) -> Tensor:
+        features = self.encoder(images)
+        with head_context(features=features, precision=self.head_precision):
+            return self.fc(
+                features.float() if self.head_precision == "fp32" else features
+            )
+
+
+def build_research_model(*, config: MechanismConfig) -> ResearchModel:
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(config.adaptation.run.seed)
+        encoder = build_model(
+            pretrained=config.adaptation.initialization == "imagenet",
+            head="categorical",
+        )
+        features = encoder.fc.in_features
+        encoder.fc = nn.Identity()
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(config.head_seed)
+        if config.scalar:
+            fc = ScalarHead(features=features)
+        elif config.binomial:
+            fc = BinomialHead(features=features, mode=config.binomial_mode)
+        elif config.categorical_binomial_init:
+            fc = fused_binomial_head(head=BinomialHead(features=features, mode="free"))
+            if config.categorical_symmetric_swap_init:
+                initialize_symmetric_swap(head=fc, head_seed=config.head_seed)
+        else:
+            fc = nn.Linear(features, NUM_BINS)
+    return ResearchModel(encoder=encoder, fc=fc, head_precision=config.head_precision)
+
+
+def routed_losses(
+    *,
+    features: Tensor,
+    head: nn.Linear,
+    targets: Tensor,
+    head_loss: LossConfig,
+    backbone_loss: LossConfig,
+) -> tuple[Tensor, Tensor]:
+    head_logits = F.linear(features.detach(), head.weight, head.bias)
+    backbone_logits = F.linear(features, head.weight.detach(), head.bias.detach())
+    return (
+        policy_loss(logits=head_logits, targets=targets, config=head_loss),
+        policy_loss(logits=backbone_logits, targets=targets, config=backbone_loss),
+    )
+
+
+def loss_config(*, template: LossConfig, method: MechanismLoss) -> LossConfig:
+    return template.model_copy(update={"method": method})
+
+
+def tensor_sha256(*, values: Tensor) -> str:
+    return model_sha256(state={"values": values})
+
+
+def provenance(
+    *,
+    config: MechanismConfig,
+    model: ResearchModel,
+    manifest: dict,
+    train_indices: list[int],
+) -> dict:
+    root = source_root()
+    clean_labels = torch.tensor(
+        [record["age"] for record in manifest["records"]], dtype=torch.int64
+    )
+    fused_source = {}
+    if config.categorical_binomial_init:
+        with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+            torch.random.default_generator.manual_seed(config.head_seed)
+            scalar = ScalarHead(features=model.fc.in_features)
+            fused_source["score_initial_sha256"] = model_sha256(
+                state=scalar.linear.state_dict()
+            )
+        if config.categorical_symmetric_swap_init:
+            fused_source["symmetric_age_assignment"] = symmetric_swap_provenance(
+                head_seed=config.head_seed
+            )
+    source = {
+        "mechanism_config": config.model_dump(mode="json"),
+        "manifest_fingerprint": manifest["fingerprint"],
+        "manifest_sha256": file_sha256(path=config.adaptation.run.manifest),
+        "training_indices_sha256": json_sha256(train_indices),
+        "training_count": len(train_indices),
+        "clean_labels_sha256": tensor_sha256(values=clean_labels),
+        "clean_training_labels_sha256": tensor_sha256(
+            values=clean_labels[train_indices]
+        ),
+        "encoder_initial_sha256": model_sha256(state=model.encoder.state_dict()),
+        "head_initial_sha256": model_sha256(state=model.fc.state_dict()),
+        "head_precision": config.head_precision,
+        "float32_matmul_precision": torch.get_float32_matmul_precision(),
+        "encoder_precision": config.adaptation.run.precision,
+        "head_initialization": config.head_initialization,
+        **fused_source,
+        **(
+            {"score_initial_sha256": model_sha256(state=model.fc.linear.state_dict())}
+            if config.scalar or config.binomial
+            else {}
+        ),
+        **(
+            {
+                "residual_initial_sha256": model_sha256(
+                    state=model.fc.residual.state_dict()
+                ),
+                "binomial_residual_mode": config.binomial_mode,
+                "binomial_residual_gate": model.fc.gate,
+                "binomial_branch_precision": (
+                    "float32_linears_projection_and_sum"
+                    if config.head_precision == "fp32"
+                    else "bf16_linear_then_float32_projection_and_sum"
+                ),
+            }
+            if config.binomial
+            else {}
+        ),
+        "model_seed": config.adaptation.run.seed,
+        "head_seed": config.head_seed,
+        "view_seed": config.adaptation.view_seed,
+        "order_seed": config.adaptation.order_seed,
+        "noise_seed": config.adaptation.run.noise.seed,
+        "head_method": config.head_method,
+        "backbone_method": config.backbone_method,
+        "loss_scaling": "native_canonical_losses",
+        "reported_train_loss": "head_objective",
+        "gradient_clipping": {
+            "groups": ["backbone", "head"],
+            "norm_bound": config.adaptation.run.clip_grad_norm,
+        },
+        "update_diagnostics": {
+            "sample_every_steps": UPDATE_SAMPLE_EVERY,
+            "sample_offset": 0,
+            "parameter_groups": ["backbone", "head"]
+            + (["fc.linear", "fc.residual"] if config.binomial else []),
+            "rms": "actual_parameter_delta_including_weight_decay",
+            "cosine": "actual_delta_versus_negative_clipped_gradient",
+        },
+        "checkpoint_policy": "best_and_final_models_plus_one_latest_per_epoch",
+        "selection": {"split": "val", "metric": "mae_mean", "ties": "earliest"},
+        "environment": {
+            "python": platform.python_version(),
+            "torch": str(torch.__version__),
+            "torchvision": str(torchvision.__version__),
+            "cuda": str(torch.version.cuda),
+            "hostname": platform.node(),
+            "git_commit": git_head(),
+        },
+        "source_sha256": {
+            name: file_sha256(path=root / name) for name in MECHANISM_SOURCE_FILES
+        },
+    }
+    return {**source, "fingerprint": json_sha256(source)}
+
+
+def save_checkpoint(*, path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".pt.tmp")
+    torch.save(payload, temporary)
+    temporary.replace(path)
+
+
+def model_checkpoint(
+    *,
+    state: dict[str, Tensor],
+    config: MechanismConfig,
+    epoch: int,
+    validation: dict,
+    run_provenance: dict,
+) -> dict:
+    return {
+        "model": state,
+        "model_sha256": model_sha256(state=state),
+        "config": config.model_dump(mode="json"),
+        "epoch": epoch,
+        "validation": validation,
+        "variant": config.variant.value,
+        "head": config.adaptation.run.head,
+        "provenance": run_provenance,
+    }
+
+
+def save_latest(
+    *,
+    path: Path,
+    model: ResearchModel,
+    optimizer: AdamW,
+    scheduler: LambdaLR | None,
+    config: MechanismConfig,
+    epoch: int,
+    history: list[dict],
+    initialization: dict,
+    best_epoch: int,
+    best_validation: dict,
+    best_model: dict[str, Tensor],
+    run_provenance: dict,
+    elapsed_seconds: float,
+) -> None:
+    state = model_state_cpu(model=model)
+    save_checkpoint(
+        path=path,
+        payload={
+            "model": state,
+            "model_sha256": model_sha256(state=state),
+            "best_model": best_model,
+            "best_model_sha256": model_sha256(state=best_model),
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict() if scheduler is not None else None,
+            "rng": serialized_rng_state(),
+            "config": config.model_dump(mode="json"),
+            "epoch": epoch,
+            "history": history,
+            "initialization": initialization,
+            "best_epoch": best_epoch,
+            "best_validation": best_validation,
+            "provenance": run_provenance,
+            "elapsed_seconds": elapsed_seconds,
+        },
+    )
+
+
+def load_latest(
+    *,
+    path: Path,
+    config: MechanismConfig,
+    model: ResearchModel,
+    optimizer: AdamW,
+    scheduler: LambdaLR | None,
+    run_provenance: dict,
+) -> dict:
+    saved = torch.load(path, map_location="cpu", weights_only=True)
+    if saved["config"] != config.model_dump(mode="json"):
+        raise ValueError(f"Checkpoint config differs: {path}")
+    if saved["provenance"]["fingerprint"] != run_provenance["fingerprint"]:
+        raise ValueError(f"Checkpoint provenance differs: {path}")
+    if saved["model_sha256"] != model_sha256(state=saved["model"]):
+        raise ValueError(f"Checkpoint model hash differs: {path}")
+    if saved["best_model_sha256"] != model_sha256(state=saved["best_model"]):
+        raise ValueError(f"Checkpoint selected-model hash differs: {path}")
+    epoch = saved["epoch"]
+    if not 0 <= epoch <= config.adaptation.run.epochs:
+        raise ValueError(f"Checkpoint epoch is outside the run horizon: {path}")
+    if [row["epoch"] for row in saved["history"]] != list(range(1, epoch + 1)):
+        raise ValueError(f"Checkpoint history is incomplete: {path}")
+    if not 0 <= saved["best_epoch"] <= epoch:
+        raise ValueError(f"Checkpoint selected epoch is invalid: {path}")
+    model.load_state_dict(saved["model"], strict=True)
+    optimizer.load_state_dict(saved["optimizer"])
+    if (scheduler is None) != (saved["scheduler"] is None):
+        raise ValueError(f"Checkpoint scheduler presence differs: {path}")
+    if scheduler is not None:
+        scheduler.load_state_dict(saved["scheduler"])
+    restore_rng_state(state=saved["rng"])
+    return saved
+
+
+@torch.no_grad()
+def update_statistics(
+    *, parameters: tuple[nn.Parameter, ...], before: tuple[Tensor, ...]
+) -> Tensor:
+    delta_squares = []
+    grad_squares = []
+    dot_products = []
+    for parameter, previous in zip(parameters, before, strict=True):
+        if parameter.grad is None:
+            raise ValueError("A trainable parameter has no gradient")
+        delta = parameter.detach().float() - previous
+        gradient = parameter.grad.detach().float()
+        delta_squares.append(delta.square().sum())
+        grad_squares.append(gradient.square().sum())
+        dot_products.append(-(delta * gradient).sum())
+    delta_squared = torch.stack(delta_squares).sum()
+    gradient_squared = torch.stack(grad_squares).sum()
+    denominator = (delta_squared * gradient_squared).sqrt()
+    defined = denominator > 0
+    cosine = torch.where(
+        defined,
+        torch.stack(dot_products).sum() / denominator.clamp_min(1e-30),
+        0.0,
+    )
+    count = sum(parameter.numel() for parameter in parameters)
+    return torch.stack((
+        (delta_squared / count).sqrt(),
+        cosine.clamp(-1, 1),
+        defined.to(delta_squared.dtype),
+    ))
+
+
+def train_epoch(
+    *,
+    model: ResearchModel,
+    loader: DataLoader,
+    labels: Tensor,
+    config: MechanismConfig,
+    device: torch.device,
+    optimizer: AdamW,
+    scheduler: LambdaLR | None,
+    epoch: int,
+) -> dict:
+    model.train()
+    groups = (tuple(model.encoder.parameters()), tuple(model.fc.parameters()))
+    component_names = ("fc.linear", "fc.residual") if config.binomial else ()
+    sample_groups = (
+        *groups,
+        *(
+            (tuple(model.fc.linear.parameters()), tuple(model.fc.residual.parameters()))
+            if config.binomial
+            else ()
+        ),
+    )
+    head_config = loss_config(
+        template=config.adaptation.run.loss, method=config.head_method
+    )
+    backbone_config = loss_config(
+        template=config.adaptation.run.loss, method=config.backbone_method
+    )
+    loss_totals = torch.zeros(2, device=device, dtype=torch.float64)
+    norm_totals = torch.zeros(2, device=device, dtype=torch.float64)
+    norm_maxima = torch.zeros(2, device=device, dtype=torch.float64)
+    clipped_steps = torch.zeros(2, device=device, dtype=torch.float64)
+    update_totals = torch.zeros(
+        (len(sample_groups), 3), device=device, dtype=torch.float64
+    )
+    sampled_steps = []
+    count = 0
+    steps = 0
+    started = time.monotonic()
+    for step, (images, _, indices) in enumerate(loader):
+        optimizer.zero_grad(set_to_none=True)
+        with context(device=device):
+            batch_images = images.to(device, non_blocking=True)
+            batch_labels = labels[indices].to(device, non_blocking=True)
+            features = model.encoder(batch_images)
+            with head_context(features=features, precision=config.head_precision):
+                if config.head_precision == "fp32":
+                    features = features.float()
+                if config.scalar:
+                    head_value = scalar_loss(
+                        predictions=model.fc(features),
+                        targets=batch_labels,
+                        config=head_config,
+                    )
+                    backbone_value = head_value
+                    objective = head_value
+                elif config.binomial:
+                    head_value = policy_loss(
+                        logits=model.fc(features),
+                        targets=batch_labels,
+                        config=head_config,
+                    )
+                    backbone_value = head_value
+                    objective = head_value
+                else:
+                    if not isinstance(model.fc, nn.Linear):
+                        raise TypeError("Categorical routes require a linear head")
+                    head_value, backbone_value = routed_losses(
+                        features=features,
+                        head=model.fc,
+                        targets=batch_labels,
+                        head_loss=head_config,
+                        backbone_loss=backbone_config,
+                    )
+                    objective = head_value + backbone_value
+        if not torch.isfinite(objective):
+            raise FloatingPointError(
+                f"Nonfinite training loss at epoch={epoch}, step={step}"
+            )
+        objective.backward()
+        norms = torch.stack([
+            nn.utils.clip_grad_norm_(
+                parameters,
+                config.adaptation.run.clip_grad_norm,
+                error_if_nonfinite=True,
+            )
+            for parameters in groups
+        ]).double()
+        sample = step % UPDATE_SAMPLE_EVERY == 0
+        before = (
+            tuple(
+                tuple(parameter.detach().float().clone() for parameter in parameters)
+                for parameters in sample_groups
+            )
+            if sample
+            else ()
+        )
+        optimizer.step()
+        if sample:
+            for group_index, parameters in enumerate(sample_groups):
+                update_totals[group_index] += update_statistics(
+                    parameters=parameters, before=before[group_index]
+                ).double()
+            sampled_steps.append(step + 1)
+            del before
+        if scheduler is not None:
+            scheduler.step()
+        batch_count = len(indices)
+        loss_totals += (
+            torch.stack((head_value.detach(), backbone_value.detach())).double()
+            * batch_count
+        )
+        norm_totals += norms
+        norm_maxima = torch.maximum(norm_maxima, norms)
+        clipped_steps += norms > config.adaptation.run.clip_grad_norm
+        count += batch_count
+        steps += 1
+    if not count:
+        raise ValueError("Training epoch produced no examples")
+    losses = (loss_totals / count).cpu().tolist()
+    norms_mean = (norm_totals / steps).cpu().tolist()
+    norms_max = norm_maxima.cpu().tolist()
+    clipped = clipped_steps.cpu().tolist()
+    updates = update_totals.cpu().tolist()
+    diagnostics = {}
+    for index, name in enumerate(("backbone", "head")):
+        rms_sum, cosine_sum, defined_count = updates[index]
+        diagnostics[name] = {
+            "raw_grad_norm_mean": norms_mean[index],
+            "raw_grad_norm_max": norms_max[index],
+            "clipped_steps": int(clipped[index]),
+            "clip_frequency": clipped[index] / steps,
+            "update_rms_mean": rms_sum / len(sampled_steps),
+            "update_negative_gradient_cosine_mean": (
+                cosine_sum / defined_count if defined_count else None
+            ),
+            "update_cosine_defined_samples": int(defined_count),
+        }
+    for index, name in enumerate(component_names, start=2):
+        rms_sum, cosine_sum, defined_count = updates[index]
+        diagnostics[name] = {
+            "update_rms_mean": rms_sum / len(sampled_steps),
+            "update_negative_gradient_cosine_mean": (
+                cosine_sum / defined_count if defined_count else None
+            ),
+            "update_cosine_defined_samples": int(defined_count),
+        }
+    return {
+        "epoch": epoch,
+        "train_loss": losses[0],
+        "head_loss": losses[0],
+        "backbone_loss": losses[1],
+        "train_count": count,
+        "steps": steps,
+        "gradient_diagnostics": diagnostics,
+        "update_sample_steps": sampled_steps,
+        "learning_rates": [group["lr"] for group in optimizer.param_groups],
+        "epoch_seconds": time.monotonic() - started,
+    }
+
+
+def image_loader(*, config: MechanismConfig, split: str, epoch: int) -> DataLoader:
+    return build_image_loader(
+        run=config.adaptation.run,
+        pipeline=config.adaptation.pipeline,
+        split=split,
+        epoch=epoch,
+        view_seed=config.adaptation.view_seed,
+        order_seed=config.adaptation.order_seed,
+    )
+
+
+def train_job(*, config: MechanismConfig) -> dict:
+    if (
+        int(os.environ.get("WORLD_SIZE", "1")) != 1
+        or int(os.environ.get("RANK", "0")) != 0
+    ):
+        raise ValueError("Mechanism training supports one process on one GPU")
+    device = torch.device(config.adaptation.run.device)
+    if device.type != "cuda":
+        raise ValueError("Training requires CUDA; use --verify for CPU verification")
+    with torch.cuda.device(device):
+        device = collection_device(config=config.adaptation)
+    torch.set_num_threads(config.adaptation.run.cpu_threads)
+    torch.use_deterministic_algorithms(config.adaptation.run.deterministic)
+    torch.backends.cudnn.benchmark = not config.adaptation.run.deterministic
+    if config.head_precision == "fp32":
+        torch.set_float32_matmul_precision("highest")
+    output_dir = config.adaptation.run.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    payload = config.model_dump(mode="json")
+    result_path = output_dir / "result.json"
+    if result_path.is_file():
+        completed = json.loads(result_path.read_text())
+        if completed.get("config") != payload:
+            raise ValueError(f"Completed result config differs: {result_path}")
+        return completed
+    config_path = output_dir / "config.json"
+    if config_path.is_file() and json.loads(config_path.read_text()) != payload:
+        raise ValueError(f"Existing run config differs: {config_path}")
+    write_json(path=config_path, payload=payload)
+    write_json(path=output_dir / "worker-pid.json", payload={"pid": os.getpid()})
+    started = time.monotonic()
+    elapsed_before = 0.0
+    set_seeds(config.adaptation.run.seed)
+    manifest = read_manifest(path=config.adaptation.run.manifest)
+    train_indices = training_indices(
+        payload=manifest,
+        limit=config.adaptation.run.train_limit,
+        subset_seed=config.adaptation.run.subset_seed,
+    )
+    steps_per_epoch = len(train_indices) // config.adaptation.run.batch_size
+    if not steps_per_epoch:
+        raise ValueError("Training split must contain one full batch")
+    model = build_research_model(config=config)
+    run_provenance = provenance(
+        config=config, model=model, manifest=manifest, train_indices=train_indices
+    )
+    provenance_path = output_dir / "provenance.json"
+    if (
+        provenance_path.is_file()
+        and json.loads(provenance_path.read_text()) != run_provenance
+    ):
+        raise ValueError(f"Existing run provenance differs: {provenance_path}")
+    write_json(path=provenance_path, payload=run_provenance)
+
+    with torch.cuda.device(device):
+        model = model.to(device)
+        optimizer = build_optimizer(config=config.adaptation, model=model)
+        scheduler = build_scheduler(
+            config=config.adaptation,
+            optimizer=optimizer,
+            steps_per_epoch=steps_per_epoch,
+        )
+        val_loader = image_loader(config=config, split="val", epoch=0)
+        latest_path = output_dir / "latest.pt"
+        torch.cuda.reset_peak_memory_stats(device)
+        if latest_path.is_file():
+            saved = load_latest(
+                path=latest_path,
+                config=config,
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                run_provenance=run_provenance,
+            )
+            history = saved["history"]
+            initialization = saved["initialization"]
+            best_epoch = saved["best_epoch"]
+            best_validation = saved["best_validation"]
+            best_model = saved["best_model"]
+            start_after = saved["epoch"]
+            elapsed_before = saved["elapsed_seconds"]
+            del saved
+        else:
+            initial_evaluation = evaluate_loader(
+                model=model,
+                loader=val_loader,
+                config=config.adaptation,
+                device=device,
+            )
+            initialization = {
+                "epoch": 0,
+                "validation": initial_evaluation["metrics"],
+                "validation_seconds": initial_evaluation["seconds"],
+                "predictions_sha256": json_sha256(initial_evaluation["rows"]),
+                "encoder_sha256": run_provenance["encoder_initial_sha256"],
+                "head_sha256": run_provenance["head_initial_sha256"],
+            }
+            write_json(path=output_dir / "initialization.json", payload=initialization)
+            write_prediction_artifact(
+                path=output_dir / "epoch-zero-validation-predictions.json",
+                checkpoint="epoch_zero",
+                split="val",
+                epoch=0,
+                result=initial_evaluation,
+            )
+            history = []
+            best_epoch = 0
+            best_validation = initial_evaluation["metrics"]
+            best_model = model_state_cpu(model=model)
+            start_after = 0
+            save_latest(
+                path=latest_path,
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                config=config,
+                epoch=0,
+                history=history,
+                initialization=initialization,
+                best_epoch=best_epoch,
+                best_validation=best_validation,
+                best_model=best_model,
+                run_provenance=run_provenance,
+                elapsed_seconds=time.monotonic() - started,
+            )
+        save_checkpoint(
+            path=output_dir / "best.pt",
+            payload=model_checkpoint(
+                state=best_model,
+                config=config,
+                epoch=best_epoch,
+                validation=best_validation,
+                run_provenance=run_provenance,
+            ),
+        )
+        clean_ages = [record["age"] for record in manifest["records"]]
+        train_index_tensor = torch.tensor(
+            train_indices, device="cpu", dtype=torch.int64
+        )
+        for epoch in range(start_after + 1, config.adaptation.run.epochs + 1):
+            labels = noisy_labels(
+                ages=clean_ages, config=config.adaptation.run.noise, epoch=epoch
+            )
+            train_loader = image_loader(config=config, split="train", epoch=epoch)
+            row = train_epoch(
+                model=model,
+                loader=train_loader,
+                labels=labels,
+                config=config,
+                device=device,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                epoch=epoch,
+            )
+            del train_loader
+            validation = evaluate_loader(
+                model=model,
+                loader=val_loader,
+                config=config.adaptation,
+                device=device,
+            )
+            row["validation"] = validation["metrics"]
+            row["validation_seconds"] = validation["seconds"]
+            row["predictions_sha256"] = json_sha256(validation["rows"])
+            order = epoch_order(
+                count=len(train_indices),
+                epoch=epoch,
+                order_seed=config.adaptation.order_seed,
+            )
+            consumed = train_index_tensor[order[: row["train_count"]]]
+            row["global_labels_sha256"] = tensor_sha256(values=labels)
+            row["training_labels_sha256"] = tensor_sha256(
+                values=labels[train_index_tensor]
+            )
+            row["consumed_indices_sha256"] = tensor_sha256(values=consumed)
+            row["consumed_labels_sha256"] = tensor_sha256(values=labels[consumed])
+            history.append(row)
+            if row["validation"]["mae_mean"] < best_validation["mae_mean"]:
+                best_epoch = epoch
+                best_validation = row["validation"]
+                best_model = model_state_cpu(model=model)
+                save_checkpoint(
+                    path=output_dir / "best.pt",
+                    payload=model_checkpoint(
+                        state=best_model,
+                        config=config,
+                        epoch=best_epoch,
+                        validation=best_validation,
+                        run_provenance=run_provenance,
+                    ),
+                )
+            write_json(path=output_dir / "history.json", payload=history)
+            if epoch in config.adaptation.control.model_milestones:
+                save_checkpoint(
+                    path=output_dir / "model-milestones" / f"epoch_{epoch:03d}.pt",
+                    payload=model_checkpoint(
+                        state=model_state_cpu(model=model),
+                        config=config,
+                        epoch=epoch,
+                        validation=row["validation"],
+                        run_provenance=run_provenance,
+                    ),
+                )
+            save_latest(
+                path=latest_path,
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                config=config,
+                epoch=epoch,
+                history=history,
+                initialization=initialization,
+                best_epoch=best_epoch,
+                best_validation=best_validation,
+                best_model=best_model,
+                run_provenance=run_provenance,
+                elapsed_seconds=elapsed_before + time.monotonic() - started,
+            )
+            print(
+                json.dumps({
+                    "epoch": epoch,
+                    "validation": row["validation"],
+                    "best_epoch": best_epoch,
+                }),
+                flush=True,
+            )
+
+        final_epoch = config.adaptation.run.epochs
+        final_state = model_state_cpu(model=model)
+        final_hash = model_sha256(state=final_state)
+        best_hash = model_sha256(state=best_model)
+        final_validation = evaluate_loader(
+            model=model, loader=val_loader, config=config.adaptation, device=device
+        )
+        save_checkpoint(
+            path=output_dir / "final.pt",
+            payload=model_checkpoint(
+                state=final_state,
+                config=config,
+                epoch=final_epoch,
+                validation=final_validation["metrics"],
+                run_provenance=run_provenance,
+            ),
+        )
+        write_prediction_artifact(
+            path=output_dir / "final-validation-predictions.json",
+            checkpoint="final",
+            split="val",
+            epoch=final_epoch,
+            result=final_validation,
+        )
+        model.load_state_dict(best_model, strict=True)
+        selected_validation = evaluate_loader(
+            model=model, loader=val_loader, config=config.adaptation, device=device
+        )
+        write_prediction_artifact(
+            path=output_dir / "best-validation-predictions.json",
+            checkpoint="best",
+            split="val",
+            epoch=best_epoch,
+            result=selected_validation,
+        )
+        selection = {
+            "frozen": True,
+            "selection_split": "val",
+            "selection_metric": "mae_mean",
+            "best_epoch": best_epoch,
+            "best_validation": best_validation,
+            "best_model_sha256": best_hash,
+            "final_epoch": final_epoch,
+            "final_validation": final_validation["metrics"],
+            "final_model_sha256": final_hash,
+        }
+        write_json(path=output_dir / "selection.json", payload=selection)
+        best_test = None
+        final_test = None
+        if config.adaptation.run.evaluate_test:
+            test_loader = image_loader(config=config, split="test", epoch=0)
+            best_test = evaluate_loader(
+                model=model, loader=test_loader, config=config.adaptation, device=device
+            )
+            write_prediction_artifact(
+                path=output_dir / "best-test-predictions.json",
+                checkpoint="best",
+                split="test",
+                epoch=best_epoch,
+                result=best_test,
+            )
+            model.load_state_dict(final_state, strict=True)
+            final_test = evaluate_loader(
+                model=model, loader=test_loader, config=config.adaptation, device=device
+            )
+            write_prediction_artifact(
+                path=output_dir / "final-test-predictions.json",
+                checkpoint="final",
+                split="test",
+                epoch=final_epoch,
+                result=final_test,
+            )
+        result = {
+            "config": payload,
+            "status": "complete",
+            "provenance": run_provenance,
+            "initialization": initialization,
+            "history": history,
+            **selection,
+            "best_validation": selected_validation["metrics"],
+            "best_test": best_test["metrics"] if best_test is not None else None,
+            "final_test": final_test["metrics"] if final_test is not None else None,
+            "elapsed_seconds": elapsed_before + time.monotonic() - started,
+            "peak_allocated_mib": torch.cuda.max_memory_allocated(device) / 2**20,
+            "peak_reserved_mib": torch.cuda.max_memory_reserved(device) / 2**20,
+            "predictions": {
+                "epoch_zero": "epoch-zero-validation-predictions.json",
+                "best_validation": "best-validation-predictions.json",
+                "final_validation": "final-validation-predictions.json",
+                "best_test": "best-test-predictions.json"
+                if best_test is not None
+                else None,
+                "final_test": "final-test-predictions.json"
+                if final_test is not None
+                else None,
+            },
+        }
+        write_json(path=output_dir / "history.json", payload=history)
+        write_json(path=result_path, payload=result)
+    cleanup_cuda(device=device)
+    return result
+
+
+def verify_binomial_identity() -> dict:
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(1701)
+        scalar = ScalarHead(features=7)
+        heads = {}
+        for mode in ("fixed", "free", "affine"):
+            torch.random.default_generator.manual_seed(1701)
+            heads[mode] = BinomialHead(features=7, mode=mode)
+        if len({model_sha256(state=head.state_dict()) for head in heads.values()}) != 1:
+            raise AssertionError("Binomial modes produced different initial states")
+        for head in heads.values():
+            if model_sha256(state=scalar.linear.state_dict()) != model_sha256(
+                state=head.linear.state_dict()
+            ):
+                raise AssertionError("Scalar and binomial score initialization differs")
+        features = torch.randn(16, 7)
+        scalar_predictions = scalar(features).flatten()
+        binomial = heads["fixed"]
+        logits = binomial(features)
+        for head in heads.values():
+            torch.testing.assert_close(head(features), logits, rtol=0, atol=0)
+        native_logits = (
+            binomial.log_coefficients
+            + binomial.bins * binomial.linear(features).float()
+        )
+        torch.testing.assert_close(logits, native_logits, rtol=0, atol=0)
+        probabilities = logits.softmax(-1)
+        mean = (probabilities * torch.arange(NUM_BINS)).sum(-1)
+        for head in heads.values():
+            candidate_mean = (head(features).softmax(-1) * head.bins).sum(-1)
+            torch.testing.assert_close(candidate_mean, mean, rtol=0, atol=0)
+        torch.testing.assert_close(mean, scalar_predictions, rtol=2e-6, atol=2e-4)
+        scalar_gradient = torch.autograd.grad(
+            scalar_predictions.sum(), scalar.parameters()
+        )
+        binomial_gradient = torch.autograd.grad(
+            mean.sum(), binomial.linear.parameters()
+        )
+        for expected, actual in zip(scalar_gradient, binomial_gradient, strict=True):
+            torch.testing.assert_close(actual, expected, rtol=3e-4, atol=3e-4)
+        targets = torch.tensor([0, 2, 17, 33, 49, 64, 88, MAX_AGE] * 2)
+        checks = {}
+        for method in ("ce", "tailrl_population"):
+            loss = LossConfig(
+                method=method,
+                kernel_scale_years=5,
+                num_rollouts=64,
+                survival_floor=0,
+                std_floor=1e-4,
+            )
+            gradients = {}
+            for mode, head in heads.items():
+                inputs = features.detach().clone().requires_grad_()
+                value = policy_loss(logits=head(inputs), targets=targets, config=loss)
+                gradients[mode] = torch.autograd.grad(
+                    value, (*head.parameters(), inputs)
+                )
+            inputs = features.detach().clone().requires_grad_()
+            native_logits = (
+                binomial.log_coefficients
+                + binomial.bins * binomial.linear(inputs).float()
+            )
+            native_value = policy_loss(
+                logits=native_logits, targets=targets, config=loss
+            )
+            native_gradients = torch.autograd.grad(
+                native_value, (*binomial.linear.parameters(), inputs)
+            )
+            for mode, values in gradients.items():
+                for actual, expected in zip(
+                    (*values[:2], values[-1]), native_gradients, strict=True
+                ):
+                    torch.testing.assert_close(actual, expected, rtol=1e-6, atol=1e-7)
+            if any(torch.count_nonzero(value) for value in gradients["fixed"][2:4]):
+                raise AssertionError(
+                    "Gate-zero residual gradients must be explicitly zero"
+                )
+            residual_difference = max(
+                (free - affine).abs().max().item()
+                for free, affine in zip(
+                    gradients["free"][2:4], gradients["affine"][2:4], strict=True
+                )
+            )
+            if residual_difference == 0:
+                raise AssertionError(
+                    "Free and affine residual gradients unexpectedly match"
+                )
+            checks[method] = {
+                "score_and_feature_gradients_match_native": True,
+                "residual_gradient_norms": {
+                    mode: sum(value.square().sum() for value in values[2:4])
+                    .sqrt()
+                    .item()
+                    for mode, values in gradients.items()
+                },
+                "free_affine_residual_gradient_max_difference": residual_difference,
+            }
+        affine = copy.deepcopy(heads["affine"])
+        with torch.no_grad():
+            affine.residual.weight.normal_(std=0.02)
+            affine.residual.bias.normal_(std=0.02)
+        residual = affine.residual(features)
+        centered = affine.bins - affine.bins.mean()
+        slope = residual @ centered / centered.square().sum()
+        expected_mean = MAX_AGE * (affine.linear(features).flatten() + slope).sigmoid()
+        affine_mean = (affine(features).softmax(-1) * affine.bins).sum(-1)
+        torch.testing.assert_close(affine_mean, expected_mean, rtol=2e-6, atol=2e-4)
+        return {
+            "mean_max_absolute_error": (mean - scalar_predictions).abs().max().item(),
+            "binomial_states_identical": True,
+            "initial_outputs_and_means_identical": True,
+            "scalar_score_initialization_identical": True,
+            "gradient_checks": checks,
+            "nonzero_affine_residual_mean_max_error": (affine_mean - expected_mean)
+            .abs()
+            .max()
+            .item(),
+        }
+
+
+def verify_routed_gradients() -> dict:
+    differences = {}
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(1702)
+        template = ResearchModel(
+            encoder=nn.Sequential(nn.Linear(7, 11), nn.Tanh()),
+            fc=nn.Linear(11, NUM_BINS),
+            head_precision="bf16",
+        ).double()
+        features = torch.randn(8, 7, dtype=torch.float64)
+        targets = torch.tensor([0, 2, 17, 33, 49, 64, 88, MAX_AGE])
+        for method in ("mse", "ce", "tailrl_population"):
+            config = LossConfig(
+                method=method,
+                kernel_scale_years=5,
+                num_rollouts=64,
+                survival_floor=0,
+                std_floor=1e-4,
+            )
+            native = copy.deepcopy(template)
+            routed = copy.deepcopy(template)
+            policy_loss(
+                logits=native(features), targets=targets, config=config
+            ).backward()
+            head_value, backbone_value = routed_losses(
+                features=routed.encoder(features),
+                head=routed.fc,
+                targets=targets,
+                head_loss=config,
+                backbone_loss=config,
+            )
+            (head_value + backbone_value).backward()
+            maximum = 0.0
+            for native_parameter, routed_parameter in zip(
+                native.parameters(), routed.parameters(), strict=True
+            ):
+                torch.testing.assert_close(
+                    routed_parameter.grad, native_parameter.grad, rtol=1e-11, atol=1e-12
+                )
+                maximum = max(
+                    maximum,
+                    (routed_parameter.grad - native_parameter.grad).abs().max().item(),
+                )
+            differences[method] = maximum
+    return differences
+
+
+def verify_fp32_controls() -> dict:
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(1703)
+        free = BinomialHead(features=512, mode="free")
+        fused = fused_binomial_head(head=free)
+        torch.random.default_generator.manual_seed(1703)
+        old_random = nn.Linear(512, NUM_BINS)
+        torch.random.default_generator.manual_seed(1703)
+        new_random = nn.Linear(512, NUM_BINS)
+        if model_sha256(state=old_random.state_dict()) != model_sha256(
+            state=new_random.state_dict()
+        ):
+            raise AssertionError(
+                "FP32 random categorical initialization differs from the original"
+            )
+        inputs = torch.randn(8, 512).bfloat16().float()
+        free_model = ResearchModel(
+            encoder=nn.Identity(), fc=free, head_precision="fp32"
+        )
+        fused_model = ResearchModel(
+            encoder=nn.Identity(), fc=fused, head_precision="fp32"
+        )
+        with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+            free_logits = free_model(inputs)
+            fused_logits = fused_model(inputs)
+        if free_logits.dtype != torch.float32 or fused_logits.dtype != torch.float32:
+            raise AssertionError("FP32 heads inherited the encoder autocast precision")
+        torch.testing.assert_close(fused_logits, free_logits, rtol=3e-6, atol=3e-5)
+        bins = free.bins
+        free_mean, fused_mean = (
+            (values.softmax(-1) * bins).sum(-1)
+            for values in (free_logits, fused_logits)
+        )
+        torch.testing.assert_close(fused_mean, free_mean, rtol=3e-6, atol=2e-4)
+        targets = torch.tensor([0, 2, 17, 33, 49, 64, 88, MAX_AGE])
+        gradient_errors = {}
+        for method in ("ce", "tailrl_population"):
+            config = LossConfig(
+                method=method,
+                kernel_scale_years=5,
+                num_rollouts=64,
+                survival_floor=0,
+                std_floor=1e-4,
+            )
+            free_inputs = inputs.detach().clone().requires_grad_()
+            fused_inputs = inputs.detach().clone().requires_grad_()
+            with (
+                torch.autocast(device_type="cpu", dtype=torch.bfloat16),
+                head_context(features=free_inputs, precision="fp32"),
+            ):
+                free_value = policy_loss(
+                    logits=free_model(free_inputs), targets=targets, config=config
+                )
+                head_value, backbone_value = routed_losses(
+                    features=fused_inputs,
+                    head=fused,
+                    targets=targets,
+                    head_loss=config,
+                    backbone_loss=config,
+                )
+            free_gradient = torch.autograd.grad(free_value, free_inputs)[0]
+            fused_gradient = torch.autograd.grad(
+                head_value + backbone_value, fused_inputs
+            )[0]
+            torch.testing.assert_close(head_value, free_value, rtol=3e-6, atol=3e-5)
+            torch.testing.assert_close(
+                fused_gradient, free_gradient, rtol=3e-4, atol=2e-5
+            )
+            gradient_errors[method] = (
+                (fused_gradient - free_gradient).abs().max().item()
+            )
+        return {
+            "head_dtype": str(free_logits.dtype),
+            "fused_random_state_matches_original": True,
+            "initial_logits_max_absolute_error": (fused_logits - free_logits)
+            .abs()
+            .max()
+            .item(),
+            "initial_mean_max_absolute_error": (fused_mean - free_mean)
+            .abs()
+            .max()
+            .item(),
+            "initial_feature_gradient_max_absolute_errors": gradient_errors,
+            "tolerance_scope": "FP32 rounding from reassociating (age * weight) @ features versus age * (weight @ features); logits rtol=3e-6/atol=3e-5, means rtol=3e-6/atol=2e-4, feature gradients rtol=3e-4/atol=2e-5.",
+        }
+
+
+def verify_symmetric_swap_initialization() -> dict:
+    tolerances = {
+        "logits_and_ce": {"rtol": 3e-6, "atol": 3e-5},
+        "probabilities": {"rtol": 3e-5, "atol": 3e-6},
+        "entropy_and_norms": {"rtol": 3e-6, "atol": 3e-5},
+        "gradients": {"rtol": 3e-4, "atol": 3e-5},
+    }
+    checks = []
+    with torch.device("cpu"), torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(1704)
+        inputs = torch.randn(NUM_BINS, 512).bfloat16().float()
+        targets = torch.arange(NUM_BINS)
+        for seeds in BLOCKS:
+            head_seed = seeds["head"]
+            torch.random.default_generator.manual_seed(head_seed)
+            score = BinomialHead(features=inputs.shape[1], mode="free")
+            ordered = fused_binomial_head(head=score)
+            swapped = copy.deepcopy(ordered)
+            rng_state = torch.get_rng_state().clone()
+            mapping = symmetric_swap_mapping(head_seed=head_seed)
+            initialize_symmetric_swap(head=swapped, head_seed=head_seed)
+            assignment = symmetric_swap_provenance(head_seed=head_seed)
+            torch.testing.assert_close(torch.get_rng_state(), rng_state, rtol=0, atol=0)
+            torch.testing.assert_close(mapping.sort().values, targets, rtol=0, atol=0)
+            torch.testing.assert_close(mapping[mapping], targets, rtol=0, atol=0)
+            torch.testing.assert_close(
+                (mapping - MAX_AGE / 2).abs(),
+                (targets - MAX_AGE / 2).abs(),
+                rtol=0,
+                atol=0,
+            )
+            if (
+                (mapping[: NUM_BINS // 2] != targets[: NUM_BINS // 2]).sum().item()
+                != SYMMETRIC_SWAP_PAIR_COUNT
+                or not (mapping.diff() > 0).any()
+                or not (mapping.diff() < 0).any()
+            ):
+                raise AssertionError(
+                    "Expected 25 swapped symmetric pairs and nonmonotone codes"
+                )
+            torch.testing.assert_close(
+                score.log_coefficients[mapping], score.log_coefficients, rtol=0, atol=0
+            )
+            torch.testing.assert_close(
+                swapped.weight, ordered.weight[mapping], rtol=0, atol=0
+            )
+            torch.testing.assert_close(
+                swapped.bias, ordered.bias[mapping], rtol=0, atol=0
+            )
+            random = nn.Linear(inputs.shape[1], NUM_BINS)
+            counts = {
+                name: sum(parameter.numel() for parameter in head.parameters())
+                for name, head in (
+                    ("ordered", ordered),
+                    ("swapped", swapped),
+                    ("random", random),
+                )
+            }
+            if (
+                len(set(counts.values())) != 1
+                or counts["swapped"] != NUM_BINS * (inputs.shape[1] + 1)
+                or type(swapped) is not nn.Linear
+                or tuple(swapped.state_dict()) != ("weight", "bias")
+                or tuple(swapped.buffers())
+            ):
+                raise AssertionError(
+                    "Symmetric swap must retain the full ordinary linear head"
+                )
+            ranks = {
+                name: torch.linalg.matrix_rank(head.weight.detach()).item()
+                for name, head in (("ordered", ordered), ("swapped", swapped))
+            }
+            if ranks["ordered"] != 1 or ranks["swapped"] != 1:
+                raise AssertionError(
+                    "Initial ordered and swapped head weights must have rank one"
+                )
+            ordered_model = ResearchModel(
+                encoder=nn.Identity(), fc=ordered, head_precision="fp32"
+            )
+            swapped_model = ResearchModel(
+                encoder=nn.Identity(), fc=swapped, head_precision="fp32"
+            )
+            ordered_inputs = inputs.detach().clone().requires_grad_()
+            swapped_inputs = inputs.detach().clone().requires_grad_()
+            with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                ordered_logits = ordered_model(ordered_inputs)
+                swapped_logits = swapped_model(swapped_inputs)
+            if (
+                ordered_logits.dtype != torch.float32
+                or swapped_logits.dtype != torch.float32
+            ):
+                raise AssertionError(
+                    "Symmetric-swap heads must compute FP32 logits under bf16 autocast"
+                )
+            ordered_log_probs = ordered_logits.log_softmax(-1)
+            swapped_log_probs = swapped_logits.log_softmax(-1)
+            ordered_probs = ordered_log_probs.exp()
+            swapped_probs = swapped_log_probs.exp()
+            ordered_ce = F.cross_entropy(
+                ordered_logits, mapping[targets], reduction="none"
+            )
+            swapped_ce = F.cross_entropy(swapped_logits, targets, reduction="none")
+            ordered_gradients = torch.autograd.grad(
+                ordered_ce.sum(), (ordered_inputs, ordered.weight, ordered.bias)
+            )
+            swapped_gradients = torch.autograd.grad(
+                swapped_ce.sum(), (swapped_inputs, swapped.weight, swapped.bias)
+            )
+            analytic_feature_gradient = (
+                MAX_AGE * score.linear(inputs).flatten().sigmoid() - mapping[targets]
+            )[:, None] * score.linear.weight
+            comparisons = (
+                ("logits", swapped_logits, ordered_logits[:, mapping], "logits_and_ce"),
+                (
+                    "probability_assignment",
+                    swapped_probs,
+                    ordered_probs[:, mapping],
+                    "probabilities",
+                ),
+                (
+                    "sorted_probabilities",
+                    swapped_probs.sort(-1).values,
+                    ordered_probs.sort(-1).values,
+                    "probabilities",
+                ),
+                (
+                    "entropy",
+                    -(swapped_probs * swapped_log_probs).sum(-1),
+                    -(ordered_probs * ordered_log_probs).sum(-1),
+                    "entropy_and_norms",
+                ),
+                (
+                    "weight_norm",
+                    swapped.weight.norm(),
+                    ordered.weight.norm(),
+                    "entropy_and_norms",
+                ),
+                (
+                    "bias_norm",
+                    swapped.bias.norm(),
+                    ordered.bias.norm(),
+                    "entropy_and_norms",
+                ),
+                ("mapped_target_ce", swapped_ce, ordered_ce, "logits_and_ce"),
+                (
+                    "mapped_target_feature_gradient",
+                    swapped_gradients[0],
+                    ordered_gradients[0],
+                    "gradients",
+                ),
+                (
+                    "mapped_target_weight_gradient",
+                    swapped_gradients[1],
+                    ordered_gradients[1][mapping],
+                    "gradients",
+                ),
+                (
+                    "mapped_target_bias_gradient",
+                    swapped_gradients[2],
+                    ordered_gradients[2][mapping],
+                    "gradients",
+                ),
+                (
+                    "analytic_feature_gradient",
+                    swapped_gradients[0],
+                    analytic_feature_gradient,
+                    "gradients",
+                ),
+            )
+            errors = {}
+            for name, actual, expected, tolerance in comparisons:
+                torch.testing.assert_close(actual, expected, **tolerances[tolerance])
+                errors[name] = (actual - expected).abs().max().item()
+            checks.append({
+                "head_seed": head_seed,
+                "symmetric_age_assignment": assignment,
+                "score_initial_sha256": model_sha256(state=score.linear.state_dict()),
+                "ordered_head_initial_sha256": model_sha256(state=ordered.state_dict()),
+                "swapped_head_initial_sha256": model_sha256(state=swapped.state_dict()),
+                "mapping_is_nontrivial_balanced_symmetric_involution": True,
+                "global_rng_unchanged_by_mapping": True,
+                "actual_age_log_coefficients_identical": True,
+                "ordinary_head_parameter_counts": counts,
+                "initial_weight_ranks": ranks,
+                "head_dtype": str(swapped_logits.dtype),
+                "max_absolute_errors": errors,
+            })
+    return {
+        "blocks": checks,
+        "fp32_tolerances": tolerances,
+        "gradient_scope": "CE(swapped, y) equals CE(ordered, mapping[y]); feature gradients match and ordinary-head gradients match after the corresponding row permutation. The analytic per-example feature gradient is (99*sigmoid(score)-mapping[y])*score_weight, using summed CE. Equality is not asserted against ordered CE at the same actual target y.",
+        "readout_scope": "Training targets and the mean-age readout retain actual ages 0..99; only the initial ordinary-head rows are swapped.",
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--config", type=Path)
+    mode.add_argument("--verify", action="store_true")
+    args = parser.parse_args()
+    if args.verify:
+        print(
+            json.dumps(
+                {
+                    "binomial_identity": verify_binomial_identity(),
+                    "routed_gradient_max_absolute_error": verify_routed_gradients(),
+                    "fp32_initialization_controls": verify_fp32_controls(),
+                    "symmetric_swap_initialization": verify_symmetric_swap_initialization(),
+                },
+                indent=2,
+            )
+        )
+        return
+    config = MechanismConfig.model_validate_json(args.config.read_text())
+    train_job(config=config)
+
+
+if __name__ == "__main__":
+    main()

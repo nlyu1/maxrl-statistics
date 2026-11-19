@@ -1,0 +1,461 @@
+import argparse
+import base64
+import html
+import json
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import polars as pl
+from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator
+
+from src.experiments.utkface.policy_centering_analysis import CENTERS, COLORS
+from src.experiments.utkface.policy_examples import sha256
+
+NOISE_LEVELS = (1, 3, 5, 10)
+ORIGINAL_COLOR = "#7451a8"
+NOISY_COLOR = "#c16b16"
+FIT_COLOR = "#b52e49"
+
+
+def load_points(*, root: Path) -> tuple[dict[int, pl.DataFrame], dict]:
+    audit = json.loads((root / "inference-audit.json").read_text())
+    frame = pl.read_csv(root / "per-image-statistics.csv").filter(
+        (pl.col("method") == "tailrl_population") & (pl.col("split") == "train")
+    )
+    points = {}
+    reference = None
+    for std in NOISE_LEVELS:
+        data = frame.filter(pl.col("std") == std).sort("index")
+        labels = data.select("index", "original_label")
+        if (
+            data.height != audit["train_count"]
+            or data["index"].n_unique() != data.height
+        ):
+            raise ValueError(f"Incomplete or duplicated training cohort at SD {std}")
+        if reference is not None and not labels.equals(reference):
+            raise ValueError("Noise levels must use the same faces and original labels")
+        reference = labels
+        for column in ("original_label", "corrupted_training_label", *CENTERS):
+            values = data[column].to_numpy()
+            if (
+                not np.isfinite(values).all()
+                or not ((0 <= values) & (values <= 99)).all()
+            ):
+                raise ValueError(f"Invalid {column} at SD {std}")
+        delta = data["corrupted_training_label"] - data["original_label"]
+        if not delta.equals(data["label_error_or_test_probe_error"].rename(delta.name)):
+            raise ValueError("The plotted noise must be the actual training corruption")
+        if not data["median"].equals(data["q50"].rename("median")):
+            raise ValueError("Median must agree with the saved policy CDF quantile")
+        points[std] = data
+    return points, audit
+
+
+def checkpoint_epoch(*, audit: dict, std: int) -> int:
+    return next(
+        run["epoch"]
+        for run in audit["runs"]
+        if run["method"] == "tailrl_population" and run["std"] == std
+    )
+
+
+def fitted_line(*, ax: plt.Axes, x: np.ndarray, y: np.ndarray, label_y: float) -> dict:
+    x_mean, y_mean = float(x.mean()), float(y.mean())
+    centered_x = x.astype(np.float64) - x_mean
+    variance = float(centered_x @ centered_x)
+    if variance <= 0:
+        raise ValueError(
+            "A fitted line requires variation in the horizontal coordinate"
+        )
+    slope = float(centered_x @ (y - y_mean) / variance)
+    intercept = y_mean - slope * x_mean
+    line_x = np.array(ax.get_xlim())
+    ax.plot(line_x, intercept + slope * line_x, color=FIT_COLOR, lw=1.8, zorder=4)
+    ax.text(
+        0.03,
+        label_y,
+        f"OLS slope = {slope:.3f}",
+        transform=ax.transAxes,
+        va="top",
+        fontsize=10,
+        color=FIT_COLOR,
+        zorder=5,
+        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 2},
+    )
+    return {"slope": slope, "intercept": intercept, "point_count": len(x)}
+
+
+def residual_scatter(
+    *, root: Path, points: dict[int, pl.DataFrame], audit: dict, zoom: bool
+) -> dict:
+    fig, axes = plt.subplots(4, 3, figsize=(13, 17.5), layout="constrained")
+    view = "Per-SD zoom" if zoom else "Full range per SD"
+    fig.suptitle(
+        "TailRL: individual policy centers versus actual label corruption\n"
+        f"{view} · equal x/y units",
+        fontsize=17,
+    )
+    axes_audit = {}
+    for row, (std, data) in enumerate(points.items()):
+        original = data["original_label"].to_numpy()
+        delta = data["corrupted_training_label"].to_numpy() - original
+        all_errors = np.concatenate([
+            data[center].to_numpy() - original for center in CENTERS
+        ])
+        error_extent = (
+            np.quantile(np.abs(all_errors), 0.99) if zoom else np.abs(all_errors).max()
+        )
+        extent = 1.05 * max(np.abs(delta).max(), error_extent)
+        ticks = MaxNLocator(nbins=6, steps=(1, 2, 5, 10), symmetric=True).tick_values(
+            -extent, extent
+        )
+        limit = float(np.abs(ticks).max())
+        guides = np.linspace(-limit, limit, 200)
+        axes_audit[str(std)] = {"limit": limit, "ticks": ticks.tolist(), "centers": {}}
+        for column, center in enumerate(CENTERS):
+            ax = axes[row, column]
+            error = data[center].to_numpy() - original
+            ax.fill_between(
+                guides,
+                np.minimum(0, guides),
+                np.maximum(0, guides),
+                color="#e5e9ee",
+                zorder=0,
+            )
+            ax.axhline(0, color=ORIGINAL_COLOR, lw=1.4, zorder=2)
+            ax.plot(guides, guides, color=NOISY_COLOR, lw=1.4, ls="--", zorder=2)
+            dots = ax.scatter(
+                delta,
+                error,
+                s=6,
+                alpha=0.17,
+                linewidths=0,
+                color=COLORS["tailrl_population"],
+                zorder=3,
+            )
+            if len(dots.get_offsets()) != data.height:
+                raise ValueError("Every face must contribute exactly one scatter point")
+            ax.set(
+                xlim=(-limit, limit),
+                ylim=(-limit, limit),
+                xticks=ticks,
+                yticks=ticks,
+                aspect="equal",
+            )
+            outside = int(((np.abs(delta) > limit) | (np.abs(error) > limit)).sum())
+            if not zoom and outside:
+                raise ValueError("Full-range plots must display every observation")
+            axes_audit[str(std)]["centers"][center] = {
+                "visible": data.height - outside,
+                "outside": outside,
+                "fit": fitted_line(
+                    ax=ax, x=delta, y=error, label_y=0.87 if zoom else 0.96
+                ),
+            }
+            if zoom:
+                ax.text(
+                    0.03,
+                    0.96,
+                    f"{outside:,} / {data.height:,} outside window",
+                    transform=ax.transAxes,
+                    va="top",
+                    fontsize=9,
+                    color="#526176",
+                )
+            ax.set_title(
+                f"SD {std} · {center.capitalize()} · epoch {checkpoint_epoch(audit=audit, std=std)}",
+                fontsize=11,
+            )
+            if column == 0:
+                ax.set_ylabel("Policy center − original label (years)")
+            if row == len(points) - 1:
+                ax.set_xlabel("Corrupted label − original label (years)")
+            ax.grid(alpha=0.12)
+            ax.set_axisbelow(True)
+    handles = [
+        Line2D(
+            [],
+            [],
+            color=ORIGINAL_COLOR,
+            lw=1.6,
+            label="Center equals original label: y = 0",
+        ),
+        Line2D(
+            [],
+            [],
+            color=NOISY_COLOR,
+            lw=1.6,
+            ls="--",
+            label="Center equals corrupted label: y = x",
+        ),
+        Line2D(
+            [], [], color="#b5bdc7", lw=7, label="Shaded region: center between labels"
+        ),
+        Line2D(
+            [],
+            [],
+            color=FIT_COLOR,
+            lw=1.8,
+            label="OLS fit: free intercept, all 4,096 observations",
+        ),
+    ]
+    fig.legend(handles=handles, loc="outside lower center", ncol=1, frameon=False)
+    fig.canvas.draw()
+    for ax in axes.flat:
+        origin, unit = ax.transData.transform(((0, 0), (1, 1)))
+        pixel_units = np.abs(unit - origin)
+        if not np.isclose(pixel_units[0], pixel_units[1], rtol=1e-9):
+            raise ValueError("The y=x reference must be a 45-degree line")
+        if not np.array_equal(ax.get_xticks(), ax.get_yticks()):
+            raise ValueError("Both axes must have identical tick spacing")
+    filename = "raw-residual-scatter.png" if zoom else "raw-residual-scatter-full.png"
+    fig.savefig(root / filename, dpi=150, facecolor="white")
+    plt.close(fig)
+    return axes_audit
+
+
+def label_scatter(*, root: Path, std: int, data: pl.DataFrame, audit: dict) -> dict:
+    fig, axes = plt.subplots(2, 3, figsize=(13, 8.8), layout="constrained")
+    fig.suptitle(
+        f"TailRL at fixed-noise SD {std}: raw labels versus policy centers\n"
+        f"All {data.height:,} training faces · checkpoint epoch {checkpoint_epoch(audit=audit, std=std)}",
+        fontsize=17,
+    )
+    original = data["original_label"].to_numpy()
+    noisy = data["corrupted_training_label"].to_numpy()
+    delta = noisy - original
+    colors = np.where(delta < 0, "#3574ad", np.where(delta > 0, "#ce691d", "#77818e"))
+    order = np.random.default_rng(0).permutation(data.height)
+    fits = {}
+    for row, (label, x) in enumerate((
+        ("Original label", original),
+        ("Corrupted label", noisy),
+    )):
+        fits[label] = {}
+        for column, center in enumerate(CENTERS):
+            ax = axes[row, column]
+            ax.plot([0, 99], [0, 99], color="#5d6570", ls="--", lw=1.1, zorder=1)
+            dots = ax.scatter(
+                x[order],
+                data[center].to_numpy()[order],
+                c=colors[order],
+                s=7,
+                alpha=0.27,
+                linewidths=0,
+                zorder=2,
+            )
+            if len(dots.get_offsets()) != data.height:
+                raise ValueError("Every face must contribute exactly one scatter point")
+            ax.set(
+                title=f"Policy {center}",
+                xlabel=f"{label} (years)",
+                ylabel=f"Policy {center} (years)",
+                xlim=(-2, 101),
+                ylim=(-2, 101),
+                xticks=(0, 20, 40, 60, 80, 99),
+                yticks=(0, 20, 40, 60, 80, 99),
+                aspect="equal",
+            )
+            fits[label][center] = fitted_line(
+                ax=ax, x=x, y=data[center].to_numpy(), label_y=0.96
+            )
+            ax.grid(alpha=0.12)
+            ax.set_axisbelow(True)
+    handles = [
+        Line2D([], [], marker="o", ls="", color=color, label=label, markersize=5)
+        for color, label in (
+            ("#3574ad", "Corruption lowered the label"),
+            ("#ce691d", "Corruption raised the label"),
+            ("#77818e", "Rounded/clipped label unchanged"),
+        )
+    ]
+    handles.append(
+        Line2D([], [], color=FIT_COLOR, lw=1.8, label="OLS fit (free intercept)")
+    )
+    fig.legend(
+        handles=handles, loc="outside lower center", ncol=2, frameon=False, fontsize=9
+    )
+    fig.savefig(root / f"raw-label-scatter-s{std}.png", dpi=150, facecolor="white")
+    plt.close(fig)
+    return fits
+
+
+def image_html(*, root: Path, filename: str, caption: str) -> str:
+    encoded = base64.b64encode((root / filename).read_bytes()).decode()
+    return (
+        f'<figure><img src="data:image/png;base64,{encoded}" alt="{html.escape(caption)}">'
+        f"<figcaption>{html.escape(caption)}</figcaption></figure>"
+    )
+
+
+def report_html(
+    *,
+    root: Path,
+    points: dict[int, pl.DataFrame],
+    audit: dict,
+    axes_audit: dict,
+    label_fits: dict,
+) -> None:
+    residual = image_html(
+        root=root,
+        filename="raw-residual-scatter.png",
+        caption="Each SD has its own range, shared across mean, median, and mode. "
+        "Both axes have identical limits, tick spacing, and physical units, so y=x is 45 degrees. "
+        "The zoom extent covers all actual corruptions and the pooled 99th percentile of "
+        "absolute prediction error across the three centers, rounded outward. "
+        "Each panel states how many of its 4,096 points lie outside the zoom window. "
+        "The vertical coordinate is each policy center minus the original annotation. "
+        "The horizontal coordinate is the actual rounded/clipped training corruption. "
+        "Purple: original-label center; orange: corrupted-label center; gray band: between. "
+        "Red: ordinary least-squares fit y = intercept + slope × x, with its slope labeled. "
+        "The fit uses all 4,096 observations, including those outside the zoom window, "
+        "and estimates a free intercept. No binning, subsampling, jitter, or age adjustment "
+        "is applied. Coincident integer-valued points overlap.",
+    )
+    residual_full = image_html(
+        root=root,
+        filename="raw-residual-scatter-full.png",
+        caption="Full range: every observation is visible. Each SD has its own limits, "
+        "shared across all three centers. Both axes use equal units and identical ticks. "
+        "Red fitted lines and slopes are identical to the zoomed view because both use all observations.",
+    )
+    tabs = []
+    css = []
+    for std in NOISE_LEVELS:
+        checked = " checked" if std == 5 else ""
+        tabs.append(f'<input type="radio" id="sd{std}" name="noise"{checked}>')
+        css.append(f"#sd{std}:checked ~ .views #view{std}{{display:block}}")
+        css.append(
+            f'#sd{std}:checked ~ .choices label[for="sd{std}"]{{background:#146d69;color:white}}'
+        )
+    choices = "".join(f'<label for="sd{std}">SD {std}</label>' for std in NOISE_LEVELS)
+    views = []
+    for std in NOISE_LEVELS:
+        plot = image_html(
+            root=root,
+            filename=f"raw-label-scatter-s{std}.png",
+            caption="Top row: original annotation versus policy center. Bottom row: actual "
+            "corrupted training label versus the same policy center. Dashed lines indicate "
+            "equality. Red lines are ordinary least-squares fits with a free intercept and "
+            "their slopes are labeled. Point colors show the direction of corruption. Every panel uses all faces "
+            "and the full 0–99-year label range.",
+        )
+        views.append(f'<section class="view" id="view{std}">{plot}</section>')
+    document = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TailRL raw per-image scatter plots</title><style>
+body{margin:0;background:#f4f6f8;color:#1d2938;font:16px/1.6 system-ui,sans-serif}
+main{max-width:1300px;margin:auto;padding:24px}h1{font-size:30px;line-height:1.25}code{overflow-wrap:anywhere}
+h2{font-size:22px;margin-top:30px}p{max-width:1100px}figure{background:white;margin:20px 0}
+img{display:block;width:100%;height:auto}figcaption{padding:12px 16px;color:#4b5c6f;font-size:14px}
+input[type=radio]{position:absolute;opacity:0}.choices{display:flex;gap:8px;flex-wrap:wrap}
+.choices label{cursor:pointer;padding:8px 20px;background:#e0e6ec;border-radius:6px}
+.view{display:none}input:focus-visible ~ .choices{outline:2px solid #146d69}
+.residual-view{display:none}
+#range-zoom:checked ~ .residual-views #residual-zoom,#range-full:checked ~ .residual-views #residual-full{display:block}
+#range-zoom:checked ~ .choices label[for="range-zoom"],#range-full:checked ~ .choices label[for="range-full"]{background:#146d69;color:white}
+__CSS__
+@media print{body{background:white}main{padding:0}.choices{display:none}.view,.residual-view{display:block}figure{break-inside:avoid}}
+</style></head><body><main>
+<h1>TailRL: the individual observations</h1>
+<p>Mean, median, and mode from the saved fixed-noise checkpoints. Each point is one
+training face; each panel contains all 4,096 faces. The median is the first integer age
+whose policy CDF reaches 0.5; the mode is the highest-probability age.</p>
+<h2>Actual corruption versus prediction error</h2>
+<p>A center at the original label would sit on the horizontal purple line. A center
+at the corrupted label would sit on the orange diagonal. A center between the labels
+would fall inside the gray band. The broad clouds show why an aggregate association
+does not describe every image.</p>
+<p>Choose the zoomed view for the main clouds, or the full range to inspect every point.
+Each SD uses its own square axes; one year has the same physical size on both axes.</p>
+<p>The red line in every panel is an ordinary least-squares fit through the sample centroid,
+with a free intercept. Its slope is printed in that panel. All 4,096 faces enter each fit,
+including points outside the zoom window. These are raw associations without age adjustment.</p>
+<input type="radio" id="range-zoom" name="range" checked>
+<input type="radio" id="range-full" name="range">
+<div class="choices"><label for="range-zoom">Zoom to clouds</label><label for="range-full">Full range</label></div>
+<div class="residual-views"><section class="residual-view" id="residual-zoom">__RESIDUAL__</section>
+<section class="residual-view" id="residual-full">__RESIDUAL_FULL__</section></div>
+<h2>Original and corrupted labels versus the policy centers</h2>
+<p>Select a noise level to inspect the raw age coordinates. The same prediction is
+plotted against the original label above and the corrupted label below.</p>
+__TABS__<div class="choices">__CHOICES__</div><div class="views">__VIEWS__</div>
+<p>These are unadjusted observations from one optimization seed and one corruption field.
+Checkpoints were selected using clean validation mean MAE (epochs 23, 22, 19, and 12).
+Original UTKFace annotations are reference ages, not independently verified true ages.
+Median and mode are discrete: overlap can hide many coincident points, and cloud
+appearance alone cannot establish a Gaussian shape, bimodality, or a causal mechanism.
+No held-out synthetic noise probes are included in these plots.</p>
+<p>Source training fingerprint: <code>__FINGERPRINT__</code>.</p>
+</main></body></html>"""
+    for key, value in (
+        ("__CSS__", "".join(css)),
+        ("__RESIDUAL__", residual),
+        ("__RESIDUAL_FULL__", residual_full),
+        ("__TABS__", "".join(tabs)),
+        ("__CHOICES__", choices),
+        ("__VIEWS__", "".join(views)),
+        ("__FINGERPRINT__", html.escape(audit["training_fingerprint"])),
+    ):
+        document = document.replace(key, value)
+    (root / "scatter-report.html").write_text(document)
+    validation = {
+        "source_csv_sha256": sha256(path=root / "per-image-statistics.csv"),
+        "training_fingerprint": audit["training_fingerprint"],
+        "method": "tailrl_population",
+        "split": "train",
+        "points_per_panel": {str(std): data.height for std, data in points.items()},
+        "centers": list(CENTERS),
+        "same_image_ids_across_noise_levels": True,
+        "actual_corrupted_training_labels": True,
+        "fitted_regressions": True,
+        "fit_method": "ordinary least squares with free intercept; all observations; no age adjustment",
+        "jitter": False,
+        "subsampling": False,
+        "residual_axes": axes_audit,
+        "label_fits": label_fits,
+        "equal_physical_x_y_units_verified": True,
+        "identical_x_y_ticks_verified": True,
+        "figures": ["raw-residual-scatter.png", "raw-residual-scatter-full.png"]
+        + [f"raw-label-scatter-s{std}.png" for std in NOISE_LEVELS],
+    }
+    (root / "scatter-validation.json").write_text(json.dumps(validation, indent=2))
+    print(json.dumps(validation), flush=True)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, required=True)
+    args = parser.parse_args()
+    points, audit = load_points(root=args.root)
+    plt.rcParams.update({
+        "font.size": 10,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+    })
+    axes_audit = {
+        "zoom": residual_scatter(root=args.root, points=points, audit=audit, zoom=True),
+        "full": residual_scatter(
+            root=args.root, points=points, audit=audit, zoom=False
+        ),
+    }
+    label_fits = {
+        str(std): label_scatter(root=args.root, std=std, data=data, audit=audit)
+        for std, data in points.items()
+    }
+    report_html(
+        root=args.root,
+        points=points,
+        audit=audit,
+        axes_audit=axes_audit,
+        label_fits=label_fits,
+    )
+
+
+if __name__ == "__main__":
+    main()

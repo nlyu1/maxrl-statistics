@@ -25,6 +25,33 @@ uv run --no-sync python -m src.experiments.utkface.vlm_queue \
   --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-followup" --detach
 ```
 
+## Thinking-on sampling revision, 2026-10-22
+
+The three thinking-on evaluations are rerun with Qwen's official general-task sampling parameters: temperature 1.0, top-p 0.95, top-k 20, min-p 0, presence penalty 1.5 and repetition penalty 1.0. All six parameters are explicit in requests and retained in new response/result metadata. The six completed Base/thinking-off evaluations remain in the prior follow-up root. Earlier thinking-on responses and pilots also remain there; they are not reused or mixed into the revised results.
+
+The revised root retains the identical pinned checkpoints, subset, prompt, eight samples, seeds, 4096/8192-token pilots, concurrency pilots and serving configuration. Stop the prior follow-up supervisor gracefully before pulling changed evaluation sources, and record response hashes before and after preparing the revision. Launch only the revised three-model queue. Its dispatch checks continue to reject allocated GPUs even when their instantaneous utilization is zero.
+
+```bash
+uv run --no-sync python -m src.experiments.utkface.vlm_eval thinking-rerun \
+  --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-thinking-recommended" \
+  --reference "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-followup" \
+  --cache-volume utkface-vlm-qwen35-persistent
+uv run --no-sync python -m src.experiments.utkface.vlm_queue \
+  --root "$HOME/.local/state/maxrl-statistics/utkface-vlm-20261022-thinking-recommended" --detach
+```
+
+Reference: [Qwen3.5 recommended sampling](https://huggingface.co/Qwen/Qwen3.5-4B#best-practices). This revision changes sampling only; it does not add a separate reasoning-token budget or enlarge the authorized output caps.
+
+## Conditional sharing after a ten-minute observation
+
+The human authorized measuring GPUs 1, 2, 3, 5 and 9 for another ten minutes, then sharing unused memory for only the 0.8B and 2B thinking-on runs if all five remain idle. The ordinary 4B job continues to require an exclusive GPU.
+
+`shared-serving.json` records the authorization as two distinct model/GPU grants. It references a SHA-256-pinned observation covering all five candidates for at least 600 seconds, with every recorded utilization at most 5%. Before creating it, also verify stable memory usage and unchanged resident process identities. Each grant pins resident GPU UUID, PID, UID, process start ticks, command hash and boot ID. A grant never ignores a newly created or changed process.
+
+Shared workers target 35% of total GPU memory, admit 64 active sequences and benchmark 8/16 HTTP requests on the existing 64 disjoint pilot images. Prompts, official sampling parameters, checkpoints, evaluation images, eight draws, seeds and 4096/8192-token pilots stay fixed. At least 6 GiB remains outside the worker's target budget at dispatch. The supervisor stops only its own worker if an unknown GPU process appears, free memory falls below that headroom, or a resident's CPU consumption exceeds 0.25 of a core between checks. Existing response files survive preemption. The effective serving configuration and grant are saved in worker launch metadata and results.
+
+Stop the existing supervisor before changing frozen source hashes. Preserve the preceding plan and record a serving-change provenance file; do not overwrite older responses or mix tuning trials from different serving configurations. The conditional measurement and gate artifacts belong under the study's persistent `diagnostics/` directory. A failed or incomplete observation grants no sharing access.
+
 ## Original 20261020 protocol
 
 Prompt: `What is the person's age in years? Put your final answer in \boxed{}.`

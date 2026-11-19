@@ -1,0 +1,348 @@
+## What the objectives ask the model to learn
+
+Write $D=99$, $h=h_\theta(x)$ for the pooled image features, and $\mu$ for the prediction in years. A scalar head uses
+
+$$
+u=w^\top h+b,\qquad q=\operatorname{sigmoid}(u),\qquad \mu=Dq.
+$$
+
+Its MAE and MSE losses are $|\mu-y|/D$ and $(\mu-y)^2/D^2$. Squared error targets the conditional mean; absolute error targets a conditional median. Their feature gradients are
+
+$$
+\nabla_h L_{\mathrm{MSE}}=
+\frac{2(\mu-y)q(1-q)}{D}\,w,
+\qquad
+\nabla_h L_{\mathrm{MAE}}=
+\operatorname{sign}(\mu-y)q(1-q)\,w.
+$$
+
+At a fixed head, every image communicates its numerical correction along the same learned vector $w$ in pooled feature space. The image-dependent backbone Jacobian maps that correction into parameter space.
+
+MAE's score coefficient has magnitude at most $1/4$ and uses the residual sign. The head norm and encoder Jacobian also enter the parameter update. Categorical CE and finite-risk TailRL each have logit-gradient $\ell_1$ norm at most two: CE subtracts two probability vectors, and each TailRL radius subtracts the policy conditioned on its window from the full policy. The comparisons concern the numerical statistic, residual weighting and resulting optimizer response.
+
+For a categorical head, $z=Wh+b$, $p=\operatorname{softmax}(z)$ and $\mu=\sum_a a p_a$. Put $v_a=p_a(a-\mu)$. Direct mean-MSE has
+
+$$
+\nabla_z L_{\mathrm{MSE}}=\frac{2(\mu-y)}{D^2}v,
+\qquad
+\nabla_h L_{\mathrm{MSE}}=\frac{2(\mu-y)}{D^2}W^\top v.
+$$
+
+Here $v$ changes with the image's policy. Both heads receive the numerical label; the scalar head supplies a particularly strong form of sharing for its numerical correction. At one common fixed model state and input, averaging a fresh conditionally zero-mean label perturbation preserves the MSE gradient. The corresponding conditional gradient covariance has rank at most one.
+
+Categorical CE has $\nabla_z L=p-e_y$. With unrestricted conditional probabilities, CE elicits the full conditional label law. With label corruption, the shape of that law changes as well as any change in its mean. These are distinct supervision requirements even when the evaluation uses one point prediction. The [central mean subspace](https://doi.org/10.1214/aos/1021379861) formalizes the distinction between retaining a conditional mean and retaining a full conditional distribution; the sufficiency of a shared score in a particular feature representation remains an empirical question.
+
+### A working CE likelihood with the scalar mean
+
+The binomial construction uses the logits
+
+$$
+z_a=\log {D\choose a}+au,\qquad a=0,\ldots,D.
+$$
+
+Their policy mean is exactly $D\operatorname{sigmoid}(u)$, equal to the scalar head. For an arbitrary conditional age law with $m=\mathbb E[Y\mid x]$,
+
+$$
+\mathbb E[L_{\mathrm{BinCE}}\mid x]
+=D\log(1+e^u)-mu-\mathbb E\!\left[\log {D\choose Y}\mid x\right],
+$$
+
+and therefore
+
+$$
+\partial_u R_{\mathrm{BinCE}}=\mu-m.
+$$
+
+The working likelihood targets the conditional mean for every label law on the grid. Normalized binomial CE and scalar MSE have excess risks
+
+$$
+\frac{R_{\mathrm{BinCE}}(u)-R_{\mathrm{BinCE}}^*}{D}
+=\operatorname{KL}\!\left(\operatorname{Ber}(m/D)\Vert\operatorname{Ber}(q)\right),
+\qquad
+R_{\mathrm{MSE}}(u)-R_{\mathrm{MSE}}^*=(q-m/D)^2.
+$$
+
+They share the pointwise target and correction sign, with different curvature and example weighting. This is the role of the working mean model in [quasi-likelihood](https://doi.org/10.1093/biomet/61.3.439); our age-head statement follows directly from the displayed algebra. [Proper composite loss theory](https://jmlr.org/papers/v11/reid10a.html) supplies a general account of residual corrections with different positive weights.
+
+The residual intervention in the experiments uses
+
+$$
+z_a=\log {D\choose a}+au+\gamma R_a(h).
+$$
+
+All three variants own the same parameters and start with $R=0$. The fixed gate $\gamma=0$ retains one score. A free residual permits class-specific changes. An age-affine residual projects $R$ onto the span of $1$ and $a$, preserving the same scalar mean function class while adding a redundant path for location updates. The initial distributions, score gradients and feature gradients agree across these variants. Registered parameters are matched; effective freedom is the experimental intervention.
+
+### A variance-dependent prediction for scalar losses
+
+There is a precise setting in which the loss weights can be compared. Suppose independent observations have a correctly specified mean $\mu(x)=D\operatorname{sigmoid}(\beta_*^\top x)$, a fixed-dimensional augmented predictor $x$, conditional variance $v(x)>0$, and a consistent regular estimating-equation solution. Put $\mu'=Dq(1-q)$ and consider
+
+$$
+\psi_b=x\,b(x)\,[Y-\mu(x)].
+$$
+
+Under the usual finite-moment and nonsingularity conditions, its first-order coefficient covariance is $A_b^{-1}B_bA_b^{-\top}/n$, where
+
+$$
+A_b=\mathbb E[b\mu'xx^\top],\qquad B_b=\mathbb E[b^2vxx^\top].
+$$
+
+The optimal weight within these regular mean estimating equations is $b_*=\mu'/v$. To see this directly, define $t=x\mu'/\sqrt v$, $r=xb\sqrt v$ and $I=\mathbb E[tt^\top]$. Since $\mathbb E[rt^\top]=A_b$,
+
+$$
+\mathbb E[(r-A_bI^{-1}t)(r-A_bI^{-1}t)^\top]
+=B_b-A_bI^{-1}A_b^\top\succeq0.
+$$
+
+Multiplication by $A_b^{-1}$ and its transpose gives the covariance lower bound $I^{-1}/n$, attained by $b_*$. This is an estimating-equation argument for the specified mean model.
+
+Binomial labels have $v=Dq(1-q)=\mu'$, giving $b_*=1$, exactly the binomial-CE correction. Endpoint labels $Y=D\operatorname{Ber}(q)$ have $v=D^2q(1-q)=D\mu'$, giving the same correction up to a constant. At endpoint labels, binomial CE equals $D$ times binary logistic negative log likelihood. With $H=\mathbb E[q(1-q)xx^\top]$, the respective coefficient covariances are
+
+$$
+\frac{H^{-1}}{Dn}\quad\text{and}\quad\frac{H^{-1}}{n}.
+$$
+
+The endpoint experiment therefore has 99 times larger first-order coefficient variance for the same score and sample size. Scalar MSE instead uses $b$ proportional to $\mu'$ and attains this weighting bound when $v$ is constant. These formulas supply a variance-dependent prediction about scalar loss weighting. They apply to the regular, correctly specified, fixed-dimensional limit with penalties vanishing sufficiently quickly, for example $\lambda_n=o(n^{-1/2})$ in an average-loss ridge objective. The synthetic study's fixed penalties and the learned image encoder define additional finite-sample interventions measured separately in the experiments.
+
+### The coordinate metric of a structured head
+
+Identical initial predictions can lead to different next functions. Let $a_c$ be the centered age vector and let $K_{ij}$ be the inner product of augmented features for two images. For head-only Euclidean SGD, modulo a common logit shift, the effective logit-update kernels are
+
+$$
+\begin{array}{c|c}
+\text{head coordinates}&\text{logit kernel}\hline
+\text{ordinary affine categorical}&K_{ij}I\\
+\text{fixed age score}&K_{ij}a_ca_c^\top\\
+\text{age score plus free residual}&K_{ij}(a_ca_c^\top+I)\\
+\text{age score plus affine residual}&K_{ij}(a_ca_c^\top+P_{\operatorname{span}(1,a_c)})
+\end{array}
+$$
+
+Adam, clipping and floating-point arithmetic determine the actual updates in the image experiment. The kernels identify the coordinate mechanism available at a common state; the matched-function interventions measure its practical contribution under the declared optimizer.
+
+An action-space residual basis $B$ satisfying $B^\top 1=B^\top a=0$ still changes the softmax mean. For a residual coefficient $\Gamma_{kj}$,
+
+$$
+\frac{\partial\mu(x)}{\partial\Gamma_{kj}}
+=x_j\operatorname{Cov}_{p(\cdot\mid x)}(A,B_k(A)).
+$$
+
+Thus free residual coordinates add mean flexibility together with distributional flexibility. The Euclidean projection used by the synthetic design gives an identifiable coordinate system and penalty, while the covariance gives its prediction-space effect.
+
+For comparison, linear ridge readouts supply an exact sharing identity. With fixed design $X$, one-hot label matrix $Y$, common ridge $\lambda$ and age vector $a$, the multi-output solution is $\widehat B=(X^\top X+\lambda I)^{-1}X^\top Y$. Its age projection on held-out design $X_*$ is
+
+$$
+X_*\widehat B a
+=X_*(X^\top X+\lambda I)^{-1}X^\top(Ya),
+$$
+
+exactly the scalar ridge prediction using age targets $Ya$. Common preprocessing and an identically treated intercept preserve this identity. The softmax mean map, categorical objectives and nonlinear encoder learning supply the additional ingredients evaluated by the image interventions.
+
+### The statistic carried by a numerical code
+
+The shared channel's numerical meaning can be characterized exactly. For positive base weights $b_a$ and any real age code $c_a$, the fixed one-score family
+
+$$
+p_s(a)=b_a\exp\{c_as-A_c(s)\},\qquad
+A_c(s)=\log\sum_a b_a e^{c_as}
+$$
+
+has conditional CE derivative
+
+$$
+R_c'(s;q)=\mathbb E_{p_s}[c(A)]-\mathbb E_q[c(Y)].
+$$
+
+For a nonconstant code and a pointwise optimized scalar score, its coded policy mean equals the supplied coded-label mean, with limiting optima at the code endpoints. A shared neural score introduces its own fitting constraints. A decoder satisfying $\mathbb E_qY=f(\mathbb E_qc(Y))$ for **every** label law exists exactly when $c_a=\alpha+\gamma a$ with $\gamma\ne0$. Sufficiency follows by taking expectations. For necessity with a nonconstant code, choose ages $i,j$ attaining the smallest and largest code values, so $c_i<c_j$. A point mass at any age $a$ has the same code mean as
+
+$$
+\lambda_a\delta_i+(1-\lambda_a)\delta_j,
+\qquad
+\lambda_a=\frac{c_j-c_a}{c_j-c_i}.
+$$
+
+Universal recovery forces $a=\lambda_ai+(1-\lambda_a)j$, which rearranges to a nonconstant affine code. For a constant code every point mass shares one coded mean while the physical-age means span the entire grid. The result concerns arbitrary label mixtures and recovery of their **mean**; restricted label families and median targets supply different questions.
+
+Each permutation preserves individual labels through its known inverse. The characterization concerns the statistic retained after averaging. Local point alignment has its own conditions: with code $c_a=a^2$ and the centered binomial base, $\mathbb E[c(A)]=2475$ and $\operatorname{Cov}(A,c(A))=2450.25$. Since $49^2<2475<50^2$, its infinitesimal held-head CE feature directions improve squared point error for all 100 integer target ages when $w\ne0$. This supplies a constructive distinction between local alignment and universal mean recovery.
+
+For permutations of the equally spaced age grid, the affine possibilities are identity and global reversal. Reversal gives $p_{\mathrm{rev},s}=p_{\mathrm{ordered},-s}$ for the binomial base. Its physical-age mean is $D\operatorname{sigmoid}(-s)$, and its feature correction uses the opposite score direction with the same age-mean target. Numerical coherence here includes this change of sign convention.
+
+The retained partial swaps give concrete cancellation examples. Let $C=49.5$, choose an unswapped lower-half age $u$ and a swapped lower-half age $v$, and assign probabilities
+
+$$
+q_L(u)=\frac{C-v}{99-u-v},\qquad
+q_L(v)=\frac{C-u}{99-u-v}.
+$$
+
+Then $\mathbb E_{q_L}\pi(Y)=C$ while $\mathbb E_{q_L}Y<C$. Reflecting this law around $C$ keeps its coded mean equal to $C$ and makes its physical-age mean larger than $C$. The fixed permuted-score CE optimum is $s=0$ for both laws, giving physical-age prediction $C$.
+
+| Retained head seed | $u$ | $v$ | Lower-law age mean | Coded mean |
+|--:|--:|--:|--:|--:|
+| 1731 | 49 | 48 | $48.75$ | $49.5$ |
+| 1947 | 49 | 48 | $48.75$ | $49.5$ |
+| 2163 | 47 | 49 | $48\tfrac23$ | $49.5$ |
+
+An exact-rational CPU audit checks all three retained maps, the reflected laws and the global-reversal control. At the centered state, the swapped conditional expected feature correction is zero; the ordered and reversed physical-mean updates point toward the target mean. These are designed conditional laws that expose which statistic the initial channel averages.
+
+The ordinary full head retains a nonzero bias gradient $p_0-q_L$ at this same state. For these witnesses a sufficiently small bias-only Euclidean step moves the physical mean toward the target, and subsequent updates can leave the one-score family. The construction identifies an initial encoder-signal difference within the measured assignment intervention. The [complete derivation](notes/numerical-code-theory.txt), [executed audit](notes/numerical-code-audit.json) and [independent challenge](notes/numerical-code-challenge.txt) record its assumptions and checks.
+
+### A centered anchor for numerical age assignment
+
+Let $\pi$ swap rows within chosen symmetric pairs $\{a,D-a\}$ of the ordinary binomial-initialized head. The base coefficient stays attached to its original age, and the initial feature correction becomes
+
+$$
+\nabla_h L_{\mathrm{CE}}^{P}=[D\operatorname{sigmoid}(u)-\pi(y)]w.
+$$
+
+At a common feature vector with score $u=0$, the two policies coincide exactly:
+
+$$
+p_F(a)=p_P(a)={D\choose a}2^{-D}.
+$$
+
+They therefore give the same point prediction, entropy and target CE at that anchor. For an unswapped target, the feature correction also agrees. For a swapped target, $\pi(y)=D-y$ gives
+
+$$
+\nabla_h L_{\mathrm{CE}}^{P}=(y-D/2)w
+=-\nabla_h L_{\mathrm{CE}}^{F}.
+$$
+
+Every target retains its individual correction magnitude while the chosen pairs change sign. Numerical age assignment can therefore organize the encoder's correction field even at a common prediction and common loss value. Actual image scores vary; the paired training intervention evaluates the complete assignment change under those scores and the declared optimizer.
+
+The conditional expectations identify the initial numerical tasks explicitly: the ordered correction uses $\mu_F-\mathbb E[Y\mid h]$, and the swapped correction uses $\mu_F-\mathbb E[\pi(Y)\mid h]$. The full ordinary heads retain the same attainable family during fitting; these identities describe their starting feature-correction fields.
+
+There is also an exact point-alignment comparison at the centered anchor. Hold the head fixed and take an independent feature step $h_\eta=h-\eta\nabla_hL_{\mathrm{CE}}$. Define the physical-age point loss $E_y=\tfrac12(\mu-y)^2$ and
+
+$$
+\kappa=\operatorname{Cov}_{A\sim\operatorname{Bin}(99,1/2)}[A,\pi(A)].
+$$
+
+For the swapped head,
+
+$$
+\left.\frac{dE_y}{d\eta}\right|_{\eta=0}
+=-\kappa\,\|w\|^2(49.5-y)[49.5-\pi(y)].
+$$
+
+The ordered head has $\kappa=99/4$, giving a strictly point-improving direction for all 100 integer target ages when $w\ne0$. With 25 swapped pairs, $\kappa\ne0$ and $w\ne0$, the control has 50 point-improving and 50 point-worsening directions; the sign of $\kappa$ determines which set improves. An independent CPU audit computes the three retained codes' covariances as exact rational numbers and checks five finite steps from $10^{-3}$ through $10^{-7}$. All 2,000 target-step records pass the stated checks: every step decreases CE, and the smallest-step point derivatives recover the analytical alignment counts. Shared minibatches, encoder Jacobians, head updates, clipping and Adam determine the actual neural parameter updates; the audit concerns the stated held-head feature step.
+
+### Point-loss weighting and reference-label noise
+
+Scalar MAE gives the numerical residual a bounded sign weight. Scalar MSE weights it proportionally to its magnitude. For a deterministic integer reference age $y$, adding symmetric Gaussian noise and then rounding and clipping to $[0,D]$ preserves $y$ as a median. The conditional mean follows
+
+$$
+m_\sigma(y)=\sum_{k=0}^{D}k\,\Pr\{\operatorname{clip}(\operatorname{round}(y+\sigma Z))=k\}.
+$$
+
+Clipping moves this mean inward near the age boundaries. The exact SD-10 law gives $m_{10}(0)=3.9877600593$ years. Thus the clean reference median and corrupted-label mean supply different point targets at a boundary. In a general random $Y\mid X$, the relevant targets are the conditional median and mean of the resulting label law. [Point forecast theory](https://doi.org/10.1198/jasa.2011.r10138) gives the precise mean/median interpretation of these losses.
+
+## An exact mean-calibration result for population TailRL
+
+The implemented population objective averages all radii with equal weight:
+
+$$
+S_r(p,y)=\sum_{a:\,|a-y|\le r}p_a,
+\qquad
+L_T(p,y)=-\frac1D\sum_{r=0}^{D-1}\log S_r(p,y).
+$$
+
+For a label law $q$, let $R_T(p;q)=\sum_yq_yL_T(p,y)$, $m_q=\sum_y yq_y$, and $\mu_p=\sum_a ap_a$. The following result concerns the full probability simplex, complete radii, equal weights and survival floor zero.
+
+**Mean calibration.** Every population minimizer satisfies
+
+$$
+\mu_{p^*}=m_q.
+$$
+
+For every finite-risk policy,
+
+$$
+R_T(p;q)-R_T^*(q)
+\ge\operatorname{KL}\!\left(\operatorname{Ber}(m_q/D)\Vert\operatorname{Ber}(\mu_p/D)\right)
+\ge\frac{2(\mu_p-m_q)^2}{D^2}.
+$$
+
+Consequently TailRL has a positive mean-calibration guarantee at the unrestricted population level. Its optimal distribution can change shape while retaining the target mean. The joint neural parameterization, available observations and optimization trajectory determine how a trained model approaches that target.
+
+### Proof through cumulative probabilities
+
+Let $F_i=\sum_{a=0}^{i}p_a$, with $F_{-1}=0$ and $F_D=1$. The mean is
+
+$$
+\mu_p=D-\sum_{i=0}^{D-1}F_i.
+$$
+
+Choose the cumulative tangent $\delta F_i=F_i(1-F_i)$. It induces
+
+$$
+\delta p_i=p_i(1-F_i-F_{i-1}).
+$$
+
+Both $p+\delta p$ and $p-\delta p$ lie in the simplex, since their factors multiplying $p_i$ lie in $[0,2]$ and their total masses equal one. Zero coordinates stay zero, so the path also handles a boundary optimum.
+
+For a window put $U=\min(D,y+r)$ and $L=\max(-1,y-r-1)$. Then
+
+$$
+\delta\log S_r
+=\frac{F_U(1-F_U)-F_L(1-F_L)}{F_U-F_L}
+=1-F_U-F_L.
+$$
+
+Across all $D$ radii, the upper and lower endpoints together visit every interior CDF value once and the endpoint $F_D=1$ exactly $y$ times. Therefore
+
+$$
+\sum_{r=0}^{D-1}\delta\log S_r=\mu_p-y,
+\qquad
+\nabla_pR_T\cdot\delta p=\frac{m_q-\mu_p}{D}.
+$$
+
+Finite risk supplies positive mass to each radius-zero window with $q_y>0$, so these derivatives exist. At a minimum the derivative along this two-sided feasible path equals zero. A finite minimum exists by lower semicontinuity on the compact simplex and the finite risk of a uniform policy. This proves the mean statement.
+
+### An exact orbit and the regret bound
+
+Shift every CDF log-odds by $\eta$:
+
+$$
+F_i(\eta)=\frac{F_i e^\eta}{1-F_i+F_i e^\eta}.
+$$
+
+This preserves CDF order and zero probability coordinates. Writing $A_i=1-F_i+F_ie^\eta$, a window obeys $S_r(p_\eta,y)=e^\eta S_r(p,y)/(A_UA_L)$. The same endpoint counting yields
+
+$$
+R_T(p_\eta;q)-R_T(p;q)
+=\frac{(m_q-D)\eta+\sum_{i=0}^{D-1}\log A_i}{D}.
+$$
+
+Its derivative is $(m_q-\mu_{p_\eta})/D$. Put $r=m_q/D$ and $s=\mu_p/D$. Jensen's inequality bounds this risk change above by
+
+$$
+(r-1)\eta+\log\!\left[s+(1-s)e^\eta\right].
+$$
+
+Minimizing the last expression gives $-\operatorname{KL}(\operatorname{Ber}(r)\Vert\operatorname{Ber}(s))$. Comparing the feasible orbit point with the global optimum proves the regret inequality. Endpoint values follow by limits.
+
+### A direct numerical mean certificate
+
+For $g=\nabla_pR_T$, define the full-simplex Frank–Wolfe gap $G=p^\top g-\min_a g_a$. Applying its linear bound to both feasible points $p\pm\delta p$ gives
+
+$$
+|\mu_p-m_q|\le D G.
+$$
+
+The implementation audits checked 18 positive/sparse constructions. The largest tangent identity error was $1.36\times10^{-15}$ and the largest exact-orbit risk error was $9.99\times10^{-15}$. Five independent inverse-KKT constructions recovered the mean within $7.11\times10^{-14}$ years. The inverse construction chooses $p$ first and solves the stationary equations for $q$, providing a check independent of the original nonlinear population solver.
+
+The separate direct population audit retained 25 candidates and passed every repository-autograd check. Fourteen candidates met the full-simplex Frank–Wolfe tolerance of $10^{-8}$: 12 of 13 finite-support laws and two of 12 rounded/clipped corruption laws. Eleven candidates remain approximate at that tolerance, with maximum recorded gap **7.2258** for `rounded_clipped_sd1_original0`. These candidates are retained as optimization diagnostics. The mean-calibration result rests on the exact CDF proof, supported separately by the tangent/orbit and inverse-KKT checks. At the largest recorded gap, $99G$ exceeds the entire age range. Small-gap candidates give precision certificates according to $99G$; the remaining candidates retain their approximate optimization status.
+
+Two scope controls establish why the assumptions matter. On the three-age grid $\{0,1,2\}$, doubling only the radius-zero weight gives a certified optimum $p=(1/2,1/3,1/6)$ for $q=(35,19,13)/67$, with mean difference $-1/201$ years. Restricting TailRL to the binomial family also changes its available path: on the 100-age grid, for $q=0.75\delta_0+0.25\delta_{99}$ and binomial mean $24.75$, its score derivative is $-4.5106882579$, while binomial CE and mean-MSE have zero derivatives. The experiments therefore evaluate binomial TailRL as a separate restricted-model intervention.
+
+## How the routing experiment assigns a learning effect
+
+For categorical logits, the routed training loss is
+
+$$
+L_H\!\left(W\operatorname{sg}(h)+b,y\right)
++L_B\!\left(\operatorname{sg}(W)h+\operatorname{sg}(b),y\right),
+$$
+
+where $\operatorname{sg}$ holds a tensor fixed during differentiation. The image encoder runs once. The head receives exactly the gradient from $L_H$ and the encoder exactly the gradient from $L_B$. With matching objectives this reproduces the native parameter gradients, verified with maximum absolute difference zero for MSE, CE and TailRL in the float64 audit.
+
+The four MSE/TailRL cells identify within-head backbone effects and within-backbone head effects under the specified optimizer. Groupwise clipping and recorded actual Adam updates make the intervention measurable. Common readouts fitted to matched final-epoch encoders provide a second observation about representation quality. A feature-space directional explanation additionally requires its magnitude and example-weight controls; the measured routing effect itself concerns the complete specified route and optimizer.

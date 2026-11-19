@@ -1,0 +1,88 @@
+{
+  "schema": "utkface-mechanism-workflow-v1",
+  "artifact_root": "/home/zitongw2/.local/state/maxrl-statistics",
+  "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-workflow-age-assignment-20261029",
+  "max_gpus": 4,
+  "jobs_per_gpu": 2,
+  "poll_seconds": 5,
+  "idle_memory_mib": 100,
+  "idle_utilization": 5,
+  "dispatch_lock": "/tmp/utkface-extension-20261014/global-dispatch.lock",
+  "environment": {
+    "UV_PROJECT_ENVIRONMENT": "/home/zitongw2/maxrl-statistics/.venv",
+    "TMPDIR": "/tmp/utkface-lr-tmp",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "stages": [
+    {
+      "name": "age_assignment_study",
+      "kind": "study",
+      "root": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-age-assignment-20261029",
+      "launch": true,
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    },
+    {
+      "name": "age_assignment_report",
+      "kind": "report",
+      "root": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-age-assignment-20261029",
+      "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/age-assignment",
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable"
+    },
+    {
+      "name": "age_assignment_probes",
+      "kind": "probes",
+      "root": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-age-assignment-20261029",
+      "output_dir": "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-age-assignment-20261029",
+      "checkpoints": [
+        "epoch_025",
+        "final"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics-mechanism-age-assignment-e71bebc",
+      "commit": "e71bebcfcc990ab35daa8e1122a6f5eb4e6abfb8"
+    },
+    {
+      "name": "age_assignment_noise",
+      "kind": "command",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_noise_audit",
+        "--probe-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-age-assignment-20261029/g0",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-age-assignment-20261029/g0",
+        "--reference-fields",
+        "128"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-age-assignment-20261029/g0/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-age-assignment-20261029/g0/summary.tsv"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable"
+    },
+    {
+      "name": "age_assignment_probe_report",
+      "kind": "command",
+      "argv": [
+        "-m",
+        "src.experiments.utkface.mechanism_probe_report",
+        "--probe-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-probes-age-assignment-20261029",
+        "--noise-root",
+        "/home/zitongw2/.local/state/maxrl-statistics/utkface-mechanism-noise-age-assignment-20261029",
+        "--output-dir",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/age-assignment-probes"
+      ],
+      "artifacts": [
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/age-assignment-probes/report.json",
+        "/home/zitongw2/.local/state/maxrl-statistics/reports/utkface-mechanism-20261029/age-assignment-probes/summary.tsv"
+      ],
+      "checkout": "/home/zitongw2/maxrl-statistics",
+      "commit": "mutable"
+    }
+  ]
+}

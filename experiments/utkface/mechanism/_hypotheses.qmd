@@ -1,0 +1,71 @@
+## Hypotheses, challenges and experimental decisions
+
+The investigation treats an explanation as a prediction about an intervention. The first 78 image fits were inspected before this register's initial revision; its predictions preceded interpretation of the complete 36-fit initialization cohort. The symmetric-assignment prediction was subsequently frozen before its six fits. The scratch-500 predictions precede that cohort's completed outcomes. The synthetic scalar-ridge control is a challenger-designed diagnostic using the original five training blocks and fresh oracle inputs.
+
+| Candidate explanation | Discriminating evidence | Resulting claim |
+|:--|:--|:--|
+| Different unrestricted mean targets explain the TailRL/mean-MSE gap | Complete-radius population optimization, CDF tangent proof, exact orbit and inverse-KKT checks | The implemented equal-radius population TailRL objective recovers the conditional mean on the full simplex. Restricted models and finite training supply the relevant remaining distinctions. |
+| A scalar bottleneck explains the point-prediction advantage | Scalar versus categorical mean-MSE in the 50-epoch ImageNet cohort; fixed, affine and free residual heads | In that ImageNet cohort, categorical mean-MSE has lower selected error than scalar MSE in all six clean/noisy block comparisons. The point map and its optimization supply a regime-dependent tradeoff. |
+| The scalar loss changes the age representation learned under a shared prediction family | Matched scalar MAE/MSE fits and a diagnostic audit of their fixed-epoch common readouts | MAE training improves clean ridge MAE and MSE in every block at epochs 25 and 50. Under SD-10 the readout target and error criterion change the comparison. This identifies the implemented loss/update intervention. |
+| MSE encoder supervision improves age information across label regimes | The 50-epoch ImageNet head-loss by encoder-loss routing factorial, followed by common readouts | In that routing cohort, clean selected predictors favor the MSE encoder route with either head. Under SD-10, the route effect changes with the head objective. Common readouts locate the contribution accessible through the declared probe. |
+| Added categorical freedom changes the estimation tradeoff | Free versus affine residuals with matched starting functions, plus certified synthetic fits | The affine restriction improves CE in both image label regimes and TailRL under SD-10; clean TailRL comparisons have a different ordering. The synthetic cost of weak residual regularization falls with sample size and strong shrinkage. |
+| Extra categorical freedom explains the small endpoint-law synthetic gain | Three validation candidates for scalar ridge, compared with the three retained flexible-head candidates | Scalar shrinkage substantially improves the smaller-sample endpoint estimator. The positive result concerns the declared regularization procedures and preserves the full model's ability to approach a scalar solution under suitable penalties. |
+| The useful age structure acts through the initial function | Float32 ordinary categorical heads with binomial versus random initialization | Clean CE gains 0.653 years selected MAE and 1.684 years under the final common ridge, with all block signs favorable. The ordinary full head obtains the initialization benefit. |
+| A persistent, strongly loaded age coordinate improves optimization | Float32 fused versus scalar-plus-residual heads with the same starting function and full categorical family | The native clean-CE endpoint difference is small and mixed, while early transients and common-readout outcomes differ. The normalized native-gain control stays outside the executed fit set under its declared gate. |
+| Coherent numerical assignment contributes beyond preserved entropy, rank and base coefficients | Six symmetric row-swap fits with fixed mappings and common epoch-25/50 readouts | Ordered assignment improves selected MAE by 0.733 years clean and 1.183 under SD-10, with every block favorable; all common-readout comparisons retain the ordering. |
+| Long-horizon differences reflect different fitting trajectories | Repeated 500-epoch scratch fits, retained fixed epochs, common readouts and corruption-following slopes | Scalar MAE continues improving ridge accessibility in every block under both label regimes. Ordinary TailRL's noisy native/ridge errors increase during further fitting. The noisy free-versus-affine relative cost grows in every block; one-score CE and TailRL also sustain useful learning. |
+
+### Prospective initialization predictions
+
+The clean structured-CE improvement motivates a signed prediction: binomial initialization should improve an ordinary categorical CE head over random initialization when precision and coordinates match. Comparing the fused ordinal head with the redundant score-plus-residual head separates a starting-function contribution from a persistent-coordinate contribution. A starting-function explanation predicts that fused and redundant heads remain relatively close compared with their gap from the random head. A persistent-coordinate explanation predicts a further change after head updates even though the two initial functions agree.
+
+The completed first cohort motivates an objective-by-time interaction for TailRL. Its structured free head selects later checkpoints under SD-10, and its selected and final comparisons have opposite signs. The initialization study should therefore report learning speed, selected accuracy and common final-epoch accuracy separately for each objective and label regime.
+
+If a repeated, practically material clean-CE fused-versus-free difference remains, the challenger proposes a normalized persistent score. Let $a_c=a-49.5$, $N=\sqrt{83325}$ and $e=a_c/N$. Replacing $a\,s(h)$ by $e\,u(h)$ with $u(h)=Ns(h)$ at initialization preserves the initial policy up to a common logit shift. With a free residual, the attainable categorical family also agrees. For Euclidean head-only SGD, the age-coordinate contribution to the logit kernel changes from $a_ca_c^\top$ to $ee^\top$. Under Adam, the resulting intervention includes adaptive normalization and clipping. Moving the normalized head toward the fused trajectory would support the loading of the persistent age coordinate as a contributor. A remaining separation would motivate the broader redundant-coordinate or update-interaction explanation.
+
+### Prospective long-horizon predictions
+
+The retained earlier scratch results motivate three observations to check in the repeated cohort: scalar MAE should have a useful learning horizon extending beyond ordinary TailRL's selected epoch; continued TailRL optimization should improve its supplied-label objective during a period of worsening held-out point error; and opening free residual directions should change the amount or timing of that late fitting relative to the affine control.
+
+Common readouts distinguish two outcomes. A remaining difference with the same ridge procedure identifies a change in age information accessible to that procedure. Recovery of the native-head gap by refitting identifies a contribution from the stored readout and its coadaptation with the encoder. Corruption-following slopes and age bands provide a further observation of fitting the particular supplied field. Agreement across these measurements supports the corresponding location of the effect.
+
+The retained checkpoints and complete trajectories evaluate every prediction at its stated horizon. The completed decision table below records the outcomes and resulting refinements, while preserving the prospective statements as their historical register.
+
+Before inspecting completed scratch outcomes, the independent reviewer fixes the paired analysis in [the long-horizon decision matrix](notes/long-horizon-decision-matrix.txt). For each label condition it reports the three block differences in selected MAE, final MAE and selected epoch. Additional validation improvement is the best score through epoch 50 minus the best score through epoch 500. Fixed-epoch native and common-readout changes use the declared 50→200, 200→500 and 50→500 intervals. Later checkpoint selection receives support as useful continued learning when these held-out trajectories agree.
+
+For noisy free versus affine TailRL, the signed transfer prediction is a larger final free-head cost and less continued common-readout improvement. Absolute changes and paired differences of changes distinguish a decline from a smaller improvement. CE versions and clean TailRL versions are planned descriptive comparisons. Corruption-following slopes, entropy and policy variance supply associated trajectory measurements. The matrix separates these observations from the original signed predictions and from analyses chosen after inspecting outcomes.
+
+### Challenger follow-up after the 36 initialization fits
+
+The completed float32 cohort supports the clean CE starting-function prediction: the ordinary binomial-initialized head improves selected MAE by 0.653 years relative to the ordinary random head, with gains in all three blocks. The additional free-score path has a small average difference with mixed block signs. The conditional normalized-score experiment therefore stays outside the executed fit set. The early-closeness prediction is revised: fused and free coordinates produce large, reversing early differences despite similar endpoint averages.
+
+The independent challenger sharpens the next question to the numerical assignment of that starting function. The proposed control swaps rows only within symmetric pairs $\{a,99-a\}$. Since $\log {99\choose a}=\log {99\choose99-a}$, these swaps preserve each age's base binomial coefficient. Whole-row permutation also preserves the initial probability multiset, entropy, head norm, rank and full attainable categorical family. Actual target labels and the ages used to evaluate the mean stay fixed.
+
+The mapping is frozen from a label-independent randomization: an isolated CPU generator uses seed $2026102937+\text{head\_seed}$ and chooses exactly 25 of the 50 symmetric pairs to swap. The same block mapping is used for clean and SD-10 fits. This gives six fits under the existing 50-epoch protocol. Clean CE is the primary comparison against the retained ordered and random ordinary heads; SD-10 is secondary.
+
+Write $\pi$ for the involution and $\mu_F=\sum_a a p_F(a)$. The swapped starting function has $z_a^P=\log {99\choose a}+\pi(a)s$, hence
+
+$$
+\nabla_h L_{\mathrm{CE}}^{P}(x,y)
+=w[\mu_F(x)-\pi(y)],
+\qquad
+\nabla_h L_{\mathrm{CE}}^{F}(x,y)
+=w[\mu_F(x)-y].
+$$
+
+Both initial corrections share one feature direction, while the swapped correction uses the altered numerical code. The signed prediction is lower clean selected error for the ordered assignment. A repeated improvement would support coherent numerical assignment beyond the retained base coefficient, entropy and rank. Similar performance would redirect the explanation toward the broader starting-state package. The swaps retain distance from the midpoint, and changes in example weighting, correction sign and clipping remain part of the intervention. Its interpretation concerns the complete numerical-assignment change under the declared optimizer.
+
+### Completed long-horizon decisions
+
+All 66 fits and 198 common-readout/noise sources are complete. The [independent final review](notes/final-long-horizon-review.txt) checks the prespecified paired outcomes against the retained raw records.
+
+| Registered prediction or planned comparison | Completed evidence | Resulting explanation |
+|:--|:--|:--|
+| P1: scalar MAE has a useful horizon extending beyond ordinary TailRL | Later MAE selection in every block, additional best-validation gains, and improving 50→500 common ridge under both label regimes; ordinary TailRL ridge worsens in every block | Sustained numerical learning supplies more age access under the common procedure. |
+| P2: continued TailRL fitting can accompany worsening held-out point prediction | Under SD-10, train loss falls from 0.1764 to 0.00293 while native and both common-readout errors rise in every block over 50→500 | The fitting/decision divergence transfers in the registered noisy interval. Clean native fixed-interval changes retain their mixed signs and different timing. |
+| P3: noisy free TailRL has a larger late affine-relative cost and less continued accessible learning | Final native/supplied/oracle costs and their 50→500 growth are positive in every block; the free head's absolute ridge changes have mixed signs | The matched constraint improves later learning relative to the free update rule. |
+| D: validation-selected scalar-MAE versus ordinary-Tail accuracy | Clean selected difference −0.561 ± 0.131 years; SD-10 difference −0.003 ± 0.051 with mixed block signs; noisy final difference −2.166 ± 0.515 | Selected decisions and final-horizon performance give distinct comparisons. |
+| D: CE and clean-Tail free-versus-affine transfer | Positive final common-ridge costs and growing gaps in every block in these scratch conditions | The useful constraint extends across objectives in this training recipe; the earlier ImageNet clean-Tail ordering remains part of the evidence. |
+| D: all 11 training rules | One-score binomial CE/Tail and scalar MSE also yield useful sustained predictors; binomial noisy selected means are below scalar MAE's | Numerical sharing and the implemented loss/update rule provide the broader account. MAE's exact properties and specific empirical effects supply its particular contribution. |
+
+The temporal result sharpens the supported hypothesis. Scalar MAE supplies a repeated useful learning horizon relative to ordinary TailRL, while the broader scalar/one-score group demonstrates useful numerical organization across losses. Strong own-field following can coexist with improving held-out age access. The completed interventions identify the numerical learning rule and its head–encoder trajectory as the explanatory level.

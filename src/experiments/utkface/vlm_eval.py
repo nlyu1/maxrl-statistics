@@ -55,6 +55,27 @@ class GPUProcessException(BaseModel):
     boot_id: str
 
 
+class SharedGPURuntime(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_identifier: Literal["0p8b_posttrained", "2b_posttrained"]
+    gpu_uuid: str
+    resident_processes: tuple[GPUProcessException, ...]
+    baseline_memory_mib: int = Field(ge=0)
+    total_memory_mib: int = Field(gt=0)
+    gpu_memory_utilization: float = Field(gt=0, le=0.4)
+    max_num_seqs: int = Field(gt=0, le=64)
+    client_concurrencies: tuple[int, ...]
+
+
+class SharedServingPolicy(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    observation: Path
+    observation_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    minimum_headroom_mib: int = Field(ge=4096)
+    maximum_resident_cpu_fraction: float = Field(gt=0, le=0.25)
+    grants: tuple[SharedGPURuntime, ...]
+
+
 class EvaluationPlan(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     manifest: Path
@@ -119,6 +140,49 @@ def load_plan(*, root: Path) -> EvaluationPlan:
         ):
             raise ValueError("Chat template differs from the pinned checkpoint")
     return plan
+
+
+def load_shared_policy(*, root: Path) -> SharedServingPolicy | None:
+    path = root / "shared-serving.json"
+    if not path.exists():
+        return None
+    policy = SharedServingPolicy.model_validate_json(path.read_text())
+    content = policy.observation.read_bytes()
+    if hashlib.sha256(content).hexdigest() != policy.observation_sha256:
+        raise ValueError("Shared-GPU idle observation changed")
+    observed = json.loads(content)
+    if not observed["accepted"] or observed["elapsed_seconds"] < 600:
+        raise ValueError("Shared GPUs require a completed ten-minute idle observation")
+    if observed["boot_id"] != Path("/proc/sys/kernel/random/boot_id").read_text().strip():
+        raise ValueError("Shared-GPU idle observation belongs to another server boot")
+    if {row["index"] for row in observed["gpus"]} != {1, 2, 3, 5, 9}:
+        raise ValueError("Idle observation must cover all five authorized candidates")
+    if any(row["max_utilization"] > 5 for row in observed["gpus"]):
+        raise ValueError("A candidate GPU was active during the observation")
+    if len({grant.model_identifier for grant in policy.grants}) != len(
+        policy.grants
+    ) or len({grant.gpu_uuid for grant in policy.grants}) != len(policy.grants):
+        raise ValueError("Each shared model requires a distinct GPU")
+    observed_uuids = {row["uuid"] for row in observed["gpus"]}
+    if any(grant.gpu_uuid not in observed_uuids for grant in policy.grants):
+        raise ValueError("Shared GPU was not observed")
+    if any(
+        process.gpu_uuid != grant.gpu_uuid
+        for grant in policy.grants
+        for process in grant.resident_processes
+    ):
+        raise ValueError("Resident exception differs from its granted GPU")
+    return policy
+
+
+def shared_runtime(
+    *, policy: SharedServingPolicy | None, identifier: str
+) -> SharedGPURuntime | None:
+    if policy is None:
+        return None
+    return next(
+        (grant for grant in policy.grants if grant.model_identifier == identifier), None
+    )
 
 
 def prepare(*, root: Path, manifest: Path, image: str) -> None:
@@ -302,6 +366,48 @@ def prepare_followup(*, root: Path, reference: Path, cache_volume: str) -> None:
     )
 
 
+def sampling_parameters(*, plan: EvaluationPlan) -> dict:
+    return {
+        "temperature": plan.temperature,
+        "top_p": plan.top_p,
+        "top_k": plan.top_k,
+        "min_p": 0.0,
+        "presence_penalty": plan.presence_penalty,
+        "repetition_penalty": 1.0,
+    }
+
+
+def prepare_thinking_rerun(*, root: Path, reference: Path, cache_volume: str) -> None:
+    prepare_followup(root=root, reference=reference, cache_volume=cache_volume)
+    plan = EvaluationPlan.model_validate_json((root / "plan.json").read_text())
+    evaluations = tuple(spec for spec in plan.evaluations if spec.mode == "thinking_on")
+    identifiers = {spec.model_identifier for spec in evaluations}
+    if len(evaluations) != 3 or len(identifiers) != 3:
+        raise ValueError("Expected three distinct thinking-on model sizes")
+    plan = EvaluationPlan.model_validate({
+        **plan.model_dump(),
+        "evaluations": evaluations,
+        "models": tuple(
+            model for model in plan.models if model.identifier in identifiers
+        ),
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 20,
+        "presence_penalty": 1.5,
+    })
+    write_json(path=root / "plan.json", payload=plan.model_dump(mode="json"))
+    provenance_path = root / "provenance.json"
+    provenance = json.loads(provenance_path.read_text())
+    provenance.update({
+        "sampling": sampling_parameters(plan=plan),
+        "sampling_source": "https://huggingface.co/Qwen/Qwen3.5-4B#best-practices",
+        "unchanged": "Pinned checkpoints, templates, 1024 evaluation images, 64 pilot images, eight samples, seeds, prompt, token-cap and concurrency pilots, serving configuration",
+        "superseded_evaluations": [spec.identifier for spec in evaluations],
+        "retention": "Reference responses stay in the reference root; no responses or tuning trials are copied into this rerun",
+    })
+    write_json(path=provenance_path, payload=provenance)
+
+
 def parse_age(*, content: str) -> float | None:
     final = content.rsplit("</think>", 1)[-1]
     boxes = re.findall(r"\\boxed\s*\{([^{}]*)\}", final)
@@ -453,10 +559,7 @@ def query_image(
             ],
             "n": samples,
             "max_tokens": max_tokens,
-            "temperature": plan.temperature,
-            "top_p": plan.top_p,
-            "top_k": plan.top_k,
-            "presence_penalty": plan.presence_penalty,
+            **sampling_parameters(plan=plan),
             "seed": plan.sampling_seed + index,
             "chat_template_kwargs": {"enable_thinking": spec.mode == "thinking_on"},
         },
@@ -467,6 +570,7 @@ def query_image(
         "index": index,
         "target": record["age"],
         "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
+        "sampling": sampling_parameters(plan=plan),
         "request_seconds": time.monotonic() - started,
         "response": response,
     }
@@ -648,9 +752,10 @@ def tune(
     )
     order = [
         (round_index, concurrency)
-        for round_index, candidates in enumerate(
-            (plan.client_concurrencies, plan.client_concurrencies[::-1])
-        )
+        for round_index, candidates in enumerate((
+            plan.client_concurrencies,
+            plan.client_concurrencies[::-1],
+        ))
         for concurrency in candidates
     ]
     for round_index, concurrency in order:
@@ -666,7 +771,9 @@ def tune(
                 samples=plan.samples,
                 max_tokens=cap,
                 concurrency=concurrency,
-                output=directory / "pilot" / f"concurrency_{concurrency}_{time.time_ns()}",
+                output=directory
+                / "pilot"
+                / f"concurrency_{concurrency}_{time.time_ns()}",
             )
         metrics = summarize_records(records=records, samples=plan.samples)
         concurrency_results.append({
@@ -830,6 +937,26 @@ def worker(
     *, root: Path, identifier: str, gpu_uuid: str, port: int, container: str
 ) -> None:
     plan = load_plan(root=root)
+    sharing = shared_runtime(
+        policy=load_shared_policy(root=root), identifier=identifier
+    )
+    if sharing is not None:
+        if sharing.gpu_uuid != gpu_uuid:
+            raise ValueError("Worker GPU differs from the authorized sharing grant")
+        plan = EvaluationPlan.model_validate({
+            **plan.model_dump(),
+            "gpu_memory_utilization": sharing.gpu_memory_utilization,
+            "max_num_seqs": sharing.max_num_seqs,
+            "client_concurrencies": sharing.client_concurrencies,
+        })
+    serving = {
+        "gpu_memory_utilization": plan.gpu_memory_utilization,
+        "max_num_seqs": plan.max_num_seqs,
+        "client_concurrencies": plan.client_concurrencies,
+        "max_model_len": plan.max_model_len,
+        "max_num_batched_tokens": plan.max_num_batched_tokens,
+        "sharing": sharing.model_dump(mode="json") if sharing is not None else None,
+    }
     model = next(model for model in plan.models if model.identifier == identifier)
     payload = read_manifest(path=plan.manifest)
     if payload["fingerprint"] != plan.fingerprint:
@@ -857,6 +984,7 @@ def worker(
             "started_at": time.time(),
             "gpu_uuid": gpu_uuid,
             "source_hashes": source_hashes(),
+            "serving": serving,
         },
     )
     try:
@@ -891,6 +1019,8 @@ def worker(
                 "evaluation": spec.model_dump(),
                 "model": model.model_dump(),
                 "fingerprint": plan.fingerprint,
+                "sampling": sampling_parameters(plan=plan),
+                "serving": serving,
                 "tuning": tuning,
                 "metrics": summarize_records(records=records, samples=plan.samples),
                 "successful_attempt_seconds": seconds,
@@ -973,6 +1103,10 @@ def report(*, root: Path) -> dict:
         "",
         f"Prompt: `{plan.prompt}`",
         "",
+        "Sampling: `"
+        + json.dumps(sampling_parameters(plan=plan), sort_keys=True)
+        + "`",
+        "",
         "| Configuration | Valid % | Pooled MAE | Pooled RMSE | Pooled Spearman | Mean-8 MAE | Median-8 MAE | Complete-8 images | Truncated |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
@@ -997,7 +1131,7 @@ def report(*, root: Path) -> dict:
         "",
         "Invalid answers remain in the raw responses and coverage counts; they are not silently imputed. JSON includes explicitly labeled worst-case invalid penalties. Truncation counts include length-limited completions even when a boxed number is present. Main prompts and sampling parameters are fixed; token caps and client concurrency are selected on disjoint pilot images using completion and throughput, without selecting on age accuracy.",
         "",
-        "Base models use their own weights/tokenizers/processors with the paired post-trained model's official chat template and thinking disabled. Thinking-on/off use identical post-trained weights and sampling parameters. Images are sent as bytes; filenames and labels are absent from model requests.",
+        "Base models use their own weights/tokenizers/processors with the paired post-trained model's official chat template and thinking disabled. Post-trained modes use pinned post-trained weights. Sampling parameters are recorded in the plan and new results. Images are sent as bytes; filenames and labels are absent from model requests.",
     ])
     (root / "REPORT.md").write_text("\n".join(lines) + "\n")
     return summary
@@ -1005,7 +1139,9 @@ def report(*, root: Path) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("prepare", "followup", "worker", "report"))
+    parser.add_argument(
+        "action", choices=("prepare", "followup", "thinking-rerun", "worker", "report")
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--image")
@@ -1024,6 +1160,12 @@ def main() -> None:
         if args.reference is None or args.cache_volume is None:
             parser.error("followup requires --reference and --cache-volume")
         prepare_followup(
+            root=args.root, reference=args.reference, cache_volume=args.cache_volume
+        )
+    elif args.action == "thinking-rerun":
+        if args.reference is None or args.cache_volume is None:
+            parser.error("thinking-rerun requires --reference and --cache-volume")
+        prepare_thinking_rerun(
             root=args.root, reference=args.reference, cache_volume=args.cache_volume
         )
     elif args.action == "worker":
