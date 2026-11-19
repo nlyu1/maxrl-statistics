@@ -27,3 +27,5 @@ writeup/assets/
 **.bak
 nogit**
 *.parquet
+server.md
+experiments/utkface/vlm/results/
