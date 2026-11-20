@@ -199,6 +199,31 @@ Secrets (`TINKER_API_KEY`, `WANDB_API_KEY`, `HF_TOKEN`) come from the gitignored
 `.env` at the repository root. Code runs on the server (see `server.md`), so the
 `.env` must be copied there out of band, never through Git.
 
+## Commands
+
+Run these on the server from a checkout of this branch. The solver worker runs
+in an isolated `uv` environment with vLLM 0.32.0, which keeps it separate from
+the project's torch and transformers pins. GPUs are claimed through
+`~/.local/state/maxrl-statistics/gpu-claims`.
+
+```bash
+ROOT=~/.local/state/maxrl-statistics/pass-rate-calibration-20261120
+M=src.experiments.pass_rate_calibration
+uv run python -m $M.solver launch --root $ROOT --gpus 6 7
+uv run python -m $M.solver grade --root $ROOT
+uv run python -m $M.ground_truth --root $ROOT
+uv run python -m $M.pilot run --root $ROOT --models qwen3-8b qwen3.5-4b
+uv run python -m $M.pilot report --root $ROOT --models qwen3-8b qwen3.5-4b --with-labels
+uv run python -m $M.head features --root $ROOT --gpu 7
+uv run python -m $M.head train-frozen --root $ROOT
+uv run python -m $M.head queue-full --root $ROOT --gpus 2 --cpu-offload
+uv run python -m $M.head report --root $ROOT
+```
+
+Reports are written to `$ROOT/ground-truth.md`, `$ROOT/pilot/pilot.md` and
+`$ROOT/heads/phase2.md`. Training curves are logged to the W&B project
+`maxrl-pass-rate-calibration`.
+
 ## Open decisions
 
 - Learning-rate protocol: after Phase 1.

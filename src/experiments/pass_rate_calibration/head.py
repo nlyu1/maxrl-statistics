@@ -52,6 +52,7 @@ from src.experiments.utkface.run import write_json
 EVAL_BATCH = 16
 FEATURE_BATCH = 8
 CHECK_TOLERANCE = 0.5
+OPTIMIZER_THREADS = 32
 
 
 @dataclass(kw_only=True, frozen=True, config=ConfigDict(arbitrary_types_allowed=True))
@@ -475,6 +476,7 @@ def queue_full(
                             **os.environ,
                             "CUDA_VISIBLE_DEVICES": visible_devices(gpus=claimed),
                             "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+                            "OMP_NUM_THREADS": str(OPTIMIZER_THREADS),
                         },
                         stdout=log,
                         stderr=subprocess.STDOUT,
