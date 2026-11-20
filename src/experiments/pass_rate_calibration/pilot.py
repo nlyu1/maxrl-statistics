@@ -46,7 +46,7 @@ def pilot_problems(*, root: Path) -> pl.DataFrame:
 
 
 async def sample_problem(
-    *, client: tinker.SamplingClient, tokens: list[int], seed: int, stop: list[int]
+    *, client: tinker.SamplingClient, tokens: list[int], stop: list[int]
 ) -> tuple[tinker.SampleResponse, float]:
     began = time.perf_counter()
     response = await client.sample(
@@ -55,7 +55,6 @@ async def sample_problem(
         sampling_params=tinker.SamplingParams(
             max_tokens=PILOT.max_tokens,
             temperature=PILOT.temperature,
-            seed=seed,
             stop=stop,
         ),
     )
@@ -66,12 +65,7 @@ async def sample_all(
     *, client: tinker.SamplingClient, prompts: list[list[int]], stop: list[int]
 ) -> list[tuple[tinker.SampleResponse, float]]:
     return await asyncio.gather(
-        *(
-            sample_problem(
-                client=client, tokens=tokens, seed=PILOT.seed + index, stop=stop
-            )
-            for index, tokens in enumerate(prompts)
-        )
+        *(sample_problem(client=client, tokens=tokens, stop=stop) for tokens in prompts)
     )
 
 
@@ -164,6 +158,12 @@ def model_summary(*, root: Path, model: PredictorModel) -> dict:
     summary = {
         "model": model.name,
         "rollouts": frame.height,
+        "distinct_completions_per_problem": float(
+            frame
+            .group_by("problem_id")
+            .agg(pl.col("completion").n_unique())["completion"]
+            .mean()
+        ),
         "completion_mean": float(lengths.mean()),
         "completion_median": float(np.median(lengths)),
         "completion_p90": float(np.quantile(lengths, 0.9)),
