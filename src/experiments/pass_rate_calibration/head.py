@@ -142,7 +142,12 @@ def extract_features(*, root: Path, gpu: int) -> None:
             .to(device)
             .eval()
         )
-        weight = (model.lm_head.weight[yes] - model.lm_head.weight[no]).float().cpu()
+        weight = (
+            (model.lm_head.weight[yes] - model.lm_head.weight[no])
+            .detach()
+            .float()
+            .cpu()
+        )
         hidden, readout = [], []
         with (
             torch.cuda.device(device),
@@ -253,6 +258,17 @@ def train(
                 if key not in ("step", "split") and value is not None
             }
         wandb.log(logged, step=step)
+        print(
+            json.dumps({
+                "run": run.identifier,
+                "step": step,
+                **{
+                    key: logged[key]
+                    for key in ("val/native_loss", "val/mae", "test/mae")
+                },
+            }),
+            flush=True,
+        )
         snapshots.append(pl.DataFrame({"step": step, "problem_id": labels.ids, "q": q}))
 
     record(0)
@@ -290,6 +306,11 @@ def train(
             wandb.log(
                 {"train/loss": mean_loss, "train/step_seconds": seconds}, step=step
             )
+            if step % 10 == 0:
+                print(
+                    json.dumps({"step": step, "loss": mean_loss, "seconds": seconds}),
+                    flush=True,
+                )
         if step % run.eval_every == 0 or step == run.steps:
             record(step)
     if not context.primary:
