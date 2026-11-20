@@ -199,6 +199,56 @@ Secrets (`TINKER_API_KEY`, `WANDB_API_KEY`, `HF_TOKEN`) come from the gitignored
 `.env` at the repository root. Code runs on the server (see `server.md`), so the
 `.env` must be copied there out of band, never through Git.
 
+## Status (2026-11-20)
+
+**Phase 0 is done.**
+- The gate passed: pass@1 is 0.312 on Minerva (paper about 0.295) and 0.248 on
+  JEEBench (paper about 0.25).
+- The training prior is 0.300. Of the 240 training problems, 88 have p̂ = 0
+  and 10 have p̂ = 1.
+- The random validation set is easier, with mean 0.403.
+- JEEBench has mean 0.248: math 0.316, phy 0.205, chem 0.185.
+- Truncation at 4096 tokens is 2.0% on Minerva and 8.3% on JEEBench.
+- Grader artifacts are inherited by design. Examples are rounded gold values
+  and the gold answer `np.arcsin(10/13)`.
+
+Pointwise optimum RMSE on the training p̂:
+
+| Method | N = 16 | N = 64 | N = 128 |
+|---|---|---|---|
+| MaxRL-shared | 0.019 | 0.003 | 0.002 |
+| MaxRL-split | 0.078 | 0.035 | 0.022 |
+| RLOO/GRPO | 0.167 | 0.167 | 0.167 |
+
+The constant training prior gives RMSE 0.376 on train.
+
+**Phase 1 is done, and Qwen3-8B is the predictor.**
+- Thinking traces average 2292 tokens. At the 4096 cap, 26% of rollouts abort
+  and 3% are malformed.
+- The untrained predictor answers Yes 98.9% of the time: mean q is 0.99 against
+  mean p̂ 0.36, with Pearson -0.06.
+- P(answer | reasoning) averages 0.999.
+- Qwen3.5-4B averages 3720 tokens, and 71% of its rollouts abort.
+- Projected Phase 3 cost per 300-step config is $190, $758 and $1,515 at
+  N = 16, 64 and 128.
+- A shared Tinker seed with `num_samples > 1` returns identical samples, so
+  never pass one.
+
+**Phase 2 frozen heads are done; the full fine-tunes are queued.** The queue
+runs on 2 L40s with CPU offload, at about 7.7 s per step. Selected frozen runs:
+
+| Run | Val MAE | Val Pearson | JEEBench MAE | JEEBench Pearson |
+|---|---|---|---|---|
+| Constant prior | 0.396 | - | 0.256 | - |
+| CE, binary labels, lr 1e-3 | 0.223 | 0.73 | 0.233 | 0.14 |
+| CE, soft p̂, lr 1e-3 | 0.218 | 0.74 | 0.234 | 0.16 |
+| MSE, binary labels, lr 3e-4 | 0.291 | 0.45 | 0.368 | 0.29 |
+| MSE, soft p̂, lr 3e-4 | 0.299 | 0.43 | 0.285 | 0.31 |
+
+MSE through the sigmoid cannot leave the saturated Yes/No initialization. The
+median |logit| is 4.25, and 42% of logits exceed 5. At lr ≥ 1e-3 every
+prediction collapses to 0 or 1.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
