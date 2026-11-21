@@ -162,9 +162,17 @@ Implementation (`rl.py`):
 - Problem order and labels are a function of (seed, step) alone. Every config
   sees the same batches and the same shared labels, and a resumed run continues
   exactly.
-- The base model is evaluated once on all 409 problems and shared as step 0.
-  Each 15-step epoch covers the training set once, so on-policy training
-  rollouts give a free train-set estimate (`train_epoch/*`).
+- Evaluation uses 16 samples per problem.
+  - Training, train and val evaluations use the 4096-token cap. JEEBench
+    evaluation uses 8192, because 35% of base-model JEEBench traces hit 4096,
+    mostly while solving the problem themselves.
+  - Every 15 steps (one epoch) the run evaluates the 32 val problems and a fixed
+    48-problem JEEBench subset (`test_subset/*`). The subset is stratified by
+    subject (21 math, 12 phy, 15 chem) and by p̂ tercile within each subject.
+  - The full train, val and JEEBench sets (`train_eval/*`, `test/*`) are
+    evaluated at step 0, which is the shared base model, and at the last step.
+  - Each epoch covers the training set once, so the on-policy rollouts also give
+    a free train-set estimate (`train_epoch/*`).
 - Every evaluation step saves sampler weights and a full Tinker state with
   optimizer moments. Rerunning a sweep with a longer horizon resumes from the
   last checkpoint, so a 30-step pilot extends to 300 steps without restarting.
@@ -357,7 +365,7 @@ uv run python -m $M.pilot report --root $ROOT --models qwen3-8b qwen3.5-4b --wit
 uv run python -m $M.head features --root $ROOT
 uv run python -m $M.head train-frozen --root $ROOT
 uv run python -m $M.head queue-full --root $ROOT --gpus 2 --cpu-offload \
-  --identifiers full-ce-soft-lr3e-06 full-mse-binary-lr3e-06
+  --identifiers full-ce-soft-lr3e-06
 uv run python -m $M.head report --root $ROOT
 uv run python -m $M.head compare --root $ROOT --reference $OLD_ROOT
 uv run python -m $M.rl launch --root $ROOT --sweep lr-pilot
@@ -384,5 +392,7 @@ under a new prompt, start a fresh `ROOT` and copy `problems.parquet` and
 - N grid: after Phase 0.
 - Whether GRPO and RLOO run at N = 16 only.
 - Predictor model: after Phase 1.
-- The Phase 2 heads used the original prompt. Rerun them under the current
-  prompt before comparing method families.
+- Phase 2 under the current prompt (root `pass-rate-calibration-20261120-small-base`):
+  all 24 frozen heads were rerun. Train and val barely change. JEEBench MAE is
+  slightly worse (0.29 vs 0.23) and JEEBench Pearson about 0.20. The full
+  fine-tune reruns were dropped.

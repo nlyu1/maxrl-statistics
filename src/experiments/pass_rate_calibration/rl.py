@@ -31,6 +31,7 @@ from src.experiments.pass_rate_calibration.config import (
     WANDB_PROJECT,
     RLRun,
     RLSweep,
+    Split,
     rl_sweep,
 )
 from src.experiments.pass_rate_calibration.data import (
@@ -47,7 +48,6 @@ from src.experiments.pass_rate_calibration.predictor import (
 )
 from src.experiments.utkface.run import write_json
 
-EVAL_SPLITS = ("val", "test")
 SWEEPS: tuple[RLSweep, ...] = ("smoke", "smoke-resume", "lr-pilot")
 
 
@@ -65,6 +65,7 @@ class Rollout:
     tokens: tuple[int, ...]
     logprobs: tuple[float, ...]
     stop_reason: str
+    max_tokens: int
     status: str
     answer: str
     confidence: float
@@ -101,22 +102,25 @@ def load_problems(*, root: Path, tokenizer: PreTrainedTokenizerBase) -> Problems
 
 
 def sampling_params(
-    *, run: RLRun, tokenizer: PreTrainedTokenizerBase
+    *, max_tokens: int, temperature: float, tokenizer: PreTrainedTokenizerBase
 ) -> tinker.SamplingParams:
     return tinker.SamplingParams(
-        max_tokens=run.max_tokens,
-        temperature=run.temperature,
+        max_tokens=max_tokens,
+        temperature=temperature,
         stop=stop_tokens(tokenizer=tokenizer),
     )
+
+
+def split_caps(*, run: RLRun) -> dict[Split, int]:
+    return {"train": run.max_tokens, "val": run.max_tokens, "test": run.test_max_tokens}
 
 
 def sample_rollouts(
     *,
     client: tinker.SamplingClient,
     problems: Problems,
-    rows: np.ndarray,
+    requests: list[tuple[int, tinker.SamplingParams]],
     samples: int,
-    params: tinker.SamplingParams,
     tokenizer: PreTrainedTokenizerBase,
 ) -> list[Rollout]:
     futures = [
@@ -125,10 +129,10 @@ def sample_rollouts(
             num_samples=samples,
             sampling_params=params,
         )
-        for row in rows
+        for row, params in requests
     ]
     rollouts = []
-    for row, future in zip(rows, futures, strict=True):
+    for (row, params), future in zip(requests, futures, strict=True):
         sequences = future.result().sequences
         if len(sequences) != samples:
             raise RuntimeError(f"Expected {samples} samples, got {len(sequences)}")
@@ -149,6 +153,7 @@ def sample_rollouts(
                     tokens=tuple(tokens),
                     logprobs=tuple(logprobs),
                     stop_reason=sequence.stop_reason,
+                    max_tokens=params.max_tokens,
                     status=parsed["status"],
                     answer=parsed["answer"] or "",
                     confidence=float("nan")
@@ -173,6 +178,7 @@ def rollout_frame(
                 "sample": rollout.sample,
                 "completion_tokens": len(rollout.tokens),
                 "stop_reason": rollout.stop_reason,
+                "max_tokens": rollout.max_tokens,
                 "status": rollout.status,
                 "answer": rollout.answer,
                 "confidence": rollout.confidence,
@@ -288,11 +294,68 @@ def prefixed(*, metrics: dict[str, float], prefix: str) -> dict[str, float]:
     return {f"{prefix}/{key}": value for key, value in metrics.items()}
 
 
-def eval_logs(*, metrics: dict[str, dict[str, float]]) -> dict[str, float]:
-    names = {"train": "train_eval", "val": "val", "test": "test"}
+def test_subset(*, root: Path, problems: Problems, run: RLRun) -> frozenset[str]:
+    test = problems.frame.filter(pl.col("split") == "test")
+    subjects = test.group_by("subject").len().sort("subject")
+    shares = subjects["len"].to_numpy() * run.test_subset_size / test.height
+    quota = np.floor(shares).astype(int)
+    quota[np.argsort(quota - shares)[: run.test_subset_size - quota.sum()]] += 1
+    generator = np.random.default_rng((run.seed, 2))
+    chosen = []
+    for subject, count in zip(subjects["subject"], quota, strict=True):
+        pool = (
+            test
+            .filter(pl.col("subject") == subject)
+            .sort("p_hat", "problem_id")["problem_id"]
+            .to_numpy()
+        )
+        for tercile, slots in zip(
+            np.array_split(pool, 3), np.array_split(np.arange(count), 3), strict=True
+        ):
+            chosen += generator.choice(tercile, size=len(slots), replace=False).tolist()
+    subset = frozenset(chosen)
+    path = root / "rl" / f"test-subset-{run.test_subset_size}.json"
+    if path.exists():
+        if frozenset(json.loads(path.read_text())["problem_ids"]) != subset:
+            raise ValueError(f"{path} disagrees with the stratified test subset")
+        return subset
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(
+        path=path,
+        payload={
+            "problem_ids": sorted(subset),
+            "quota": dict(zip(subjects["subject"], map(int, quota), strict=True)),
+            "seed": run.seed,
+        },
+    )
+    return subset
+
+
+def eval_logs(
+    *, frame: pl.DataFrame, problems: Problems, run: RLRun, subset: frozenset[str]
+) -> dict[str, float]:
+    metrics = evaluation_metrics(frame=frame, problems=problems, run=run)
     logged = {}
-    for split, values in metrics.items():
-        logged |= prefixed(metrics=values, prefix=names[split])
+    for split, prefix in (("train", "train_eval"), ("val", "val")):
+        if split in metrics:
+            logged |= prefixed(metrics=metrics[split], prefix=prefix)
+    tested = set(
+        frame.join(
+            problems.frame.select("problem_id", "split"), on="problem_id"
+        ).filter(pl.col("split") == "test")["problem_id"]
+    )
+    if len(tested) == int((problems.frame["split"] == "test").sum()):
+        logged |= prefixed(metrics=metrics["test"], prefix="test")
+    if not subset <= tested:
+        raise ValueError("An evaluation must cover the whole test subset")
+    logged |= prefixed(
+        metrics=evaluation_metrics(
+            frame=frame.filter(pl.col("problem_id").is_in(sorted(subset))),
+            problems=problems,
+            run=run,
+        )["test"],
+        prefix="test_subset",
+    )
     return logged
 
 
@@ -362,7 +425,6 @@ def train_step(
     tokenizer: PreTrainedTokenizerBase,
     sampler: tinker.SamplingClient,
     training: tinker.TrainingClient,
-    params: tinker.SamplingParams,
     step: int,
 ) -> tuple[dict[str, float], pl.DataFrame]:
     began = time.perf_counter()
@@ -371,12 +433,14 @@ def train_step(
     labels = np.broadcast_to(
         step_labels(p=p, run=run, step=step), (len(rows), run.rollouts)
     ).copy()
+    params = sampling_params(
+        max_tokens=run.max_tokens, temperature=run.temperature, tokenizer=tokenizer
+    )
     rollouts = sample_rollouts(
         client=sampler,
         problems=problems,
-        rows=rows,
+        requests=[(int(row), params) for row in rows],
         samples=run.rollouts,
-        params=params,
         tokenizer=tokenizer,
     )
     sampled = time.perf_counter()
@@ -465,60 +529,19 @@ def train_step(
     return metrics, frame
 
 
-def base_eval_path(*, root: Path, run: RLRun) -> Path:
+def base_eval_groups(*, run: RLRun) -> dict[int, tuple[Split, ...]]:
+    groups: dict[int, tuple[Split, ...]] = {}
+    for split, cap in split_caps(run=run).items():
+        groups[cap] = (*groups.get(cap, ()), split)
+    return groups
+
+
+def base_eval_directory(*, root: Path, run: RLRun, max_tokens: int) -> Path:
     return (
         root
         / "rl"
         / "base-eval"
-        / f"samples{run.eval_samples}-tokens{run.max_tokens}-temp{run.temperature:g}"
-    )
-
-
-def base_eval(*, root: Path, run: RLRun) -> None:
-    directory = base_eval_path(root=root, run=run)
-    if (directory / "meta.json").exists():
-        meta = json.loads((directory / "meta.json").read_text())
-        if meta["prompt"] != PREDICTOR_PROMPT:
-            raise ValueError(f"{directory} was sampled with a different prompt")
-        return
-    tokenizer = AutoTokenizer.from_pretrained(
-        RL_PREDICTOR.repository, revision=RL_PREDICTOR.revision
-    )
-    problems = load_problems(root=root, tokenizer=tokenizer)
-    client = (
-        tinker
-        .ServiceClient()
-        .create_sampling_client(base_model=RL_PREDICTOR.repository)
-        .result()
-    )
-    began = time.perf_counter()
-    frame = rollout_frame(
-        rollouts=sample_rollouts(
-            client=client,
-            problems=problems,
-            rows=np.arange(problems.frame.height),
-            samples=run.eval_samples,
-            params=sampling_params(run=run, tokenizer=tokenizer),
-            tokenizer=tokenizer,
-        ),
-        problems=problems,
-        tokenizer=tokenizer,
-    )
-    directory.mkdir(parents=True, exist_ok=True)
-    frame.write_parquet(directory / "rollouts.parquet")
-    write_json(
-        path=directory / "meta.json",
-        payload={
-            "prompt": PREDICTOR_PROMPT,
-            "model": RL_PREDICTOR.model_dump(),
-            "eval_samples": run.eval_samples,
-            "max_tokens": run.max_tokens,
-            "temperature": run.temperature,
-            "seconds": time.perf_counter() - began,
-            "cost_usd": sampling_cost(
-                frame=frame, problems=problems, samples=run.eval_samples
-            ),
-        },
+        / f"samples{run.eval_samples}-tokens{max_tokens}-temp{run.temperature:g}"
     )
 
 
@@ -527,22 +550,93 @@ def evaluate(
     client: tinker.SamplingClient,
     problems: Problems,
     run: RLRun,
-    params: tinker.SamplingParams,
     tokenizer: PreTrainedTokenizerBase,
+    rows: np.ndarray,
 ) -> pl.DataFrame:
-    rows = np.flatnonzero(problems.frame["split"].is_in(EVAL_SPLITS).to_numpy())
+    params = {
+        split: sampling_params(
+            max_tokens=cap, temperature=run.temperature, tokenizer=tokenizer
+        )
+        for split, cap in split_caps(run=run).items()
+    }
+    splits = problems.frame["split"].to_numpy()
     return rollout_frame(
         rollouts=sample_rollouts(
             client=client,
             problems=problems,
-            rows=rows,
+            requests=[(int(row), params[splits[row]]) for row in rows],
             samples=run.eval_samples,
-            params=params,
             tokenizer=tokenizer,
         ),
         problems=problems,
         tokenizer=tokenizer,
     )
+
+
+def base_eval(*, root: Path, run: RLRun) -> None:
+    tokenizer = AutoTokenizer.from_pretrained(
+        RL_PREDICTOR.repository, revision=RL_PREDICTOR.revision
+    )
+    problems = load_problems(root=root, tokenizer=tokenizer)
+    test_subset(root=root, problems=problems, run=run)
+    client = (
+        tinker
+        .ServiceClient()
+        .create_sampling_client(base_model=RL_PREDICTOR.repository)
+        .result()
+    )
+    for cap, splits in base_eval_groups(run=run).items():
+        directory = base_eval_directory(root=root, run=run, max_tokens=cap)
+        if (directory / "meta.json").exists():
+            meta = json.loads((directory / "meta.json").read_text())
+            if meta["prompt"] != PREDICTOR_PROMPT:
+                raise ValueError(f"{directory} was sampled with a different prompt")
+            continue
+        began = time.perf_counter()
+        frame = evaluate(
+            client=client,
+            problems=problems,
+            run=run,
+            tokenizer=tokenizer,
+            rows=np.flatnonzero(problems.frame["split"].is_in(splits).to_numpy()),
+        )
+        directory.mkdir(parents=True, exist_ok=True)
+        frame.write_parquet(directory / "rollouts.parquet")
+        write_json(
+            path=directory / "meta.json",
+            payload={
+                "prompt": PREDICTOR_PROMPT,
+                "model": RL_PREDICTOR.model_dump(),
+                "splits": list(splits),
+                "eval_samples": run.eval_samples,
+                "max_tokens": cap,
+                "temperature": run.temperature,
+                "seconds": time.perf_counter() - began,
+                "cost_usd": sampling_cost(
+                    frame=frame, problems=problems, samples=run.eval_samples
+                ),
+            },
+        )
+
+
+def load_base_eval(*, root: Path, run: RLRun, problems: Problems) -> pl.DataFrame:
+    frames = []
+    for cap, splits in base_eval_groups(run=run).items():
+        directory = base_eval_directory(root=root, run=run, max_tokens=cap)
+        frame = (
+            pl
+            .read_parquet(directory / "rollouts.parquet")
+            .join(problems.frame.select("problem_id", "split"), on="problem_id")
+            .filter(pl.col("split").is_in(splits))
+            .drop("split")
+        )
+        if "max_tokens" not in frame.columns:
+            frame = frame.with_columns(max_tokens=pl.lit(cap, dtype=pl.Int64))
+        expected = int(problems.frame["split"].is_in(splits).sum())
+        if frame["problem_id"].n_unique() != expected:
+            raise ValueError(f"{directory} does not cover the splits {splits}")
+        frames.append(frame.select(sorted(frame.columns)))
+    return pl.concat(frames)
 
 
 def read_history(*, directory: Path) -> list[dict]:
@@ -570,8 +664,13 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
     if len(problems.train) % run.problems_per_step:
         raise ValueError("Problems per step must divide the training set")
     steps_per_epoch = len(problems.train) // run.problems_per_step
-    base = pl.read_parquet(base_eval_path(root=root, run=run) / "rollouts.parquet")
-    params = sampling_params(run=run, tokenizer=tokenizer)
+    base = load_base_eval(root=root, run=run, problems=problems)
+    subset = test_subset(root=root, problems=problems, run=run)
+    identifiers = problems.frame["problem_id"].to_numpy()
+    periodic_rows = np.flatnonzero(
+        (problems.frame["split"].to_numpy() == "val")
+        | np.isin(identifiers, sorted(subset))
+    )
     service = tinker.ServiceClient()
     state_path = directory / "state.json"
     if state_path.exists():
@@ -646,7 +745,7 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
                     "rollout/sampled_reward",
                     "rollout/yes_rate",
                     "val/mae",
-                    "test/mae",
+                    "test_subset/mae",
                     "cost/cumulative_usd",
                 )
                 if key in metrics
@@ -658,9 +757,7 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
         record({
             "step": 0,
             "cost/cumulative_usd": 0.0,
-            **eval_logs(
-                metrics=evaluation_metrics(frame=base, problems=problems, run=run)
-            ),
+            **eval_logs(frame=base, problems=problems, run=run, subset=subset),
         })
     for step in range(start, run.steps + 1):
         began = time.perf_counter()
@@ -670,7 +767,6 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
             tokenizer=tokenizer,
             sampler=sampler,
             training=training,
-            params=params,
             step=step,
         )
         frame.write_parquet(directory / "rollouts" / f"step-{step:04d}.parquet")
@@ -695,12 +791,14 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
                 client=sampler,
                 problems=problems,
                 run=run,
-                params=params,
                 tokenizer=tokenizer,
+                rows=np.arange(problems.frame.height)
+                if step == run.steps
+                else periodic_rows,
             )
             evaluated.write_parquet(directory / "eval" / f"step-{step:04d}.parquet")
             metrics |= eval_logs(
-                metrics=evaluation_metrics(frame=evaluated, problems=problems, run=run)
+                frame=evaluated, problems=problems, run=run, subset=subset
             )
             metrics["cost/eval_usd"] = sampling_cost(
                 frame=evaluated, problems=problems, samples=run.eval_samples
@@ -787,7 +885,13 @@ STEP_PANELS = (
     "rollout/completion_mean",
     "rollout/batch_bias",
 )
-EVAL_PANELS = ("val/mae", "val/spearman", "test/mae", "test/spearman", "test/bias")
+EVAL_PANELS = (
+    "val/mae",
+    "val/spearman",
+    "test_subset/mae",
+    "test_subset/spearman",
+    "test_subset/bias",
+)
 
 
 def report(*, root: Path, sweep: RLSweep) -> None:
@@ -834,10 +938,13 @@ def report(*, root: Path, sweep: RLSweep) -> None:
         "val/mae",
         "val/spearman",
         "val/bias",
+        "test_subset/mae",
+        "test_subset/spearman",
         "test/mae",
         "test/spearman",
         "test/bias",
-        "rollout/abort_rate",
+        "test/abort_rate",
+        "train_eval/mae",
         "cost/cumulative_usd",
     )
     rows = []
@@ -851,7 +958,11 @@ def report(*, root: Path, sweep: RLSweep) -> None:
     lines = [
         f"# Phase 3 sweep `{sweep}`",
         "",
-        "Step 0 is the shared base model; the last row per run is its final evaluation.",
+        (
+            "Step 0 is the shared base model; the last row per run is its final "
+            "evaluation. `test_subset` is the fixed stratified JEEBench subset, and "
+            "`test` and `train_eval` are the full sets (step 0 and the last step)."
+        ),
         "",
         markdown_table(frame=pl.DataFrame(rows, infer_schema_length=None))
         if rows

@@ -93,8 +93,10 @@ class RLRun(Frozen):
     problems_per_step: int = Field(gt=0)
     eval_every: int = Field(gt=0)
     eval_samples: int = Field(gt=0)
+    test_subset_size: int = Field(gt=0)
     lora_rank: int = Field(gt=0)
     max_tokens: int = Field(gt=0)
+    test_max_tokens: int = Field(gt=0)
     temperature: float = Field(gt=0)
     std_floor: float = Field(gt=0)
     seed: int
@@ -215,6 +217,8 @@ RL_PREDICTOR = PREDICTORS["qwen3-8b"]
 RL_LORA_RANK = 32
 RL_STD_FLOOR = 1e-8
 RL_SEED = 20261121
+RL_TEST_MAX_TOKENS = 8192
+RL_TEST_SUBSET_SIZE = 48
 ENOTATION_PATTERN = r"[-+]?(\d+\.?\d*|\.\d+)[eE][-+]?\d+"
 
 
@@ -241,8 +245,10 @@ def rl_run(
         problems_per_step=problems_per_step,
         eval_every=eval_every,
         eval_samples=eval_samples,
+        test_subset_size=RL_TEST_SUBSET_SIZE,
         lora_rank=RL_LORA_RANK,
         max_tokens=PILOT.max_tokens,
+        test_max_tokens=RL_TEST_MAX_TOKENS,
         temperature=PILOT.temperature,
         std_floor=RL_STD_FLOOR,
         seed=RL_SEED,
@@ -259,7 +265,7 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
                 learning_rate=1e-5,
                 steps=2 if name == "smoke" else 3,
                 problems_per_step=2,
-                eval_every=2,
+                eval_every=1,
                 eval_samples=2,
             )
         ]
@@ -271,7 +277,7 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
             learning_rate=learning_rate,
             steps=30,
             problems_per_step=16,
-            eval_every=10,
+            eval_every=15,
             eval_samples=16,
         )
         for method in ("rloo", "maxrl")
