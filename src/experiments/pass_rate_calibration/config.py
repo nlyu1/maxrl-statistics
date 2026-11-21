@@ -272,7 +272,7 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
     grid: tuple[tuple[PolicyMethod, Protocol, tuple[float, ...]], ...] = (
         ("rloo", "shared", (5e-6, 1e-5, 3e-5, 1e-4)),
         ("maxrl", "shared", (5e-6, 1e-5, 3e-5, 1e-4)),
-        ("maxrl", "split", (5e-6, 1e-5)),
+        ("maxrl", "split", (5e-6, 1e-5, 3e-5, 1e-4)),
     )
     return [
         rl_run(
