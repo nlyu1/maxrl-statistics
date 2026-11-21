@@ -35,12 +35,12 @@ from src.experiments.pass_rate_calibration.config import (
     HeadRun,
     head_runs,
 )
-from src.experiments.pass_rate_calibration.data import read_labels, read_problems
-from src.experiments.pass_rate_calibration.gpu import (
-    claimed_gpus,
-    visible_devices,
-    wait_for_gpus,
+from src.experiments.pass_rate_calibration.data import (
+    read_labels,
+    read_problems,
+    require_gate,
 )
+from src.experiments.pass_rate_calibration.gpu import visible_devices, waited_gpus
 from src.experiments.pass_rate_calibration.ground_truth import markdown_table
 from src.experiments.pass_rate_calibration.metrics import prediction_metrics
 from src.experiments.pass_rate_calibration.predictor import (
@@ -65,10 +65,7 @@ class LabelledProblems:
 
 
 def load_labelled(*, root: Path) -> LabelledProblems:
-    if not json.loads((root / "ground-truth.json").read_text())["gate_passed"]:
-        raise RuntimeError(
-            "Phase 0 pass@1 gate failed; reconcile the solver settings first"
-        )
+    require_gate(root=root)
     labels = read_labels(root=root).sort("problem_id")
     splits = labels["split"].to_numpy()
     return LabelledProblems(
@@ -127,11 +124,11 @@ class BackbonePredictor(nn.Module):
         return self.head(state[torch.arange(len(last), device=last.device), last])
 
 
-def extract_features(*, root: Path, gpu: int) -> None:
+def extract_features(*, root: Path, poll_seconds: float) -> None:
     directory = root / "heads"
     directory.mkdir(parents=True, exist_ok=True)
     sequences, pad, (yes, no) = backbone_sequences(root=root)
-    with claimed_gpus(indices=(gpu,)) as claimed:
+    with waited_gpus(count=1, poll_seconds=poll_seconds) as claimed:
         os.environ["CUDA_VISIBLE_DEVICES"] = claimed[0]["uuid"]
         device = torch.device("cuda:0")
         model = (
@@ -254,11 +251,13 @@ def train(
     if context.primary:
         directory.mkdir(parents=True, exist_ok=True)
         write_json(path=directory / "config.json", payload=run.model_dump())
+        root = directory.parent.parent
         wandb.init(
             project=WANDB_PROJECT,
             name=f"phase2/{run.identifier}",
             group=f"phase2-{run.backbone}",
-            config=run.model_dump(),
+            tags=[root.name],
+            config={**run.model_dump(), "root": root.name, "prompt": PREDICTOR_PROMPT},
             dir=str(directory),
         )
 
@@ -468,50 +467,49 @@ def train_full(*, root: Path, identifier: str, cpu_offload: bool) -> None:
 
 
 def queue_full(
-    *, root: Path, gpus: int, cpu_offload: bool, poll_seconds: float
+    *,
+    root: Path,
+    identifiers: list[str],
+    gpus: int,
+    cpu_offload: bool,
+    poll_seconds: float,
 ) -> None:
     (root / "logs").mkdir(exist_ok=True)
-    for run in head_runs(backbone="full", learning_rates=FULL_LEARNING_RATES):
+    for run in [full_run(identifier=identifier) for identifier in identifiers]:
         if finished(directory=root / "heads" / run.identifier):
             continue
-        while True:
-            indices = wait_for_gpus(count=gpus, poll_seconds=poll_seconds)
-            try:
-                with (
-                    claimed_gpus(indices=indices) as claimed,
-                    (root / "logs" / f"{run.identifier}.log").open("a") as log,
-                ):
-                    code = subprocess.run(
-                        [
-                            "uv",
-                            "run",
-                            "python",
-                            "-m",
-                            "torch.distributed.run",
-                            "--standalone",
-                            f"--nproc-per-node={gpus}",
-                            "-m",
-                            "src.experiments.pass_rate_calibration.head",
-                            "train-full",
-                            "--root",
-                            str(root),
-                            "--identifier",
-                            run.identifier,
-                            *(["--cpu-offload"] if cpu_offload else []),
-                        ],
-                        env={
-                            **os.environ,
-                            "CUDA_VISIBLE_DEVICES": visible_devices(gpus=claimed),
-                            "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
-                            "OMP_NUM_THREADS": str(OPTIMIZER_THREADS),
-                        },
-                        stdout=log,
-                        stderr=subprocess.STDOUT,
-                        check=False,
-                    ).returncode
-                break
-            except (RuntimeError, BlockingIOError):
-                time.sleep(poll_seconds)
+        with (
+            waited_gpus(count=gpus, poll_seconds=poll_seconds) as claimed,
+            (root / "logs" / f"{run.identifier}.log").open("a") as log,
+        ):
+            code = subprocess.run(
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-m",
+                    "torch.distributed.run",
+                    "--standalone",
+                    f"--nproc-per-node={gpus}",
+                    "-m",
+                    "src.experiments.pass_rate_calibration.head",
+                    "train-full",
+                    "--root",
+                    str(root),
+                    "--identifier",
+                    run.identifier,
+                    *(["--cpu-offload"] if cpu_offload else []),
+                ],
+                env={
+                    **os.environ,
+                    "CUDA_VISIBLE_DEVICES": visible_devices(gpus=claimed),
+                    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+                    "OMP_NUM_THREADS": str(OPTIMIZER_THREADS),
+                },
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                check=False,
+            ).returncode
         if code:
             raise RuntimeError(f"{run.identifier} failed with exit code {code}")
 
@@ -585,15 +583,19 @@ def plot_selected(*, root: Path, selected: pl.DataFrame, path: Path) -> None:
     plt.close(figure)
 
 
-def report(*, root: Path) -> None:
-    results = result_rows(root=root)
-    selected = (
+def selected_runs(*, results: pl.DataFrame) -> pl.DataFrame:
+    return (
         results
         .sort("val_native_loss")
         .group_by("backbone", "loss", "target", maintain_order=True)
         .first()
         .sort("backbone", "loss", "target")
     )
+
+
+def report(*, root: Path) -> None:
+    results = result_rows(root=root)
+    selected = selected_runs(results=results)
     features = load_features(root=root)
     labels = read_labels(root=root).sort("problem_id")
     zero_shot = torch.sigmoid(features["zero_shot_logit"]).numpy()
@@ -664,21 +666,164 @@ def report(*, root: Path) -> None:
     )
 
 
+def zero_shot_summary(*, root: Path, labels: pl.DataFrame) -> list[dict]:
+    features = torch.load(root / "heads" / "features.pt")
+    if tuple(features["problem_ids"]) != tuple(labels["problem_id"]):
+        raise ValueError(f"{root}: feature cache and labels disagree on problem order")
+    logits = features["zero_shot_logit"].numpy()
+    rows = []
+    for split in SPLITS:
+        mask = labels["split"].to_numpy() == split
+        metrics = prediction_metrics(
+            q=1 / (1 + np.exp(-logits[mask])), p=labels["p_hat"].to_numpy()[mask]
+        )
+        rows.append({
+            "root": root.name,
+            "split": split,
+            "median_abs_logit": float(np.median(np.abs(logits[mask]))),
+            "saturated_fraction": float((np.abs(logits[mask]) > math.log(19)).mean()),
+            **{key: metrics[key] for key in ("mean_q", "mae", "pearson", "spearman")},
+        })
+    return rows
+
+
+def plot_comparison(
+    *,
+    histories: dict[tuple[str, str], pl.DataFrame],
+    identifiers: list[str],
+    path: Path,
+) -> None:
+    metrics = ("mae", "pearson", "bias")
+    figure, axes = plt.subplots(
+        len(identifiers),
+        len(metrics),
+        figsize=(4.2 * len(metrics), 2.6 * len(identifiers)),
+        constrained_layout=True,
+        squeeze=False,
+        sharex=True,
+    )
+    for row, identifier in enumerate(identifiers):
+        for column, metric in enumerate(metrics):
+            axis = axes[row, column]
+            for color, split in zip(SERIES_COLORS, SPLITS, strict=False):
+                for version, style in (("new", "-"), ("reference", "--")):
+                    frame = histories[(version, identifier)].filter(
+                        pl.col("split") == split
+                    )
+                    axis.plot(
+                        frame["step"],
+                        frame[metric],
+                        color=color,
+                        linestyle=style,
+                        linewidth=2 if version == "new" else 1.2,
+                        label=f"{split} ({version})",
+                    )
+            axis.set_title(f"{identifier}: {metric}", fontsize=9)
+            axis.grid(alpha=0.3, linewidth=0.5)
+            axis.spines[["top", "right"]].set_visible(False)
+    for axis in axes[-1]:
+        axis.set_xlabel("step")
+    axes[0, 0].legend(frameon=False, fontsize=7, ncol=2)
+    figure.savefig(path, dpi=130)
+    plt.close(figure)
+
+
+def compare(*, root: Path, reference: Path) -> None:
+    identifiers = sorted(
+        path.parent.name
+        for path in (root / "heads").glob("*/result.json")
+        if (reference / "heads" / path.parent.name / "result.json").exists()
+    )
+    if not identifiers:
+        raise ValueError("No finished runs are shared by the two roots")
+    histories = {
+        (version, identifier): pl.read_parquet(
+            base / "heads" / identifier / "history.parquet"
+        )
+        for version, base in (("new", root), ("reference", reference))
+        for identifier in identifiers
+    }
+    finals = []
+    for identifier in identifiers:
+        row = {"identifier": identifier}
+        for version in ("reference", "new"):
+            frame = histories[(version, identifier)]
+            last = frame.filter(pl.col("step") == frame["step"].max())
+            for split in ("val", "test"):
+                values = last.filter(pl.col("split") == split).row(0, named=True)
+                for metric in ("mae", "pearson", "bias"):
+                    row[f"{split}_{metric}_{version}"] = values[metric]
+        finals.append(row)
+    labels = read_labels(root=root).sort("problem_id")
+    if not labels.equals(read_labels(root=reference).sort("problem_id")):
+        raise ValueError("The two roots use different labels")
+    plotted = [
+        identifier
+        for identifier in selected_runs(results=result_rows(root=root))["identifier"]
+        if identifier in identifiers
+    ]
+    directory = root / "heads"
+    plot_comparison(
+        histories=histories,
+        identifiers=plotted,
+        path=directory / "prompt-comparison.png",
+    )
+    lines = [
+        "# Phase 2 under the current prompt vs the reference prompt",
+        "",
+        f"Reference root: `{reference.name}`. New root: `{root.name}`.",
+        "",
+        "## Zero-shot Yes/No readout (the shared head initialization)",
+        "",
+        markdown_table(
+            frame=pl.DataFrame([
+                *zero_shot_summary(root=reference, labels=labels),
+                *zero_shot_summary(root=root, labels=labels),
+            ])
+        ),
+        "",
+        "## Final metrics (step 300)",
+        "",
+        markdown_table(frame=pl.DataFrame(finals)),
+        "",
+        "Curves for each family's selected run (solid: new prompt, dashed: reference).",
+        "",
+        "![comparison](prompt-comparison.png)",
+        "",
+    ]
+    (directory / "prompt-comparison.md").write_text("\n".join(lines))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=("features", "train-frozen", "train-full", "queue-full", "report"),
+        choices=(
+            "features",
+            "train-frozen",
+            "train-full",
+            "queue-full",
+            "report",
+            "compare",
+        ),
     )
     parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--gpu", type=int)
+    parser.add_argument("--reference", type=Path)
     parser.add_argument("--identifier")
+    parser.add_argument(
+        "--identifiers",
+        nargs="+",
+        default=[
+            run.identifier
+            for run in head_runs(backbone="full", learning_rates=FULL_LEARNING_RATES)
+        ],
+    )
     parser.add_argument("--gpus", type=int)
     parser.add_argument("--cpu-offload", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=300.0)
     args = parser.parse_args()
     if args.command == "features":
-        extract_features(root=args.root, gpu=args.gpu)
+        extract_features(root=args.root, poll_seconds=args.poll_seconds)
     elif args.command == "train-frozen":
         train_frozen(root=args.root)
     elif args.command == "train-full":
@@ -688,12 +833,15 @@ def main() -> None:
     elif args.command == "queue-full":
         queue_full(
             root=args.root,
+            identifiers=args.identifiers,
             gpus=args.gpus,
             cpu_offload=args.cpu_offload,
             poll_seconds=args.poll_seconds,
         )
-    else:
+    elif args.command == "report":
         report(root=args.root)
+    else:
+        compare(root=args.root, reference=args.reference)
 
 
 if __name__ == "__main__":

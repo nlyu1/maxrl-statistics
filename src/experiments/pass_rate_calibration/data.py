@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -60,3 +61,10 @@ def read_problems(*, root: Path) -> pl.DataFrame:
 
 def read_labels(*, root: Path) -> pl.DataFrame:
     return pl.read_parquet(root / "labels.parquet")
+
+
+def require_gate(*, root: Path) -> None:
+    if not json.loads((root / "ground-truth.json").read_text())["gate_passed"]:
+        raise RuntimeError(
+            "Phase 0 pass@1 gate failed; reconcile the solver settings first"
+        )

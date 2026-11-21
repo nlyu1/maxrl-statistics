@@ -46,5 +46,19 @@ def wait_for_gpus(*, count: int, poll_seconds: float) -> tuple[int, ...]:
         time.sleep(poll_seconds)
 
 
+@contextmanager
+def waited_gpus(*, count: int, poll_seconds: float) -> Iterator[list[dict]]:
+    while True:
+        indices = wait_for_gpus(count=count, poll_seconds=poll_seconds)
+        with ExitStack() as stack:
+            try:
+                claimed = stack.enter_context(claimed_gpus(indices=indices))
+            except (RuntimeError, BlockingIOError):
+                time.sleep(poll_seconds)
+                continue
+            yield claimed
+            return
+
+
 def visible_devices(*, gpus: list[dict]) -> str:
     return ",".join(gpu["uuid"] for gpu in gpus)
