@@ -348,9 +348,10 @@ Each row below is the run with the lowest final validation native loss:
   config, down from $190.
 
 **Phase 3 learning-rate pilot (2026-11-21).**
-- Setup: RLOO and MaxRL-shared, N = 16, 30 steps, lr ∈ {1e-5, 3e-5, 1e-4}, with
-  shared batches and labels. Cost: $106 for the six runs plus $12.7 for the
-  shared base evaluations.
+- Setup: RLOO and MaxRL-shared at lr ∈ {5e-6, 1e-5, 3e-5, 1e-4}, plus
+  MaxRL-split at {5e-6, 1e-5}. All runs use N = 16 and 30 steps, with shared
+  batches; shared-label runs also share labels. Cost: $196 for the ten runs plus
+  $12.7 for the shared base evaluations.
 - Results: the outputs are in `$ROOT/rl/lr-pilot.md` and the W&B group
   `phase3-lr-pilot`. At 8192 tokens the base model hits the cap on 7% of
   JEEBench traces (35% at 4096), and JEEBench Spearman barely moves (0.45 → 0.47).
@@ -358,12 +359,26 @@ Each row below is the run with the lowest final validation native loss:
 | Run (step 30) | Yes rate | Val MAE | Val ρ | JEE MAE | JEE ρ | JEE bias |
 |---|---|---|---|---|---|---|
 | Base model (step 0) | 0.79 | 0.497 | 0.39 | 0.466 | 0.47 | +0.45 |
+| RLOO 5e-6 | 0.81 | 0.462 | 0.48 | 0.426 | 0.46 | +0.40 |
 | RLOO 1e-5 | 0.70 | 0.358 | 0.48 | 0.250 | 0.48 | +0.14 |
 | RLOO 3e-5 | 0.01 (collapsed) | 0.403 | – | 0.248 | – | −0.25 |
 | RLOO 1e-4 | 0.00 (collapsed by step 11) | 0.403 | – | 0.248 | – | −0.25 |
+| MaxRL 5e-6 | 0.80 | 0.484 | 0.48 | 0.433 | 0.45 | +0.40 |
 | MaxRL 1e-5 | 0.66 | 0.328 | 0.52 | 0.236 | 0.45 | +0.10 |
 | MaxRL 3e-5 | 0.05 (collapsing) | 0.407 | 0.23 | 0.246 | 0.02 | −0.24 |
 | MaxRL 1e-4 | 0.30 (dipped to 0.09, recovered) | 0.276 | 0.49 | 0.209 | 0.41 | −0.17 |
+| MaxRL-split 5e-6 | 0.80 | 0.450 | 0.37 | 0.418 | 0.53 | +0.40 |
+| MaxRL-split 1e-5 | 0.56 | 0.277 | 0.61 | 0.219 | 0.41 | +0.04 |
+
+- **5e-6 barely moves in 30 steps.** The Yes rate stays at 0.72-0.81 and the
+  val bias at +0.42 to +0.48, for every method.
+- **lr 1e-5 is stable for all three methods.** MaxRL-split corrects the bias
+  fastest at that rate (val bias +0.18, against +0.24 for shared and +0.30 for
+  RLOO). The split runs draw different labels from the shared runs, and each
+  configuration is a single seed.
+- **Ranking:** on the full training set, Spearman rises from 0.35 to about
+  0.45-0.52 at lr ≥ 1e-5. JEEBench Spearman stays at 0.41-0.53 for every run,
+  around the base model's 0.47.
 
 - **Collapse to all-No is absorbing.** Once every rollout in a group gives the
   same answer, every advantage is zero, so nothing pushes back. The completions
