@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.experiments.bernoulli_calibration.config import Protocol
+
 STATE_ROOT = Path.home() / ".local/state/maxrl-statistics"
 WANDB_PROJECT = "maxrl-pass-rate-calibration"
 SERIES_COLORS = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100")
@@ -13,6 +15,8 @@ SPLITS: tuple[Split, ...] = ("train", "val", "test")
 Loss = Literal["ce", "mse"]
 Target = Literal["binary", "soft"]
 Backbone = Literal["frozen", "full"]
+PolicyMethod = Literal["rloo", "grpo", "maxrl"]
+RLSweep = Literal["smoke", "smoke-resume", "lr-pilot"]
 
 
 class Frozen(BaseModel):
@@ -76,6 +80,23 @@ class HeadRun(Frozen):
     steps: int = Field(gt=0)
     problems_per_step: int = Field(gt=0)
     eval_every: int = Field(gt=0)
+    seed: int
+
+
+class RLRun(Frozen):
+    identifier: str
+    method: PolicyMethod
+    protocol: Protocol
+    rollouts: int = Field(ge=2)
+    learning_rate: float = Field(gt=0)
+    steps: int = Field(gt=0)
+    problems_per_step: int = Field(gt=0)
+    eval_every: int = Field(gt=0)
+    eval_samples: int = Field(gt=0)
+    lora_rank: int = Field(gt=0)
+    max_tokens: int = Field(gt=0)
+    temperature: float = Field(gt=0)
+    std_floor: float = Field(gt=0)
     seed: int
 
 
@@ -187,4 +208,72 @@ def head_runs(
         for rate in learning_rates
         for loss in ("ce", "mse")
         for target in ("binary", "soft")
+    ]
+
+
+RL_PREDICTOR = PREDICTORS["qwen3-8b"]
+RL_LORA_RANK = 32
+RL_STD_FLOOR = 1e-8
+RL_SEED = 20261121
+ENOTATION_PATTERN = r"[-+]?(\d+\.?\d*|\.\d+)[eE][-+]?\d+"
+
+
+def rl_run(
+    *,
+    method: PolicyMethod,
+    protocol: Protocol,
+    rollouts: int,
+    learning_rate: float,
+    steps: int,
+    problems_per_step: int,
+    eval_every: int,
+    eval_samples: int,
+) -> RLRun:
+    if method != "maxrl" and protocol != "shared":
+        raise ValueError("Only MaxRL distinguishes shared and split labels")
+    return RLRun(
+        identifier=f"{method}-{protocol}-n{rollouts}-lr{learning_rate:g}",
+        method=method,
+        protocol=protocol,
+        rollouts=rollouts,
+        learning_rate=learning_rate,
+        steps=steps,
+        problems_per_step=problems_per_step,
+        eval_every=eval_every,
+        eval_samples=eval_samples,
+        lora_rank=RL_LORA_RANK,
+        max_tokens=PILOT.max_tokens,
+        temperature=PILOT.temperature,
+        std_floor=RL_STD_FLOOR,
+        seed=RL_SEED,
+    )
+
+
+def rl_sweep(*, name: RLSweep) -> list[RLRun]:
+    if name in ("smoke", "smoke-resume"):
+        return [
+            rl_run(
+                method="maxrl",
+                protocol="shared",
+                rollouts=4,
+                learning_rate=1e-5,
+                steps=2 if name == "smoke" else 3,
+                problems_per_step=2,
+                eval_every=2,
+                eval_samples=2,
+            )
+        ]
+    return [
+        rl_run(
+            method=method,
+            protocol="shared",
+            rollouts=16,
+            learning_rate=learning_rate,
+            steps=30,
+            problems_per_step=16,
+            eval_every=10,
+            eval_samples=16,
+        )
+        for method in ("rloo", "maxrl")
+        for learning_rate in (1e-5, 3e-5, 1e-4)
     ]

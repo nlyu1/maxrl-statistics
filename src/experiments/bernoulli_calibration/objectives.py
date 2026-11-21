@@ -2,18 +2,30 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from src.experiments.bernoulli_calibration.config import SUPERVISED, RunConfig
+from src.experiments.bernoulli_calibration.config import (
+    SUPERVISED,
+    Method,
+    Protocol,
+    RunConfig,
+)
 from src.experiments.utkface.advantages import batched_advantages
 
 
-def grouped_advantages(*, rewards: Tensor, labels: Tensor, config: RunConfig) -> Tensor:
-    estimator = "binary_maxrl" if config.method == "maxrl" else config.method
-    if config.protocol == "shared":
+def grouped_advantages(
+    *,
+    rewards: Tensor,
+    labels: Tensor,
+    method: Method,
+    protocol: Protocol,
+    std_floor: float,
+) -> Tensor:
+    estimator = "binary_maxrl" if method == "maxrl" else method
+    if protocol == "shared":
         return batched_advantages(
             rewards=rewards,
             estimator=estimator,
             survival_floor=0.0,
-            std_floor=config.std_floor,
+            std_floor=std_floor,
         )
     result = torch.zeros_like(rewards)
     for label in (0, 1):
@@ -22,24 +34,24 @@ def grouped_advantages(*, rewards: Tensor, labels: Tensor, config: RunConfig) ->
         successes = (rewards * mask).sum(-1, keepdim=True)
         mean = successes / count.clamp_min(1)
         centered = rewards - mean
-        if config.method == "rloo":
+        if method == "rloo":
             advantage = torch.where(
                 count > 1, centered * count / (count - 1).clamp_min(1), rewards
             )
-        elif config.method == "grpo":
+        elif method == "grpo":
             variance = (centered.square() * mask).sum(-1, keepdim=True)
             std = (variance / (count - 1).clamp_min(1)).sqrt()
             advantage = torch.where(
-                (count > 1) & (std >= config.std_floor),
-                centered / std.clamp_min(config.std_floor),
+                (count > 1) & (std >= std_floor),
+                centered / std.clamp_min(std_floor),
                 0.0,
             )
-        elif config.method == "maxrl":
+        elif method == "maxrl":
             advantage = torch.where(
                 successes > 0, rewards * count / successes.clamp_min(1) - 1, 0.0
             )
         else:
-            raise ValueError(f"Unsupported policy method: {config.method}")
+            raise ValueError(f"Unsupported policy method: {method}")
         result += advantage * mask
     return result
 
@@ -79,7 +91,13 @@ def training_loss(
         ).float()
         rewards = (actions == labels).float()
         labels = labels.expand_as(rewards)
-        advantages = grouped_advantages(rewards=rewards, labels=labels, config=config)
+        advantages = grouped_advantages(
+            rewards=rewards,
+            labels=labels,
+            method=config.method,
+            protocol=config.protocol,
+            std_floor=config.std_floor,
+        )
         if config.protocol == "shared":
             counts = torch.full((len(values), 1), config.num_rollouts)
             successes = rewards.sum(-1, keepdim=True)
