@@ -348,10 +348,10 @@ Each row below is the run with the lowest final validation native loss:
   config, down from $190.
 
 **Phase 3 learning-rate pilot (2026-11-21).**
-- Setup: RLOO and MaxRL-shared at lr ∈ {5e-6, 1e-5, 3e-5, 1e-4}, plus
-  MaxRL-split at {5e-6, 1e-5}. All runs use N = 16 and 30 steps, with shared
-  batches; shared-label runs also share labels. Cost: $196 for the ten runs plus
-  $12.7 for the shared base evaluations.
+- Setup: RLOO, MaxRL-shared and MaxRL-split at lr ∈ {5e-6, 1e-5, 3e-5, 1e-4}.
+  All runs use N = 16 and 30 steps, with shared batches; shared-label runs also
+  share labels. Cost: $235 for the twelve runs plus $12.7 for the shared base
+  evaluations.
 - Results: the outputs are in `$ROOT/rl/lr-pilot.md` and the W&B group
   `phase3-lr-pilot`. At 8192 tokens the base model hits the cap on 7% of
   JEEBench traces (35% at 4096), and JEEBench Spearman barely moves (0.45 → 0.47).
@@ -369,6 +369,8 @@ Each row below is the run with the lowest final validation native loss:
 | MaxRL 1e-4 | 0.30 (dipped to 0.09, recovered) | 0.276 | 0.49 | 0.209 | 0.41 | −0.17 |
 | MaxRL-split 5e-6 | 0.80 | 0.450 | 0.37 | 0.418 | 0.53 | +0.40 |
 | MaxRL-split 1e-5 | 0.56 | 0.277 | 0.61 | 0.219 | 0.41 | +0.04 |
+| MaxRL-split 3e-5 | 0.21 (dipped to 0.07, recovered) | 0.289 | 0.52 | 0.228 | 0.25 | −0.21 |
+| MaxRL-split 1e-4 | 0.38 (dipped to 0.09, recovered) | 0.254 | 0.48 | 0.197 | 0.42 | −0.11 |
 
 - **5e-6 barely moves in 30 steps.** The Yes rate stays at 0.72-0.81 and the
   val bias at +0.42 to +0.48, for every method.
@@ -376,6 +378,14 @@ Each row below is the run with the lowest final validation native loss:
   fastest at that rate (val bias +0.18, against +0.24 for shared and +0.30 for
   RLOO). The split runs draw different labels from the shared runs, and each
   configuration is a single seed.
+- **Split labels resist collapse.**
+  - No MaxRL-split run collapsed. At 3e-5, the Yes rate bottomed at 0.07 and
+    the nonzero-advantage fraction stayed at or above 0.38. MaxRL-shared at 3e-5
+    fell to Yes 0.01-0.05.
+  - MaxRL-split at 1e-4 has the best val MAE (0.254, bias −0.02) and JEEBench
+    MAE (0.197) of all twelve runs.
+  - So far no run shows the toy study's split dead zone.
+  - Each configuration is a single seed.
 - **Ranking:** on the full training set, Spearman rises from 0.35 to about
   0.45-0.52 at lr ≥ 1e-5. JEEBench Spearman stays at 0.41-0.53 for every run,
   around the base model's 0.47.
