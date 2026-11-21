@@ -148,6 +148,33 @@ Training setup:
 Evaluation: val and JEEBench every 30 steps with 16 samples per problem. The
 full training set at steps 0, 150 and 300.
 
+Implementation (`rl.py`):
+- One synchronous on-policy step:
+  - sample N completions for each of 16 problems from the current LoRA weights;
+  - reward is 1 when a valid Yes/No matches a fresh Bernoulli(p̂) label;
+  - advantages come from `bernoulli_calibration.objectives.grouped_advantages`;
+  - one `importance_sampling` forward-backward on the rollouts with nonzero
+    advantage, then one Adam step (Tinker defaults: β = (0.9, 0.95), no weight
+    decay, no clipping).
+- The loss is the toy objective: the mean over rollouts of A · log π(completion).
+  Token log-probabilities are summed within a completion, with no length
+  normalization. Adam makes the global scale irrelevant.
+- Problem order and labels are a function of (seed, step) alone. Every config
+  sees the same batches and the same shared labels, and a resumed run continues
+  exactly.
+- The base model is evaluated once on all 409 problems and shared as step 0.
+  Each 15-step epoch covers the training set once, so on-policy training
+  rollouts give a free train-set estimate (`train_epoch/*`).
+- Every evaluation step saves sampler weights and a full Tinker state with
+  optimizer moments. Rerunning a sweep with a longer horizon resumes from the
+  last checkpoint, so a 30-step pilot extends to 300 steps without restarting.
+- W&B logs, per run (group `phase3-<sweep>`):
+  - rollout diagnostics: reward, Yes rate, abort and malformed rates, length,
+    nonzero-advantage and no-success group fractions, batch bias;
+  - trainer-vs-sampler log-probability gap, cost and time per phase;
+  - evaluation metrics, plus metrics without the e-notation golds, distance to
+    the objective's own pointwise optimum, and dead-zone collapse.
+
 Estimated cost on Qwen3-8B, at $0.195 prefill, $0.60 sampling and $0.44 training
 per million tokens. Each rollout is assumed to use 350 prompt and 3000
 completion tokens, about $0.0033; replace this with the Phase 1 measurement.
@@ -327,11 +354,20 @@ uv run python -m $M.solver grade --root $ROOT
 uv run python -m $M.ground_truth --root $ROOT
 uv run python -m $M.pilot run --root $ROOT --models qwen3-8b qwen3.5-4b
 uv run python -m $M.pilot report --root $ROOT --models qwen3-8b qwen3.5-4b --with-labels
-uv run python -m $M.head features --root $ROOT --gpu 7
+uv run python -m $M.head features --root $ROOT
 uv run python -m $M.head train-frozen --root $ROOT
-uv run python -m $M.head queue-full --root $ROOT --gpus 2 --cpu-offload
+uv run python -m $M.head queue-full --root $ROOT --gpus 2 --cpu-offload \
+  --identifiers full-ce-soft-lr3e-06 full-mse-binary-lr3e-06
 uv run python -m $M.head report --root $ROOT
+uv run python -m $M.head compare --root $ROOT --reference $OLD_ROOT
+uv run python -m $M.rl launch --root $ROOT --sweep lr-pilot
+uv run python -m $M.rl report --root $ROOT --sweep lr-pilot
 ```
+
+`features` and `queue-full` wait for free GPUs. `queue-full` defaults to all
+eight full fine-tunes. `rl launch` runs the shared base evaluation if it is
+missing, then starts one process per unfinished run and writes
+`$ROOT/rl/<sweep>.md`. Secrets come from `set -a; . ./.env; set +a`.
 
 Reports are written to `$ROOT/ground-truth.md`, `$ROOT/pilot/pilot.md` and
 `$ROOT/heads/phase2.md`. Training curves are logged to the W&B project
