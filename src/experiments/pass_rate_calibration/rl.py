@@ -674,7 +674,7 @@ def finished(*, directory: Path, run: RLRun) -> bool:
 
 
 def comparable(*, run: RLRun) -> dict:
-    return run.model_dump(exclude={"steps"})
+    return run.model_dump(exclude={"steps", "checkpoint_every"})
 
 
 def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
@@ -804,11 +804,17 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
                 prefix="train_epoch",
             )
         saved = time.perf_counter()
-        if step % run.eval_every == 0 or step == run.steps:
+        checkpointed = step % run.checkpoint_every == 0 or step == run.steps
+        if checkpointed:
             sampler_path = (
                 training.save_weights_for_sampler(name=f"step-{step:04d}").result().path
             )
             sampler = service.create_sampling_client(model_path=sampler_path).result()
+        else:
+            sampler = training.save_weights_and_get_sampling_client().result()
+        metrics["time/save_seconds"] = time.perf_counter() - saved
+        if step % run.eval_every == 0 or step == run.steps:
+            evaluated_at = time.perf_counter()
             evaluated = evaluate(
                 client=sampler,
                 problems=problems,
@@ -825,6 +831,8 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
             metrics["cost/eval_usd"] = sampling_cost(
                 frame=evaluated, problems=problems, samples=run.eval_samples
             )
+            metrics["time/eval_seconds"] = time.perf_counter() - evaluated_at
+        if checkpointed:
             state |= {
                 "step": step,
                 "sampler_path": sampler_path,
@@ -834,10 +842,6 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
                 .path,
             }
             write_json(path=state_path, payload=state)
-            metrics["time/eval_seconds"] = time.perf_counter() - saved
-        else:
-            sampler = training.save_weights_and_get_sampling_client().result()
-            metrics["time/save_seconds"] = time.perf_counter() - saved
         metrics["time/step_seconds"] = time.perf_counter() - began
         metrics["cost/cumulative_usd"] = (
             history[-1]["cost/cumulative_usd"]

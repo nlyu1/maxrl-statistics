@@ -92,6 +92,7 @@ class RLRun(Frozen):
     steps: int = Field(gt=0)
     problems_per_step: int = Field(gt=0)
     eval_every: int = Field(gt=0)
+    checkpoint_every: int = Field(gt=0)
     eval_samples: int = Field(gt=0)
     test_subset_size: int = Field(gt=0)
     lora_rank: int = Field(gt=0)
@@ -219,6 +220,7 @@ RL_STD_FLOOR = 1e-8
 RL_SEED = 20261121
 RL_TEST_MAX_TOKENS = 8192
 RL_TEST_SUBSET_SIZE = 48
+RL_CHECKPOINT_EVERY = 75
 ENOTATION_PATTERN = r"[-+]?(\d+\.?\d*|\.\d+)[eE][-+]?\d+"
 
 
@@ -244,6 +246,7 @@ def rl_run(
         steps=steps,
         problems_per_step=problems_per_step,
         eval_every=eval_every,
+        checkpoint_every=RL_CHECKPOINT_EVERY,
         eval_samples=eval_samples,
         test_subset_size=RL_TEST_SUBSET_SIZE,
         lora_rank=RL_LORA_RANK,

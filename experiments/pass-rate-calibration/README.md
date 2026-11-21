@@ -173,9 +173,15 @@ Implementation (`rl.py`):
     evaluated at step 0, which is the shared base model, and at the last step.
   - Each epoch covers the training set once, so the on-policy rollouts also give
     a free train-set estimate (`train_epoch/*`).
-- Every evaluation step saves sampler weights and a full Tinker state with
-  optimizer moments. Rerunning a sweep with a longer horizon resumes from the
-  last checkpoint, so a 30-step pilot extends to 300 steps without restarting.
+- Every 75 steps, and at the last step, the run saves sampler weights and a full
+  Tinker state with optimizer moments. Evaluations at other steps use temporary
+  sampler snapshots, which don't count against checkpoint storage. Rerunning a
+  sweep with a longer horizon resumes from the last checkpoint, so a 30-step
+  pilot extends to 300 steps without restarting.
+- Tinker's free checkpoint storage appears to be shared across the organization.
+  Saving every 15 steps filled it at step 150 of the 300-step runs (102
+  checkpoints, 75 GB). The superseded checkpoints were deleted with the user's
+  approval; the manifest is `rl/deleted-checkpoints-*.json`.
 - W&B logs, per run (group `phase3-<sweep>`):
   - rollout diagnostics: reward, Yes rate, abort and malformed rates, length,
     nonzero-advantage and no-success group fractions, batch bias;
