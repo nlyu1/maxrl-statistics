@@ -594,10 +594,11 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
         ]
     else:
         if directory.exists():
-            raise FileExistsError(
-                f"{directory} holds a run that never reached a checkpoint; "
-                "move it aside before restarting"
+            abandoned = directory.with_name(
+                f"{directory.name}.abandoned-{time.strftime('%Y%m%d-%H%M%S')}"
             )
+            directory.rename(abandoned)
+            print(f"Moved a run without a checkpoint to {abandoned}", flush=True)
         directory.mkdir(parents=True)
         state = {"wandb_id": wandb.util.generate_id()}
         write_json(
