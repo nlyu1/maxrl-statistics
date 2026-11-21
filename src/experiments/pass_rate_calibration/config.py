@@ -16,7 +16,7 @@ Loss = Literal["ce", "mse"]
 Target = Literal["binary", "soft"]
 Backbone = Literal["frozen", "full"]
 PolicyMethod = Literal["rloo", "grpo", "maxrl"]
-RLSweep = Literal["smoke", "smoke-resume", "lr-pilot"]
+RLSweep = Literal["smoke", "smoke-resume", "lr-pilot", "long"]
 
 
 class Frozen(BaseModel):
@@ -267,6 +267,24 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
                 problems_per_step=2,
                 eval_every=1,
                 eval_samples=2,
+            )
+        ]
+    if name == "long":
+        return [
+            rl_run(
+                method=method,
+                protocol=protocol,
+                rollouts=16,
+                learning_rate=1e-5,
+                steps=300,
+                problems_per_step=16,
+                eval_every=15,
+                eval_samples=16,
+            )
+            for method, protocol in (
+                ("rloo", "shared"),
+                ("maxrl", "shared"),
+                ("maxrl", "split"),
             )
         ]
     grid: tuple[tuple[PolicyMethod, Protocol, tuple[float, ...]], ...] = (

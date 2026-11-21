@@ -48,7 +48,7 @@ from src.experiments.pass_rate_calibration.predictor import (
 )
 from src.experiments.utkface.run import write_json
 
-SWEEPS: tuple[RLSweep, ...] = ("smoke", "smoke-resume", "lr-pilot")
+SWEEPS: tuple[RLSweep, ...] = ("smoke", "smoke-resume", "lr-pilot", "long")
 
 
 @dataclass(kw_only=True, frozen=True, config=ConfigDict(arbitrary_types_allowed=True))
@@ -182,6 +182,7 @@ def rollout_frame(
                 "status": rollout.status,
                 "answer": rollout.answer,
                 "confidence": rollout.confidence,
+                "token_nll": -float(np.sum(rollout.logprobs)),
                 "text": tokenizer.decode(list(rollout.tokens)),
             }
             for rollout in rollouts
@@ -274,7 +275,12 @@ def evaluation_metrics(
             "malformed_rate": float((sampled["status"] == "malformed").mean()),
             "completion_mean": float(sampled["completion_tokens"].mean()),
             "confidence_mean": float(valid["confidence"].mean()),
+            "answer_entropy_bits": float(binary_entropy(q=q).mean()),
         }
+        if "token_nll" in sampled.columns:
+            metrics["token_entropy"] = float(
+                sampled["token_nll"].sum() / sampled["completion_tokens"].sum()
+            )
         clean = scored.filter(~pl.col("enotation"))
         if clean.height < scored.height:
             subset = prediction_metrics(
@@ -288,6 +294,11 @@ def evaluation_metrics(
             key: value for key, value in metrics.items() if value is not None
         }
     return result
+
+
+def binary_entropy(*, q: np.ndarray) -> np.ndarray:
+    clipped = np.clip(q, 1e-12, 1 - 1e-12)
+    return -(clipped * np.log2(clipped) + (1 - clipped) * np.log2(1 - clipped))
 
 
 def prefixed(*, metrics: dict[str, float], prefix: str) -> dict[str, float]:
@@ -490,9 +501,10 @@ def train_step(
     )
     lengths = frame["completion_tokens"].to_numpy()
     valid = frame.filter(pl.col("status") == "valid")
-    answered = (yes | no).sum(-1)
-    scored = answered > 0
-    batch_q = yes.sum(-1)[scored] / answered[scored]
+    answered = yes | no
+    counts = answered.sum(-1)
+    scored = counts > 0
+    batch_q = yes.sum(-1)[scored] / counts[scored]
     cost = request_cost(
         prompt_tokens=sum(len(problems.prompts[row]) for row in rows),
         samples=run.rollouts,
@@ -515,6 +527,16 @@ def train_step(
         "rollout/advantage_abs_max": float(np.abs(advantages).max()),
         "rollout/batch_bias": float(batch_q.mean() - p[scored].mean()),
         "rollout/batch_mae": float(np.abs(batch_q - p[scored]).mean()),
+        "rollout/answer_entropy_bits": float(binary_entropy(q=batch_q).mean()),
+        "rollout/token_entropy": float(
+            -sum(np.sum(rollout.logprobs) for rollout in rollouts) / lengths.sum()
+        ),
+        **{
+            f"rollout/yes_rate_label_{name}": float(yes[mask].mean())
+            for value, name in ((1, "yes"), (0, "no"))
+            for mask in [(labels == value) & answered]
+            if mask.any()
+        },
         "train/datums": len(trained),
         "train/logprob_gap_mean": float(gaps.mean()) if gaps.size else 0.0,
         "train/logprob_gap_abs_mean": float(np.abs(gaps).mean()) if gaps.size else 0.0,
@@ -884,20 +906,37 @@ LINE_STYLES = {
     ("maxrl", "shared"): "-",
     ("maxrl", "split"): ":",
 }
-STEP_PANELS = (
-    "rollout/sampled_reward",
-    "rollout/yes_rate",
-    "rollout/abort_rate",
-    "rollout/completion_mean",
-    "rollout/batch_bias",
+PANEL_ROWS = (
+    (
+        "rollout/sampled_reward",
+        "rollout/yes_rate",
+        "rollout/yes_rate_label_yes",
+        "rollout/yes_rate_label_no",
+        "rollout/batch_bias",
+    ),
+    (
+        "rollout/abort_rate",
+        "rollout/completion_mean",
+        "rollout/token_entropy",
+        "rollout/answer_entropy_bits",
+        "rollout/nonzero_advantage_fraction",
+    ),
+    (
+        "val/mae",
+        "val/spearman",
+        "test_subset/mae",
+        "test_subset/spearman",
+        "test_subset/bias",
+    ),
 )
-EVAL_PANELS = (
-    "val/mae",
-    "val/spearman",
-    "test_subset/mae",
-    "test_subset/spearman",
-    "test_subset/bias",
-)
+SMOOTHING_STEPS = 5
+
+
+def trailing_mean(*, values: np.ndarray, window: int) -> np.ndarray:
+    kernel = np.ones(window)
+    sums = np.convolve(values, kernel)[: len(values)]
+    counts = np.convolve(np.ones_like(values), kernel)[: len(values)]
+    return sums / counts
 
 
 def report(*, root: Path, sweep: RLSweep) -> None:
@@ -907,34 +946,57 @@ def report(*, root: Path, sweep: RLSweep) -> None:
         for run in runs
     }
     rates = sorted({run.learning_rate for run in runs})
-    if len(rates) > len(SERIES_COLORS):
-        raise ValueError("More learning rates than series colors")
+    families = sorted({(run.method, run.protocol) for run in runs})
+    keyed = rates if len(rates) > 1 else families
+    if len(keyed) > len(SERIES_COLORS):
+        raise ValueError("More series than series colors")
     figure, axes = plt.subplots(
-        2, len(STEP_PANELS), figsize=(4 * len(STEP_PANELS), 7), constrained_layout=True
+        len(PANEL_ROWS),
+        len(PANEL_ROWS[0]),
+        figsize=(4 * len(PANEL_ROWS[0]), 3.4 * len(PANEL_ROWS)),
+        constrained_layout=True,
     )
     for run in runs:
         history = histories[run.identifier]
         if not history:
             continue
+        key = run.learning_rate if len(rates) > 1 else (run.method, run.protocol)
         style = {
-            "color": SERIES_COLORS[rates.index(run.learning_rate)],
-            "linestyle": LINE_STYLES[(run.method, run.protocol)],
+            "color": SERIES_COLORS[keyed.index(key)],
+            "linestyle": LINE_STYLES[(run.method, run.protocol)]
+            if len(rates) > 1
+            else "-",
             "linewidth": 2,
             "label": f"{run.method}-{run.protocol} lr {run.learning_rate:g}",
         }
-        for axis, key in zip(axes[0], STEP_PANELS, strict=True):
-            points = [(row["step"], row[key]) for row in history if key in row]
-            if points:
-                axis.plot(*zip(*points, strict=True), **style)
-        for axis, key in zip(axes[1], EVAL_PANELS, strict=True):
-            points = [(row["step"], row[key]) for row in history if key in row]
-            if points:
-                axis.plot(*zip(*points, strict=True), marker="o", markersize=4, **style)
-    for axis, key in zip(axes.ravel(), STEP_PANELS + EVAL_PANELS, strict=True):
-        axis.set_title(key, fontsize=10)
-        axis.grid(alpha=0.3, linewidth=0.5)
-        axis.spines[["top", "right"]].set_visible(False)
-        axis.set_xlabel("step")
+        for row, panels in enumerate(PANEL_ROWS):
+            evaluated = row == len(PANEL_ROWS) - 1
+            for axis, panel in zip(axes[row], panels, strict=True):
+                points = [
+                    (item["step"], item[panel]) for item in history if panel in item
+                ]
+                if not points:
+                    continue
+                steps, values = (
+                    np.asarray(part, dtype=float) for part in zip(*points, strict=True)
+                )
+                if evaluated:
+                    axis.plot(steps, values, marker="o", markersize=4, **style)
+                else:
+                    axis.plot(
+                        steps,
+                        trailing_mean(values=values, window=SMOOTHING_STEPS),
+                        **style,
+                    )
+    for row, panels in enumerate(PANEL_ROWS):
+        for axis, panel in zip(axes[row], panels, strict=True):
+            suffix = (
+                "" if row == len(PANEL_ROWS) - 1 else f" ({SMOOTHING_STEPS}-step mean)"
+            )
+            axis.set_title(panel + suffix, fontsize=9)
+            axis.grid(alpha=0.3, linewidth=0.5)
+            axis.spines[["top", "right"]].set_visible(False)
+            axis.set_xlabel("step")
     axes[0, 0].legend(frameon=False, fontsize=8)
     directory = root / "rl"
     figure.savefig(directory / f"{sweep}-curves.png", dpi=130)
