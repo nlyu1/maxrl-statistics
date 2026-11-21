@@ -234,20 +234,34 @@ The constant training prior gives RMSE 0.376 on train.
 - A shared Tinker seed with `num_samples > 1` returns identical samples, so
   never pass one.
 
-**Phase 2 frozen heads are done; the full fine-tunes are queued.** The queue
-runs on 2 L40s with CPU offload, at about 7.7 s per step. Selected frozen runs:
+**Phase 2 is done.**
+- Frozen heads: 24 runs.
+- Full fine-tunes: 8 runs, FSDP2 on 2 L40s with CPU offload, about 7.8 s per
+  step. Every full run selected lr 3e-6.
 
-| Run | Val MAE | Val Pearson | JEEBench MAE | JEEBench Pearson |
-|---|---|---|---|---|
-| Constant prior | 0.396 | - | 0.256 | - |
-| CE, binary labels, lr 1e-3 | 0.223 | 0.73 | 0.233 | 0.14 |
-| CE, soft p̂, lr 1e-3 | 0.218 | 0.74 | 0.234 | 0.16 |
-| MSE, binary labels, lr 3e-4 | 0.291 | 0.45 | 0.368 | 0.29 |
-| MSE, soft p̂, lr 3e-4 | 0.299 | 0.43 | 0.285 | 0.31 |
+Each row below is the run with the lowest final validation native loss:
 
-MSE through the sigmoid cannot leave the saturated Yes/No initialization. The
-median |logit| is 4.25, and 42% of logits exceed 5. At lr ≥ 1e-3 every
-prediction collapses to 0 or 1.
+| Run | Val MAE | Val Pearson | JEEBench MAE | JEEBench Pearson | JEEBench bias |
+|---|---|---|---|---|---|
+| Constant prior | 0.396 | - | 0.256 | - | +0.05 |
+| Frozen CE, binary labels | 0.223 | 0.73 | 0.233 | 0.14 | -0.05 |
+| Frozen CE, soft p̂ | 0.218 | 0.74 | 0.234 | 0.16 | -0.03 |
+| Frozen MSE, binary labels | 0.291 | 0.45 | 0.368 | 0.29 | +0.23 |
+| Frozen MSE, soft p̂ | 0.299 | 0.43 | 0.285 | 0.31 | +0.09 |
+| Full CE, binary labels | 0.211 | 0.74 | 0.243 | 0.28 | +0.04 |
+| Full CE, soft p̂ | 0.163 | 0.81 | 0.303 | 0.31 | +0.16 |
+| Full MSE, binary labels | 0.216 | 0.70 | 0.223 | 0.29 | -0.01 |
+| Full MSE, soft p̂ | 0.212 | 0.70 | 0.242 | 0.31 | +0.04 |
+
+- **Frozen MSE saturates.** MSE through the sigmoid cannot leave the saturated
+  Yes/No initialization: the median |logit| is 4.25, and 42% exceed 5. Frozen
+  MSE collapses at lr ≥ 1e-3, and full MSE collapses to q = 0 at lr 1e-5.
+- **Full fine-tuning improves JEEBench ranking but not absolute error.**
+  Pearson rises from about 0.15 to 0.3. JEEBench MAE barely moves relative to
+  the constant prior.
+- **Validation and JEEBench disagree.** The validation set has mean 0.40 and
+  JEEBench 0.25, so the best validation fit over-predicts JEEBench (full CE on
+  soft p̂, bias +0.16). The 32-problem selection does not transfer.
 
 ## Commands
 
