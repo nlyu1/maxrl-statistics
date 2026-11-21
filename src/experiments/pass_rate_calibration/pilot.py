@@ -15,6 +15,7 @@ from transformers import AutoTokenizer
 
 from src.experiments.pass_rate_calibration.config import (
     PILOT,
+    PREDICTOR_PROMPT,
     PREDICTORS,
     SERIES_COLORS,
     PredictorModel,
@@ -125,6 +126,7 @@ def run_model(*, root: Path, model: PredictorModel) -> None:
             "model": model.model_dump(),
             "wall_seconds": wall,
             "pilot": PILOT.model_dump(),
+            "prompt": PREDICTOR_PROMPT,
         },
     )
 

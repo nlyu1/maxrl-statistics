@@ -8,6 +8,8 @@ from src.experiments.pass_rate_calibration.config import ANSWERS, PREDICTOR_PROM
 def predictor_tokens(
     *, tokenizer: PreTrainedTokenizerBase, problem: str, thinking: bool
 ) -> list[int]:
+    if "```" in problem:
+        raise ValueError("The problem contains a code fence, which breaks the prompt")
     text = tokenizer.apply_chat_template(
         [{"role": "user", "content": PREDICTOR_PROMPT.format(problem=problem)}],
         tokenize=False,

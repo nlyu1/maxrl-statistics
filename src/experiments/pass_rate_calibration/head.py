@@ -28,6 +28,7 @@ from src.experiments.pass_rate_calibration.config import (
     FROZEN_LEARNING_RATES,
     FULL_LEARNING_RATES,
     HEAD_BACKBONE,
+    PREDICTOR_PROMPT,
     SERIES_COLORS,
     SPLITS,
     WANDB_PROJECT,
@@ -191,10 +192,35 @@ def extract_features(*, root: Path, gpu: int) -> None:
             "yes_token": yes,
             "no_token": no,
             "revision": HEAD_BACKBONE.revision,
+            "prompt": PREDICTOR_PROMPT,
             "max_check_error": error,
         },
         directory / "features.pt",
     )
+
+
+def require_current_prompt(*, prompt: str, source: Path) -> None:
+    if prompt != PREDICTOR_PROMPT:
+        raise ValueError(
+            f"{source} was produced with a different predictor prompt; "
+            "use a fresh artifact root"
+        )
+
+
+def load_features(*, root: Path) -> dict:
+    path = root / "heads" / "features.pt"
+    features = torch.load(path)
+    require_current_prompt(prompt=features.get("prompt", ""), source=path)
+    return features
+
+
+def finished(*, directory: Path) -> bool:
+    path = directory / "result.json"
+    if not path.exists():
+        return False
+    result = json.loads(path.read_text())
+    require_current_prompt(prompt=result.get("prompt", ""), source=path)
+    return True
 
 
 def training_loss(*, run: HeadRun, logits: Tensor, targets: Tensor) -> Tensor:
@@ -326,6 +352,7 @@ def train(
         path=directory / "result.json",
         payload={
             "config": run.model_dump(),
+            "prompt": PREDICTOR_PROMPT,
             "final": final,
             "mean_step_seconds": float(np.mean([row["seconds"] for row in steps])),
         },
@@ -335,14 +362,14 @@ def train(
 
 def train_frozen(*, root: Path) -> None:
     labels = load_labelled(root=root)
-    features = torch.load(root / "heads" / "features.pt")
+    features = load_features(root=root)
     if tuple(features["problem_ids"]) != labels.ids:
         raise ValueError("Feature cache and labels disagree on problem order")
     hidden = features["hidden"]
     context = DistributedContext(rank=0, world_size=1, device=torch.device("cpu"))
     for run in head_runs(backbone="frozen", learning_rates=FROZEN_LEARNING_RATES):
         directory = root / "heads" / run.identifier
-        if (directory / "result.json").exists():
+        if finished(directory=directory):
             continue
         torch.manual_seed(run.seed)
         head = LinearHead(weight=features["head_weight"])
@@ -445,7 +472,7 @@ def queue_full(
 ) -> None:
     (root / "logs").mkdir(exist_ok=True)
     for run in head_runs(backbone="full", learning_rates=FULL_LEARNING_RATES):
-        if (root / "heads" / run.identifier / "result.json").exists():
+        if finished(directory=root / "heads" / run.identifier):
             continue
         while True:
             indices = wait_for_gpus(count=gpus, poll_seconds=poll_seconds)
@@ -493,6 +520,7 @@ def result_rows(*, root: Path) -> pl.DataFrame:
     rows = []
     for path in sorted((root / "heads").glob("*/result.json")):
         result = json.loads(path.read_text())
+        require_current_prompt(prompt=result.get("prompt", ""), source=path)
         config = result["config"]
         row = {
             key: config[key]
@@ -566,7 +594,7 @@ def report(*, root: Path) -> None:
         .first()
         .sort("backbone", "loss", "target")
     )
-    features = torch.load(root / "heads" / "features.pt")
+    features = load_features(root=root)
     labels = read_labels(root=root).sort("problem_id")
     zero_shot = torch.sigmoid(features["zero_shot_logit"]).numpy()
     baseline = [

@@ -38,8 +38,20 @@ diagnostic.
 ## Predictor
 
 Every method family starts from `Qwen/Qwen3-8B`. Qwen3.5-4B is the Phase 1
-alternative. The predictor sees only the problem, in a single user turn
-(draft prompt):
+alternative. The predictor sees only the problem, in a single user turn:
+
+````
+An independent small 1.7B base model will try to solve the following problem. You should predict whether that model will get a correct answer. Do not solve the question yourself. Respond with exactly one word: Yes or No.
+
+Problem to be solved by the other model:
+```
+{problem}
+```
+````
+
+The prompt pilot in the status section chose this prompt. The solver is
+RL-trained from a base model, so "base model" is a deliberate simplification.
+Phases 1 and 2 used the original prompt:
 
 ```
 A specific AI model will attempt the math problem below once, reasoning step by step before giving a final answer. Predict whether its final answer will be correct. Respond with exactly one word: Yes or No.
@@ -211,6 +223,13 @@ Secrets (`TINKER_API_KEY`, `WANDB_API_KEY`, `HF_TOKEN`) come from the gitignored
 - Truncation at 4096 tokens is 2.0% on Minerva and 8.3% on JEEBench.
 - Grader artifacts are inherited by design. Examples are rounded gold values
   and the gold answer `np.arcsin(10/13)`.
+- The largest artifact: `math_verify` parses e-notation golds such as `3.83e35`
+  as 3.83·e·35, with e as Euler's number. Only the literal string then scores.
+  - 53 of 240 training golds and 5 of 32 validation golds use e-notation, and
+    52 of the 53 training ones have p̂ = 0. JEEBench has none.
+  - Regrading them against `a \times 10^{b}` would raise the training prior to
+    0.343 and cut the training problems with p̂ = 0 from 88 to 51.
+  - The grader stays unchanged for now.
 
 Pointwise optimum RMSE on the training p̂:
 
@@ -263,6 +282,36 @@ Each row below is the run with the lowest final validation native loss:
   JEEBench 0.25, so the best validation fit over-predicts JEEBench (full CE on
   soft p̂, bias +0.16). The 32-problem selection does not transfer.
 
+**The prompt pilot replaced the predictor prompt.**
+- Setup: Qwen3-8B with thinking on, a 4096-token cap and temperature 1.0, on the
+  Phase 1 training problems.
+- Why: under the original prompt, the traces solve the problem and check their
+  own derivation. Nos appear only when the problem itself looks defective.
+- Outputs are in `$ROOT/pilot-variants/`.
+
+| Prompt | Problems × samples | Yes rate | Spearman vs p̂ | Median tokens | Capped |
+|---|---|---|---|---|---|
+| Original | 32 × 8 | 0.99 | 0.03 | 1,901 | 26% |
+| Original, answer in `\boxed{}` | 32 × 8 | 0.99 | 0.00 | 2,672 | 33% |
+| "Independent 1.7B model", "without solving" | 16 × 4 | 0.93 | 0.10 | 1,298 | 11% |
+| Same, plus "solves about 30%", exact match | 16 × 4 | 0.22 | 0.17 | 2,540 | 20% |
+| "Independent small 1.7B model", "Do not solve" | 32 × 4 | 0.92 | 0.09 | 1,073 | 6% |
+| "Independent small 1.7B base model", "Do not solve" (current) | 32 × 8 | 0.83 | 0.50 | 1,165 | 6% |
+
+- **The current prompt ranks problems.**
+  - The permutation p is 0.004, and the bootstrap 95% interval is 0.21-0.72.
+  - Mean q is 0.67 for p̂ < 0.01, 0.81 for 0.01 ≤ p̂ < 0.5, and 1.0 for
+    p̂ ≥ 0.5.
+  - Its Nos cite missing domain knowledge, while mechanical calculations get Yes.
+- **It is still biased upward.** Mean q is 0.81 against a mean p̂ of 0.31. MAE
+  is 0.50, against 0.34 for the constant prior.
+- **The ranking needs replication.** Six prompts were compared on the same
+  problems, and the result has not yet been tested on fresh problems.
+- **RL signal is dense from the start.** At N = 16, about 94% of groups whose
+  label is No contain at least one No (12% under the original prompt).
+- **It is cheaper.** The projected cost is about $130 per 300-step N = 16
+  config, down from $190.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
@@ -288,9 +337,16 @@ Reports are written to `$ROOT/ground-truth.md`, `$ROOT/pilot/pilot.md` and
 `$ROOT/heads/phase2.md`. Training curves are logged to the W&B project
 `maxrl-pass-rate-calibration`.
 
+Head features, head results and pilot outputs record the predictor prompt. The
+head commands refuse artifacts made with a different prompt. To rerun Phases 1-2
+under a new prompt, start a fresh `ROOT` and copy `problems.parquet` and
+`labels.parquet` into it from the Phase 0 root.
+
 ## Open decisions
 
 - Learning-rate protocol: after Phase 1.
 - N grid: after Phase 0.
 - Whether GRPO and RLOO run at N = 16 only.
 - Predictor model: after Phase 1.
+- The Phase 2 heads used the original prompt. Rerun them under the current
+  prompt before comparing method families.

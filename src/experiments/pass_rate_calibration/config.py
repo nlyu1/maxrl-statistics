@@ -120,9 +120,10 @@ VALIDATION_PROBLEMS = 32
 SPLIT_SEED = 20261120
 
 PREDICTOR_PROMPT = (
-    "A specific AI model will attempt the math problem below once, reasoning step "
-    "by step before giving a final answer. Predict whether its final answer will be "
-    "correct. Respond with exactly one word: Yes or No.\n\nProblem:\n{problem}"
+    "An independent small 1.7B base model will try to solve the following problem. "
+    "You should predict whether that model will get a correct answer. Do not solve "
+    "the question yourself. Respond with exactly one word: Yes or No.\n\n"
+    "Problem to be solved by the other model:\n```\n{problem}\n```"
 )
 ANSWERS = ("Yes", "No")
 
