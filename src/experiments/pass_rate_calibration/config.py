@@ -269,10 +269,15 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
                 eval_samples=2,
             )
         ]
+    grid: tuple[tuple[PolicyMethod, Protocol, tuple[float, ...]], ...] = (
+        ("rloo", "shared", (5e-6, 1e-5, 3e-5, 1e-4)),
+        ("maxrl", "shared", (5e-6, 1e-5, 3e-5, 1e-4)),
+        ("maxrl", "split", (5e-6, 1e-5)),
+    )
     return [
         rl_run(
             method=method,
-            protocol="shared",
+            protocol=protocol,
             rollouts=16,
             learning_rate=learning_rate,
             steps=30,
@@ -280,6 +285,6 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
             eval_every=15,
             eval_samples=16,
         )
-        for method in ("rloo", "maxrl")
-        for learning_rate in (1e-5, 3e-5, 1e-4)
+        for method, protocol, learning_rates in grid
+        for learning_rate in learning_rates
     ]

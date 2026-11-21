@@ -878,6 +878,12 @@ def launch(*, root: Path, sweep: RLSweep) -> None:
         raise RuntimeError(f"Failed runs: {failed}")
 
 
+LINE_STYLES = {
+    ("rloo", "shared"): "--",
+    ("grpo", "shared"): "-.",
+    ("maxrl", "shared"): "-",
+    ("maxrl", "split"): ":",
+}
 STEP_PANELS = (
     "rollout/sampled_reward",
     "rollout/yes_rate",
@@ -912,7 +918,7 @@ def report(*, root: Path, sweep: RLSweep) -> None:
             continue
         style = {
             "color": SERIES_COLORS[rates.index(run.learning_rate)],
-            "linestyle": "-" if run.method == "maxrl" else "--",
+            "linestyle": LINE_STYLES[(run.method, run.protocol)],
             "linewidth": 2,
             "label": f"{run.method}-{run.protocol} lr {run.learning_rate:g}",
         }
