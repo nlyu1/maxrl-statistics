@@ -347,6 +347,35 @@ Each row below is the run with the lowest final validation native loss:
 - **It is cheaper.** The projected cost is about $130 per 300-step N = 16
   config, down from $190.
 
+**Phase 3 learning-rate pilot (2026-11-21).**
+- Setup: RLOO and MaxRL-shared, N = 16, 30 steps, lr ∈ {1e-5, 3e-5, 1e-4}, with
+  shared batches and labels. Cost: $106 for the six runs plus $12.7 for the
+  shared base evaluations.
+- Results: the outputs are in `$ROOT/rl/lr-pilot.md` and the W&B group
+  `phase3-lr-pilot`. At 8192 tokens the base model hits the cap on 7% of
+  JEEBench traces (35% at 4096), and JEEBench Spearman barely moves (0.45 → 0.47).
+
+| Run (step 30) | Yes rate | Val MAE | Val ρ | JEE MAE | JEE ρ | JEE bias |
+|---|---|---|---|---|---|---|
+| Base model (step 0) | 0.79 | 0.497 | 0.39 | 0.466 | 0.47 | +0.45 |
+| RLOO 1e-5 | 0.70 | 0.358 | 0.48 | 0.250 | 0.48 | +0.14 |
+| RLOO 3e-5 | 0.01 (collapsed) | 0.403 | – | 0.248 | – | −0.25 |
+| RLOO 1e-4 | 0.00 (collapsed by step 11) | 0.403 | – | 0.248 | – | −0.25 |
+| MaxRL 1e-5 | 0.66 | 0.328 | 0.52 | 0.236 | 0.45 | +0.10 |
+| MaxRL 3e-5 | 0.05 (collapsing) | 0.407 | 0.23 | 0.246 | 0.02 | −0.24 |
+| MaxRL 1e-4 | 0.30 (dipped to 0.09, recovered) | 0.276 | 0.49 | 0.209 | 0.41 | −0.17 |
+
+- **Collapse to all-No is absorbing.** Once every rollout in a group gives the
+  same answer, every advantage is zero, so nothing pushes back. The completions
+  also shrink to about 500 tokens of quick Nos.
+- **MaxRL can recover.** It gives a rare correct Yes a weight of up to N − 1 = 15,
+  against about 1 under RLOO. This is a single seed.
+- **JEEBench MAE rewards collapse.** An all-No predictor scores 0.248 against
+  0.256 for the constant prior, so rank by Spearman and bias.
+- **The fixed 48-problem subset reads JEEBench ranking low.** Its step-0
+  Spearman is 0.28 against 0.47 for the full set, about 2 sd. The offset is
+  constant, but subset ρ is not JEEBench ρ.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
