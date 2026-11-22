@@ -407,6 +407,62 @@ Each row below is the run with the lowest final validation native loss:
   Spearman is 0.28 against 0.47 for the full set, about 2 sd. The offset is
   constant, but subset ρ is not JEEBench ρ.
 
+**Phase 3, 300 steps at lr 1e-5 (2026-11-21).**
+- Setup: RLOO, MaxRL-shared and MaxRL-split, extended from the pilot's step-30
+  checkpoints, one seed each.
+- Cost: $119, $144 and $142. The outputs are in `$ROOT/rl/long.md` and the W&B
+  group `phase3-long`.
+- Step 300 is scored on the full sets. JEEBench uses the 8192-token cap. The
+  constant predictor at the training prior scores val MAE 0.396 (RMSE 0.434)
+  and JEEBench MAE 0.256 (RMSE 0.294).
+
+| Full set, step 300 | Base | RLOO | MaxRL-shared | MaxRL-split |
+|---|---|---|---|---|
+| Train MAE / RMSE | 0.501 / 0.613 | 0.204 / 0.328 | 0.225 / 0.319 | 0.216 / 0.317 |
+| Train Spearman / Pearson | 0.35 / 0.33 | 0.51 / 0.58 | 0.53 / 0.57 | 0.52 / 0.58 |
+| Train bias | +0.47 | −0.09 | 0.00 | −0.05 |
+| Train fraction with q ∈ {0, 1} | 0.42 | 0.51 | 0.26 | 0.31 |
+| Val MAE / RMSE / Spearman | 0.497 / 0.621 / 0.39 | 0.253 / 0.381 / 0.56 | 0.279 / 0.375 / 0.45 | 0.252 / 0.355 / 0.49 |
+| Val bias | +0.49 | −0.12 | −0.05 | −0.07 |
+| JEEBench MAE / RMSE | 0.466 / 0.546 | 0.228 / 0.346 | 0.193 / 0.282 | 0.205 / 0.304 |
+| JEEBench Spearman / Pearson | 0.47 / 0.42 | 0.42 / 0.40 | 0.48 / 0.49 | 0.48 / 0.43 |
+| JEEBench mean q (mean p̂ 0.25) | 0.69 | 0.03 | 0.12 | 0.09 |
+| JEEBench answer entropy (bits) | – | 0.13 | 0.41 | 0.31 |
+
+- **All three methods remove the base-rate bias and improve in-distribution
+  ranking.** Train Spearman rises from 0.35 to about 0.52. Most of the gain is
+  in place by step 60-120.
+- **The methods differ in sharpness, in the order the toy study predicts.**
+  - RLOO pushes the most problems to q ∈ {0, 1} and has the lowest answer
+    entropy. On JEEBench it says No to almost everything.
+  - MaxRL-shared stays the most probabilistic and is unbiased on train.
+  - MaxRL-split lies in between.
+  - All three remain far from their own pointwise optima (optimum MAE about
+    0.23), so model capacity dominates the error, not objective bias.
+- **Dynamics.**
+  - RLOO fell into a low-Yes regime (Yes about 0.07, steps 61-150) and then
+    partly recovered to about 0.2.
+  - Over the last 30 steps, the Yes rate on Yes-labelled versus No-labelled
+    rollouts is 0.41 vs 0.10 for RLOO, 0.53 vs 0.21 for MaxRL-shared, and
+    0.45 vs 0.17 for MaxRL-split.
+  - Token entropy drifts up for RLOO (0.40 → 0.44) and down for MaxRL-split
+    (0.39 → 0.34). Traces shorten from about 1,560 to 965-1,120 tokens, and the
+    abort rate falls to about 1%.
+- **JEEBench ranking does not improve.** Spearman stays at 0.42-0.48 against
+  0.47 for the base model. Every method under-predicts JEEBench, with bias
+  −0.13 to −0.22. Only MaxRL-shared beats the constant prior on JEEBench RMSE
+  (0.282 vs 0.294).
+- **The e-notation artifacts lower ranking rather than help it.** Without them,
+  train Spearman is 0.58-0.61. There is no sign of a shortcut that predicts No
+  from scientific-notation answers.
+- **Comparison with the frozen CE head (new prompt):** the head scores val
+  MAE 0.227 and val Spearman 0.69, but JEEBench MAE 0.291 and Spearman 0.26.
+  Reasoning RL transfers better to JEEBench, while the head (selected on val)
+  fits Minerva better.
+- **Caveats.** These are single seeds, and val (32 problems) and the 48-problem
+  JEEBench subset are noisy from one evaluation to the next. RLOO repeated steps
+  166-179 after a storage-limit crash; W&B keeps the first copy of those steps.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
