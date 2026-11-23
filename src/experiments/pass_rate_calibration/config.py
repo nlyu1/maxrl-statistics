@@ -16,7 +16,9 @@ Loss = Literal["ce", "mse"]
 Target = Literal["binary", "soft"]
 Backbone = Literal["frozen", "full"]
 PolicyMethod = Literal["rloo", "grpo", "maxrl"]
-RLSweep = Literal["smoke", "smoke-resume", "lr-pilot", "long", "round2"]
+RLSweep = Literal[
+    "smoke", "smoke-resume", "lr-pilot", "long", "round2", "collapse-check"
+]
 
 
 class Frozen(BaseModel):
@@ -276,6 +278,21 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
                 eval_samples=2,
                 replicate=0,
             )
+        ]
+    if name == "collapse-check":
+        return [
+            rl_run(
+                method=method,
+                protocol="shared",
+                rollouts=16,
+                learning_rate=3e-5,
+                steps=60,
+                problems_per_step=16,
+                eval_every=15,
+                eval_samples=16,
+                replicate=1,
+            )
+            for method in ("rloo", "grpo")
         ]
     if name == "round2":
         plan: tuple[tuple[PolicyMethod, Protocol, float, int, int], ...] = (

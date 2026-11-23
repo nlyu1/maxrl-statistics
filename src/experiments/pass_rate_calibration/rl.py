@@ -48,7 +48,14 @@ from src.experiments.pass_rate_calibration.predictor import (
 )
 from src.experiments.utkface.run import write_json
 
-SWEEPS: tuple[RLSweep, ...] = ("smoke", "smoke-resume", "lr-pilot", "long", "round2")
+SWEEPS: tuple[RLSweep, ...] = (
+    "smoke",
+    "smoke-resume",
+    "lr-pilot",
+    "long",
+    "round2",
+    "collapse-check",
+)
 
 
 @dataclass(kw_only=True, frozen=True, config=ConfigDict(arbitrary_types_allowed=True))
