@@ -512,6 +512,45 @@ Each row below is the run with the lowest final validation native loss:
   - RLOO keeps sharpening toward its 0/1 target: 65% of training problems sit
     at q ∈ {0, 1}, and JEEBench answer entropy is 0.09 bits.
 
+**RL against the Phase 2 baselines.**
+- Supervised heads are the val-selected run per family. Full fine-tunes exist only
+  under the original prompt.
+- RL q comes from 16 samples per problem. "Noise-corrected" RMSE subtracts the
+  binomial sampling variance q(1 − q)/(n − 1).
+
+| Predictor | Val MAE / RMSE / ρ / Pearson | JEEBench MAE / RMSE / ρ / Pearson / bias |
+|---|---|---|
+| Constant training prior | 0.396 / 0.434 / – / – | 0.256 / 0.294 / – / – / +0.05 |
+| Zero-shot Yes/No readout (no reasoning) | 0.404 / 0.565 / 0.41 / 0.26 | 0.391 / 0.512 / 0.07 / 0.07 / +0.15 |
+| Frozen head, CE, binary labels | 0.227 / 0.320 / 0.69 / 0.71 | 0.291 / 0.381 / 0.26 / 0.20 / +0.09 |
+| Frozen head, CE, soft p̂ | 0.224 / 0.305 / 0.62 / 0.73 | 0.299 / 0.380 / 0.25 / 0.20 / +0.11 |
+| Full FT, CE, soft p̂ (old prompt) | **0.163 / 0.262 / 0.78 / 0.81** | 0.303 / 0.398 / 0.38 / 0.31 / +0.16 |
+| Full FT, MSE, binary labels (old prompt) | 0.216 / 0.317 / 0.62 / 0.70 | 0.223 / 0.298 / 0.40 / 0.29 / −0.01 |
+| Untrained reasoning predictor | 0.497 / 0.621 / 0.39 / 0.42 | 0.469 / 0.548 / 0.47 / 0.42 / +0.45 |
+| RL RLOO 1e-5, step 300 | 0.253 / 0.381 / 0.56 / 0.56 | 0.228 / 0.346 / 0.42 / 0.40 / −0.22 |
+| RL MaxRL-shared 1e-5, step 300 | 0.279 / 0.375 / 0.45 / 0.50 | 0.193 / 0.282 / 0.48 / 0.49 / −0.13 |
+| RL MaxRL-split 3e-5 r1, step 300 | 0.212 / 0.309 / 0.61 / 0.71 | **0.167 / 0.246 / 0.56 / 0.65** / −0.11 |
+
+- **In distribution (val):** the best RL run (MaxRL-split 3e-5) matches the
+  frozen CE heads. The old-prompt full fine-tune is better (val MAE 0.163),
+  though it nearly memorizes the training set (train RMSE 0.036).
+- **Out of distribution (JEEBench):** RL beats every supervised baseline.
+  - No supervised head beats the constant prior's RMSE, and their Pearson is at
+    most 0.31.
+  - MaxRL-split 3e-5 reaches RMSE 0.246 (0.234 noise-corrected), Spearman 0.56
+    and Pearson 0.65.
+  - Most of the transfer comes from reasoning itself: the untrained reasoning
+    predictor already ranks JEEBench better (Spearman 0.47) than any supervised
+    head. RL adds calibration and some ranking (0.47 → 0.56).
+- **Caveats.**
+  - The heads were picked on val, and the RL learning rate was chosen after
+    seeing pilot results.
+  - The full fine-tunes used the old prompt.
+  - The RL runs are single seeds: JEEBench RMSE reproduces within about 0.01,
+    Spearman within about 0.06-0.1.
+  - RL predictions cost 16 reasoning samples per problem (about $0.02), against
+    one forward pass for a head.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
