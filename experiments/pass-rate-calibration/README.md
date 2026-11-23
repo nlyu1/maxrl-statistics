@@ -551,6 +551,37 @@ Each row below is the run with the lowest final validation native loss:
   - RL predictions cost 16 reasoning samples per problem (about $0.02), against
     one forward pass for a head.
 
+**Collapse check at lr 3e-5 (2026-11-23, $42).**
+- Setup: fresh RLOO and GRPO runs (`-r1`) for 60 steps, from the same LoRA
+  initialization and the same batches and labels as the MaxRL 3e-5 r1 runs.
+
+| Yes rate, 5-step means (steps) | 1-5 | 11-15 | 16-20 | 21-25 | 26-30 | 36-40 | 46-50 | 56-60 |
+|---|---|---|---|---|---|---|---|---|
+| RLOO r0 (pilot) | 0.79 | 0.47 | 0.17 | 0.04 | 0.01 | – | – | – |
+| RLOO r1 | 0.79 | 0.48 | 0.17 | 0.05 | 0.02 | 0.01 | 0.00 | 0.00 |
+| GRPO r1 | 0.80 | 0.51 | 0.17 | 0.06 | 0.01 | 0.00 | 0.00 | 0.00 |
+| MaxRL-shared r0 (pilot) | 0.78 | 0.33 | 0.08 | 0.04 | 0.05 | – | – | – |
+| MaxRL-shared r1 | 0.77 | 0.32 | 0.11 | 0.09 | 0.21 | 0.32 | 0.38 | 0.25 |
+| MaxRL-split r1 | 0.79 | 0.38 | 0.08 | 0.03 | 0.07 | 0.22 | 0.44 | 0.23 |
+
+- **RLOO and GRPO collapse at 3e-5.**
+  - Both are all-No from about step 35 on, and the fraction of rollouts with
+    nonzero advantage falls to 0.01-0.05.
+  - Val and JEEBench predictions are then constant (val MAE 0.403, JEEBench
+    MAE 0.248).
+  - RLOO r1 retraces the pilot RLOO almost exactly, so the collapse
+    reproduces across seeds.
+- **The collapse comes from the objective, not the seed.** All four methods
+  dip together through about step 25.
+  - MaxRL keeps 29-49% of rollouts with nonzero advantage at the bottom of the
+    dip, then recovers, and it recovers with label separation (Yes rate
+    0.55-0.64 on Yes labels vs 0.24-0.34 on No labels).
+  - RLOO and GRPO lose all signal.
+- **The pilot's "collapsed" MaxRL-shared 3e-5 run was probably caught
+  mid-dip.** At step 30 it had Yes 0.05 with 34% of rollouts still carrying
+  signal, within the range from which both r1 MaxRL runs recovered. Resuming it
+  from its kept step-30 checkpoint would settle this.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
