@@ -463,6 +463,55 @@ Each row below is the run with the lowest final validation native loss:
   JEEBench subset are noisy from one evaluation to the next. RLOO repeated steps
   166-179 after a storage-limit crash; W&B keeps the first copy of those steps.
 
+**Phase 3, round 2 (2026-11-23).**
+- Setup:
+  - The three lr 1e-5 runs continued from step 300 to 450.
+  - Fresh runs (`-r1`, LoRA init seed + 1, same batches and labels): MaxRL-shared
+    and MaxRL-split at 3e-5, and RLOO and GRPO at 1e-5, all 300 steps.
+  - Each run kept only its latest checkpoint.
+- Cost: $617. The outputs are in `$ROOT/rl/round2.md` and the W&B group
+  `phase3-round2`.
+- Constant predictor at the training prior: train RMSE 0.376, val MAE 0.396 /
+  RMSE 0.434, JEEBench MAE 0.256 / RMSE 0.294.
+
+| Full set | Train MAE / RMSE / ρ / bias | Val MAE / ρ | JEEBench MAE / RMSE / ρ / Pearson / bias |
+|---|---|---|---|
+| Base | 0.501 / 0.613 / 0.35 / +0.47 | 0.497 / 0.39 | 0.466 / 0.546 / 0.47 / 0.42 / +0.45 |
+| RLOO r0, 300 | 0.204 / 0.328 / 0.51 / −0.09 | 0.253 / 0.56 | 0.228 / 0.346 / 0.42 / 0.40 / −0.22 |
+| RLOO r1, 300 | 0.210 / 0.335 / 0.51 / −0.12 | 0.295 / 0.45 | 0.229 / 0.353 / 0.36 / 0.40 / −0.23 |
+| GRPO r1, 300 | 0.206 / 0.317 / 0.52 / −0.07 | 0.231 / 0.51 | 0.220 / 0.332 / 0.37 / 0.41 / −0.20 |
+| MaxRL-shared 1e-5, 300 | 0.225 / 0.319 / 0.53 / 0.00 | 0.279 / 0.45 | 0.193 / 0.282 / 0.48 / 0.49 / −0.13 |
+| MaxRL-split 1e-5, 300 | 0.216 / 0.317 / 0.52 / −0.05 | 0.252 / 0.49 | 0.205 / 0.304 / 0.48 / 0.43 / −0.16 |
+| **MaxRL-shared 3e-5 r1, 300** | 0.189 / 0.277 / 0.64 / +0.05 | 0.237 / 0.60 | 0.180 / 0.262 / 0.55 / 0.53 / −0.05 |
+| **MaxRL-split 3e-5 r1, 300** | 0.187 / 0.274 / 0.65 / +0.03 | 0.212 / 0.61 | 0.167 / 0.246 / 0.56 / 0.65 / −0.11 |
+| RLOO r0, 450 | 0.184 / 0.315 / 0.58 / −0.10 | 0.273 / 0.45 | 0.235 / 0.358 / 0.27 / 0.28 / −0.23 |
+| MaxRL-shared 1e-5, 450 | 0.206 / 0.304 / 0.56 / −0.05 | 0.235 / 0.54 | 0.203 / 0.300 / 0.40 / 0.44 / −0.15 |
+| MaxRL-split 1e-5, 450 | 0.203 / 0.295 / 0.56 / −0.03 | 0.255 / 0.52 | 0.209 / 0.312 / 0.43 / 0.43 / −0.17 |
+
+- **Seed noise (RLOO r0 vs r1).**
+  - Train metrics and JEEBench MAE/RMSE reproduce within about 0.01.
+  - Val metrics (32 problems) and Spearman vary by up to about 0.1.
+  - So compare runs on the full train set and on JEEBench RMSE or Pearson.
+- **MaxRL at 3e-5 is the best setting so far.**
+  - Against 1e-5, train Spearman rises by +0.11 to +0.13 and JEEBench RMSE
+    falls by 0.02 to 0.06. These gaps are several times the seed noise.
+  - JEEBench Spearman improves over the base model (0.55-0.56 vs 0.47) for the
+    first time.
+  - Predictions are less compressed: problems with p̂ ≈ 0.83 get q 0.65-0.68,
+    against about 0.5 at 1e-5.
+  - Neither fresh run collapsed. The pilot's MaxRL-shared at 3e-5 (another
+    seed) collapsed by step 25, so collapse at 3e-5 depends on the seed.
+- **GRPO behaves like RLOO.** It dipped deeper mid-run (Yes 0.04-0.06 over
+  steps 61-150, against 0.13-0.15 for RLOO r1) and ends slightly less sharp.
+  Its edge over RLOO r1 (JEEBench RMSE 0.332 vs 0.353) is about 3× the seed
+  gap. Both stay sharper and more biased than MaxRL at the same learning rate.
+- **Training longer at 1e-5 overfits Minerva.**
+  - From step 300 to 450, train Spearman rises (+0.03 to +0.08) while
+    JEEBench Spearman falls: RLOO 0.42 → 0.27, MaxRL-shared 0.48 → 0.40,
+    MaxRL-split 0.48 → 0.43.
+  - RLOO keeps sharpening toward its 0/1 target: 65% of training problems sit
+    at q ∈ {0, 1}, and JEEBench answer entropy is 0.09 bits.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
