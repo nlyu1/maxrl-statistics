@@ -48,7 +48,7 @@ from src.experiments.pass_rate_calibration.predictor import (
 )
 from src.experiments.utkface.run import write_json
 
-SWEEPS: tuple[RLSweep, ...] = ("smoke", "smoke-resume", "lr-pilot", "long")
+SWEEPS: tuple[RLSweep, ...] = ("smoke", "smoke-resume", "lr-pilot", "long", "round2")
 
 
 @dataclass(kw_only=True, frozen=True, config=ConfigDict(arbitrary_types_allowed=True))
@@ -674,7 +674,7 @@ def finished(*, directory: Path, run: RLRun) -> bool:
 
 
 def comparable(*, run: RLRun) -> dict:
-    return run.model_dump(exclude={"steps", "checkpoint_every"})
+    return run.model_dump(exclude={"steps", "checkpoint_every", "replicate"})
 
 
 def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
@@ -694,6 +694,7 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
         | np.isin(identifiers, sorted(subset))
     )
     service = tinker.ServiceClient()
+    rest = tinker.RestClient()
     state_path = directory / "state.json"
     if state_path.exists():
         if json.loads((directory / "config.json").read_text())["comparable"] != (
@@ -727,7 +728,9 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
             payload={"run": run.model_dump(), "comparable": comparable(run=run)},
         )
         training = service.create_lora_training_client(
-            base_model=RL_PREDICTOR.repository, rank=run.lora_rank, seed=run.seed
+            base_model=RL_PREDICTOR.repository,
+            rank=run.lora_rank,
+            seed=run.seed + run.replicate,
         ).result()
         sampler = training.save_weights_and_get_sampling_client().result()
         start = 1
@@ -833,6 +836,9 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
             )
             metrics["time/eval_seconds"] = time.perf_counter() - evaluated_at
         if checkpointed:
+            previous = {
+                state[key] for key in ("state_path", "sampler_path") if key in state
+            }
             state |= {
                 "step": step,
                 "sampler_path": sampler_path,
@@ -842,6 +848,8 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
                 .path,
             }
             write_json(path=state_path, payload=state)
+            for path in previous - {state["state_path"], state["sampler_path"]}:
+                rest.delete_checkpoint_from_tinker_path(path).result()
         metrics["time/step_seconds"] = time.perf_counter() - began
         metrics["cost/cumulative_usd"] = (
             history[-1]["cost/cumulative_usd"]
@@ -966,12 +974,14 @@ def report(*, root: Path, sweep: RLSweep) -> None:
             continue
         key = run.learning_rate if len(rates) > 1 else (run.method, run.protocol)
         style = {
+            "alpha": 1.0 if run.replicate == 0 else 0.6,
             "color": SERIES_COLORS[keyed.index(key)],
             "linestyle": LINE_STYLES[(run.method, run.protocol)]
             if len(rates) > 1
             else "-",
             "linewidth": 2,
-            "label": f"{run.method}-{run.protocol} lr {run.learning_rate:g}",
+            "label": f"{run.method}-{run.protocol} lr {run.learning_rate:g}"
+            + (f" r{run.replicate}" if run.replicate else ""),
         }
         for row, panels in enumerate(PANEL_ROWS):
             evaluated = row == len(PANEL_ROWS) - 1

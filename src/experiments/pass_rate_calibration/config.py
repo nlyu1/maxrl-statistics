@@ -16,7 +16,7 @@ Loss = Literal["ce", "mse"]
 Target = Literal["binary", "soft"]
 Backbone = Literal["frozen", "full"]
 PolicyMethod = Literal["rloo", "grpo", "maxrl"]
-RLSweep = Literal["smoke", "smoke-resume", "lr-pilot", "long"]
+RLSweep = Literal["smoke", "smoke-resume", "lr-pilot", "long", "round2"]
 
 
 class Frozen(BaseModel):
@@ -101,6 +101,7 @@ class RLRun(Frozen):
     temperature: float = Field(gt=0)
     std_floor: float = Field(gt=0)
     seed: int
+    replicate: int = Field(ge=0)
 
 
 SOURCES = (
@@ -234,11 +235,13 @@ def rl_run(
     problems_per_step: int,
     eval_every: int,
     eval_samples: int,
+    replicate: int,
 ) -> RLRun:
     if method != "maxrl" and protocol != "shared":
         raise ValueError("Only MaxRL distinguishes shared and split labels")
+    suffix = f"-r{replicate}" if replicate else ""
     return RLRun(
-        identifier=f"{method}-{protocol}-n{rollouts}-lr{learning_rate:g}",
+        identifier=f"{method}-{protocol}-n{rollouts}-lr{learning_rate:g}{suffix}",
         method=method,
         protocol=protocol,
         rollouts=rollouts,
@@ -255,6 +258,7 @@ def rl_run(
         temperature=PILOT.temperature,
         std_floor=RL_STD_FLOOR,
         seed=RL_SEED,
+        replicate=replicate,
     )
 
 
@@ -270,7 +274,32 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
                 problems_per_step=2,
                 eval_every=1,
                 eval_samples=2,
+                replicate=0,
             )
+        ]
+    if name == "round2":
+        plan: tuple[tuple[PolicyMethod, Protocol, float, int, int], ...] = (
+            ("rloo", "shared", 1e-5, 450, 0),
+            ("maxrl", "shared", 1e-5, 450, 0),
+            ("maxrl", "split", 1e-5, 450, 0),
+            ("maxrl", "shared", 3e-5, 300, 1),
+            ("maxrl", "split", 3e-5, 300, 1),
+            ("rloo", "shared", 1e-5, 300, 1),
+            ("grpo", "shared", 1e-5, 300, 1),
+        )
+        return [
+            rl_run(
+                method=method,
+                protocol=protocol,
+                rollouts=16,
+                learning_rate=learning_rate,
+                steps=steps,
+                problems_per_step=16,
+                eval_every=15,
+                eval_samples=16,
+                replicate=replicate,
+            )
+            for method, protocol, learning_rate, steps, replicate in plan
         ]
     if name == "long":
         return [
@@ -283,6 +312,7 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
                 problems_per_step=16,
                 eval_every=15,
                 eval_samples=16,
+                replicate=0,
             )
             for method, protocol in (
                 ("rloo", "shared"),
@@ -305,6 +335,7 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
             problems_per_step=16,
             eval_every=15,
             eval_samples=16,
+            replicate=0,
         )
         for method, protocol, learning_rates in grid
         for learning_rate in learning_rates
