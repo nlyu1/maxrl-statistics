@@ -582,6 +582,32 @@ Each row below is the run with the lowest final validation native loss:
   signal, within the range from which both r1 MaxRL runs recovered. Resuming it
   from its kept step-30 checkpoint would settle this.
 
+**MaxRL at 3e-5 extended from 300 to 450 steps (2026-11-26, $106).**
+- The step-300 checkpoints were kept (`RL_PROTECTED_CHECKPOINT_STEPS`).
+- RMSE* is corrected for the noise of estimating q from 16 samples.
+
+| Full set | Train MAE / RMSE* / ρ / q ∈ {0, 1} | Val MAE / RMSE* / ρ | JEEBench MAE / RMSE* / ρ / Pearson / bias |
+|---|---|---|---|
+| MaxRL-shared 3e-5, 300 | 0.189 / 0.263 / 0.64 / 0.28 | 0.237 / 0.302 / 0.60 | 0.180 / 0.247 / 0.55 / 0.53 / −0.05 |
+| MaxRL-shared 3e-5, 450 | 0.148 / 0.212 / 0.72 / 0.43 | 0.244 / 0.337 / 0.57 | 0.190 / 0.285 / 0.51 / 0.52 / −0.16 |
+| MaxRL-split 3e-5, 300 | 0.187 / 0.259 / 0.65 / 0.28 | 0.212 / 0.294 / 0.61 | 0.167 / 0.234 / 0.56 / 0.65 / −0.11 |
+| MaxRL-split 3e-5, 450 | 0.162 / 0.225 / 0.71 / 0.38 | 0.212 / 0.307 / 0.59 | 0.187 / 0.285 / 0.52 / 0.52 / −0.16 |
+
+- **Extending past 300 overfits Minerva, more than at 1e-5.**
+  - Train RMSE* drops by 0.03-0.05 and train Spearman rises to 0.71-0.72.
+  - Val is flat or slightly worse.
+  - JEEBench RMSE* rises by 0.04-0.05, several times the seed noise of about
+    0.01. Spearman falls by about 0.04, and JEEBench bias moves to −0.16.
+  - Predictions sharpen: the share of training problems at q ∈ {0, 1} goes from
+    0.28 to 0.38-0.43.
+- **MaxRL-shared's reasoning text grows more deterministic.** Token entropy
+  falls from 0.31 to 0.15, while split's stays at 0.30-0.34.
+- **The step-300 checkpoints remain the best models.** At 450, the 3e-5 runs'
+  JEEBench RMSE* (0.285) has fallen back to the level of the 1e-5 runs at
+  step 300.
+- **Practical rule:** with 240 training problems, stop at about 300 steps
+  (20 epochs) at 3e-5.
+
 ## Commands
 
 Run these on the server from a checkout of this branch. The solver worker runs
