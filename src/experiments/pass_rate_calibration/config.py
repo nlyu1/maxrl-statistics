@@ -17,7 +17,13 @@ Target = Literal["binary", "soft"]
 Backbone = Literal["frozen", "full"]
 PolicyMethod = Literal["rloo", "grpo", "maxrl"]
 RLSweep = Literal[
-    "smoke", "smoke-resume", "lr-pilot", "long", "round2", "collapse-check"
+    "smoke",
+    "smoke-resume",
+    "lr-pilot",
+    "long",
+    "round2",
+    "collapse-check",
+    "extend-3e-5",
 ]
 
 
@@ -224,6 +230,7 @@ RL_SEED = 20261121
 RL_TEST_MAX_TOKENS = 8192
 RL_TEST_SUBSET_SIZE = 48
 RL_CHECKPOINT_EVERY = 75
+RL_PROTECTED_CHECKPOINT_STEPS = (300,)
 ENOTATION_PATTERN = r"[-+]?(\d+\.?\d*|\.\d+)[eE][-+]?\d+"
 
 
@@ -278,6 +285,21 @@ def rl_sweep(*, name: RLSweep) -> list[RLRun]:
                 eval_samples=2,
                 replicate=0,
             )
+        ]
+    if name == "extend-3e-5":
+        return [
+            rl_run(
+                method="maxrl",
+                protocol=protocol,
+                rollouts=16,
+                learning_rate=3e-5,
+                steps=450,
+                problems_per_step=16,
+                eval_every=15,
+                eval_samples=16,
+                replicate=1,
+            )
+            for protocol in ("shared", "split")
         ]
     if name == "collapse-check":
         return [

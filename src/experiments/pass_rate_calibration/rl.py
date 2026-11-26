@@ -26,6 +26,7 @@ from src.experiments.pass_rate_calibration.config import (
     ENOTATION_PATTERN,
     PREDICTOR_PROMPT,
     RL_PREDICTOR,
+    RL_PROTECTED_CHECKPOINT_STEPS,
     SERIES_COLORS,
     SPLITS,
     WANDB_PROJECT,
@@ -55,6 +56,7 @@ SWEEPS: tuple[RLSweep, ...] = (
     "long",
     "round2",
     "collapse-check",
+    "extend-3e-5",
 )
 
 
@@ -844,8 +846,12 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
             metrics["time/eval_seconds"] = time.perf_counter() - evaluated_at
         if checkpointed:
             previous = {
-                state[key] for key in ("state_path", "sampler_path") if key in state
+                key: state[key]
+                for key in ("step", "state_path", "sampler_path")
+                if key in state
             }
+            if previous.get("step") in RL_PROTECTED_CHECKPOINT_STEPS:
+                state["protected"] = [*state.get("protected", []), previous]
             state |= {
                 "step": step,
                 "sampler_path": sampler_path,
@@ -855,8 +861,13 @@ def train(*, root: Path, sweep: RLSweep, run: RLRun) -> None:
                 .path,
             }
             write_json(path=state_path, payload=state)
-            for path in previous - {state["state_path"], state["sampler_path"]}:
-                rest.delete_checkpoint_from_tinker_path(path).result()
+            if previous and previous["step"] not in RL_PROTECTED_CHECKPOINT_STEPS:
+                for key in ("state_path", "sampler_path"):
+                    if previous[key] not in (
+                        state["state_path"],
+                        state["sampler_path"],
+                    ):
+                        rest.delete_checkpoint_from_tinker_path(previous[key]).result()
         metrics["time/step_seconds"] = time.perf_counter() - began
         metrics["cost/cumulative_usd"] = (
             history[-1]["cost/cumulative_usd"]
